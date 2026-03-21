@@ -224,7 +224,9 @@ static schema_node_ptr compile_node(dom::element el,
 
   // Boolean schema
   if (el.is<bool>()) {
-    node->boolean_schema = bool(el);
+    bool bval;
+    el.get(bval);
+    node->boolean_schema = bval;
     return node;
   }
 
@@ -232,7 +234,8 @@ static schema_node_ptr compile_node(dom::element el,
     return node;
   }
 
-  auto obj = dom::object(el);
+  dom::object obj;
+  el.get(obj);
 
   // $ref
   dom::element ref_el;
@@ -251,7 +254,7 @@ static schema_node_ptr compile_node(dom::element el,
       type_el.get(sv);
       node->types.emplace_back(sv);
     } else if (type_el.is<dom::array>()) {
-      for (auto t : dom::array(type_el)) {
+      dom::array type_arr; type_el.get(type_arr); for (auto t : type_arr) {
         std::string_view sv;
         if (t.get(sv) == SUCCESS) {
           node->types.emplace_back(sv);
@@ -323,7 +326,7 @@ static schema_node_ptr compile_node(dom::element el,
   // prefixItems (Draft 2020-12)
   dom::element pi_el;
   if (obj["prefixItems"].get(pi_el) == SUCCESS && pi_el.is<dom::array>()) {
-    for (auto item : dom::array(pi_el)) {
+    dom::array pi_arr; pi_el.get(pi_arr); for (auto item : pi_arr) {
       node->prefix_items.push_back(compile_node(item, ctx));
     }
   }
@@ -351,14 +354,14 @@ static schema_node_ptr compile_node(dom::element el,
   // object constraints
   dom::element props_el;
   if (obj["properties"].get(props_el) == SUCCESS && props_el.is<dom::object>()) {
-    for (auto [key, val] : dom::object(props_el)) {
+    dom::object props_obj; props_el.get(props_obj); for (auto [key, val] : props_obj) {
       node->properties[std::string(key)] = compile_node(val, ctx);
     }
   }
 
   dom::element req_el;
   if (obj["required"].get(req_el) == SUCCESS && req_el.is<dom::array>()) {
-    for (auto r : dom::array(req_el)) {
+    dom::array req_arr; req_el.get(req_arr); for (auto r : req_arr) {
       std::string_view sv;
       if (r.get(sv) == SUCCESS) {
         node->required.emplace_back(sv);
@@ -369,7 +372,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element ap_el;
   if (obj["additionalProperties"].get(ap_el) == SUCCESS) {
     if (ap_el.is<bool>()) {
-      node->additional_properties_bool = bool(ap_el);
+      bool ap_bool; ap_el.get(ap_bool); node->additional_properties_bool = ap_bool;
     } else {
       node->additional_properties_schema = compile_node(ap_el, ctx);
     }
@@ -394,10 +397,10 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element dr_el;
   if (obj["dependentRequired"].get(dr_el) == SUCCESS &&
       dr_el.is<dom::object>()) {
-    for (auto [key, val] : dom::object(dr_el)) {
+    dom::object dr_obj; dr_el.get(dr_obj); for (auto [key, val] : dr_obj) {
       std::vector<std::string> deps;
       if (val.is<dom::array>()) {
-        for (auto d : dom::array(val)) {
+        dom::array val_arr; val.get(val_arr); for (auto d : val_arr) {
           std::string_view sv;
           if (d.get(sv) == SUCCESS) deps.emplace_back(sv);
         }
@@ -410,7 +413,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element ds_el;
   if (obj["dependentSchemas"].get(ds_el) == SUCCESS &&
       ds_el.is<dom::object>()) {
-    for (auto [key, val] : dom::object(ds_el)) {
+    dom::object ds_obj; ds_el.get(ds_obj); for (auto [key, val] : ds_obj) {
       node->dependent_schemas[std::string(key)] = compile_node(val, ctx);
     }
   }
@@ -419,7 +422,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element pp_el;
   if (obj["patternProperties"].get(pp_el) == SUCCESS &&
       pp_el.is<dom::object>()) {
-    for (auto [key, val] : dom::object(pp_el)) {
+    dom::object pp_obj; pp_el.get(pp_obj); for (auto [key, val] : pp_obj) {
       node->pattern_properties.emplace_back(std::string(key),
                                              compile_node(val, ctx));
     }
@@ -446,7 +449,7 @@ static schema_node_ptr compile_node(dom::element el,
   if (obj["enum"].get(enum_el) == SUCCESS) {
     node->enum_values_raw = std::string(minify(enum_el));
     if (enum_el.is<dom::array>()) {
-      for (auto e : dom::array(enum_el)) {
+      dom::array enum_arr; enum_el.get(enum_arr); for (auto e : enum_arr) {
         node->enum_values_minified.push_back(std::string(minify(e)));
       }
     }
@@ -461,17 +464,20 @@ static schema_node_ptr compile_node(dom::element el,
   // composition
   dom::element comp_el;
   if (obj["allOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    for (auto s : dom::array(comp_el)) {
+    dom::array comp_arr; comp_el.get(comp_arr);
+    for (auto s : comp_arr) {
       node->all_of.push_back(compile_node(s, ctx));
     }
   }
   if (obj["anyOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    for (auto s : dom::array(comp_el)) {
+    dom::array comp_arr2; comp_el.get(comp_arr2);
+    for (auto s : comp_arr2) {
       node->any_of.push_back(compile_node(s, ctx));
     }
   }
   if (obj["oneOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    for (auto s : dom::array(comp_el)) {
+    dom::array comp_arr3; comp_el.get(comp_arr3);
+    for (auto s : comp_arr3) {
       node->one_of.push_back(compile_node(s, ctx));
     }
   }
@@ -497,14 +503,14 @@ static schema_node_ptr compile_node(dom::element el,
   // $defs / definitions
   dom::element defs_el;
   if (obj["$defs"].get(defs_el) == SUCCESS && defs_el.is<dom::object>()) {
-    for (auto [key, val] : dom::object(defs_el)) {
+    dom::object defs_obj; defs_el.get(defs_obj); for (auto [key, val] : defs_obj) {
       std::string def_path = "#/$defs/" + std::string(key);
       ctx.defs[def_path] = compile_node(val, ctx);
     }
   }
   if (obj["definitions"].get(defs_el) == SUCCESS &&
       defs_el.is<dom::object>()) {
-    for (auto [key, val] : dom::object(defs_el)) {
+    dom::object defs_obj; defs_el.get(defs_obj); for (auto [key, val] : defs_obj) {
       std::string def_path = "#/definitions/" + std::string(key);
       ctx.defs[def_path] = compile_node(val, ctx);
     }
@@ -828,7 +834,7 @@ static void validate_node(const schema_node_ptr& node,
 
   // Array validations
   if (actual_type == "array" && value.is<dom::array>()) {
-    auto arr = dom::array(value);
+    dom::array arr; value.get(arr);
     uint64_t arr_size = 0;
     for ([[maybe_unused]] auto _ : arr) ++arr_size;
 
@@ -901,7 +907,7 @@ static void validate_node(const schema_node_ptr& node,
 
   // Object validations
   if (actual_type == "object" && value.is<dom::object>()) {
-    auto obj = dom::object(value);
+    dom::object obj; value.get(obj);
     uint64_t prop_count = 0;
     for ([[maybe_unused]] auto _ : obj) ++prop_count;
 
