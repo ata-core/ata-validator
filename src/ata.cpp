@@ -210,12 +210,38 @@ struct schema_node {
   std::optional<bool> boolean_schema;
 };
 
+// --- Codegen: flat bytecode plan ---
+namespace cg {
+enum class op : uint8_t {
+  END=0, EXPECT_OBJECT, EXPECT_ARRAY, EXPECT_STRING, EXPECT_NUMBER,
+  EXPECT_INTEGER, EXPECT_BOOLEAN, EXPECT_NULL, EXPECT_TYPE_MULTI,
+  CHECK_MINIMUM, CHECK_MAXIMUM, CHECK_EX_MINIMUM, CHECK_EX_MAXIMUM,
+  CHECK_MULTIPLE_OF, CHECK_MIN_LENGTH, CHECK_MAX_LENGTH, CHECK_PATTERN,
+  CHECK_FORMAT, CHECK_MIN_ITEMS, CHECK_MAX_ITEMS, CHECK_UNIQUE_ITEMS,
+  ARRAY_ITEMS, CHECK_REQUIRED, CHECK_MIN_PROPS, CHECK_MAX_PROPS,
+  OBJ_PROPS_START, OBJ_PROP, OBJ_PROPS_END, CHECK_NO_ADDITIONAL,
+  CHECK_ENUM_STR, CHECK_ENUM, CHECK_CONST, COMPOSITION,
+};
+struct ins { op o; uint32_t a=0, b=0; };
+struct plan {
+  std::vector<ins> code;
+  std::vector<double> doubles;
+  std::vector<std::string> strings;
+  std::vector<std::shared_ptr<std::regex>> regexes;
+  std::vector<std::vector<std::string>> enum_sets;
+  std::vector<std::vector<std::string>> type_sets;
+  std::vector<uint8_t> format_ids;
+  std::vector<std::vector<ins>> subs;
+};
+}  // namespace cg
+
 struct compiled_schema {
   schema_node_ptr root;
   std::unordered_map<std::string, schema_node_ptr> defs;
   std::string raw_schema;
   dom::parser parser;
-  dom::parser doc_parser;  // reusable parser for document validation
+  dom::parser doc_parser;
+  cg::plan gen_plan;  // codegen validation plan
 };
 
 // --- Schema compilation ---
@@ -1102,6 +1128,185 @@ static void validate_node(const schema_node_ptr& node,
   }
 }
 
+// --- Codegen compiler ---
+static void cg_compile(const schema_node* n, cg::plan& p,
+                        std::vector<cg::ins>& out) {
+  if (!n) return;
+  if (n->boolean_schema.has_value()) {
+    if (!*n->boolean_schema) out.push_back({cg::op::EXPECT_NULL});
+    return;
+  }
+  // Composition fallback
+  if (!n->ref.empty() || !n->all_of.empty() || !n->any_of.empty() ||
+      !n->one_of.empty() || n->not_schema || n->if_schema) {
+    uintptr_t ptr = reinterpret_cast<uintptr_t>(n);
+    out.push_back({cg::op::COMPOSITION, (uint32_t)(ptr & 0xFFFFFFFF),
+                   (uint32_t)((ptr >> 32) & 0xFFFFFFFF)});
+    return;
+  }
+  // Type
+  if (!n->types.empty()) {
+    if (n->types.size() == 1) {
+      auto& t = n->types[0];
+      if (t=="object") out.push_back({cg::op::EXPECT_OBJECT});
+      else if (t=="array") out.push_back({cg::op::EXPECT_ARRAY});
+      else if (t=="string") out.push_back({cg::op::EXPECT_STRING});
+      else if (t=="number") out.push_back({cg::op::EXPECT_NUMBER});
+      else if (t=="integer") out.push_back({cg::op::EXPECT_INTEGER});
+      else if (t=="boolean") out.push_back({cg::op::EXPECT_BOOLEAN});
+      else if (t=="null") out.push_back({cg::op::EXPECT_NULL});
+    } else {
+      uint32_t i = (uint32_t)p.type_sets.size();
+      p.type_sets.push_back(n->types);
+      out.push_back({cg::op::EXPECT_TYPE_MULTI, i});
+    }
+  }
+  // Enum
+  if (!n->enum_values_minified.empty()) {
+    bool all_str = true;
+    for (auto& e : n->enum_values_minified)
+      if (e.empty() || e[0]!='"') { all_str=false; break; }
+    uint32_t i = (uint32_t)p.enum_sets.size();
+    p.enum_sets.push_back(n->enum_values_minified);
+    out.push_back({all_str ? cg::op::CHECK_ENUM_STR : cg::op::CHECK_ENUM, i});
+  }
+  if (n->const_value_raw.has_value()) {
+    uint32_t i=(uint32_t)p.strings.size();
+    p.strings.push_back(*n->const_value_raw);
+    out.push_back({cg::op::CHECK_CONST, i});
+  }
+  // Numeric
+  if (n->minimum.has_value()) { uint32_t i=(uint32_t)p.doubles.size(); p.doubles.push_back(*n->minimum); out.push_back({cg::op::CHECK_MINIMUM,i}); }
+  if (n->maximum.has_value()) { uint32_t i=(uint32_t)p.doubles.size(); p.doubles.push_back(*n->maximum); out.push_back({cg::op::CHECK_MAXIMUM,i}); }
+  if (n->exclusive_minimum.has_value()) { uint32_t i=(uint32_t)p.doubles.size(); p.doubles.push_back(*n->exclusive_minimum); out.push_back({cg::op::CHECK_EX_MINIMUM,i}); }
+  if (n->exclusive_maximum.has_value()) { uint32_t i=(uint32_t)p.doubles.size(); p.doubles.push_back(*n->exclusive_maximum); out.push_back({cg::op::CHECK_EX_MAXIMUM,i}); }
+  if (n->multiple_of.has_value()) { uint32_t i=(uint32_t)p.doubles.size(); p.doubles.push_back(*n->multiple_of); out.push_back({cg::op::CHECK_MULTIPLE_OF,i}); }
+  // String
+  if (n->min_length.has_value()) out.push_back({cg::op::CHECK_MIN_LENGTH,(uint32_t)*n->min_length});
+  if (n->max_length.has_value()) out.push_back({cg::op::CHECK_MAX_LENGTH,(uint32_t)*n->max_length});
+  if (n->compiled_pattern) { uint32_t i=(uint32_t)p.regexes.size(); p.regexes.push_back(n->compiled_pattern); out.push_back({cg::op::CHECK_PATTERN,i}); }
+  if (n->format.has_value()) {
+    uint32_t i=(uint32_t)p.format_ids.size();
+    uint8_t fid=255;
+    auto& f=*n->format;
+    if(f=="email")fid=0;else if(f=="date")fid=1;else if(f=="date-time")fid=2;
+    else if(f=="time")fid=3;else if(f=="ipv4")fid=4;else if(f=="ipv6")fid=5;
+    else if(f=="uri"||f=="uri-reference")fid=6;else if(f=="uuid")fid=7;
+    else if(f=="hostname")fid=8;
+    p.format_ids.push_back(fid);
+    out.push_back({cg::op::CHECK_FORMAT,i});
+  }
+  // Array
+  if (n->min_items.has_value()) out.push_back({cg::op::CHECK_MIN_ITEMS,(uint32_t)*n->min_items});
+  if (n->max_items.has_value()) out.push_back({cg::op::CHECK_MAX_ITEMS,(uint32_t)*n->max_items});
+  if (n->unique_items) out.push_back({cg::op::CHECK_UNIQUE_ITEMS});
+  if (n->items_schema) {
+    uint32_t si=(uint32_t)p.subs.size();
+    p.subs.emplace_back();
+    std::vector<cg::ins> sub_code;
+    cg_compile(n->items_schema.get(), p, sub_code);
+    sub_code.push_back({cg::op::END});
+    p.subs[si] = std::move(sub_code);
+    out.push_back({cg::op::ARRAY_ITEMS, si});
+  }
+  // Object
+  for (auto& r : n->required) { uint32_t i=(uint32_t)p.strings.size(); p.strings.push_back(r); out.push_back({cg::op::CHECK_REQUIRED,i}); }
+  if (n->min_properties.has_value()) out.push_back({cg::op::CHECK_MIN_PROPS,(uint32_t)*n->min_properties});
+  if (n->max_properties.has_value()) out.push_back({cg::op::CHECK_MAX_PROPS,(uint32_t)*n->max_properties});
+  if (n->additional_properties_bool.has_value() && !*n->additional_properties_bool)
+    out.push_back({cg::op::CHECK_NO_ADDITIONAL});
+  if (!n->properties.empty()) {
+    out.push_back({cg::op::OBJ_PROPS_START});
+    for (auto& [name, schema] : n->properties) {
+      uint32_t ni=(uint32_t)p.strings.size(); p.strings.push_back(name);
+      uint32_t si=(uint32_t)p.subs.size();
+      p.subs.emplace_back();
+      std::vector<cg::ins> sub_code;
+      cg_compile(schema.get(), p, sub_code);
+      sub_code.push_back({cg::op::END});
+      p.subs[si] = std::move(sub_code);
+      out.push_back({cg::op::OBJ_PROP, ni, si});
+    }
+    out.push_back({cg::op::OBJ_PROPS_END});
+  }
+}
+
+// --- Codegen executor ---
+static const char* fmt_names[]={"email","date","date-time","time","ipv4","ipv6","uri","uuid","hostname"};
+
+static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
+                     dom::element value) {
+  auto t = type_of_sv(value);
+  for (size_t i=0; i<code.size(); ++i) {
+    auto& c = code[i];
+    switch(c.o) {
+    case cg::op::END: return true;
+    case cg::op::EXPECT_OBJECT: if(t!="object") return false; break;
+    case cg::op::EXPECT_ARRAY: if(t!="array") return false; break;
+    case cg::op::EXPECT_STRING: if(t!="string") return false; break;
+    case cg::op::EXPECT_NUMBER: if(t!="number"&&t!="integer") return false; break;
+    case cg::op::EXPECT_INTEGER: if(t!="integer") return false; break;
+    case cg::op::EXPECT_BOOLEAN: if(t!="boolean") return false; break;
+    case cg::op::EXPECT_NULL: if(t!="null") return false; break;
+    case cg::op::EXPECT_TYPE_MULTI: {
+      auto& ts=p.type_sets[c.a]; bool m=false;
+      for(auto& ty:ts){if(t==ty||(ty=="number"&&(t=="integer"||t=="number"))){m=true;break;}}
+      if(!m) return false; break;
+    }
+    case cg::op::CHECK_MINIMUM: if(t=="integer"||t=="number"){if(to_double(value)<p.doubles[c.a])return false;} break;
+    case cg::op::CHECK_MAXIMUM: if(t=="integer"||t=="number"){if(to_double(value)>p.doubles[c.a])return false;} break;
+    case cg::op::CHECK_EX_MINIMUM: if(t=="integer"||t=="number"){if(to_double(value)<=p.doubles[c.a])return false;} break;
+    case cg::op::CHECK_EX_MAXIMUM: if(t=="integer"||t=="number"){if(to_double(value)>=p.doubles[c.a])return false;} break;
+    case cg::op::CHECK_MULTIPLE_OF: if(t=="integer"||t=="number"){double v=to_double(value),d=p.doubles[c.a],r=std::fmod(v,d);if(std::abs(r)>1e-8&&std::abs(r-d)>1e-8)return false;} break;
+    case cg::op::CHECK_MIN_LENGTH: if(t=="string"){std::string_view sv;value.get(sv);if(utf8_length(sv)<c.a)return false;} break;
+    case cg::op::CHECK_MAX_LENGTH: if(t=="string"){std::string_view sv;value.get(sv);if(utf8_length(sv)>c.a)return false;} break;
+    case cg::op::CHECK_PATTERN: if(t=="string"){std::string_view sv;value.get(sv);if(!std::regex_search(sv.begin(),sv.end(),*p.regexes[c.a]))return false;} break;
+    case cg::op::CHECK_FORMAT: if(t=="string"){std::string_view sv;value.get(sv);uint8_t f=p.format_ids[c.a];if(f<9&&!check_format(sv,fmt_names[f]))return false;} break;
+    case cg::op::CHECK_MIN_ITEMS: if(t=="array"){dom::array a;value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s<c.a)return false;} break;
+    case cg::op::CHECK_MAX_ITEMS: if(t=="array"){dom::array a;value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s>c.a)return false;} break;
+    case cg::op::CHECK_UNIQUE_ITEMS: if(t=="array"){dom::array a;value.get(a);std::set<std::string> seen;for(auto x:a)if(!seen.insert(std::string(minify(x))).second)return false;} break;
+    case cg::op::ARRAY_ITEMS: if(t=="array"){dom::array a;value.get(a);for(auto x:a)if(!cg_exec(p,p.subs[c.a],x))return false;} break;
+    case cg::op::CHECK_REQUIRED: if(t=="object"){dom::object o;value.get(o);dom::element d;if(o[p.strings[c.a]].get(d)!=SUCCESS)return false;} break;
+    case cg::op::CHECK_MIN_PROPS: if(t=="object"){dom::object o;value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n<c.a)return false;} break;
+    case cg::op::CHECK_MAX_PROPS: if(t=="object"){dom::object o;value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n>c.a)return false;} break;
+    case cg::op::OBJ_PROPS_START: if(t=="object"){
+      dom::object o; value.get(o);
+      // collect prop defs
+      struct pd{std::string_view nm;uint32_t si;};
+      std::vector<pd> props; bool no_add=false;
+      size_t j=i+1;
+      for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j){
+        if(code[j].o==cg::op::OBJ_PROP) props.push_back({p.strings[code[j].a],code[j].b});
+        else if(code[j].o==cg::op::CHECK_NO_ADDITIONAL) no_add=true;
+      }
+      for(auto [key,val]:o){
+        bool matched=false;
+        for(auto& pp:props){if(key==pp.nm){if(!cg_exec(p,p.subs[pp.si],val))return false;matched=true;break;}}
+        if(!matched&&no_add)return false;
+      }
+      i=j; break;
+    } else { /* skip to OBJ_PROPS_END */ size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j); i=j; } break;
+    case cg::op::OBJ_PROP: case cg::op::OBJ_PROPS_END: case cg::op::CHECK_NO_ADDITIONAL: break;
+    case cg::op::CHECK_ENUM_STR: {
+      auto& es=p.enum_sets[c.a]; bool f=false;
+      if(t=="string"){std::string_view sv;value.get(sv);for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
+      if(!f){std::string v=std::string(minify(value));for(auto& e:es)if(e==v){f=true;break;}}
+      if(!f)return false; break;
+    }
+    case cg::op::CHECK_ENUM: {
+      auto& es=p.enum_sets[c.a]; bool f=false;
+      if(t=="string"){std::string_view sv;value.get(sv);for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
+      if(!f&&value.is<int64_t>()){int64_t v;value.get(v);auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
+      if(!f){std::string v=std::string(minify(value));for(auto& e:es)if(e==v){f=true;break;}}
+      if(!f)return false; break;
+    }
+    case cg::op::CHECK_CONST: if(std::string(minify(value))!=p.strings[c.a])return false; break;
+    case cg::op::COMPOSITION: return false; // fallback to tree walker
+    }
+  }
+  return true;
+}
+
 schema_ref compile(std::string_view schema_json) {
   auto ctx = std::make_shared<compiled_schema>();
   ctx->raw_schema = std::string(schema_json);
@@ -1114,6 +1319,10 @@ schema_ref compile(std::string_view schema_json) {
   doc = result.value();
 
   ctx->root = compile_node(doc, *ctx);
+
+  // Generate codegen plan
+  cg_compile(ctx->root.get(), ctx->gen_plan, ctx->gen_plan.code);
+  ctx->gen_plan.code.push_back({cg::op::END});
 
   schema_ref ref;
   ref.impl = ctx;
@@ -1133,10 +1342,20 @@ validation_result validate(const schema_ref& schema, std::string_view json,
     return {false, {{error_code::invalid_json, "", "invalid JSON document"}}};
   }
 
-  // Fast path: validate without building error details
+  // Fast path: codegen bytecode execution
+  if (!schema.impl->gen_plan.code.empty()) {
+    if (cg_exec(schema.impl->gen_plan, schema.impl->gen_plan.code,
+                result.value())) {
+      return {true, {}};
+    }
+    // Codegen said invalid OR hit COMPOSITION — fall through to tree walker
+  }
+
+  // Slow path: tree walker with error details
+  auto result2 = doc_parser.parse(padded);
   std::vector<validation_error> errors;
-  validate_node(schema.impl->root, result.value(), "", *schema.impl, errors,
-                false);  // all_errors=false for fast early termination
+  validate_node(schema.impl->root, result2.value(), "", *schema.impl, errors,
+                opts.all_errors);
 
   return {errors.empty(), std::move(errors)};
 }

@@ -68,7 +68,7 @@ function makeData(userCount) {
       },
     });
   }
-  return { users, metadata: { total: userCount, page: 1, perPage: userCount } };
+  return { users, metadata: { total: userCount, page: 1, perPage: Math.min(userCount, 100) } };
 }
 
 function bench(label, iterations, fn) {
