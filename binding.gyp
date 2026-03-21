@@ -26,6 +26,13 @@
             "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
             "MACOSX_DEPLOYMENT_TARGET": "12.0"
           }
+        }],
+        ["OS=='win'", {
+          "msvs_settings": {
+            "VCCLCompilerTool": {
+              "AdditionalOptions": ["/std:c++20", "/EHsc"]
+            }
+          }
         }]
       ]
     }
