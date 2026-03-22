@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.28)
 project(ata VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -16,7 +16,30 @@ FetchContent_Declare(
   GIT_TAG v3.12.2
   GIT_SHALLOW TRUE
 )
-FetchContent_MakeAvailable(simdjson)
+
+# RE2 — fast regex engine (replaces std::regex)
+set(RE2_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+  re2
+  GIT_REPOSITORY https://github.com/google/re2.git
+  GIT_TAG 2024-07-02
+  GIT_SHALLOW TRUE
+  EXCLUDE_FROM_ALL
+)
+
+# Abseil — required by RE2
+set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "" FORCE)
+set(ABSL_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(ABSL_ENABLE_INSTALL ON CACHE BOOL "" FORCE)
+FetchContent_Declare(
+  abseil-cpp
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+  GIT_TAG 20240722.0
+  GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(abseil-cpp)
+FetchContent_MakeAvailable(simdjson re2)
 
 # Core library
 add_library(ata
@@ -24,7 +47,7 @@ add_library(ata
   src/ata_c.cpp
 )
 target_include_directories(ata PUBLIC include)
-target_link_libraries(ata PRIVATE simdjson)
+target_link_libraries(ata PRIVATE simdjson re2)
 add_library(ata::ata ALIAS ata)
 
 if(ATA_SANITIZE)

@@ -1,7 +1,7 @@
 #include <napi.h>
 
 #include <cmath>
-#include <regex>
+#include <re2/re2.h>
 #include <set>
 #include <string>
 #include <vector>
@@ -31,7 +31,7 @@ struct schema_node {
   std::optional<uint64_t> min_length;
   std::optional<uint64_t> max_length;
   std::optional<std::string> pattern;
-  std::shared_ptr<std::regex> compiled_pattern;
+  std::shared_ptr<re2::RE2> compiled_pattern;
 
   std::optional<uint64_t> min_items;
   std::optional<uint64_t> max_items;
@@ -55,7 +55,7 @@ struct schema_node {
   struct pattern_prop {
     std::string pattern;
     schema_node_ptr schema;
-    std::shared_ptr<std::regex> compiled;
+    std::shared_ptr<re2::RE2> compiled;
   };
   std::vector<pattern_prop> pattern_properties;
 
@@ -83,6 +83,89 @@ struct compiled_schema_internal {
   schema_node_ptr root;
   std::unordered_map<std::string, schema_node_ptr> defs;
 };
+
+// --- Fast format validators (no regex) ---
+
+static bool nb_is_digit(char c) { return c >= '0' && c <= '9'; }
+static bool nb_is_alpha(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+static bool nb_is_alnum(char c) { return nb_is_alpha(c) || nb_is_digit(c); }
+static bool nb_is_hex(char c) {
+  return nb_is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+static bool napi_check_format(const std::string& sv, const std::string& fmt) {
+  if (fmt == "email") {
+    auto at = sv.find('@');
+    if (at == std::string::npos || at == 0 || at == sv.size() - 1) return false;
+    auto dot = sv.find('.', at + 1);
+    return dot != std::string::npos && dot != at + 1 && dot != sv.size() - 1 &&
+           (sv.size() - dot - 1) >= 2;
+  }
+  if (fmt == "date") {
+    return sv.size() == 10 && nb_is_digit(sv[0]) && nb_is_digit(sv[1]) &&
+           nb_is_digit(sv[2]) && nb_is_digit(sv[3]) && sv[4] == '-' &&
+           nb_is_digit(sv[5]) && nb_is_digit(sv[6]) && sv[7] == '-' &&
+           nb_is_digit(sv[8]) && nb_is_digit(sv[9]);
+  }
+  if (fmt == "time") {
+    if (sv.size() < 8) return false;
+    return nb_is_digit(sv[0]) && nb_is_digit(sv[1]) && sv[2] == ':' &&
+           nb_is_digit(sv[3]) && nb_is_digit(sv[4]) && sv[5] == ':' &&
+           nb_is_digit(sv[6]) && nb_is_digit(sv[7]);
+  }
+  if (fmt == "date-time") {
+    if (sv.size() < 19) return false;
+    if (!napi_check_format(sv.substr(0, 10), "date")) return false;
+    if (sv[10] != 'T' && sv[10] != 't' && sv[10] != ' ') return false;
+    return napi_check_format(sv.substr(11), "time");
+  }
+  if (fmt == "ipv4") {
+    int parts = 0, val = 0, digits = 0;
+    for (size_t i = 0; i <= sv.size(); ++i) {
+      if (i == sv.size() || sv[i] == '.') {
+        if (digits == 0 || val > 255) return false;
+        ++parts; val = 0; digits = 0;
+      } else if (nb_is_digit(sv[i])) {
+        val = val * 10 + (sv[i] - '0'); ++digits;
+        if (digits > 3) return false;
+      } else {
+        return false;
+      }
+    }
+    return parts == 4;
+  }
+  if (fmt == "ipv6") return sv.find(':') != std::string::npos;
+  if (fmt == "uri" || fmt == "uri-reference") {
+    if (sv.size() < 3 || !nb_is_alpha(sv[0])) return false;
+    size_t i = 1;
+    while (i < sv.size() && (nb_is_alnum(sv[i]) || sv[i] == '+' || sv[i] == '-' || sv[i] == '.')) ++i;
+    return i < sv.size() && sv[i] == ':' && i + 1 < sv.size();
+  }
+  if (fmt == "uuid") {
+    if (sv.size() != 36) return false;
+    for (size_t i = 0; i < 36; ++i) {
+      if (i == 8 || i == 13 || i == 18 || i == 23) {
+        if (sv[i] != '-') return false;
+      } else {
+        if (!nb_is_hex(sv[i])) return false;
+      }
+    }
+    return true;
+  }
+  if (fmt == "hostname") {
+    if (sv.empty() || sv.size() > 253) return false;
+    size_t label_len = 0;
+    for (size_t i = 0; i < sv.size(); ++i) {
+      if (sv[i] == '.') { if (label_len == 0) return false; label_len = 0; }
+      else if (nb_is_alnum(sv[i]) || sv[i] == '-') { ++label_len; if (label_len > 63) return false; }
+      else return false;
+    }
+    return label_len > 0;
+  }
+  return true;
+}
 
 // --- V8 Direct Validator ---
 
@@ -367,7 +450,7 @@ static void validate_napi(const schema_node_ptr& node,
                             std::to_string(node->max_length.value())});
     }
     if (node->compiled_pattern) {
-      if (!std::regex_search(sv, *node->compiled_pattern)) {
+      if (!re2::RE2::PartialMatch(sv, *node->compiled_pattern)) {
         errors.push_back({ata::error_code::pattern_mismatch, path,
                           "string does not match pattern: " +
                               node->pattern.value()});
@@ -375,40 +458,7 @@ static void validate_napi(const schema_node_ptr& node,
     }
     if (node->format.has_value()) {
       const auto& fmt = node->format.value();
-      bool format_ok = true;
-      if (fmt == "email") {
-        static const std::regex email_re(
-            R"([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})");
-        format_ok = std::regex_match(sv, email_re);
-      } else if (fmt == "uri" || fmt == "uri-reference") {
-        static const std::regex uri_re(R"([a-zA-Z][a-zA-Z0-9+\-.]*:.+)");
-        format_ok = std::regex_match(sv, uri_re);
-      } else if (fmt == "date") {
-        static const std::regex date_re(R"(\d{4}-\d{2}-\d{2})");
-        format_ok = std::regex_match(sv, date_re);
-      } else if (fmt == "date-time") {
-        static const std::regex dt_re(
-            R"(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+\-]\d{2}:\d{2})?)");
-        format_ok = std::regex_match(sv, dt_re);
-      } else if (fmt == "time") {
-        static const std::regex time_re(
-            R"(\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+\-]\d{2}:\d{2})?)");
-        format_ok = std::regex_match(sv, time_re);
-      } else if (fmt == "ipv4") {
-        static const std::regex ipv4_re(
-            R"((\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}))");
-        format_ok = std::regex_match(sv, ipv4_re);
-      } else if (fmt == "ipv6") {
-        format_ok = sv.find(':') != std::string::npos;
-      } else if (fmt == "uuid") {
-        static const std::regex uuid_re(
-            R"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
-        format_ok = std::regex_match(sv, uuid_re);
-      } else if (fmt == "hostname") {
-        static const std::regex host_re(
-            R"([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*)");
-        format_ok = std::regex_match(sv, host_re);
-      }
+      bool format_ok = napi_check_format(sv, fmt);
       if (!format_ok) {
         errors.push_back({ata::error_code::format_mismatch, path,
                           "string does not match format: " + fmt});
@@ -527,7 +577,7 @@ static void validate_napi(const schema_node_ptr& node,
       }
 
       for (const auto& pp : node->pattern_properties) {
-        if (pp.compiled && std::regex_search(key_str, *pp.compiled)) {
+        if (pp.compiled && re2::RE2::PartialMatch(key_str, *pp.compiled)) {
           validate_napi(pp.schema, val, env, path + "/" + key_str, ctx,
                         errors);
           matched = true;

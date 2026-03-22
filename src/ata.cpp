@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <regex>
+#include <re2/re2.h>
 #include <set>
 #include <unordered_map>
 
@@ -153,7 +153,7 @@ struct schema_node {
   std::optional<uint64_t> min_length;
   std::optional<uint64_t> max_length;
   std::optional<std::string> pattern;
-  std::shared_ptr<std::regex> compiled_pattern;  // cached compiled regex
+  std::shared_ptr<re2::RE2> compiled_pattern;  // cached compiled regex (RE2)
 
   // array
   std::optional<uint64_t> min_items;
@@ -180,7 +180,7 @@ struct schema_node {
   struct pattern_prop {
     std::string pattern;
     schema_node_ptr schema;
-    std::shared_ptr<std::regex> compiled;
+    std::shared_ptr<re2::RE2> compiled;
   };
   std::vector<pattern_prop> pattern_properties;
 
@@ -227,7 +227,7 @@ struct plan {
   std::vector<ins> code;
   std::vector<double> doubles;
   std::vector<std::string> strings;
-  std::vector<std::shared_ptr<std::regex>> regexes;
+  std::vector<std::shared_ptr<re2::RE2>> regexes;
   std::vector<std::vector<std::string>> enum_sets;
   std::vector<std::vector<std::string>> type_sets;
   std::vector<uint8_t> format_ids;
@@ -331,17 +331,9 @@ static schema_node_ptr compile_node(dom::element el,
     std::string_view sv;
     if (str_el.get(sv) == SUCCESS) {
       node->pattern = std::string(sv);
-      // Skip patterns with Unicode property escapes (\p{...}) —
-      // std::regex doesn't support them and may abort on some platforms
-      bool safe_pattern = node->pattern.value().find("\\p{") == std::string::npos &&
-                          node->pattern.value().find("\\P{") == std::string::npos;
-      if (safe_pattern) {
-        try {
-          node->compiled_pattern =
-              std::make_shared<std::regex>(node->pattern.value());
-        } catch (...) {
-          // Invalid regex — leave compiled_pattern null
-        }
+      auto re = std::make_shared<re2::RE2>(node->pattern.value());
+      if (re->ok()) {
+        node->compiled_pattern = std::move(re);
       }
     }
   }
@@ -464,13 +456,9 @@ static schema_node_ptr compile_node(dom::element el,
       schema_node::pattern_prop pp;
       pp.pattern = std::string(key);
       pp.schema = compile_node(val, ctx);
-      bool safe = pp.pattern.find("\\p{") == std::string::npos &&
-                  pp.pattern.find("\\P{") == std::string::npos;
-      if (safe) {
-        try {
-          pp.compiled = std::make_shared<std::regex>(pp.pattern);
-        } catch (...) {
-        }
+      auto re = std::make_shared<re2::RE2>(pp.pattern);
+      if (re->ok()) {
+        pp.compiled = std::move(re);
       }
       node->pattern_properties.push_back(std::move(pp));
     }
@@ -864,7 +852,7 @@ static void validate_node(const schema_node_ptr& node,
                             std::to_string(node->max_length.value())});
     }
     if (node->compiled_pattern) {
-      if (!std::regex_search(sv.begin(), sv.end(), *node->compiled_pattern)) {
+      if (!re2::RE2::PartialMatch(re2::StringPiece(sv.data(), sv.size()), *node->compiled_pattern)) {
         errors.push_back({error_code::pattern_mismatch, path,
                           "string does not match pattern: " +
                               node->pattern.value()});
@@ -997,7 +985,7 @@ static void validate_node(const schema_node_ptr& node,
 
       // Check patternProperties (use cached compiled regex)
       for (const auto& pp : node->pattern_properties) {
-        if (pp.compiled && std::regex_search(key_str, *pp.compiled)) {
+        if (pp.compiled && re2::RE2::PartialMatch(key_str, *pp.compiled)) {
           validate_node(pp.schema, val, path + "/" + key_str, ctx, errors, all_errors);
           matched = true;
         }
@@ -1213,10 +1201,15 @@ static void cg_compile(const schema_node* n, cg::plan& p,
   for (auto& r : n->required) { uint32_t i=(uint32_t)p.strings.size(); p.strings.push_back(r); out.push_back({cg::op::CHECK_REQUIRED,i}); }
   if (n->min_properties.has_value()) out.push_back({cg::op::CHECK_MIN_PROPS,(uint32_t)*n->min_properties});
   if (n->max_properties.has_value()) out.push_back({cg::op::CHECK_MAX_PROPS,(uint32_t)*n->max_properties});
-  if (n->additional_properties_bool.has_value() && !*n->additional_properties_bool)
-    out.push_back({cg::op::CHECK_NO_ADDITIONAL});
-  if (!n->properties.empty()) {
+  // additional_properties_schema requires tree walker — bail out to COMPOSITION
+  if (n->additional_properties_schema) {
+    out.push_back({cg::op::COMPOSITION, 0, 0});
+    return;
+  }
+  if (!n->properties.empty() || (n->additional_properties_bool.has_value() && !*n->additional_properties_bool)) {
     out.push_back({cg::op::OBJ_PROPS_START});
+    if (n->additional_properties_bool.has_value() && !*n->additional_properties_bool)
+      out.push_back({cg::op::CHECK_NO_ADDITIONAL});
     for (auto& [name, schema] : n->properties) {
       uint32_t ni=(uint32_t)p.strings.size(); p.strings.push_back(name);
       uint32_t si=(uint32_t)p.subs.size();
@@ -1260,7 +1253,7 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::CHECK_MULTIPLE_OF: if(t=="integer"||t=="number"){double v=to_double(value),d=p.doubles[c.a],r=std::fmod(v,d);if(std::abs(r)>1e-8&&std::abs(r-d)>1e-8)return false;} break;
     case cg::op::CHECK_MIN_LENGTH: if(t=="string"){std::string_view sv;value.get(sv);if(utf8_length(sv)<c.a)return false;} break;
     case cg::op::CHECK_MAX_LENGTH: if(t=="string"){std::string_view sv;value.get(sv);if(utf8_length(sv)>c.a)return false;} break;
-    case cg::op::CHECK_PATTERN: if(t=="string"){std::string_view sv;value.get(sv);if(!std::regex_search(sv.begin(),sv.end(),*p.regexes[c.a]))return false;} break;
+    case cg::op::CHECK_PATTERN: if(t=="string"){std::string_view sv;value.get(sv);if(!re2::RE2::PartialMatch(re2::StringPiece(sv.data(),sv.size()),*p.regexes[c.a]))return false;} break;
     case cg::op::CHECK_FORMAT: if(t=="string"){std::string_view sv;value.get(sv);uint8_t f=p.format_ids[c.a];if(f<9&&!check_format(sv,fmt_names[f]))return false;} break;
     case cg::op::CHECK_MIN_ITEMS: if(t=="array"){dom::array a;value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s<c.a)return false;} break;
     case cg::op::CHECK_MAX_ITEMS: if(t=="array"){dom::array a;value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s>c.a)return false;} break;
