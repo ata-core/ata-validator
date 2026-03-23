@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
         node: [18, 20, 22]
     runs-on: ${{ matrix.os }}
     steps:
@@ -20,6 +20,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+
+      - name: Install RE2 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install re2 abseil
+
+      - name: Install RE2 (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libre2-dev libabsl-dev
 
       - name: Install dependencies
         run: npm install
@@ -33,10 +41,16 @@ jobs:
       - name: Run compat tests
         run: npm run test:compat
 
+      - name: Run Standard Schema tests
+        run: npm run test:standard-schema
+
   test-cpp:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install RE2
+        run: sudo apt-get update && sudo apt-get install -y libre2-dev libabsl-dev
 
       - name: Configure CMake
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -51,19 +65,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Install RE2
+        run: sudo apt-get update && sudo apt-get install -y libre2-dev libabsl-dev
 
       - name: Install dependencies
         run: npm install
 
       - name: Build native addon
         run: npm run build
-
-      - name: Clone JSON Schema Test Suite
-        run: git clone --depth 1 https://github.com/json-schema-org/JSON-Schema-Test-Suite.git tests/suite
 
       - name: Run JSON Schema Test Suite
         run: npm run test:suite

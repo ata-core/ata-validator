@@ -18,8 +18,6 @@ jobs:
             arch: arm64
           - os: macos-13
             arch: x64
-          - os: windows-latest
-            arch: x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +25,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Install RE2 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install re2 abseil
+
+      - name: Install RE2 (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libre2-dev libabsl-dev
 
       - name: Install dependencies
         run: npm install
