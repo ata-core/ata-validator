@@ -626,6 +626,12 @@ static void validate_node(const schema_node_ptr& node,
                            std::vector<validation_error>& errors,
                            bool all_errors = true);
 
+// Fast boolean-only tree walker — no error collection, no string allocation.
+// Uses [[likely]]/[[unlikely]] hints. Returns true if valid.
+static bool validate_fast(const schema_node_ptr& node,
+                           dom::element value,
+                           const compiled_schema& ctx);
+
 // Macro for early termination
 #define ATA_CHECK_EARLY() if (!all_errors && !errors.empty()) return
 
@@ -1200,6 +1206,221 @@ static void validate_node(const schema_node_ptr& node,
   }
 }
 
+// Fast boolean-only tree walker — stripped of all error collection.
+// No std::string allocation, no path tracking, no error messages.
+// Returns true if valid. Uses [[likely]]/[[unlikely]] branch hints.
+static bool validate_fast(const schema_node_ptr& node,
+                           dom::element value,
+                           const compiled_schema& ctx) {
+  if (!node) [[unlikely]] return true;
+
+  if (node->boolean_schema.has_value()) [[unlikely]]
+    return node->boolean_schema.value();
+
+  // $ref
+  if (!node->ref.empty()) [[unlikely]] {
+    auto it = ctx.defs.find(node->ref);
+    if (it != ctx.defs.end()) {
+      if (!validate_fast(it->second, value, ctx)) return false;
+    } else if (node->ref == "#" && ctx.root) {
+      if (!validate_fast(ctx.root, value, ctx)) return false;
+    } else {
+      return false;
+    }
+  }
+
+  // type
+  if (!node->types.empty()) {
+    bool match = false;
+    for (const auto& t : node->types) {
+      if (type_matches(value, t)) { match = true; break; }
+    }
+    if (!match) [[unlikely]] return false;
+  }
+
+  // enum
+  if (!node->enum_values_minified.empty()) {
+    auto val_str = canonical_json(value);
+    bool found = false;
+    for (const auto& ev : node->enum_values_minified) {
+      if (ev == val_str) { found = true; break; }
+    }
+    if (!found) [[unlikely]] return false;
+  }
+
+  // const
+  if (node->const_value_raw.has_value()) {
+    if (canonical_json(value) != node->const_value_raw.value()) [[unlikely]] return false;
+  }
+
+  auto actual_type = type_of_sv(value);
+
+  // Numeric
+  if (actual_type == "integer" || actual_type == "number") {
+    double v = to_double(value);
+    if (node->minimum.has_value() && v < node->minimum.value()) return false;
+    if (node->maximum.has_value() && v > node->maximum.value()) return false;
+    if (node->exclusive_minimum.has_value() && v <= node->exclusive_minimum.value()) return false;
+    if (node->exclusive_maximum.has_value() && v >= node->exclusive_maximum.value()) return false;
+    if (node->multiple_of.has_value()) {
+      double rem = std::fmod(v, node->multiple_of.value());
+      if (std::abs(rem) > 1e-8 && std::abs(rem - node->multiple_of.value()) > 1e-8) return false;
+    }
+  }
+
+  // String
+  if (actual_type == "string") {
+    std::string_view sv;
+    value.get(sv);
+    uint64_t len = utf8_length(sv);
+    if (node->min_length.has_value() && len < node->min_length.value()) return false;
+    if (node->max_length.has_value() && len > node->max_length.value()) return false;
+    if (node->compiled_pattern) {
+      if (!re2::RE2::PartialMatch(re2::StringPiece(sv.data(), sv.size()), *node->compiled_pattern))
+        return false;
+    }
+    if (node->format.has_value() && !check_format(sv, node->format.value())) return false;
+  }
+
+  // Array
+  if (actual_type == "array" && value.is<dom::array>()) {
+    dom::array arr; value.get(arr);
+    uint64_t arr_size = 0;
+    for ([[maybe_unused]] auto _ : arr) ++arr_size;
+
+    if (node->min_items.has_value() && arr_size < node->min_items.value()) return false;
+    if (node->max_items.has_value() && arr_size > node->max_items.value()) return false;
+
+    if (node->unique_items) {
+      std::set<std::string> seen;
+      for (auto item : arr) {
+        if (!seen.insert(canonical_json(item)).second) return false;
+      }
+    }
+
+    { uint64_t idx = 0;
+      for (auto item : arr) {
+        if (idx < node->prefix_items.size()) {
+          if (!validate_fast(node->prefix_items[idx], item, ctx)) return false;
+        } else if (node->items_schema) {
+          if (!validate_fast(node->items_schema, item, ctx)) return false;
+        }
+        ++idx;
+      }
+    }
+
+    if (node->contains_schema) {
+      uint64_t match_count = 0;
+      for (auto item : arr) {
+        if (validate_fast(node->contains_schema, item, ctx)) ++match_count;
+      }
+      uint64_t min_c = node->min_contains.value_or(1);
+      uint64_t max_c = node->max_contains.value_or(arr_size);
+      if (match_count < min_c || match_count > max_c) return false;
+    }
+  }
+
+  // Object
+  if (actual_type == "object" && value.is<dom::object>()) {
+    dom::object obj; value.get(obj);
+
+    if (node->min_properties.has_value() || node->max_properties.has_value()) {
+      uint64_t n = 0;
+      for ([[maybe_unused]] auto _ : obj) ++n;
+      if (node->min_properties.has_value() && n < node->min_properties.value()) return false;
+      if (node->max_properties.has_value() && n > node->max_properties.value()) return false;
+    }
+
+    for (const auto& req : node->required) {
+      dom::element d;
+      if (obj[req].get(d) != SUCCESS) [[unlikely]] return false;
+    }
+
+    for (auto [key, val] : obj) {
+      std::string_view key_sv(key);
+      bool matched = false;
+
+      auto it = node->properties.find(std::string(key_sv));
+      if (it != node->properties.end()) {
+        if (!validate_fast(it->second, val, ctx)) return false;
+        matched = true;
+      }
+
+      for (const auto& pp : node->pattern_properties) {
+        if (pp.compiled && re2::RE2::PartialMatch(
+            re2::StringPiece(key_sv.data(), key_sv.size()), *pp.compiled)) {
+          if (!validate_fast(pp.schema, val, ctx)) return false;
+          matched = true;
+        }
+      }
+
+      if (!matched) {
+        if (node->additional_properties_bool.has_value() &&
+            !node->additional_properties_bool.value()) return false;
+        if (node->additional_properties_schema &&
+            !validate_fast(node->additional_properties_schema, val, ctx)) return false;
+      }
+    }
+
+    for (const auto& [prop, deps] : node->dependent_required) {
+      dom::element d;
+      if (obj[prop].get(d) == SUCCESS) {
+        for (const auto& dep : deps) {
+          dom::element dd;
+          if (obj[dep].get(dd) != SUCCESS) return false;
+        }
+      }
+    }
+
+    for (const auto& [prop, schema] : node->dependent_schemas) {
+      dom::element d;
+      if (obj[prop].get(d) == SUCCESS) {
+        if (!validate_fast(schema, value, ctx)) return false;
+      }
+    }
+  }
+
+  // allOf
+  for (const auto& sub : node->all_of) {
+    if (!validate_fast(sub, value, ctx)) return false;
+  }
+
+  // anyOf
+  if (!node->any_of.empty()) {
+    bool any = false;
+    for (const auto& sub : node->any_of) {
+      if (validate_fast(sub, value, ctx)) { any = true; break; }
+    }
+    if (!any) return false;
+  }
+
+  // oneOf
+  if (!node->one_of.empty()) {
+    int n = 0;
+    for (const auto& sub : node->one_of) {
+      if (validate_fast(sub, value, ctx)) ++n;
+      if (n > 1) return false;
+    }
+    if (n != 1) return false;
+  }
+
+  // not
+  if (node->not_schema) {
+    if (validate_fast(node->not_schema, value, ctx)) return false;
+  }
+
+  // if/then/else
+  if (node->if_schema) {
+    if (validate_fast(node->if_schema, value, ctx)) {
+      if (node->then_schema && !validate_fast(node->then_schema, value, ctx)) return false;
+    } else {
+      if (node->else_schema && !validate_fast(node->else_schema, value, ctx)) return false;
+    }
+  }
+
+  return true;
+}
+
 // --- Codegen compiler ---
 static void cg_compile(const schema_node* n, cg::plan& p,
                         std::vector<cg::ins>& out) {
@@ -1660,9 +1881,8 @@ bool is_valid_prepadded(const schema_ref& schema, const char* data, size_t lengt
     return cg_exec(schema.impl->gen_plan, schema.impl->gen_plan.code, result.value());
   }
 
-  std::vector<validation_error> errors;
-  validate_node(schema.impl->root, result.value(), "", *schema.impl, errors, false);
-  return errors.empty();
+  // Use fast boolean-only tree walker — no error collection overhead
+  return validate_fast(schema.impl->root, result.value(), *schema.impl);
 }
 
 }  // namespace ata
