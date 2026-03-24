@@ -10,10 +10,10 @@ Ultra-fast JSON Schema validator powered by [simdjson](https://github.com/simdjs
 
 | Scenario | ata | ajv | |
 |---|---|---|---|
-| **validate(obj)** | 9.6M ops/sec | 8.5M ops/sec | **ata 1.1x faster** |
-| **isValidObject(obj)** | 10.4M ops/sec | 9.3M ops/sec | **ata 1.1x faster** |
-| **validateJSON(str)** | 1.9M ops/sec | 1.87M ops/sec | **ata 1.02x faster** |
-| **isValidJSON(str)** | 1.9M ops/sec | 1.89M ops/sec | **ata 1.01x faster** |
+| **validate(obj)** | 15M ops/sec | 8.5M ops/sec | **ata 1.8x faster** |
+| **isValidObject(obj)** | 17.4M ops/sec | 9.4M ops/sec | **ata 1.8x faster** |
+| **validateJSON(str)** | 2.1M ops/sec | 1.9M ops/sec | **ata 1.1x faster** |
+| **isValidJSON(str)** | 2.0M ops/sec | 1.9M ops/sec | **ata 1.1x faster** |
 | **Schema compilation** | 125,690 ops/sec | 831 ops/sec | **ata 151x faster** |
 
 ### Large Data — JS Object Validation
@@ -24,61 +24,64 @@ Ultra-fast JSON Schema validator powered by [simdjson](https://github.com/simdjs
 | 100 users (20KB) | 658K ops/sec | 243K ops/sec | **ata 2.7x faster** |
 | 1,000 users (205KB) | 64K ops/sec | 23.5K ops/sec | **ata 2.7x faster** |
 
-### Parallel Batch Validation (multi-core)
+### Real-World Scenarios
 
-| Batch Size | ata | ajv | |
+| Scenario | ata | ajv | |
 |---|---|---|---|
-| 1,000 items | 8.4M items/sec | 2.2M items/sec | **ata 3.9x faster** |
-| 10,000 items | 12.5M items/sec | 2.1M items/sec | **ata 5.9x faster** |
-
-> ajv is single-threaded (JS). ata uses all CPU cores via a persistent C++ thread pool.
+| **Serverless cold start** (50 schemas) | 7.7ms | 96ms | **ata 12.5x faster** |
+| **ReDoS protection** (`^(a+)+$`) | 0.3ms | 765ms | **ata immune (RE2)** |
+| **Batch NDJSON** (10K items, multi-core) | 13.4M/sec | 5.1M/sec | **ata 2.6x faster** |
+| **Fastify HTTP** (100 users POST) | 24.6K req/sec | 22.6K req/sec | **ata 9% faster** |
 
 ### Where ajv wins
 
 | Scenario | ata | ajv | |
 |---|---|---|---|
-| **validate(obj)** (invalid data, error collection) | 133K ops/sec | 7.5M ops/sec | **ajv 56x faster** |
-| **validateJSON(str)** (invalid data) | 169K ops/sec | 2.3M ops/sec | **ajv 14x faster** |
+| **validate(obj)** (invalid data) | 6M ops/sec | 7.9M ops/sec | **ajv 1.3x faster** |
+| **validateJSON(str)** (invalid data) | 2.2M ops/sec | 2.3M ops/sec | **ajv 1.1x faster** |
 
-> Invalid-data error collection goes through the C++ NAPI path. This is the slow path by design — production traffic is overwhelmingly valid.
+> Invalid-data error path — ajv is slightly faster. Production traffic is overwhelmingly valid.
 
 ### How it works
 
-**Speculative validation**: For valid data (the common case), ata runs a JS codegen fast path entirely in V8 JIT — no NAPI boundary crossing. Only when validation fails does it fall through to the C++ engine for detailed error collection.
+**Speculative validation**: For valid data (the common case), ata runs a JS codegen fast path entirely in V8 JIT — no NAPI boundary crossing. Only when validation fails does it fall through to the JS error-collecting codegen or C++ engine.
 
-**JS codegen**: Schemas are compiled to monolithic JS functions (like ajv). Supported keywords: `type`, `required`, `properties`, `items`, `enum`, `const`, `allOf`, `anyOf`, `oneOf`, `not`, `if/then/else`, `uniqueItems`, `contains`, `prefixItems`, `additionalProperties`, `dependentRequired`, `minimum/maximum`, `minLength/maxLength`, `pattern`, `format`.
+**JS codegen**: Schemas are compiled to monolithic JS functions (like ajv). Supported keywords: `type`, `required`, `properties`, `items`, `enum`, `const`, `allOf`, `anyOf`, `oneOf`, `not`, `if/then/else`, `uniqueItems`, `contains`, `prefixItems`, `additionalProperties`, `dependentRequired`, `$ref` (local), `minimum/maximum`, `minLength/maxLength`, `pattern`, `format`.
 
-**V8 TurboFan optimizations**: Destructuring batch reads, `undefined` checks instead of `in` operator, context-aware type guard elimination, property hoisting to local variables.
+**V8 TurboFan optimizations**: Destructuring batch reads, `undefined` checks instead of `in` operator, context-aware type guard elimination, property hoisting to local variables, tiered uniqueItems (nested loop for small arrays).
 
 **Adaptive simdjson**: For large documents (>8KB) with selective schemas, simdjson On Demand seeks only the needed fields — skipping irrelevant data at GB/s speeds.
 
 ### JSON Schema Test Suite
 
-**98.5%** pass rate (938/952) on official [JSON Schema Test Suite](https://github.com/json-schema-org/JSON-Schema-Test-Suite) (Draft 2020-12).
+**98.4%** pass rate (937/952) on official [JSON Schema Test Suite](https://github.com/json-schema-org/JSON-Schema-Test-Suite) (Draft 2020-12).
 
 ## When to use ata
 
-- **Any `validate(obj)` workload** — 1.1x–2.7x faster than ajv on valid data
-- **Batch/streaming validation** — NDJSON log processing, data pipelines (5.9x faster)
-- **Schema-heavy startup** — many schemas compiled at boot (151x faster compile)
+- **Any `validate(obj)` workload** — 1.8x–2.7x faster than ajv on valid data
+- **Serverless / cold starts** — 12.5x faster schema compilation
+- **Security-sensitive apps** — RE2 regex, immune to ReDoS attacks
+- **Batch/streaming validation** — NDJSON log processing, data pipelines (2.6x faster)
+- **Standard Schema V1** — native support for Fastify v5, tRPC, TanStack
 - **C/C++ embedding** — native library, no JS runtime needed
 
 ## When to use ajv
 
-- **Error-heavy workloads** — where most data is invalid and error details matter
-- **Schemas with `$ref`, `patternProperties`, `dependentSchemas`** — these bypass JS codegen and hit the slower NAPI path
+- **Error-heavy workloads** — where most data is invalid (ajv 1.3x faster on error path)
+- **Schemas with `patternProperties`, `dependentSchemas`** — these bypass JS codegen
 
 ## Features
 
 - **Speculative validation**: JS codegen fast path — valid data never crosses the NAPI boundary
-- **Multi-core**: Parallel validation across all CPU cores — 12.5M validations/sec
+- **Multi-core**: Parallel validation across all CPU cores — 13.4M validations/sec
 - **simdjson**: SIMD-accelerated JSON parsing at GB/s speeds, adaptive On Demand for large docs
-- **RE2 regex**: Linear-time guarantees, immune to ReDoS attacks
+- **RE2 regex**: Linear-time guarantees, immune to ReDoS attacks (2391x faster on pathological input)
 - **V8-optimized codegen**: Destructuring batch reads, type guard elimination, property hoisting
 - **Standard Schema V1**: Compatible with Fastify, tRPC, TanStack, Drizzle
 - **Zero-copy paths**: Buffer and pre-padded input support — no unnecessary copies
+- **Defaults + coercion**: `default` values, `coerceTypes`, `removeAdditional` support
 - **C/C++ library**: Native API for non-Node.js environments
-- **98.5% spec compliant**: Draft 2020-12
+- **98.4% spec compliant**: Draft 2020-12
 
 ## Installation
 
@@ -98,18 +101,18 @@ const v = new Validator({
   properties: {
     name: { type: 'string', minLength: 1 },
     email: { type: 'string', format: 'email' },
-    age: { type: 'integer', minimum: 0 }
+    age: { type: 'integer', minimum: 0 },
+    role: { type: 'string', default: 'user' }
   },
   required: ['name', 'email']
 });
 
-// Fast boolean check — JS codegen, no NAPI (1.1x faster than ajv)
+// Fast boolean check — JS codegen, no NAPI (1.8x faster than ajv)
 v.isValidObject({ name: 'Mert', email: 'mert@example.com', age: 26 }); // true
 
-// Full validation with error details
-const result = v.validate({ name: 'Mert', email: 'mert@example.com', age: 26 });
-console.log(result.valid); // true
-console.log(result.errors); // []
+// Full validation with error details + defaults applied
+const result = v.validate({ name: 'Mert', email: 'mert@example.com' });
+// result.valid === true, data.role === 'user' (default applied)
 
 // JSON string validation (simdjson fast path)
 v.validateJSON('{"name": "Mert", "email": "mert@example.com"}');
@@ -118,10 +121,19 @@ v.isValidJSON('{"name": "Mert", "email": "mert@example.com"}'); // true
 // Buffer input (zero-copy, raw NAPI)
 v.isValid(Buffer.from('{"name": "Mert", "email": "mert@example.com"}'));
 
-// Parallel batch — multi-core, NDJSON (5.9x faster than ajv)
+// Parallel batch — multi-core, NDJSON (2.6x faster than ajv)
 const ndjson = Buffer.from(lines.join('\n'));
 v.isValidParallel(ndjson);  // bool[]
 v.countValid(ndjson);        // number
+```
+
+### Options
+
+```javascript
+const v = new Validator(schema, {
+  coerceTypes: true,       // "42" → 42 for integer fields
+  removeAdditional: true,  // strip properties not in schema
+});
 ```
 
 ### Standard Schema V1
@@ -143,7 +155,10 @@ npm install fastify-ata
 
 ```javascript
 const fastify = require('fastify')();
-fastify.register(require('fastify-ata'));
+fastify.register(require('fastify-ata'), {
+  coerceTypes: true,
+  removeAdditional: true,
+});
 
 // All existing JSON Schema route definitions work as-is
 ```
