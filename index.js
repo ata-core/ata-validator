@@ -49,6 +49,131 @@ function collectDefaults(schema, actions, path) {
   }
 }
 
+// Build a function that coerces property values to match schema types in-place.
+// Handles string→number, string→integer, string→boolean, number→string, boolean→string.
+function buildCoercer(schema) {
+  if (typeof schema !== 'object' || schema === null) return null;
+  const actions = [];
+  collectCoercions(schema, actions);
+  if (actions.length === 0) return null;
+  return (data) => {
+    for (let i = 0; i < actions.length; i++) actions[i](data);
+  };
+}
+
+function collectCoercions(schema, actions, path) {
+  if (typeof schema !== 'object' || schema === null) return;
+  const props = schema.properties;
+  if (!props) return;
+  for (const [key, prop] of Object.entries(props)) {
+    if (!prop || typeof prop !== 'object' || !prop.type) continue;
+    const targetType = Array.isArray(prop.type) ? null : prop.type;
+    if (!targetType) continue;
+
+    const coerce = buildSingleCoercion(targetType);
+    if (!coerce) continue;
+
+    if (!path) {
+      actions.push((data) => {
+        if (typeof data === 'object' && data !== null && key in data) {
+          const coerced = coerce(data[key]);
+          if (coerced !== undefined) data[key] = coerced;
+        }
+      });
+    } else {
+      const parentPath = path;
+      actions.push((data) => {
+        let target = data;
+        for (let j = 0; j < parentPath.length; j++) {
+          if (typeof target !== 'object' || target === null) return;
+          target = target[parentPath[j]];
+        }
+        if (typeof target === 'object' && target !== null && key in target) {
+          const coerced = coerce(target[key]);
+          if (coerced !== undefined) target[key] = coerced;
+        }
+      });
+    }
+
+    // Recurse into nested object properties
+    if (prop.properties) {
+      collectCoercions(prop, actions, (path || []).concat(key));
+    }
+  }
+}
+
+function buildSingleCoercion(targetType) {
+  switch (targetType) {
+    case 'number': return (v) => {
+      if (typeof v === 'string') { const n = Number(v); if (v !== '' && !isNaN(n)) return n; }
+      if (typeof v === 'boolean') return v ? 1 : 0;
+    };
+    case 'integer': return (v) => {
+      if (typeof v === 'string') { const n = Number(v); if (v !== '' && Number.isInteger(n)) return n; }
+      if (typeof v === 'boolean') return v ? 1 : 0;
+    };
+    case 'string': return (v) => {
+      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    };
+    case 'boolean': return (v) => {
+      if (v === 'true' || v === '1') return true;
+      if (v === 'false' || v === '0') return false;
+    };
+    default: return null;
+  }
+}
+
+// Build a function that removes properties not defined in schema.properties.
+// Walks nested objects recursively.
+function buildRemover(schema) {
+  if (typeof schema !== 'object' || schema === null) return null;
+  const actions = [];
+  collectRemovals(schema, actions);
+  if (actions.length === 0) return null;
+  return (data) => {
+    for (let i = 0; i < actions.length; i++) actions[i](data);
+  };
+}
+
+function collectRemovals(schema, actions, path) {
+  if (typeof schema !== 'object' || schema === null || !schema.properties) return;
+
+  // If this level has additionalProperties: false, add a removal action
+  if (schema.additionalProperties === false) {
+    const allowed = new Set(Object.keys(schema.properties));
+    if (!path) {
+      actions.push((data) => {
+        if (typeof data !== 'object' || data === null || Array.isArray(data)) return;
+        const keys = Object.keys(data);
+        for (let i = 0; i < keys.length; i++) {
+          if (!allowed.has(keys[i])) delete data[keys[i]];
+        }
+      });
+    } else {
+      const parentPath = path;
+      actions.push((data) => {
+        let target = data;
+        for (let j = 0; j < parentPath.length; j++) {
+          if (typeof target !== 'object' || target === null) return;
+          target = target[parentPath[j]];
+        }
+        if (typeof target !== 'object' || target === null || Array.isArray(target)) return;
+        const keys = Object.keys(target);
+        for (let i = 0; i < keys.length; i++) {
+          if (!allowed.has(keys[i])) delete target[keys[i]];
+        }
+      });
+    }
+  }
+
+  // Always recurse into nested properties (they may have their own additionalProperties: false)
+  for (const [key, prop] of Object.entries(schema.properties)) {
+    if (prop && typeof prop === 'object' && prop.properties) {
+      collectRemovals(prop, actions, (path || []).concat(key));
+    }
+  }
+}
+
 const SIMDJSON_PADDING = 64;
 const VALID_RESULT = Object.freeze({ valid: true, errors: Object.freeze([]) });
 
@@ -75,7 +200,8 @@ function createPaddedBuffer(jsonStr) {
 }
 
 class Validator {
-  constructor(schema) {
+  constructor(schema, opts) {
+    const options = opts || {};
     const schemaStr =
       typeof schema === "string" ? schema : JSON.stringify(schema);
     const compiled = new native.CompiledSchema(schemaStr);
@@ -90,9 +216,18 @@ class Validator {
       : (compileToJSCodegen(schemaObj) || compileToJS(schemaObj));
     this._jsFn = jsFn;
 
-    // Default value applier — applies schema defaults to objects in-place
+    // Data mutators — applied in-place before validation
     const applyDefaults = buildDefaultsApplier(schemaObj);
+    const applyCoerce = options.coerceTypes ? buildCoercer(schemaObj) : null;
+    const applyRemove = options.removeAdditional ? buildRemover(schemaObj) : null;
     this._applyDefaults = applyDefaults;
+
+    // Combine all mutators into a single pre-validation step
+    const mutators = [applyRemove, applyCoerce, applyDefaults].filter(Boolean);
+    const preprocess = mutators.length === 0 ? null
+      : mutators.length === 1 ? mutators[0]
+      : (data) => { for (let i = 0; i < mutators.length; i++) mutators[i](data); };
+    this._preprocess = preprocess;
 
     // Closure-capture: avoid `this` property lookup on every call.
     // V8 keeps closure vars in registers — no hidden class traversal.
@@ -107,8 +242,8 @@ class Validator {
     const useSimdjsonForLarge = !hasArrayTraversal;
 
     if (jsFn) {
-      this.validate = applyDefaults
-        ? (data) => { applyDefaults(data); return jsFn(data) ? VALID_RESULT : compiled.validate(data); }
+      this.validate = preprocess
+        ? (data) => { preprocess(data); return jsFn(data) ? VALID_RESULT : compiled.validate(data); }
         : (data) => jsFn(data) ? VALID_RESULT : compiled.validate(data);
       this.isValidObject = jsFn;
       this.validateJSON = useSimdjsonForLarge
@@ -177,7 +312,7 @@ class Validator {
 
   // Fallback methods — only used when JS codegen is unavailable
   validate(data) {
-    if (this._applyDefaults) this._applyDefaults(data);
+    if (this._preprocess) this._preprocess(data);
     return this._compiled.validate(data);
   }
 
