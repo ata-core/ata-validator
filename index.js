@@ -1,6 +1,54 @@
 const native = require("node-gyp-build")(__dirname);
 const { compileToJS, compileToJSCodegen } = require("./lib/js-compiler");
 
+// Extract default values from a schema tree. Returns a function that applies
+// defaults to an object in-place (mutates), or null if no defaults exist.
+function buildDefaultsApplier(schema) {
+  if (typeof schema !== 'object' || schema === null) return null;
+  const actions = [];
+  collectDefaults(schema, actions);
+  if (actions.length === 0) return null;
+  return (data) => {
+    for (let i = 0; i < actions.length; i++) actions[i](data);
+  };
+}
+
+function collectDefaults(schema, actions, path) {
+  if (typeof schema !== 'object' || schema === null) return;
+  const props = schema.properties;
+  if (!props) return;
+  for (const [key, prop] of Object.entries(props)) {
+    if (prop && typeof prop === 'object' && prop.default !== undefined) {
+      const defaultVal = prop.default;
+      if (!path) {
+        actions.push((data) => {
+          if (typeof data === 'object' && data !== null && !(key in data)) {
+            data[key] = typeof defaultVal === 'object' && defaultVal !== null
+              ? JSON.parse(JSON.stringify(defaultVal)) : defaultVal;
+          }
+        });
+      } else {
+        const parentPath = path;
+        actions.push((data) => {
+          let target = data;
+          for (let j = 0; j < parentPath.length; j++) {
+            if (typeof target !== 'object' || target === null) return;
+            target = target[parentPath[j]];
+          }
+          if (typeof target === 'object' && target !== null && !(key in target)) {
+            target[key] = typeof defaultVal === 'object' && defaultVal !== null
+              ? JSON.parse(JSON.stringify(defaultVal)) : defaultVal;
+          }
+        });
+      }
+    }
+    // Recurse into nested object schemas
+    if (prop && typeof prop === 'object' && prop.properties) {
+      collectDefaults(prop, actions, (path || []).concat(key));
+    }
+  }
+}
+
 const SIMDJSON_PADDING = 64;
 const VALID_RESULT = Object.freeze({ valid: true, errors: Object.freeze([]) });
 
@@ -42,6 +90,10 @@ class Validator {
       : (compileToJSCodegen(schemaObj) || compileToJS(schemaObj));
     this._jsFn = jsFn;
 
+    // Default value applier — applies schema defaults to objects in-place
+    const applyDefaults = buildDefaultsApplier(schemaObj);
+    this._applyDefaults = applyDefaults;
+
     // Closure-capture: avoid `this` property lookup on every call.
     // V8 keeps closure vars in registers — no hidden class traversal.
     const fastSlot = this._fastSlot;
@@ -55,7 +107,9 @@ class Validator {
     const useSimdjsonForLarge = !hasArrayTraversal;
 
     if (jsFn) {
-      this.validate = (data) => jsFn(data) ? VALID_RESULT : compiled.validate(data);
+      this.validate = applyDefaults
+        ? (data) => { applyDefaults(data); return jsFn(data) ? VALID_RESULT : compiled.validate(data); }
+        : (data) => jsFn(data) ? VALID_RESULT : compiled.validate(data);
       this.isValidObject = jsFn;
       this.validateJSON = useSimdjsonForLarge
         ? (jsonStr) => {
@@ -123,6 +177,7 @@ class Validator {
 
   // Fallback methods — only used when JS codegen is unavailable
   validate(data) {
+    if (this._applyDefaults) this._applyDefaults(data);
     return this._compiled.validate(data);
   }
 
