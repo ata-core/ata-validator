@@ -214,10 +214,10 @@ class Validator {
     const jsFn = process.env.ATA_FORCE_NAPI
       ? null
       : (compileToJSCodegen(schemaObj) || compileToJS(schemaObj));
-    // JS error-collecting codegen — experimental, enable with ATA_JS_ERRORS=1
-    const jsErrFn = process.env.ATA_JS_ERRORS
-      ? compileToJSCodegenWithErrors(schemaObj)
-      : null;
+    // JS error-collecting codegen — invalid path stays in JS, no NAPI fallback
+    const jsErrFn = process.env.ATA_FORCE_NAPI
+      ? null
+      : compileToJSCodegenWithErrors(schemaObj);
     this._jsFn = jsFn;
 
     // Data mutators — applied in-place before validation
