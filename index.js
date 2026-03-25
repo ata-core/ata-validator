@@ -262,14 +262,20 @@ class Validator {
       }
       const errFn = safeErrFn || ((d) => compiled.validate(d));
 
-      // Speculative: jsFn (78M, pure bool) for valid path, errFn for errors.
-      // jsFn has zero error-path code — V8 fully optimizes it.
-      // No try/catch — V8 deoptimizes 3.3x with try/catch.
-      this.validate = preprocess
-        ? (data) => { preprocess(data); return jsFn(data) ? VALID_RESULT : errFn(data); }
-        : (data) => jsFn(data) ? VALID_RESULT : errFn(data);
+      // Hybrid validator: jsFn body with return R / return E(d).
+      // V8 optimizes identically to jsFn (83M) — E(d) is dead code on valid path.
+      // Invalid: E(d) calls errFn once (34M vs 6M two-pass).
+      // Fallback: jsFn + errFn speculative if hybrid unavailable.
+      const hybridFn = jsFn._hybridFactory
+        ? jsFn._hybridFactory(VALID_RESULT, errFn)
+        : null;
+      this.validate = hybridFn
+        ? (preprocess ? (data) => { preprocess(data); return hybridFn(data); } : hybridFn)
+        : (preprocess
+            ? (data) => { preprocess(data); return jsFn(data) ? VALID_RESULT : errFn(data); }
+            : (data) => jsFn(data) ? VALID_RESULT : errFn(data));
       this.isValidObject = jsFn;
-      const jsonValidateFn = (obj) => jsFn(obj) ? VALID_RESULT : errFn(obj);
+      const jsonValidateFn = hybridFn || ((obj) => jsFn(obj) ? VALID_RESULT : errFn(obj));
       this.validateJSON = useSimdjsonForLarge
         ? (jsonStr) => {
             if (jsonStr.length >= SIMDJSON_THRESHOLD) {
