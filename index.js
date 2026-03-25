@@ -486,4 +486,27 @@ function version() {
   return native.version();
 }
 
+// Bundle multiple validators into a single JS file for fast startup.
+// Usage:
+//   const bundle = Validator.bundle([schema1, schema2, ...]);
+//   fs.writeFileSync('validators.js', bundle);
+//   // On startup:
+//   const validators = Validator.loadBundle(require('./validators.js'), [schema1, schema2, ...]);
+Validator.bundle = function(schemas, opts) {
+  const parts = schemas.map(schema => {
+    const v = new Validator(schema, opts);
+    const standalone = v.toStandalone();
+    if (!standalone) return 'null';
+    return '(function(){' + standalone.replace("'use strict';", '').replace('module.exports = ', 'return ') + '})()';
+  });
+  return "'use strict';\nmodule.exports = [\n" + parts.join(',\n') + '\n];\n';
+};
+
+Validator.loadBundle = function(mods, schemas, opts) {
+  return schemas.map((schema, i) => {
+    if (mods[i]) return Validator.fromStandalone(mods[i], schema, opts);
+    return new Validator(schema, opts);
+  });
+};
+
 module.exports = { Validator, validate, version, createPaddedBuffer, SIMDJSON_PADDING };
