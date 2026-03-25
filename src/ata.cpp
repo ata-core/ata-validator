@@ -1,5 +1,10 @@
 #include "ata.h"
 
+// mimalloc: faster new/delete for small allocations.
+#if __has_include(<mimalloc-new-delete.h>)
+#include <mimalloc-new-delete.h>
+#endif
+
 #include <algorithm>
 #include <cmath>
 #include <re2/re2.h>
