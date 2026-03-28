@@ -18,6 +18,17 @@ Ultra-fast JSON Schema validator powered by [simdjson](https://github.com/simdjs
 
 > Measured with [mitata](https://github.com/evanwashere/mitata) (process-isolated). Results vary by workload and hardware.
 
+### vs typebox 1.x (with format: 'email')
+
+| Scenario | ata | typebox | |
+|---|---|---|---|
+| **isValidObject(obj)** valid | 87.5M ops/sec | 18.0M ops/sec | **ata 4.9x faster** |
+| **isValidObject(obj)** invalid | 441M ops/sec | 161M ops/sec | **ata 2.7x faster** |
+| **Schema compilation** | 2.0M ops/sec | 16.2K ops/sec | **ata 123x faster** |
+| **First validation** | 1.52M ops/sec | 15.5K ops/sec | **ata 98x faster** |
+
+> typebox 1.x is JSON Schema compliant with RFC format support. [Benchmark code](benchmark/bench_vs_typebox_esm.mjs)
+
 ### Large Data - JS Object Validation
 
 | Size | ata | ajv | |
