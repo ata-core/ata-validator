@@ -234,6 +234,7 @@ npm run test:suite
 
 MIT
 
-## Author
+## Authors
 
 [Mert Can Altin](https://github.com/mertcanaltin)
+[Daniel Lemire](https://github.com/lemire)
