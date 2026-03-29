@@ -18,8 +18,6 @@ jobs:
             arch: arm64
           - os: macos-13
             arch: x64
-          - os: windows-latest
-            arch: x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -28,17 +26,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install RE2 (macOS)
+      - name: Install deps (macOS)
         if: runner.os == 'macOS'
-        run: brew install re2 abseil
+        run: brew install re2 abseil mimalloc
 
-      - name: Install RE2 (Linux)
+      - name: Install deps (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libre2-dev libabsl-dev
-
-      - name: Install RE2 (Windows)
-        if: runner.os == 'Windows'
-        run: vcpkg install re2:x64-windows abseil:x64-windows
 
       - name: Install dependencies
         run: npm install
