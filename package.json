@@ -13,7 +13,9 @@
     "test:suite": "node tests/run_suite.js",
     "test:compat": "node tests/test_compat.js",
     "test:standard-schema": "node tests/test_standard_schema.js",
-    "bench": "node benchmark/bench_large.js"
+    "bench": "node benchmark/bench_large.js",
+    "fuzz": "node tests/fuzz_differential.js",
+    "fuzz:long": "FUZZ_ITERATIONS=100000 node tests/fuzz_differential.js"
   },
   "keywords": [
     "json",
