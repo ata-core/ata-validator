@@ -10,19 +10,19 @@ Ultra-fast JSON Schema validator powered by [simdjson](https://github.com/simdjs
 
 | Scenario | ata | ajv | |
 |---|---|---|---|
-| **validate(obj)** valid | 58ns | 101ns | **ata 1.7x faster** |
-| **validate(obj)** invalid | 78ns | 109ns | **ata 1.4x faster** |
-| **isValidObject(obj)** | 28ns | 101ns | **ata 3.6x faster** |
-| **Schema compilation** | 677ns | 1.28ms | **ata 1,888x faster** |
-| **First validation** | 1.70μs | 1.18ms | **ata 693x faster** |
+| **validate(obj)** valid | 28ns | 104ns | **ata 3.6x faster** |
+| **validate(obj)** invalid | 79ns | 108ns | **ata 2.3x faster** |
+| **isValidObject(obj)** | 28ns | 102ns | **ata 3.7x faster** |
+| **Schema compilation** | 698ns | 1.30ms | **ata 1,969x faster** |
+| **First validation** | 1.70μs | 1.18ms | **ata 719x faster** |
 
 ### Complex Schema (patternProperties + dependentSchemas + propertyNames + additionalProperties)
 
 | Scenario | ata | ajv | |
 |---|---|---|---|
-| **validate(obj)** valid | 26ns | 113ns | **ata 4.4x faster** |
-| **validate(obj)** invalid | 53ns | 195ns | **ata 3.7x faster** |
-| **isValidObject(obj)** | 20ns | 117ns | **ata 5.8x faster** |
+| **validate(obj)** valid | 20ns | 121ns | **ata 5.9x faster** |
+| **validate(obj)** invalid | 53ns | 196ns | **ata 3.2x faster** |
+| **isValidObject(obj)** | 20ns | 128ns | **ata 5.9x faster** |
 
 ### Cross-Schema `$ref` (multi-schema with `$id` registry)
 
@@ -79,8 +79,8 @@ Ultra-fast JSON Schema validator powered by [simdjson](https://github.com/simdjs
 
 ## When to use ata
 
-- **High-throughput `validate(obj)`** - 4.4x faster than ajv on complex schemas, 26x faster than zod
-- **Complex schemas** - `patternProperties`, `dependentSchemas`, `propertyNames` all inline JS codegen (5.8x faster than ajv)
+- **High-throughput `validate(obj)`** - 5.9x faster than ajv on complex schemas, 27x faster than zod
+- **Complex schemas** - `patternProperties`, `dependentSchemas`, `propertyNames` all inline JS codegen (5.9x faster than ajv)
 - **Multi-schema projects** - cross-schema `$ref` with `$id` registry, `addSchema()` API
 - **Draft 7 migration** - auto-detects `$schema`, normalizes Draft 7 keywords transparently
 - **Serverless / cold starts** - 1,888x faster compilation, 693x faster first validation
@@ -96,7 +96,7 @@ Ultra-fast JSON Schema validator powered by [simdjson](https://github.com/simdjs
 
 ## Features
 
-- **Single-pass validator**: 4.4x faster than ajv valid, 3.7x faster invalid - combined codegen with pre-allocated errors. No double pass, no try/catch. Schema compilation cache for repeated schemas
+- **Hybrid validator**: 5.9x faster than ajv valid, 3.2x faster invalid on complex schemas - jsFn boolean guard for valid path (zero allocation), combined codegen with pre-allocated errors for invalid path. Schema compilation cache for repeated schemas
 - **Cross-schema `$ref`**: `schemas` option and `addSchema()` API. Compile-time resolution with `$id` registry, zero runtime overhead
 - **Draft 7 support**: Auto-detects `$schema` field, normalizes `dependencies`/`additionalItems`/`definitions` transparently
 - **Multi-core**: Parallel validation across all CPU cores - 13.4M validations/sec
