@@ -447,7 +447,15 @@ class Validator {
         } catch {}
       }
 
-      if (safeCombinedFn) {
+      if (safeCombinedFn && jsFn) {
+        // fast path: jsFn boolean check first, combined only on failure
+        this.validate = preprocess
+          ? (data) => {
+              preprocess(data);
+              return jsFn(data) ? VALID_RESULT : safeCombinedFn(data);
+            }
+          : (data) => jsFn(data) ? VALID_RESULT : safeCombinedFn(data);
+      } else if (safeCombinedFn) {
         this.validate = preprocess
           ? (data) => {
               preprocess(data);
