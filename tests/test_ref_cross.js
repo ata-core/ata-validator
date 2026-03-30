@@ -154,9 +154,9 @@ test('same schema with different schemas option: both get their own schemaMap', 
 
 // ===== Cross-ref validation tests (expected to fail — Task 4 will wire codegen) =====
 
-console.log('\n=== cross-ref validation (expected to fail until Task 4) ===')
+console.log('\n=== cross-ref validation ===')
 
-testExpectedFail('basic cross-ref: validates string via $ref', () => {
+test('basic cross-ref: validates string via $ref', () => {
   const stringDef = { $id: 'string-def', type: 'string' }
   const v = new Validator(
     { type: 'object', properties: { name: { $ref: 'string-def' } }, required: ['name'] },
@@ -168,7 +168,7 @@ testExpectedFail('basic cross-ref: validates string via $ref', () => {
   assert.ok(!bad.valid, 'should fail for number')
 })
 
-testExpectedFail('chained refs: A -> B -> C', () => {
+test('chained refs: A -> B -> C', () => {
   const c = { $id: 'c', type: 'integer' }
   const b = { $id: 'b', properties: { val: { $ref: 'c' } } }
   const a = { $id: 'a', properties: { inner: { $ref: 'b' } } }
@@ -177,7 +177,7 @@ testExpectedFail('chained refs: A -> B -> C', () => {
   assert.ok(!v.validate({ inner: { val: 'nope' } }).valid)
 })
 
-testExpectedFail('circular refs: A -> B -> A (should not crash)', () => {
+test('circular refs: A -> B -> A (should not crash)', () => {
   const b = { $id: 'b', properties: { a: { $ref: 'a' } } }
   const a = { $id: 'a', type: 'object', properties: { b: { $ref: 'b' } } }
   const v = new Validator(a, { schemas: [b] })
@@ -185,7 +185,7 @@ testExpectedFail('circular refs: A -> B -> A (should not crash)', () => {
   v.validate({ b: { a: {} } })
 })
 
-testExpectedFail('isValidObject with cross-schema ref', () => {
+test('isValidObject with cross-schema ref', () => {
   const numDef = { $id: 'num', type: 'number' }
   const v = new Validator(
     { type: 'object', properties: { score: { $ref: 'num' } } },
@@ -195,7 +195,7 @@ testExpectedFail('isValidObject with cross-schema ref', () => {
   assert.strictEqual(v.isValidObject({ score: 'bad' }), false)
 })
 
-testExpectedFail('addSchema() cross-ref validation', () => {
+test('addSchema() cross-ref validation', () => {
   const v = new Validator({
     type: 'object',
     properties: { tag: { $ref: 'tag-def' } }
