@@ -379,17 +379,21 @@ class Validator {
     const options = this._options;
 
     // Check cache first -- reuse compiled functions for same schema
-    const cached = _compileCache.get(this._schemaStr);
+    const sm = this._schemaMap.size > 0 ? this._schemaMap : null;
+    const mapKey = this._schemaMap.size > 0
+      ? this._schemaStr + '\0' + [...this._schemaMap.keys()].sort().join('\0')
+      : this._schemaStr;
+    const cached = _compileCache.get(mapKey);
     let jsFn, jsCombinedFn, jsErrFn;
     if (cached && !process.env.ATA_FORCE_NAPI) {
       jsFn = cached.jsFn;
       jsCombinedFn = cached.combined;
       jsErrFn = cached.errFn;
     } else if (!process.env.ATA_FORCE_NAPI) {
-      jsFn = compileToJSCodegen(schemaObj) || compileToJS(schemaObj);
-      jsCombinedFn = compileToJSCombined(schemaObj, VALID_RESULT);
-      jsErrFn = compileToJSCodegenWithErrors(schemaObj);
-      _compileCache.set(this._schemaStr, { jsFn, combined: jsCombinedFn, errFn: jsErrFn });
+      jsFn = compileToJSCodegen(schemaObj, sm) || compileToJS(schemaObj, null, sm);
+      jsCombinedFn = compileToJSCombined(schemaObj, VALID_RESULT, sm);
+      jsErrFn = compileToJSCodegenWithErrors(schemaObj, sm);
+      _compileCache.set(mapKey, { jsFn, combined: jsCombinedFn, errFn: jsErrFn });
     } else {
       jsFn = null; jsCombinedFn = null; jsErrFn = null;
     }
@@ -579,8 +583,17 @@ class Validator {
   _ensureNative() {
     if (this._nativeReady) return;
     this._nativeReady = true;
-    this._compiled = new native.CompiledSchema(this._schemaStr);
-    this._fastSlot = native.fastRegister(this._schemaStr);
+    let nativeSchemaStr = this._schemaStr;
+    if (this._schemaMap.size > 0) {
+      const merged = JSON.parse(this._schemaStr);
+      if (!merged.$defs) merged.$defs = {};
+      for (const [id, s] of this._schemaMap) {
+        merged.$defs['__ext_' + id.replace(/[^a-zA-Z0-9]/g, '_')] = s;
+      }
+      nativeSchemaStr = JSON.stringify(merged);
+    }
+    this._compiled = new native.CompiledSchema(nativeSchemaStr);
+    this._fastSlot = native.fastRegister(nativeSchemaStr);
   }
 
   addSchema(schema) {
@@ -598,18 +611,22 @@ class Validator {
   _ensureCodegen() {
     if (this._jsFn) return;
     if (process.env.ATA_FORCE_NAPI) return;
-    const cached = _compileCache.get(this._schemaStr);
+    const sm = this._schemaMap.size > 0 ? this._schemaMap : null;
+    const mapKey = this._schemaMap.size > 0
+      ? this._schemaStr + '\0' + [...this._schemaMap.keys()].sort().join('\0')
+      : this._schemaStr;
+    const cached = _compileCache.get(mapKey);
     if (cached && cached.jsFn) {
       this._jsFn = cached.jsFn;
       this.isValidObject = cached.jsFn;
       return;
     }
-    const jsFn = compileToJSCodegen(this._schemaObj) || compileToJS(this._schemaObj);
+    const jsFn = compileToJSCodegen(this._schemaObj, sm) || compileToJS(this._schemaObj, null, sm);
     this._jsFn = jsFn;
     if (jsFn) {
       this.isValidObject = jsFn;
       // seed cache with codegen, combined/errFn filled later by _ensureCompiled
-      if (!cached) _compileCache.set(this._schemaStr, { jsFn, combined: null, errFn: null });
+      if (!cached) _compileCache.set(mapKey, { jsFn, combined: null, errFn: null });
       else cached.jsFn = jsFn;
     }
   }
