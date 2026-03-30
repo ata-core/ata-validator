@@ -235,6 +235,27 @@ auto result = ata::validate(schema, R"({"name": "Mert"})");
 
 ## Building from Source
 
+### Development prerequisites
+
+Native builds require C/C++ toolchain support and the following libraries:
+
+- `re2`
+- `abseil`
+- `mimalloc`
+
+Install them before running `npm install` / `npm run build`:
+
+```bash
+# macOS (Homebrew)
+brew install re2 abseil mimalloc
+```
+
+```bash
+# Ubuntu/Debian (apt)
+sudo apt-get update
+sudo apt-get install -y libre2-dev libabsl-dev libmimalloc-dev
+```
+
 ```bash
 # C++ library + tests
 cmake -B build
