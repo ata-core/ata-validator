@@ -13,7 +13,7 @@ Ultra-fast JSON Schema validator powered by [simdjson](https://github.com/simdjs
 | **validate(obj)** valid | 28ns | 104ns | **ata 3.6x faster** |
 | **validate(obj)** invalid | 79ns | 108ns | **ata 2.3x faster** |
 | **isValidObject(obj)** | 28ns | 102ns | **ata 3.7x faster** |
-| **Schema compilation** | 698ns | 1.30ms | **ata 1,969x faster** |
+| **Schema compilation** | 554ns | 1.21ms | **ata 2,184x faster** |
 | **First validation** | 1.70μs | 1.18ms | **ata 719x faster** |
 
 ### Complex Schema (patternProperties + dependentSchemas + propertyNames + additionalProperties)
@@ -83,7 +83,7 @@ Ultra-fast JSON Schema validator powered by [simdjson](https://github.com/simdjs
 - **Complex schemas** - `patternProperties`, `dependentSchemas`, `propertyNames` all inline JS codegen (5.9x faster than ajv)
 - **Multi-schema projects** - cross-schema `$ref` with `$id` registry, `addSchema()` API
 - **Draft 7 migration** - auto-detects `$schema`, normalizes Draft 7 keywords transparently
-- **Serverless / cold starts** - 1,888x faster compilation, 693x faster first validation
+- **Serverless / cold starts** - 2,184x faster compilation, 719x faster first validation
 - **Security-sensitive apps** - RE2 regex, immune to ReDoS attacks
 - **Batch/streaming validation** - NDJSON log processing, data pipelines (2.6x faster)
 - **Standard Schema V1** - native support for Fastify v5, tRPC, TanStack
