@@ -6,23 +6,23 @@ Ultra-fast JSON Schema validator powered by [simdjson](https://github.com/simdjs
 
 ## Performance
 
-### Simple Schema (5 properties, type + format + range checks)
+### Simple Schema (7 properties, type + format + range + nested object)
 
 | Scenario | ata | ajv | |
 |---|---|---|---|
-| **validate(obj)** valid | 28ns | 104ns | **ata 3.6x faster** |
-| **validate(obj)** invalid | 79ns | 108ns | **ata 2.3x faster** |
-| **isValidObject(obj)** | 28ns | 102ns | **ata 3.7x faster** |
-| **Schema compilation** | 554ns | 1.21ms | **ata 2,184x faster** |
-| **First validation** | 1.70μs | 1.18ms | **ata 719x faster** |
+| **validate(obj)** valid | 29ns | 109ns | **ata 3.8x faster** |
+| **validate(obj)** invalid | 57ns | 191ns | **ata 3.3x faster** |
+| **isValidObject(obj)** | 28ns | 109ns | **ata 3.9x faster** |
+| **Schema compilation** | 665ns | 1.38ms | **ata 2,075x faster** |
+| **First validation** | 2.52μs | 1.16ms | **ata 460x faster** |
 
 ### Complex Schema (patternProperties + dependentSchemas + propertyNames + additionalProperties)
 
 | Scenario | ata | ajv | |
 |---|---|---|---|
-| **validate(obj)** valid | 20ns | 121ns | **ata 5.9x faster** |
-| **validate(obj)** invalid | 53ns | 196ns | **ata 3.2x faster** |
-| **isValidObject(obj)** | 20ns | 128ns | **ata 5.9x faster** |
+| **validate(obj)** valid | 17ns | 116ns | **ata 6.8x faster** |
+| **validate(obj)** invalid | 58ns | 194ns | **ata 3.3x faster** |
+| **isValidObject(obj)** | 18ns | 119ns | **ata 6.5x faster** |
 
 ### Cross-Schema `$ref` (multi-schema with `$id` registry)
 
@@ -52,10 +52,10 @@ Three-tier hybrid codegen: static schemas compile to zero-overhead key checks, d
 
 | Scenario | ata | ajv | typebox | zod | valibot |
 |---|---|---|---|---|---|
-| **validate (valid)** | **13ns** | 37ns | 48ns | 328ns | 316ns |
-| **validate (invalid)** | **35ns** | 104ns | 4ns | 11.7μs | 838ns |
-| **compilation** | **533ns** | 1.14ms | 52μs | — | — |
-| **first validation** | **1.3μs** | 1.07ms | 53μs | — | — |
+| **validate (valid)** | **9ns** | 39ns | 50ns | 339ns | 322ns |
+| **validate (invalid)** | **38ns** | 107ns | 4ns | 12.0μs | 840ns |
+| **compilation** | **556ns** | 1.24ms | 54μs | — | — |
+| **first validation** | **2.0μs** | 1.16ms | 55μs | — | — |
 
 > Different categories: ata/ajv/typebox are JSON Schema validators, zod/valibot are schema-builder DSLs. [Benchmark code](benchmark/bench_all_mitata.mjs)
 
@@ -94,8 +94,8 @@ Three-tier hybrid codegen: static schemas compile to zero-overhead key checks, d
 
 ## When to use ata
 
-- **High-throughput `validate(obj)`** - 5.9x faster than ajv on complex schemas, 27x faster than zod
-- **Complex schemas** - `patternProperties`, `dependentSchemas`, `propertyNames` all inline JS codegen (5.9x faster than ajv)
+- **High-throughput `validate(obj)`** - 6.8x faster than ajv on complex schemas, 38x faster than zod
+- **Complex schemas** - `patternProperties`, `dependentSchemas`, `propertyNames`, `unevaluatedProperties` all inline JS codegen (6.8x faster than ajv)
 - **Multi-schema projects** - cross-schema `$ref` with `$id` registry, `addSchema()` API
 - **Draft 7 migration** - auto-detects `$schema`, normalizes Draft 7 keywords transparently
 - **Serverless / cold starts** - 6,904x faster compilation, 5,148x faster first validation
@@ -111,7 +111,7 @@ Three-tier hybrid codegen: static schemas compile to zero-overhead key checks, d
 
 ## Features
 
-- **Hybrid validator**: 5.9x faster than ajv valid, 6.0x faster invalid on complex schemas - jsFn boolean guard for valid path (zero allocation), combined codegen with pre-allocated errors for invalid path. Schema compilation cache for repeated schemas
+- **Hybrid validator**: 6.8x faster than ajv valid, 6.0x faster invalid on complex schemas - jsFn boolean guard for valid path (zero allocation), combined codegen with pre-allocated errors for invalid path. Schema compilation cache for repeated schemas
 - **Cross-schema `$ref`**: `schemas` option and `addSchema()` API. Compile-time resolution with `$id` registry, zero runtime overhead
 - **Draft 7 support**: Auto-detects `$schema` field, normalizes `dependencies`/`additionalItems`/`definitions` transparently
 - **Multi-core**: Parallel validation across all CPU cores - 13.4M validations/sec
