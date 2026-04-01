@@ -1046,18 +1046,25 @@ static ata::schema_ref g_fast_schemas[MAX_FAST_SLOTS];
 static std::string g_fast_schema_jsons[MAX_FAST_SLOTS];
 static uint32_t g_fast_slot_count = 0;
 
-// Register a compiled schema in a fast slot, returns slot ID
+// Register a compiled schema in a fast slot, returns slot ID.
+// Deduplicates: same schema JSON string returns existing slot.
 Napi::Value FastRegister(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   if (info.Length() < 1 || !info[0].IsString()) {
     Napi::TypeError::New(env, "Schema JSON string expected").ThrowAsJavaScriptException();
     return env.Undefined();
   }
+  std::string schema_json = info[0].As<Napi::String>().Utf8Value();
+  // Deduplicate: return existing slot for identical schema JSON
+  for (uint32_t i = 0; i < g_fast_slot_count; i++) {
+    if (g_fast_schema_jsons[i] == schema_json) {
+      return Napi::Number::New(env, i);
+    }
+  }
   if (g_fast_slot_count >= MAX_FAST_SLOTS) {
     Napi::Error::New(env, "Max fast schema slots reached").ThrowAsJavaScriptException();
     return env.Undefined();
   }
-  std::string schema_json = info[0].As<Napi::String>().Utf8Value();
   auto schema = ata::compile(schema_json);
   if (!schema) {
     Napi::Error::New(env, "Failed to compile schema").ThrowAsJavaScriptException();
