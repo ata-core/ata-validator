@@ -4,7 +4,6 @@
       "target_name": "ata",
       "sources": [
         "binding/ata_napi.cpp",
-        "binding/ata_fast.cpp",
         "src/ata.cpp",
         "deps/simdjson/simdjson.cpp"
       ],
@@ -12,7 +11,6 @@
         "<!@(node -p \"require('node-addon-api').include\")",
         "include",
         "deps/simdjson",
-        "deps/v8-fast-api",
         "<!@(node -e \"var p=process.platform,a=process.arch;if(p==='darwin'){console.log(a==='arm64'?'/opt/homebrew/opt/re2/include':'/usr/local/opt/re2/include');console.log(a==='arm64'?'/opt/homebrew/opt/abseil/include':'/usr/local/opt/abseil/include');console.log(a==='arm64'?'/opt/homebrew/opt/mimalloc/include':'/usr/local/opt/mimalloc/include')}else{console.log('/usr/include')}\")"
       ],
       "libraries": [
@@ -24,7 +22,7 @@
       "cflags!": ["-fno-exceptions"],
       "cflags_cc!": ["-fno-exceptions"],
       "cflags_cc": ["-std=c++20"],
-      "defines": ["NAPI_DISABLE_CPP_EXCEPTIONS", "NDEBUG", "ATA_V8_FAST_API"],
+      "defines": ["NAPI_DISABLE_CPP_EXCEPTIONS", "NDEBUG"],
       "conditions": [
         ["OS=='mac'", {
           "xcode_settings": {

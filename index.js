@@ -1,5 +1,4 @@
 const native = require("node-gyp-build")(__dirname);
-const hasV8Fast = typeof native.v8IsValid === 'function';
 const {
   compileToJS,
   compileToJSCodegen,
@@ -588,55 +587,30 @@ class Validator {
       this._ensureNative();
       {
         const slot = this._fastSlot;
-        const fn = hasV8Fast ? native.v8IsValid : native.rawFastValidate;
         this.isValid = (buf) => {
           if (typeof buf === 'string') buf = Buffer.from(buf);
-          return fn(slot, buf);
+          return native.rawFastValidate(slot, buf);
         };
       }
       {
         const slot = this._fastSlot;
-        if (hasV8Fast) {
-          this.countValid = (ndjsonBuf) => {
-            if (typeof ndjsonBuf === 'string') ndjsonBuf = Buffer.from(ndjsonBuf);
-            return native.v8NDJSONCount(slot, ndjsonBuf);
-          };
-        } else {
-          this.countValid = (ndjsonBuf) => {
-            if (typeof ndjsonBuf === 'string') ndjsonBuf = Buffer.from(ndjsonBuf);
-            const results = native.rawNDJSONValidate(slot, ndjsonBuf);
-            let count = 0;
-            for (let i = 0; i < results.length; i++) if (results[i]) count++;
-            return count;
-          };
-        }
+        this.countValid = (ndjsonBuf) => {
+          if (typeof ndjsonBuf === 'string') ndjsonBuf = Buffer.from(ndjsonBuf);
+          const results = native.rawNDJSONValidate(slot, ndjsonBuf);
+          let count = 0;
+          for (let i = 0; i < results.length; i++) if (results[i]) count++;
+          return count;
+        };
       }
       {
         const slot = this._fastSlot;
-        if (hasV8Fast) {
-          this.batchIsValid = (buffers) => {
-            if (buffers.length === 0) return 0;
-            let total = 0;
-            for (let i = 0; i < buffers.length; i++) total += buffers[i].length;
-            const concat = Buffer.allocUnsafe(total);
-            const offsets = new Int32Array(buffers.length);
-            let pos = 0;
-            for (let i = 0; i < buffers.length; i++) {
-              offsets[i] = pos;
-              buffers[i].copy(concat, pos);
-              pos += buffers[i].length;
-            }
-            return native.v8BatchValidate(slot, concat, offsets, buffers.length);
-          };
-        } else {
-          this.batchIsValid = (buffers) => {
-            let valid = 0;
-            for (const buf of buffers) {
-              if (native.rawFastValidate(slot, buf)) valid++;
-            }
-            return valid;
-          };
-        }
+        this.batchIsValid = (buffers) => {
+          let valid = 0;
+          for (const buf of buffers) {
+            if (native.rawFastValidate(slot, buf)) valid++;
+          }
+          return valid;
+        };
       }
     } else {
       // ATA_FORCE_NAPI path: no JS codegen, use native for everything
@@ -652,55 +626,30 @@ class Validator {
       this.isValidJSON = (jsonStr) => this._compiled.isValidJSON(jsonStr);
       {
         const slot = this._fastSlot;
-        const fn = hasV8Fast ? native.v8IsValid : native.rawFastValidate;
         this.isValid = (buf) => {
           if (typeof buf === 'string') buf = Buffer.from(buf);
-          return fn(slot, buf);
+          return native.rawFastValidate(slot, buf);
         };
       }
       {
         const slot = this._fastSlot;
-        if (hasV8Fast) {
-          this.countValid = (ndjsonBuf) => {
-            if (typeof ndjsonBuf === 'string') ndjsonBuf = Buffer.from(ndjsonBuf);
-            return native.v8NDJSONCount(slot, ndjsonBuf);
-          };
-        } else {
-          this.countValid = (ndjsonBuf) => {
-            if (typeof ndjsonBuf === 'string') ndjsonBuf = Buffer.from(ndjsonBuf);
-            const results = native.rawNDJSONValidate(slot, ndjsonBuf);
-            let count = 0;
-            for (let i = 0; i < results.length; i++) if (results[i]) count++;
-            return count;
-          };
-        }
+        this.countValid = (ndjsonBuf) => {
+          if (typeof ndjsonBuf === 'string') ndjsonBuf = Buffer.from(ndjsonBuf);
+          const results = native.rawNDJSONValidate(slot, ndjsonBuf);
+          let count = 0;
+          for (let i = 0; i < results.length; i++) if (results[i]) count++;
+          return count;
+        };
       }
       {
         const slot = this._fastSlot;
-        if (hasV8Fast) {
-          this.batchIsValid = (buffers) => {
-            if (buffers.length === 0) return 0;
-            let total = 0;
-            for (let i = 0; i < buffers.length; i++) total += buffers[i].length;
-            const concat = Buffer.allocUnsafe(total);
-            const offsets = new Int32Array(buffers.length);
-            let pos = 0;
-            for (let i = 0; i < buffers.length; i++) {
-              offsets[i] = pos;
-              buffers[i].copy(concat, pos);
-              pos += buffers[i].length;
-            }
-            return native.v8BatchValidate(slot, concat, offsets, buffers.length);
-          };
-        } else {
-          this.batchIsValid = (buffers) => {
-            let valid = 0;
-            for (const buf of buffers) {
-              if (native.rawFastValidate(slot, buf)) valid++;
-            }
-            return valid;
-          };
-        }
+        this.batchIsValid = (buffers) => {
+          let valid = 0;
+          for (const buf of buffers) {
+            if (native.rawFastValidate(slot, buf)) valid++;
+          }
+          return valid;
+        };
       }
     }
   }

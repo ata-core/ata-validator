@@ -16,10 +16,6 @@
 
 #include "ata.h"
 
-#ifdef ATA_V8_FAST_API
-#include "ata_fast.h"
-#endif
-
 // ============================================================================
 // V8 Direct Object Traversal Engine
 // Validates Napi::Value directly without JSON.stringify + simdjson parse
@@ -1044,11 +1040,11 @@ static ThreadPool& pool() {
 }
 
 // --- Fast Validation Registry ---
-// Global schema slots — extern linkage for V8 CFunction paths in ata_fast.cpp
-extern const size_t MAX_FAST_SLOTS = 4096;
-ata::schema_ref g_fast_schemas[MAX_FAST_SLOTS];
-std::string g_fast_schema_jsons[MAX_FAST_SLOTS];
-uint32_t g_fast_slot_count = 0;
+// Global schema slots for pre-compiled validation (bypasses per-call compilation)
+static constexpr size_t MAX_FAST_SLOTS = 4096;
+static ata::schema_ref g_fast_schemas[MAX_FAST_SLOTS];
+static std::string g_fast_schema_jsons[MAX_FAST_SLOTS];
+static uint32_t g_fast_slot_count = 0;
 
 // Register a compiled schema in a fast slot, returns slot ID
 Napi::Value FastRegister(const Napi::CallbackInfo& info) {
@@ -1073,12 +1069,11 @@ Napi::Value FastRegister(const Napi::CallbackInfo& info) {
   return Napi::Number::New(env, slot);
 }
 
-// Fast validation: slot + Uint8Array → bool (called via V8 Fast API)
+// Fast validation: slot + raw buffer → bool
+// Routes through is_valid_buf → is_valid_prepadded → On-Demand od_plan fast path
 static bool FastValidateImpl(uint32_t slot, const uint8_t* data, size_t length) {
   if (slot >= g_fast_slot_count) return false;
-  auto result = ata::validate(g_fast_schemas[slot],
-                               std::string_view(reinterpret_cast<const char*>(data), length));
-  return result.valid;
+  return ata::is_valid_buf(g_fast_schemas[slot], data, length);
 }
 
 // Zero-copy validation with pre-padded buffer
@@ -1523,10 +1518,6 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
   napi_value pcount_fn;
   napi_create_function(env, "rawParallelCount", NAPI_AUTO_LENGTH, RawParallelCount, nullptr, &pcount_fn);
   exports.Set("rawParallelCount", Napi::Value(env, pcount_fn));
-
-#ifdef ATA_V8_FAST_API
-  ata_fast::Register(env, exports);
-#endif
 
   return exports;
 }
