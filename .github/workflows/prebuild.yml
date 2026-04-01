@@ -36,6 +36,25 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libre2-dev libabsl-dev
 
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup vcpkg
+        if: runner.os == 'Windows'
+        run: |
+          C:\vcpkg\bootstrap-vcpkg.bat
+        shell: cmd
+
+      - name: Install deps (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          C:\vcpkg\vcpkg install re2:x64-windows-static
+          C:\vcpkg\vcpkg install abseil:x64-windows-static
+        shell: cmd
+
       - name: Install dependencies
         run: npm install
 
