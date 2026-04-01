@@ -21,7 +21,9 @@
 // MSVC implementation by Pavel P (https://gist.github.com/pps83/3210a2f980fd02bb2ba2e5a1fc4a2ef0)
 #if defined(_MSC_VER) && !defined(__clang__)
 #include <intrin.h>
+#ifndef __builtin_popcount
 #define __builtin_popcount __popcnt
+#endif
 #endif // defined(_MSC_VER) && !defined(__clang__)
 
 #include "simdjson.h"
