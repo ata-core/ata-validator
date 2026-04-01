@@ -1,13 +1,25 @@
 cmake_minimum_required(VERSION 3.28)
+cmake_policy(SET CMP0091 NEW)
+cmake_policy(SET CMP0042 NEW)
+
 project(ata VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS True)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if(MSVC)
+  set(ABSL_MSVC_STATIC_RUNTIME ON)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
 option(ATA_TESTING "Build test suite" ON)
 option(ATA_BENCHMARKS "Build benchmarks" OFF)
 option(ATA_SANITIZE "Enable address sanitizer" OFF)
+
 
 # Fetch simdjson
 include(FetchContent)
@@ -50,7 +62,7 @@ add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 
 # Include Node-API wrappers
 execute_process(
-	COMMAND node -p "require('node-addon-api').include"
+  COMMAND node -p "require('node-addon-api').include"
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   OUTPUT_VARIABLE NODE_ADDON_API_DIR
 )
@@ -76,6 +88,22 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB})
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 
 add_library(ata::ata ALIAS ata)
+
+if(APPLE)
+#
+elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Android")
+  list(APPEND LINK_LIBRARIES -static-libgcc)
+elseif(UNIX)
+  list(APPEND LINK_LIBRARIES -static-libgcc -static-libstdc++)
+endif()
+
+target_link_libraries(${PROJECT_NAME} PRIVATE ${LINK_LIBRARIES})
+
+if(UNIX AND NOT APPLE)
+  target_compile_options(${PROJECT_NAME} PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
+  target_link_options(${PROJECT_NAME} PRIVATE -Wl,--exclude-libs,ALL)
+endif()
+
 
 if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
   # Generate node.lib
