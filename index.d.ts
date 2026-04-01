@@ -1,6 +1,8 @@
 export interface ValidationError {
-  code: string;
-  path: string;
+  keyword: string;
+  instancePath: string;
+  schemaPath: string;
+  params: Record<string, unknown>;
   message: string;
 }
 
