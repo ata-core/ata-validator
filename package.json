@@ -63,14 +63,14 @@
     "LICENSE"
   ],
   "dependencies": {
-    "cmake-js": "^8.0.0",
     "node-addon-api": "^8.7.0",
-    "node-api-headers": "^1.8.0"
+    "node-api-headers": "^1.8.0",
+    "pkg-prebuilds": "^1.0.0"
   },
   "devDependencies": {
     "@sinclair/typebox": "^0.34.49",
+    "cmake-js": "^8.0.0",
     "mitata": "^1.0.34",
-    "pkg-prebuilds": "^1.0.0",
     "typebox": "^1.1.7",
     "valibot": "^1.3.1",
     "zod": "^4.3.6"
