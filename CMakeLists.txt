@@ -98,10 +98,7 @@ endif()
 
 add_library(ata::ata ALIAS ata)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE ${LINK_LIBRARIES})
-
 if(CMAKE_JS_VERSION AND UNIX AND NOT APPLE)
-  list(APPEND LINK_LIBRARIES -static-libgcc -static-libstdc++)
   target_compile_options(${PROJECT_NAME} PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
   target_link_options(${PROJECT_NAME} PRIVATE -Wl,--exclude-libs,ALL)
 endif()
