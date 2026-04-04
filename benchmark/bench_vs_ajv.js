@@ -1,6 +1,8 @@
 const { bench, group, run, summary, do_not_optimize } = require('mitata')
-const { Validator } = require('../index')
-const native = require("pkg-prebuilds")(__dirname, require("./binding-options"));
+const { Validator } = require('../index');
+const path = require('path');
+
+const native = require("pkg-prebuilds")(path.join(__dirname, ".."), require(path.join(__dirname, "..", "binding-options")));
 
 const Ajv = require('ajv')
 const addFormats = require('ajv-formats')

@@ -1,7 +1,8 @@
 const { bench, group, run, summary } = require("mitata");
 const { Validator } = require("../index");
+const path = require('path');
 
-const native = require("node-gyp-build")(__dirname + "/..");
+const native = require("pkg-prebuilds")(path.join(__dirname, ".."), require(path.join(__dirname, "..", "binding-options")));
 
 const schema = {
   type: "object",
