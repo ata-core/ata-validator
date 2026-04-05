@@ -10,15 +10,7 @@ class Ata {
     const v = new Validator(schema);
     const validate = (data) => {
       const result = v.validate(data);
-      validate.errors = result.valid
-        ? null
-        : result.errors.map((e) => ({
-            instancePath: e.path ? "/" + e.path.replace(/\//g, "/") : "",
-            schemaPath: "",
-            keyword: "",
-            params: {},
-            message: e.message,
-          }));
+      validate.errors = result.valid ? null : result.errors;
       return result.valid;
     };
     validate.errors = null;

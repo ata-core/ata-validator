@@ -1,8 +1,20 @@
 cmake_minimum_required(VERSION 3.28)
+cmake_policy(SET CMP0091 NEW)
+cmake_policy(SET CMP0042 NEW)
+
 project(ata VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS True)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+if(MSVC)
+  set(ABSL_MSVC_STATIC_RUNTIME ON)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
 
 option(ATA_TESTING "Build test suite" ON)
 option(ATA_BENCHMARKS "Build benchmarks" OFF)
@@ -38,17 +50,63 @@ FetchContent_Declare(
   GIT_SHALLOW TRUE
 )
 
-FetchContent_MakeAvailable(abseil-cpp)
-FetchContent_MakeAvailable(simdjson re2)
+FetchContent_MakeAvailable(abseil-cpp simdjson re2)
 
-# Core library
-add_library(ata
-  src/ata.cpp
-  src/ata_c.cpp
-)
-target_include_directories(ata PUBLIC include)
-target_link_libraries(ata PRIVATE simdjson re2)
+if (CMAKE_JS_VERSION)
+  # add_definitions(-DNAPI_VERSION=10)
+  include_directories(${CMAKE_JS_INC})
+  file(GLOB SOURCE_FILES "binding/*.cpp" "src/*.cpp" "deps/simdjson/*.cpp")
+else()
+  file(GLOB SOURCE_FILES "src/*.cpp")
+endif()
+
+
+if (CMAKE_JS_VERSION)
+  add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
+
+  # Include Node-API wrappers
+  execute_process(
+    COMMAND node -p "require('node-addon-api').include"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE NODE_ADDON_API_DIR
+  )
+
+  string(REGEX REPLACE "[\r\n\"]" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
+  target_include_directories(${PROJECT_NAME} PRIVATE ${NODE_ADDON_API_DIR})
+
+  # Include Node-API C headers
+  execute_process(
+    COMMAND node -p "require('node-api-headers').include_dir"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE NODE_API_HEADERS_DIR
+  )
+
+  string(REGEX REPLACE "[\r\n\"]" "" NODE_API_HEADERS_DIR ${NODE_API_HEADERS_DIR})
+  target_include_directories(${PROJECT_NAME} PRIVATE ${NODE_API_HEADERS_DIR})
+else()
+  add_library(${PROJECT_NAME} ${SOURCE_FILES})
+endif()
+
+target_include_directories(${PROJECT_NAME} PUBLIC include)
+target_link_libraries(${PROJECT_NAME} PRIVATE simdjson re2)
+
+if (CMAKE_JS_VERSION)
+  target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_JS_INC})
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB})
+  set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
+endif()
+
 add_library(ata::ata ALIAS ata)
+
+if(CMAKE_JS_VERSION AND UNIX AND NOT APPLE)
+  target_compile_options(${PROJECT_NAME} PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
+  target_link_options(${PROJECT_NAME} PRIVATE -Wl,--exclude-libs,ALL)
+endif()
+
+if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
+  # Generate node.lib
+  execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
+endif()
 
 if(ATA_SANITIZE)
   target_compile_options(ata PRIVATE -fsanitize=address -fno-omit-frame-pointer)

@@ -8,3 +8,6 @@ benchmark/package-lock.json
 package-lock.json
 build_cmake/
 *.trace
+.cache/
+.DS_Store
+docs/superpowers/

@@ -1,6 +1,8 @@
 export interface ValidationError {
-  code: string;
-  path: string;
+  keyword: string;
+  instancePath: string;
+  schemaPath: string;
+  params: Record<string, unknown>;
   message: string;
 }
 
@@ -43,8 +45,14 @@ export class Validator {
   /** Fast boolean check for JSON string */
   isValidJSON(jsonString: string): boolean;
 
-  /** Validate Buffer/Uint8Array — raw NAPI fast path */
-  isValid(input: Buffer | Uint8Array): boolean;
+  /** Ultra-fast buffer validation via V8 CFunction — zero NAPI overhead */
+  isValid(input: Buffer | Uint8Array | string): boolean;
+
+  /** Count valid documents in an NDJSON buffer */
+  countValid(ndjsonBuf: Buffer | Uint8Array | string): number;
+
+  /** Count valid documents from an array of buffers */
+  batchIsValid(buffers: (Buffer | Uint8Array)[]): number;
 
   /** Zero-copy validation with pre-padded buffer */
   isValidPrepadded(paddedBuffer: Buffer, jsonLength: number): boolean;

@@ -1,4 +1,5 @@
-// Pure validation benchmark for profiling — nothing else
+// Pure validation benchmark for profiling with xctrace — nothing else.
+// Usage: node profile_validate.js [valid|invalid|bool-valid|bool-invalid]
 const { Validator } = require('../index');
 
 const schema = {
@@ -12,29 +13,49 @@ const schema = {
     tags: { type: 'array', items: { type: 'string' }, uniqueItems: true, maxItems: 10 },
     address: {
       type: 'object',
-      properties: { street: { type: 'string' }, city: { type: 'string' } },
+      properties: { street: { type: 'string' }, city: { type: 'string' }, zip: { type: 'string', pattern: '^[0-9]{5}$' } },
       required: ['street', 'city'],
     },
   },
   required: ['id', 'name', 'email', 'active'],
 };
 
-const v = new Validator(schema);
-const doc = {
+const validDoc = {
   id: 42, name: 'Mert', email: 'mert@example.com', age: 26, active: true,
-  tags: ['nodejs', 'cpp', 'perf'], address: { street: 'Main St', city: 'Istanbul' },
+  tags: ['nodejs', 'cpp', 'perf'], address: { street: 'Main St', city: 'Istanbul', zip: '34000' },
 };
 
-// Expose internals for profiling
-const jsFn = v._jsFn;
-const combined = v.validate;
+const invalidDoc = {
+  id: -1, name: '', email: 'not-an-email', age: 200, active: 'yes',
+  tags: ['a', 'a'], address: { zip: 'abc' },
+};
 
-// Warmup
-for (let i = 0; i < 10000; i++) combined(doc);
+const v = new Validator(schema);
 
-// Profile this loop
+// Warmup — trigger JIT
+for (let i = 0; i < 1000; i++) {
+  v.validate(validDoc);
+  v.validate(invalidDoc);
+  v.isValidObject(validDoc);
+  v.isValidObject(invalidDoc);
+}
+
 const N = 5_000_000;
+const mode = process.argv[2] || 'valid';
+
+console.log(`Profiling: ${mode}, ${N} iterations`);
 const start = performance.now();
-for (let i = 0; i < N; i++) combined(doc);
+
+if (mode === 'valid') {
+  for (let i = 0; i < N; i++) v.validate(validDoc);
+} else if (mode === 'invalid') {
+  for (let i = 0; i < N; i++) v.validate(invalidDoc);
+} else if (mode === 'bool-valid') {
+  for (let i = 0; i < N; i++) v.isValidObject(validDoc);
+} else if (mode === 'bool-invalid') {
+  for (let i = 0; i < N; i++) v.isValidObject(invalidDoc);
+}
+
 const ms = performance.now() - start;
-console.log(Math.round(N / (ms / 1000)).toLocaleString(), 'ops/sec');
+const nsPerOp = (ms * 1e6) / N;
+console.log(`${nsPerOp.toFixed(2)} ns/op | ${Math.round(N / (ms / 1000)).toLocaleString()} ops/sec | ${ms.toFixed(0)}ms total`);

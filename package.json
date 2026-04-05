@@ -1,18 +1,41 @@
 {
   "name": "ata-validator",
-  "version": "0.5.0",
-  "description": "Ultra-fast JSON Schema validator with full ajv feature parity. 5.9x faster validation on complex schemas, 2,184x faster compilation. Cross-schema $ref, Draft 7 support, patternProperties/dependentSchemas/propertyNames codegen. V8-optimized JS codegen, simdjson, RE2, multi-core. Standard Schema V1 compatible.",
+  "version": "0.7.3",
+  "description": "Ultra-fast JSON Schema validator. 4.7x faster validation, 1,800x faster compilation. Works without native addon. Cross-schema $ref, Draft 2020-12 + Draft 7, V8-optimized JS codegen, simdjson, RE2, multi-core. Standard Schema V1 compatible.",
   "main": "index.js",
+  "module": "index.mjs",
   "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "browser": {
+        "import": "./index.browser.mjs",
+        "require": "./index.js"
+      },
+      "import": "./index.mjs",
+      "require": "./index.js"
+    },
+    "./compat": {
+      "types": "./compat.d.ts",
+      "import": "./compat.mjs",
+      "require": "./compat.js"
+    }
+  },
+  "sideEffects": false,
+  "browser": {
+    "pkg-prebuilds": false
+  },
   "scripts": {
-    "install": "node-gyp-build",
-    "build": "node-gyp rebuild",
-    "prebuild": "prebuildify --napi --strip",
-    "prebuild-all": "prebuildify --napi --strip --arch x64 && prebuildify --napi --strip --arch arm64",
+    "install": "node scripts/install.js",
+    "build": "cmake-js build --target ata",
+    "rebuild": "cmake-js rebuild --target ata",
+    "prebuild": "pkg-prebuilds-copy --baseDir build/Release --source ata.node --name=ata --strip --napi_version=10",
+    "prebuild-all": "npm run prebuild -- --arch x64 && npm run prebuild -- --arch arm64",
     "test": "node test.js",
     "test:suite": "node tests/run_suite.js",
     "test:compat": "node tests/test_compat.js",
     "test:standard-schema": "node tests/test_standard_schema.js",
+    "test:browser": "node tests/test_browser.js",
     "bench": "node benchmark/bench_large.js",
     "fuzz": "node tests/fuzz_differential.js",
     "fuzz:long": "FUZZ_ITERATIONS=100000 node tests/fuzz_differential.js"
@@ -47,31 +70,40 @@
   },
   "files": [
     "index.js",
+    "index.mjs",
+    "index.browser.mjs",
     "index.d.ts",
     "lib/",
     "compat.js",
+    "compat.mjs",
     "compat.d.ts",
-    "binding.gyp",
+    "binding-options.js",
     "binding/",
     "include/",
     "src/",
     "deps/",
     "prebuilds/",
+    "scripts/",
+    "CMakeLists.txt",
     "README.md",
     "LICENSE"
   ],
   "dependencies": {
-    "node-addon-api": "^8.0.0",
-    "node-gyp-build": "^4.8.4"
+    "node-addon-api": "^8.7.0",
+    "node-api-headers": "^1.8.0",
+    "pkg-prebuilds": "^1.0.0"
   },
   "devDependencies": {
     "@sinclair/typebox": "^0.34.49",
+    "cmake-js": "^8.0.0",
     "mitata": "^1.0.34",
-    "node-gyp": "^11.0.0",
-    "prebuildify": "^6.0.1",
     "typebox": "^1.1.7",
     "valibot": "^1.3.1",
     "zod": "^4.3.6"
   },
-  "gypfile": true
+  "binary": {
+    "napi_versions": [
+      10
+    ]
+  }
 }
