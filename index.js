@@ -1256,6 +1256,12 @@ Validator.bundleStandalone = function (schemas, opts) {
         .map(({ name, fn }) => `var ${name}=${fn.toString()};`)
         .join('\n');
     }
+    // Include hoisted anyOf/oneOf branch helpers (e.g. `_af1_b0`) so the
+    // bundle output is self-contained. `toStandalone` emits this same source
+    // for single-schema standalone output.
+    if (jsFn._preambleSource) {
+      preamble = preamble ? `${preamble}\n${jsFn._preambleSource}` : jsFn._preambleSource;
+    }
     if (opts && opts.verbose) {
       // Embed the schema and a small resolver so errors carry parentSchema.
       const schemaLit = JSON.stringify(typeof schema === 'string' ? JSON.parse(schema) : schema);
