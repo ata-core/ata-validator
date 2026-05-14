@@ -67,6 +67,17 @@ jobs:
       - name: Prebuild
         run: npm run prebuild
 
+      # `strip -Sx` rewrites the Mach-O and invalidates the ad-hoc signature
+      # the linker applied. arm64 macOS refuses to load unsigned code, so the
+      # binary must be re-signed and verified before it ships.
+      - name: Re-sign and verify macOS prebuild
+        if: runner.os == 'macOS'
+        run: |
+          for f in prebuilds/*/node-napi-v10.node; do
+            codesign --force --sign - "$f"
+            codesign --verify --verbose "$f"
+          done
+
       - name: Upload prebuilds
         uses: actions/upload-artifact@v4
         with:

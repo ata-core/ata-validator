@@ -36,6 +36,7 @@
   },
   "scripts": {
     "install": "node scripts/install.js",
+    "prepublishOnly": "node scripts/check-prebuilds.js",
     "build": "cmake-js build --target ata",
     "rebuild": "cmake-js rebuild --target ata",
     "prebuild": "pkg-prebuilds-copy --baseDir build/Release --source ata.node --name=ata --strip --napi_version=10",
