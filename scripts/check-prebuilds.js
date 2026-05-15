@@ -15,7 +15,6 @@ const required = [
   'ata-linux-x64-musl',
   'ata-linux-arm64-musl',
   'ata-darwin-arm64',
-  'ata-darwin-x64',
   'ata-win32-x64',
 ];
 
