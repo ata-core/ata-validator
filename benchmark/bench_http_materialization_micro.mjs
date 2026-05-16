@@ -55,7 +55,25 @@ const result = await run({ json: true })
 
 const outDir = 'benchmark/baselines/2026-05-16/http-materialization'
 mkdirSync(outDir, { recursive: true })
-writeFileSync(`${outDir}/micro.json`, JSON.stringify(result, null, 2))
+
+// mitata's per-iter samples + debug fn source dominate the JSON size (>100MB
+// otherwise). Strip them; we only need summary stats for the verdict and the
+// committed record.
+function slim(r) {
+  const trimmed = JSON.parse(JSON.stringify(r))
+  if (trimmed.context?.noop) delete trimmed.context.noop
+  for (const b of trimmed.benchmarks || []) {
+    for (const run of b.runs || []) {
+      if (run.stats) {
+        delete run.stats.samples
+        delete run.stats.debug
+      }
+    }
+  }
+  return trimmed
+}
+
+writeFileSync(`${outDir}/micro.json`, JSON.stringify(slim(result), null, 2))
 console.log(`\nRaw results written to ${outDir}/micro.json`)
 
 // --- Verdict ---
