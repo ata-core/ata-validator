@@ -2,6 +2,21 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.14.0 - 2026-05-16
+
+### Added
+
+- Generic `Validator<T>` with type predicate `isValidObject(data): data is T`. Pairs naturally with TypeBox, Zod-from-JSON-Schema, Valibot, or hand-written types over JSON Schema literals.
+- `ValidationResult<T>` and `ValidateAndParseResult<T>` are discriminated unions. On the `valid: true` branch the parsed data is typed; on `valid: false` the `errors` array carries the diagnostic information.
+
+### Changed
+
+- Type-level only: accessing `result.data` (or `result.value` on `validateAndParse`) without first checking `result.valid` is now a TypeScript compile error. Runtime behavior is unchanged. The previous shape returned `undefined` in that position, so this surfaces an existing latent bug at compile time.
+
+### Notes
+
+- Pure `.d.ts` change. No JS, C++, AOT, or CLI behavior is affected. Bundle size unchanged. Runtime performance unchanged.
+
 ## 0.13.4 — 2026-05-14
 
 ### Fixed
