@@ -1,6 +1,6 @@
 # ata-validator
 
-Compile JSON Schema files into per-schema ESM modules at build time. Drop the runtime validator from your production bundle. Optional runtime API for dynamic schemas.
+JSON Schema validation with first-class TypeScript and zero runtime cost. AOT compile your schemas to per-schema ESM modules with no validator dependency. `Validator<T>` composes with TypeBox, Zod-from-JSON-Schema, Valibot, or hand-written types. Runtime API available for dynamic schemas.
 
 [![npm](https://img.shields.io/npm/v/ata-validator)](https://www.npmjs.com/package/ata-validator)
 [![License](https://img.shields.io/npm/l/ata-validator)](LICENSE)
