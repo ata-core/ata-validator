@@ -1,6 +1,6 @@
 {
   "name": "ata-validator",
-  "version": "0.13.4",
+  "version": "0.14.0",
   "description": "Ultra-fast JSON Schema validator. 5x faster validation, 159,000x faster compilation. Works without native addon. Cross-schema $ref, Draft 2020-12 + Draft 7, V8-optimized JS codegen, simdjson, RE2, multi-core. Standard Schema V1 compatible.",
   "main": "index.js",
   "module": "index.mjs",
@@ -41,7 +41,7 @@
     "rebuild": "cmake-js rebuild --target ata",
     "prebuild": "pkg-prebuilds-copy --baseDir build/Release --source ata.node --name=ata --strip --napi_version=10",
     "prebuild-all": "npm run prebuild -- --arch x64 && npm run prebuild -- --arch arm64",
-    "test": "node test.js && node tests/test_no_native.js && node tests/test_aot_build.js && node tests/test_aot_differential.js && node tests/test_aot_cli_build.js && node tests/test_aot_cli_smoke.js && node tests/test_bundle_standalone.js",
+    "test": "node test.js && node tests/test_no_native.js && node tests/test_aot_build.js && node tests/test_aot_differential.js && node tests/test_aot_cli_build.js && node tests/test_aot_cli_smoke.js && node tests/test_bundle_standalone.js && node tests/test_typed_validator_runner.js",
     "test:suite": "node tests/run_suite.js",
     "test:compat": "node tests/test_compat.js",
     "test:standard-schema": "node tests/test_standard_schema.js",
@@ -49,6 +49,7 @@
     "test:ts": "node tests/test_ts_gen.js",
     "test:ts-corpus": "node tests/test_ts_corpus.js",
     "test:ts-differential": "node tests/test_ts_differential.js",
+    "test:typed": "node tests/test_typed_validator_runner.js",
     "bench": "node benchmark/bench_large.js",
     "fuzz": "node tests/fuzz_differential.js",
     "fuzz:long": "FUZZ_ITERATIONS=100000 node tests/fuzz_differential.js",
@@ -119,10 +120,13 @@
     "yaml": "^2.0.0"
   },
   "peerDependenciesMeta": {
-    "yaml": { "optional": true }
+    "yaml": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@sinclair/typebox": "^0.34.49",
+    "@types/node": "^25.8.0",
     "cmake-js": "^8.0.0",
     "mitata": "^1.0.34",
     "typebox": "^1.1.7",
