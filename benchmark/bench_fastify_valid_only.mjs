@@ -117,3 +117,26 @@ const outDir = 'benchmark/baselines/2026-05-16/http-materialization'
 mkdirSync(outDir, { recursive: true })
 writeFileSync(`${outDir}/e2e.json`, JSON.stringify(allResults, null, 2))
 console.log(`\nRaw results written to ${outDir}/e2e.json`)
+
+// --- Verdict ---
+// E2e condition: |rps_best_ata - rps_ajv| / rps_ajv <= 5%
+// evaluated on the MEDIUM payload (spec choice).
+const target = allResults.medium
+const bestAta = Math.max(target.ata1.rps, target.ata2.rps)
+const bestLabel = target.ata1.rps >= target.ata2.rps ? 'ata-v1' : 'ata-v2'
+const delta = Math.abs(bestAta - target.ajv.rps) / target.ajv.rps
+const pass = delta <= 0.05
+
+console.log('\nCRITERIA EVALUATION (e2e, medium payload, 100% valid)')
+console.log('-'.repeat(70))
+console.log(`  ajv rps:        ${target.ajv.rps.toFixed(0)}`)
+console.log(`  ata-v1 rps:     ${target.ata1.rps.toFixed(0)}`)
+console.log(`  ata-v2 rps:     ${target.ata2.rps.toFixed(0)}`)
+const dir = bestAta >= target.ajv.rps ? 'ahead' : 'behind'
+console.log(`  best-ata (${bestLabel}) vs ajv:  ${(delta * 100).toFixed(1)}% ${dir}   ${pass ? 'PASS' : 'FAIL'}`)
+console.log(`  (PASS means within ±5% — the moment where a fused path matters)`)
+
+writeFileSync(
+  `${outDir}/e2e_verdict.json`,
+  JSON.stringify({ pass, delta, bestLabel, dir, target }, null, 2),
+)
