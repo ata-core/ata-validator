@@ -50,3 +50,36 @@ if (r.valid) {
 // Without narrowing on r.valid, r.data has type `User | undefined`; .id must error in strict mode
 // @ts-expect-error -- r.data may be undefined without checking r.valid
 const _directId: number = r.data.id;
+
+// --- Scenario 2: hand-written JSON Schema literal + hand-typed interface ---
+
+interface Order {
+  orderId: string;
+  total: number;
+  paid: boolean;
+}
+
+const orderSchema = {
+  type: 'object',
+  properties: {
+    orderId: { type: 'string', minLength: 1 },
+    total: { type: 'number', minimum: 0 },
+    paid: { type: 'boolean' },
+  },
+  required: ['orderId', 'total', 'paid'],
+} as const;
+
+const orderValidator = new Validator<Order>(orderSchema);
+
+declare const maybeOrder: unknown;
+
+if (orderValidator.isValidObject(maybeOrder)) {
+  const _orderId: string = maybeOrder.orderId;
+  const _total: number = maybeOrder.total;
+  const _paid: boolean = maybeOrder.paid;
+}
+
+const orderResult = orderValidator.validate(maybeOrder);
+if (orderResult.valid) {
+  const _orderFromResult: Order = orderResult.data;
+}
