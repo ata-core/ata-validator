@@ -51,14 +51,54 @@ The condition was designed to detect the marginal case where a fused path would 
 
 3. simdjson walk being 1.5-2x faster than V8 parse opens a separate, larger opportunity: a simdjson-based JSON materializer that replaces V8 `JSON.parse` entirely, with validation as a free side effect. The current measurement doesn't quantify whether NAPI overhead allows this to actually beat V8 parse. That is a different spike.
 
-## Recommended next steps
+## Follow-up: NAPI materialize feasibility (added 2026-05-16)
 
-In order of leverage:
+To gate the "can we fix v1 with a fused validate-and-materialize C++ path?"
+question, we benched the npm `simdjson` package — which is essentially what
+a fused implementation would be: simdjson parse + NAPI materialize, no
+validation.
 
-1. **Document the winning Fastify integration pattern** in ata's README and benchmarks: `addContentTypeParser(buffer) → JSON.parse → isValidObject`. Make the +10-23% delta visible and reproducible. This directly addresses Matteo's binary-dep argument with data.
+| Size | bytes | JSON.parse(str) | simdjson.parse(str) | ratio | simdjson.lazyParse(str) |
+|------|------:|---:|---:|---:|---:|
+| small  | 78    | 158 ns   | 739 ns    | 4.67x slower | 1132 ns |
+| medium | 4045  | 6.57 µs  | 28.16 µs  | 4.29x slower | 6.67 µs |
+| large  | 41419 | 62.33 µs | 279.46 µs | 4.48x slower | 46.78 µs |
 
-2. **Bring the numbers to the Fastify thread.** The runtime benefit Matteo doubted is measurable. Whether it changes his default-validator stance is his call, but the evidence is real and worth presenting.
+**NAPI materialize is the wall.** Eager simdjson + NAPI is 4-5x slower than
+V8's JSON.parse across all sizes. Adding validation on top cannot recover
+that. **The "fused validate-and-materialize C++ path" is not feasible.**
 
-3. **(Optional) Open a separate spike** on simdjson-based parse-and-materialize that replaces V8 `JSON.parse`. This is architecturally interesting because Micro #2 confirmed simdjson walk is faster than V8 parse. But this is a much bigger build than fused parse+validate; estimate NAPI overhead first before committing.
+`simdjson.lazyParse` is interesting on a different axis: at large payloads it
+beats V8 by 25% — but only because it returns a Proxy that defers all
+materialization. Handler-side access cost is not measured here and could
+flip the picture. This is a separate product direction (lazy validated
+parsing for handlers that read partial bodies), not a fix for v1.
 
-**Do not build:** fused parse + validate + materialize. The microbench rules it out.
+## Final recommendation
+
+The v1 configuration (`isValid(buf) + JSON.parse`) cannot be made faster
+than AJV by changing ata's C++ side. The buffer-content-type-parser
+overhead and the double byte walk are structural; the obvious fix (fuse
+the walk with materialization) hits the NAPI wall.
+
+**The real win is repositioning, not C++.**
+
+1. **Make `parse + isValidObject` the documented Fastify pattern.** Update
+   README and examples to lead with it. Currently ata is being measured in
+   its losing configuration; the +12-22% configuration is buried.
+
+2. **Take the numbers to the Fastify thread.** Concrete counter-evidence to
+   "not really worth a binary dep": at medium and large payloads in 100%
+   valid traffic, ata in the right configuration is +12% to +22% faster
+   than AJV. That is a meaningful runtime benefit. Present it honestly,
+   including the v1 finding (intuitive "fast path" doesn't win) — it
+   strengthens the credibility of the v2 numbers.
+
+3. **Backlog: lazy parsing as a separate product.** `simdjson.lazyParse`'s
+   25% win on large payloads suggests a future `ata-lazy` package (or mode)
+   for handlers that read partial bodies. Out of scope for now; spike it
+   separately when there is a clear consumer.
+
+**Do not build:** any C++ change to "fix" v1. The two underlying bench
+results (no headroom from fusing parse+validate, NAPI wall on
+parse+materialize) close that door together.
