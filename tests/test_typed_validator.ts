@@ -83,3 +83,38 @@ const orderResult = orderValidator.validate(maybeOrder);
 if (orderResult.valid) {
   const _orderFromResult: Order = orderResult.data;
 }
+
+// --- Scenario 3: Standard Schema V1 bridge composition ---
+
+interface Profile {
+  username: string;
+  age: number;
+}
+
+const profileSchema = {
+  type: 'object',
+  properties: {
+    username: { type: 'string', minLength: 3 },
+    age: { type: 'integer', minimum: 0 },
+  },
+  required: ['username', 'age'],
+} as const;
+
+const profileValidator = new Validator<Profile>(profileSchema);
+
+// The ~standard interface should be present and typed
+const std = profileValidator['~standard'];
+
+const _version: 1 = std.version;
+const _vendor: 'ata-validator' = std.vendor;
+
+declare const profileInput: unknown;
+const stdResult = std.validate(profileInput);
+
+// Standard Schema V1 result shape: { value: unknown } | { issues: [...] }
+if ('issues' in stdResult) {
+  const _issuesLen: number = stdResult.issues.length;
+} else {
+  // .value is unknown per the spec; consumers narrow at their level
+  const _stdValue: unknown = stdResult.value;
+}
