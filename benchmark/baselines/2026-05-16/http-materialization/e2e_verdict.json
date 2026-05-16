@@ -1,0 +1,36 @@
+{
+  "pass": false,
+  "delta": 0.11739433348815595,
+  "bestLabel": "ata-v2",
+  "dir": "ahead",
+  "target": {
+    "payloadBytes": 4045,
+    "ajv": {
+      "label": "ajv",
+      "rps": 27558.4,
+      "latencyAvg": 0,
+      "latencyP99": 0,
+      "throughputMBs": 4.78359375,
+      "errors": 0,
+      "non2xx": 0
+    },
+    "ata1": {
+      "label": "ata-v1",
+      "rps": 26144,
+      "latencyAvg": 0.01,
+      "latencyP99": 0,
+      "throughputMBs": 4.5375,
+      "errors": 0,
+      "non2xx": 0
+    },
+    "ata2": {
+      "label": "ata-v2",
+      "rps": 30793.6,
+      "latencyAvg": 0,
+      "latencyP99": 0,
+      "throughputMBs": 5.344921875,
+      "errors": 0,
+      "non2xx": 0
+    }
+  }
+}

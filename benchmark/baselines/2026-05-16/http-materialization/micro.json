@@ -1,0 +1,806 @@
+{
+  "layout": [
+    {
+      "name": null,
+      "types": []
+    },
+    {
+      "name": "size=small (78 bytes)",
+      "types": [
+        "g"
+      ]
+    },
+    {
+      "name": null,
+      "types": []
+    },
+    {
+      "name": "size=medium (4045 bytes)",
+      "types": [
+        "g"
+      ]
+    },
+    {
+      "name": null,
+      "types": []
+    },
+    {
+      "name": "size=large (41419 bytes)",
+      "types": [
+        "g"
+      ]
+    },
+    {
+      "name": null,
+      "types": []
+    }
+  ],
+  "context": {
+    "now": 1778927645321,
+    "arch": "arm64-darwin",
+    "version": "25.2.1",
+    "runtime": "node",
+    "cpu": {
+      "name": "Apple M4 Pro",
+      "freq": 4.437011354438681
+    }
+  },
+  "benchmarks": [
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(str)",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 159.952880859375,
+            "max": 274.94287109375,
+            "p25": 172.60742187476717,
+            "p50": 175.791259765625,
+            "p75": 178.853271484375,
+            "p99": 209.23876953125,
+            "p999": 233.45947265625,
+            "avg": 176.6551194450315,
+            "ticks": 3915776,
+            "heap": {
+              "_": 936,
+              "total": 97716.619140625,
+              "min": 3.431640625,
+              "max": 278.171875,
+              "avg": 104.3980973724626
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(buf)",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 263.203857421875,
+            "max": 641.215087890625,
+            "p25": 277.191162109375,
+            "p50": 285.2783203125,
+            "p75": 298.370361328125,
+            "p99": 371.012451171875,
+            "p999": 544.036865234375,
+            "avg": 290.8815152939052,
+            "ticks": 2392064,
+            "heap": {
+              "_": 572,
+              "total": 115337.802734375,
+              "min": 189.25,
+              "max": 448.134765625,
+              "avg": 201.63951526988637
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(buf)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "secure-json-parse(str)",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 196.044921875,
+            "max": 251.33251953125,
+            "p25": 212.544677734375,
+            "p50": 216.756103515625,
+            "p75": 220.489501953125,
+            "p99": 241.170166015625,
+            "p999": 250.42724609375,
+            "avg": 216.7831804791733,
+            "ticks": 3223552,
+            "heap": {
+              "_": 778,
+              "total": 81351.1484375,
+              "min": 23.109375,
+              "max": 282.107421875,
+              "avg": 104.56445814588689
+            }
+          },
+          "args": {},
+          "name": "secure-json-parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "ata.isValid(buf)",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 41,
+            "max": 270167,
+            "p25": 125,
+            "p50": 125,
+            "p75": 166,
+            "p99": 208,
+            "p999": 375,
+            "avg": 137.17296738208805,
+            "ticks": 2768019,
+            "heap": {
+              "_": 2767910,
+              "total": 1072906448,
+              "min": 384,
+              "max": 238528,
+              "avg": 387.623314341868
+            }
+          },
+          "args": {},
+          "name": "ata.isValid(buf)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "ata.isValidObject(obj)",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 8.575439453125,
+            "max": 152.313232421875,
+            "p25": 9.30786132789217,
+            "p50": 9.89794921851717,
+            "p75": 10.467529296875,
+            "p99": 33.589599609375,
+            "p999": 76.79248046898283,
+            "avg": 11.64900131278058,
+            "ticks": 59842560,
+            "heap": {
+              "_": 14597,
+              "total": 2606.11328125,
+              "min": 0.10546875,
+              "max": 64.10546875,
+              "avg": 0.17853759548194834
+            }
+          },
+          "args": {},
+          "name": "ata.isValidObject(obj)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(str) + ata.isValidObject(obj)",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 176.717041015625,
+            "max": 745.24951171875,
+            "p25": 189.046142578125,
+            "p50": 194.7021484375,
+            "p75": 206.9296875,
+            "p99": 473.93798828171566,
+            "p999": 723.917724609375,
+            "avg": 207.57238724151952,
+            "ticks": 3305472,
+            "heap": {
+              "_": 803,
+              "total": 84024.09765625,
+              "min": 48.298828125,
+              "max": 310.109375,
+              "avg": 104.63773058063512
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(str) + ata.isValidObject(obj)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "AJV(JSON.parse(str))",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 207.5400390625,
+            "max": 266.835693359375,
+            "p25": 226.633544921875,
+            "p50": 231.221435546875,
+            "p75": 233.28662109375,
+            "p99": 252.105712890625,
+            "p999": 262.237548828125,
+            "avg": 230.2837069124789,
+            "ticks": 3031040,
+            "heap": {
+              "_": 734,
+              "total": 117942.935546875,
+              "min": 109.12890625,
+              "max": 334.12890625,
+              "avg": 160.68519829274524
+            }
+          },
+          "args": {},
+          "name": "AJV(JSON.parse(str))"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(str)",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 6157.114501953125,
+            "max": 6335.652587890625,
+            "p25": 6203.958984375,
+            "p50": 6245.03564453125,
+            "p75": 6255.228759765625,
+            "p99": 6334.513427734375,
+            "p999": 6334.513427734375,
+            "avg": 6241.586507161458,
+            "ticks": 98304,
+            "heap": {
+              "_": 18,
+              "total": 101688.158203125,
+              "min": 5649.1796875,
+              "max": 5649.46484375,
+              "avg": 5649.342122395833
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(buf)",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 6501.129150390625,
+            "max": 6749.1455078125,
+            "p25": 6552.927734375,
+            "p50": 6586.212158203125,
+            "p75": 6659.210205078125,
+            "p99": 6684.489013671875,
+            "p999": 6684.489013671875,
+            "avg": 6606.5294855291195,
+            "ticks": 90112,
+            "heap": {
+              "_": 10,
+              "total": 97155.515625,
+              "min": 9715.546875,
+              "max": 9715.552734375,
+              "avg": 9715.5515625
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(buf)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "secure-json-parse(str)",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 7074.808837890625,
+            "max": 7483.052490234375,
+            "p25": 7147.216796875,
+            "p50": 7217.64111328125,
+            "p75": 7330.03759765625,
+            "p99": 7435.791015625,
+            "p999": 7435.791015625,
+            "avg": 7245.965576171875,
+            "ticks": 81920,
+            "heap": {
+              "_": 15,
+              "total": 84740.01171875,
+              "min": 5649.1640625,
+              "max": 5649.46484375,
+              "avg": 5649.334114583334
+            }
+          },
+          "args": {},
+          "name": "secure-json-parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "ata.isValid(buf)",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 3958,
+            "max": 38167,
+            "p25": 4166,
+            "p50": 4291,
+            "p75": 4625,
+            "p99": 5875,
+            "p999": 13834,
+            "avg": 4418.927333111071,
+            "ticks": 155972,
+            "heap": {
+              "_": 155933,
+              "total": 6881096,
+              "min": 0,
+              "max": 176040,
+              "avg": 44.12854238679433
+            }
+          },
+          "args": {},
+          "name": "ata.isValid(buf)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "ata.isValidObject(obj)",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 566.426513671875,
+            "max": 680.765869140625,
+            "p25": 614.349365234375,
+            "p50": 620.1884765625,
+            "p75": 625.274658203125,
+            "p99": 640.0146484375,
+            "p999": 645.884033203125,
+            "avg": 618.3867027698864,
+            "ticks": 1126400,
+            "heap": {
+              "_": 278,
+              "total": 398.3984375,
+              "min": 0.09375,
+              "max": 365.10546875,
+              "avg": 1.433087904676259
+            }
+          },
+          "args": {},
+          "name": "ata.isValidObject(obj)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(str) + ata.isValidObject(obj)",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 6725.830078125,
+            "max": 6998.026611328125,
+            "p25": 6809.95703125,
+            "p50": 6850.03662109375,
+            "p75": 6879.251953125,
+            "p99": 6990.864990234375,
+            "p999": 6990.864990234375,
+            "avg": 6858.3235418146305,
+            "ticks": 90112,
+            "heap": {
+              "_": 18,
+              "total": 99587.62890625,
+              "min": 3546.12890625,
+              "max": 5652.580078125,
+              "avg": 5532.646050347223
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(str) + ata.isValidObject(obj)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "AJV(JSON.parse(str))",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 8755.177734375,
+            "max": 8977.6611328125,
+            "p25": 8771.37255859375,
+            "p50": 8878.3466796875,
+            "p75": 8940.673828125,
+            "p99": 8965.494873046875,
+            "p999": 8965.494873046875,
+            "avg": 8863.294631958008,
+            "ticks": 65536,
+            "heap": {
+              "_": 13,
+              "total": 74171.333984375,
+              "min": 5705.400390625,
+              "max": 5706.048828125,
+              "avg": 5705.487229567308
+            }
+          },
+          "args": {},
+          "name": "AJV(JSON.parse(str))"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(str)",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 64475.728515625,
+            "max": 69199.1474609375,
+            "p25": 64673.207763671875,
+            "p50": 65237.253906250466,
+            "p75": 66367.23852539062,
+            "p99": 69098.337890625,
+            "p999": 69098.337890625,
+            "avg": 66093.86450195312,
+            "ticks": 49152,
+            "heap": {
+              "_": 6,
+              "total": 42522.361328125,
+              "min": 7080.52734375,
+              "max": 7089.7890625,
+              "avg": 7087.060221354167
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(buf)",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 60667,
+            "max": 248250,
+            "p25": 63625,
+            "p50": 68542,
+            "p75": 70167,
+            "p99": 93709,
+            "p999": 202917,
+            "avg": 68525.24341720305,
+            "ticks": 10254,
+            "heap": {
+              "_": 10232,
+              "total": 1074251072,
+              "min": 16000,
+              "max": 331392,
+              "avg": 104989.35418295543
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(buf)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "secure-json-parse(str)",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 67792,
+            "max": 234250,
+            "p25": 72875,
+            "p50": 76916,
+            "p75": 78000,
+            "p99": 89542,
+            "p999": 121541,
+            "avg": 76094.95163907822,
+            "ticks": 9243,
+            "heap": {
+              "_": 9230,
+              "total": 521785384,
+              "min": 44216,
+              "max": 351056,
+              "avg": 56531.46088840737
+            }
+          },
+          "args": {},
+          "name": "secure-json-parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "ata.isValid(buf)",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 41564.208984375,
+            "max": 43495.025634765625,
+            "p25": 41858.591796875,
+            "p50": 42184.651611328125,
+            "p75": 42488.169189453125,
+            "p99": 42688.53759765625,
+            "p999": 42688.53759765625,
+            "avg": 42277.536153157555,
+            "ticks": 49152,
+            "heap": {
+              "_": 12,
+              "total": 0.69140625,
+              "min": 0.01171875,
+              "max": 0.5625,
+              "avg": 0.0576171875
+            }
+          },
+          "args": {},
+          "name": "ata.isValid(buf)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "ata.isValidObject(obj)",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 6266.133544921875,
+            "max": 6442.81005859375,
+            "p25": 6304.534912109375,
+            "p50": 6345.27587890625,
+            "p75": 6407.196044921875,
+            "p99": 6438.17138671875,
+            "p999": 6438.17138671875,
+            "avg": 6352.830230712891,
+            "ticks": 98304,
+            "heap": {
+              "_": 27,
+              "total": 3.232421875,
+              "min": 0,
+              "max": 2.869140625,
+              "avg": 0.1197193287037037
+            }
+          },
+          "args": {},
+          "name": "ata.isValidObject(obj)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(str) + ata.isValidObject(obj)",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 64000,
+            "max": 231583,
+            "p25": 68750,
+            "p50": 72125,
+            "p75": 73458,
+            "p99": 87250,
+            "p999": 194625,
+            "avg": 71903.68678396071,
+            "ticks": 9776,
+            "heap": {
+              "_": 9763,
+              "total": 551197496,
+              "min": 23712,
+              "max": 269472,
+              "avg": 56457.799446891324
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(str) + ata.isValidObject(obj)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "AJV(JSON.parse(str))",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 82125,
+            "max": 851791,
+            "p25": 87333,
+            "p50": 93083,
+            "p75": 97250,
+            "p99": 195792,
+            "p999": 533417,
+            "avg": 96340.93781813179,
+            "ticks": 7269,
+            "heap": {
+              "_": 7258,
+              "total": 410526312,
+              "min": 31960,
+              "max": 318312,
+              "avg": 56561.905759162306
+            }
+          },
+          "args": {},
+          "name": "AJV(JSON.parse(str))"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    }
+  ]
+}
