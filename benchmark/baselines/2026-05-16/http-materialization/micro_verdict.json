@@ -1,0 +1,27 @@
+{
+  "micro1AllPass": false,
+  "micro2AllPass": true,
+  "summary": [
+    {
+      "size": "small",
+      "ratio1": 1.1750148418773017,
+      "ratio2": 0.4715767766937311,
+      "pass1": false,
+      "pass2": true
+    },
+    {
+      "size": "medium",
+      "ratio1": 1.0988109407673101,
+      "ratio2": 0.6688727179361339,
+      "pass1": false,
+      "pass2": true
+    },
+    {
+      "size": "large",
+      "ratio1": 1.0879025961908446,
+      "ratio2": 0.6169629474463699,
+      "pass1": false,
+      "pass2": true
+    }
+  ]
+}

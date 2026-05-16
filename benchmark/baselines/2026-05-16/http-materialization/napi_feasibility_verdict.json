@@ -1,0 +1,41 @@
+{
+  "perSize": [
+    {
+      "size": "small",
+      "v8Str": 158.1454289990161,
+      "sjStr": 738.8565780907346,
+      "strRatio": 4.672007169396792,
+      "winStr": false,
+      "v8Buf": 277.7391979057248,
+      "sjFromBuf": 762.6572475519655,
+      "bufRatio": 2.745947469074352,
+      "winBuf": false,
+      "sjLazy": 1131.6754986620324
+    },
+    {
+      "size": "medium",
+      "v8Str": 6566.009563943624,
+      "sjStr": 28162.132242838543,
+      "strRatio": 4.289078772819214,
+      "winStr": false,
+      "v8Buf": 6911.692801339274,
+      "sjFromBuf": 28649.330159505207,
+      "bufRatio": 4.1450525917404555,
+      "winBuf": false,
+      "sjLazy": 6670.38984818892
+    },
+    {
+      "size": "large",
+      "v8Str": 62332.90399911622,
+      "sjStr": 279459.0564163172,
+      "strRatio": 4.483331250221864,
+      "winStr": false,
+      "v8Buf": 64643.63608805338,
+      "sjFromBuf": 283117.0096540512,
+      "bufRatio": 4.379657871788146,
+      "winBuf": false,
+      "sjLazy": 46776.21122233073
+    }
+  ],
+  "gatePass": false
+}
