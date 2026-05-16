@@ -119,7 +119,9 @@
     "yaml": "^2.0.0"
   },
   "peerDependenciesMeta": {
-    "yaml": { "optional": true }
+    "yaml": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@sinclair/typebox": "^0.34.49",
