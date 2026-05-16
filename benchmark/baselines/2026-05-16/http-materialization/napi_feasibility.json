@@ -1,0 +1,590 @@
+{
+  "layout": [
+    {
+      "name": null,
+      "types": []
+    },
+    {
+      "name": "size=small (78 bytes)",
+      "types": [
+        "g"
+      ]
+    },
+    {
+      "name": null,
+      "types": []
+    },
+    {
+      "name": "size=medium (4045 bytes)",
+      "types": [
+        "g"
+      ]
+    },
+    {
+      "name": null,
+      "types": []
+    },
+    {
+      "name": "size=large (41419 bytes)",
+      "types": [
+        "g"
+      ]
+    },
+    {
+      "name": null,
+      "types": []
+    }
+  ],
+  "context": {
+    "now": 1778928239419,
+    "arch": "arm64-darwin",
+    "version": "25.2.1",
+    "runtime": "node",
+    "cpu": {
+      "name": "Apple M4 Pro",
+      "freq": 4.452916480235106
+    }
+  },
+  "benchmarks": [
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(str)",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 141.09277343726717,
+            "max": 546.539306640625,
+            "p25": 155.01904296863358,
+            "p50": 157.1044921875,
+            "p75": 159.27124023425858,
+            "p99": 173.03466796875,
+            "p999": 268.68701171875,
+            "avg": 158.1454289990161,
+            "ticks": 4415488,
+            "heap": {
+              "_": 1052,
+              "total": 109678.173828125,
+              "min": 20.18359375,
+              "max": 270.173828125,
+              "avg": 104.25681922825571
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(buf)",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 239.237548828125,
+            "max": 1362.966064453125,
+            "p25": 259.92822265625,
+            "p50": 263.4990234375,
+            "p75": 274.18017578125,
+            "p99": 714.436767578125,
+            "p999": 1360.982421875,
+            "avg": 277.7391979057248,
+            "ticks": 2437120,
+            "heap": {
+              "_": 582,
+              "total": 117391.638671875,
+              "min": 191.041015625,
+              "max": 498.134765625,
+              "avg": 201.70384651524915
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(buf)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "simdjson.parse(str)",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 650.766845703125,
+            "max": 1299.1435546875,
+            "p25": 713.96875,
+            "p50": 726.08447265625,
+            "p75": 742.98095703125,
+            "p99": 984.822509765625,
+            "p999": 1207.275390625,
+            "avg": 738.8565780907346,
+            "ticks": 933888,
+            "heap": {
+              "_": 226,
+              "total": 38170.59375,
+              "min": 168.09765625,
+              "max": 341.123046875,
+              "avg": 168.8964325221239
+            }
+          },
+          "args": {},
+          "name": "simdjson.parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "buf.toString()+simdjson.parse",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 709.340576171875,
+            "max": 855.96728515625,
+            "p25": 745.2900390625,
+            "p50": 759.135009765625,
+            "p75": 775.766845703125,
+            "p99": 823.466064453125,
+            "p999": 845.021484375,
+            "avg": 762.6572475519655,
+            "ticks": 905216,
+            "heap": {
+              "_": 220,
+              "total": 58362.591796875,
+              "min": 262.505859375,
+              "max": 336.140625,
+              "avg": 265.28450816761364
+            }
+          },
+          "args": {},
+          "name": "buf.toString()+simdjson.parse"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "simdjson.lazyParse(str)",
+      "group": 1,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 869.66943359375,
+            "max": 11992.045166015625,
+            "p25": 924.835205078125,
+            "p50": 956.67529296875,
+            "p75": 999.064208984375,
+            "p99": 1776.682373046875,
+            "p999": 8337.331298828125,
+            "avg": 1131.6754986620324,
+            "ticks": 520192,
+            "heap": {
+              "_": 126,
+              "total": 92758.212890625,
+              "min": 735.84375,
+              "max": 739.337890625,
+              "avg": 736.1762927827381
+            }
+          },
+          "args": {},
+          "name": "simdjson.lazyParse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(str)",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 6467.559814453125,
+            "max": 6713.0126953125,
+            "p25": 6508.219482421875,
+            "p50": 6552.388427734375,
+            "p75": 6577.067138671875,
+            "p99": 6707.804443359375,
+            "p999": 6707.804443359375,
+            "avg": 6566.009563943624,
+            "ticks": 94208,
+            "heap": {
+              "_": 18,
+              "total": 99163.3046875,
+              "min": 3122.873046875,
+              "max": 5651.75390625,
+              "avg": 5509.072482638889
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(buf)",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 6805.938720703125,
+            "max": 6999.949218750233,
+            "p25": 6875.48828125,
+            "p50": 6894.1142578125,
+            "p75": 6961.06982421875,
+            "p99": 6992.248535156483,
+            "p999": 6992.248535156483,
+            "avg": 6911.692801339274,
+            "ticks": 86016,
+            "heap": {
+              "_": 11,
+              "total": 97554,
+              "min": 398.39453125,
+              "max": 9715.587890625,
+              "avg": 8868.545454545454
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(buf)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "simdjson.parse(str)",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 27695.96337890625,
+            "max": 28801.788330078125,
+            "p25": 27811.767578125,
+            "p50": 28087.982177734375,
+            "p75": 28382.6904296875,
+            "p99": 28671.01025390625,
+            "p999": 28671.01025390625,
+            "avg": 28162.132242838543,
+            "ticks": 49152,
+            "heap": {
+              "_": 4,
+              "total": 38476.8515625,
+              "min": 9619.208984375,
+              "max": 9619.216796875,
+              "avg": 9619.212890625
+            }
+          },
+          "args": {},
+          "name": "simdjson.parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "buf.toString()+simdjson.parse",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 27990.234375,
+            "max": 29304.656982421875,
+            "p25": 28329.986572265625,
+            "p50": 28565.633056640625,
+            "p75": 28911.478759765625,
+            "p99": 29121.561767578125,
+            "p999": 29121.561767578125,
+            "avg": 28649.330159505207,
+            "ticks": 49152,
+            "heap": {
+              "_": 2,
+              "total": 22684.6015625,
+              "min": 8888.84375,
+              "max": 13795.7578125,
+              "avg": 11342.30078125
+            }
+          },
+          "args": {},
+          "name": "buf.toString()+simdjson.parse"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "simdjson.lazyParse(str)",
+      "group": 3,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 5850.870849609375,
+            "max": 7408.57958984375,
+            "p25": 6372.660400390625,
+            "p50": 6772.237060546875,
+            "p75": 6907.643798828125,
+            "p99": 7243.804931640625,
+            "p999": 7243.804931640625,
+            "avg": 6670.38984818892,
+            "ticks": 90112,
+            "heap": {
+              "_": 25,
+              "total": 18407.189453125,
+              "min": 735.984375,
+              "max": 739.302734375,
+              "avg": 736.287578125
+            }
+          },
+          "args": {},
+          "name": "simdjson.lazyParse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(str)",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 55083,
+            "max": 209125,
+            "p25": 60250,
+            "p50": 62625,
+            "p75": 63916,
+            "p99": 73708,
+            "p999": 90042,
+            "avg": 62332.90399911622,
+            "ticks": 9052,
+            "heap": {
+              "_": 9039,
+              "total": 511900568,
+              "min": 15520,
+              "max": 285856,
+              "avg": 56632.43367629163
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "JSON.parse(buf)",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 64067.433837890625,
+            "max": 65872.10083007812,
+            "p25": 64249.81689453125,
+            "p50": 64538.95068359375,
+            "p75": 64942.17919921875,
+            "p99": 65059.916259765625,
+            "p999": 65059.916259765625,
+            "avg": 64643.63608805338,
+            "ticks": 49152,
+            "heap": {
+              "_": 7,
+              "total": 45886.072265625,
+              "min": 6551.28515625,
+              "max": 6560.291015625,
+              "avg": 6555.153180803572
+            }
+          },
+          "args": {},
+          "name": "JSON.parse(buf)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "simdjson.parse(str)",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 252874.99999809265,
+            "max": 451834,
+            "p25": 273959.00000190735,
+            "p50": 279208.9999961853,
+            "p75": 284416.00000190735,
+            "p99": 307790.99999809265,
+            "p999": 359458,
+            "avg": 279459.0564163172,
+            "ticks": 2517,
+            "heap": {
+              "_": 2513,
+              "total": 243458880,
+              "min": 95512,
+              "max": 648904,
+              "avg": 96879.77715877438
+            }
+          },
+          "args": {},
+          "name": "simdjson.parse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "buf.toString()+simdjson.parse",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 256375,
+            "max": 442333,
+            "p25": 277834,
+            "p50": 282333,
+            "p75": 288209,
+            "p99": 311834,
+            "p999": 430750,
+            "avg": 283117.0096540512,
+            "ticks": 2486,
+            "heap": {
+              "_": 2479,
+              "total": 349981128,
+              "min": 57392,
+              "max": 723200,
+              "avg": 141178.34933440902
+            }
+          },
+          "args": {},
+          "name": "buf.toString()+simdjson.parse"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    },
+    {
+      "kind": "static",
+      "args": {},
+      "alias": "simdjson.lazyParse(str)",
+      "group": 5,
+      "baseline": false,
+      "runs": [
+        {
+          "stats": {
+            "kind": "fn",
+            "min": 44377.81787109375,
+            "max": 54985.4228515625,
+            "p25": 44533.101318359375,
+            "p50": 45244.873046875,
+            "p75": 47283.793212890625,
+            "p99": 48988.545654296875,
+            "p999": 48988.545654296875,
+            "avg": 46776.21122233073,
+            "ticks": 49152,
+            "heap": {
+              "_": 11,
+              "total": 8097.755859375,
+              "min": 736.15625,
+              "max": 736.16796875,
+              "avg": 736.1596235795455
+            }
+          },
+          "args": {},
+          "name": "simdjson.lazyParse(str)"
+        }
+      ],
+      "style": {
+        "highlight": false,
+        "compact": false
+      }
+    }
+  ]
+}
