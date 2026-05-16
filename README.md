@@ -90,6 +90,39 @@ v.isValidParallel(ndjson);  // bool[]
 v.countValid(ndjson);        // number
 ```
 
+### Type-safe schemas
+
+`Validator` is generic. Pair it with any schema authoring tool, or a hand-written type, to get TypeScript narrowing in your handler code.
+
+```ts
+import { Type, type Static } from '@sinclair/typebox'
+import { Validator } from 'ata-validator'
+
+const UserSchema = Type.Object({
+  id: Type.Integer({ minimum: 1 }),
+  name: Type.String({ minLength: 1 }),
+  email: Type.String({ format: 'email' }),
+})
+
+type User = Static<typeof UserSchema>
+
+const v = new Validator<User>(UserSchema)
+
+if (v.isValidObject(data)) {
+  // data is narrowed to User, no cast needed
+  console.log(data.name)
+}
+
+const result = v.validate(data)
+if (result.valid) {
+  // result.data is User
+} else {
+  // result.errors: ValidationError[]
+}
+```
+
+The same pattern works with Zod-from-JSON-Schema, Valibot, or a hand-written `type User = {...}` alongside a JSON Schema literal. `Validator<T>` makes no library-specific assumption.
+
 ### Cross-Schema `$ref`
 
 ```javascript
