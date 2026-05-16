@@ -15,16 +15,13 @@ export interface ValidationError {
 /** A user-supplied format checker. Receives the candidate value, returns true if valid. */
 export type FormatChecker = (value: string) => boolean;
 
-export interface ValidationResult {
-  valid: boolean;
-  errors: ValidationError[];
-}
+export type ValidationResult<T = unknown> =
+  | { valid: true;  data: T;       errors: ValidationError[] }
+  | { valid: false; data?: never;  errors: ValidationError[] };
 
-export interface ValidateAndParseResult {
-  valid: boolean;
-  value: unknown;
-  errors: ValidationError[];
-}
+export type ValidateAndParseResult<T = unknown> =
+  | { valid: true;  value: T;       errors: ValidationError[] }
+  | { valid: false; value: unknown; errors: ValidationError[] };
 
 export interface ValidatorOptions {
   coerceTypes?: boolean;
@@ -74,26 +71,26 @@ export interface StandaloneModule {
   errFn: ((data: unknown, allErrors?: boolean) => ValidationResult) | null;
 }
 
-export class Validator {
+export class Validator<T = unknown> {
   constructor(schema: object | string, options?: ValidatorOptions);
 
   /** Add a schema to the registry for cross-schema $ref resolution */
   addSchema(schema: object): void;
 
   /** Validate data, returns result with errors. Applies defaults, coerceTypes, removeAdditional. */
-  validate(data: unknown): ValidationResult;
+  validate(data: unknown): ValidationResult<T>;
 
   /** Fast boolean check via JS codegen or tier 0 interpreter. No error collection. */
-  isValidObject(data: unknown): boolean;
+  isValidObject(data: unknown): data is T;
 
   /** Validate a JSON string. Uses simdjson fast path for large documents. */
-  validateJSON(jsonString: string): ValidationResult;
+  validateJSON(jsonString: string): ValidationResult<T>;
 
   /** Fast boolean check for a JSON string */
   isValidJSON(jsonString: string): boolean;
 
   /** Parse JSON with simdjson + validate against schema. Returns parsed value and validation result. Requires native addon. */
-  validateAndParse(jsonString: string | Buffer): ValidateAndParseResult;
+  validateAndParse(jsonString: string | Buffer): ValidateAndParseResult<T>;
 
   /** Ultra-fast buffer validation via native addon */
   isValid(input: Buffer | Uint8Array | string): boolean;
@@ -128,7 +125,7 @@ export class Validator {
   toStandaloneModule(options?: { format?: 'esm' | 'cjs'; abortEarly?: boolean }): string | null;
 
   /** Load a pre-compiled standalone module. Zero schema compilation at startup. */
-  static fromStandalone(mod: StandaloneModule, schema: object | string, options?: ValidatorOptions): Validator;
+  static fromStandalone<T = unknown>(mod: StandaloneModule, schema: object | string, options?: ValidatorOptions): Validator<T>;
 
   /** Bundle multiple schemas into a single JS module string. Load with Validator.loadBundle(). */
   static bundle(schemas: object[], options?: ValidatorOptions): string;
@@ -155,16 +152,16 @@ export class Validator {
 }
 
 /** One-shot validate: creates a Validator, validates data, returns result. */
-export function validate(
+export function validate<T = unknown>(
   schema: object | string,
   data: unknown
-): ValidationResult;
+): ValidationResult<T>;
 
 /** Fast compile: returns a validate function directly. WeakMap cached, second call with same schema is near-zero cost. */
-export function compile(
+export function compile<T = unknown>(
   schema: object | string,
   options?: ValidatorOptions
-): (data: unknown) => ValidationResult;
+): (data: unknown) => ValidationResult<T>;
 
 /** Parse JSON using simdjson (native addon) or JSON.parse (fallback). */
 export function parseJSON(jsonString: string | Buffer): unknown;
