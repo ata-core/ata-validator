@@ -10,6 +10,9 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 - Structured error fields: `code` (`ATA####`), `expected`, `received`, `docUrl`, `dataFrame` (when input was JSON string/Buffer).
 - `Validator` accepts `{ source: { path, content }, richErrors }`.
 - `richErrors: false` opt-out preserves v0.14 error shape exactly.
+- AOT-compiled validators carry the structured error fields (`code`, `docUrl`) and embed a per-error schema source frame (`schemaSource: { file, line, col, text }`) when built with the source map enabled. The map is on by default in development and off when `NODE_ENV=production` or `--no-source` is passed.
+- `ata compile` and `ata build`: new `--source` / `--no-source` flags. `ata build --dual` emits both a source-mapped artifact (`*.compiled.mjs`) and a stripped one (`*.compiled.min.mjs`) in a single run.
+- `bench:size` npm script wires a gzipped-byte budget over the AOT codegen output to catch silent bundle bloat. Baseline lives at `benchmark/baselines/aot-size.json`; gates derive from the baseline (1.5x headroom).
 
 ## 0.14.0 - 2026-05-16
 
