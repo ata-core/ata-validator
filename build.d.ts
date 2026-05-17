@@ -19,6 +19,12 @@ export interface BuildOptions {
   strict?: boolean;
   /** Emit a .d.mts/.d.cts/.d.ts sibling for each compiled module. Default: true. */
   types?: boolean;
+  /**
+   * Embed a schema source map and bake per-error `schemaSource` frames.
+   * Defaults to true when `NODE_ENV !== 'production'`, false otherwise.
+   * Set explicitly to override the environment default.
+   */
+  source?: boolean;
 }
 
 export interface CompiledEntry {
