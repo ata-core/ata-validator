@@ -8,8 +8,17 @@ function usage() {
   process.stdout.write(`ata-validator CLI
 
 Usage:
-  ata compile <schema-file> [options]   Compile one schema to a standalone module.
-  ata build   <glob>...    [options]    Compile a project's schemas (glob pattern) per file.
+  ata compile  <schema-file> [options]  Compile one schema to a standalone module.
+  ata build    <glob>...     [options]  Compile a project's schemas (glob pattern) per file.
+  ata validate <schema> <data> [options] Validate a JSON data file against a schema.
+
+Validate options:
+  --pretty                Render errors with source frames (default on TTY)
+  --compact               Render errors as one line each (default when piped)
+  --format <fmt>          Output format: pretty | compact | json
+  --max-errors <n>        Limit pretty output to N errors (0 = no limit). Default: 20
+  --color <when>          Color output: auto | always | never. Default: auto
+  --no-color              Disable color output (alias for --color=never)
 
 Compile options:
   -o, --output <file>     Output path. Default: <schema-file>.validator.mjs
@@ -41,11 +50,25 @@ Examples:
   ata compile schemas/user.json -o src/generated/user.validator.mjs
   ata build 'schemas/*.json'
   ata build 'src/**/*.schema.json' --out-dir build/validators
+  ata validate schemas/user.json payload.json --pretty
 `);
 }
 
 function parseArgs(argv) {
   const out = { _: [], opts: {} };
+  // Normalize --key=value into --key value pairs so equals-form is accepted
+  // for every option without per-option branches below.
+  const normalized = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith('--') && a.includes('=')) {
+      const eq = a.indexOf('=');
+      normalized.push(a.slice(0, eq), a.slice(eq + 1));
+    } else {
+      normalized.push(a);
+    }
+  }
+  argv = normalized;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') { out.opts.help = true; continue; }
@@ -72,6 +95,19 @@ function parseArgs(argv) {
     if (a === '--source') { out.opts.source = true; continue; }
     if (a === '--no-source') { out.opts.source = false; continue; }
     if (a === '--dual') { out.opts.dual = true; continue; }
+    if (a === '--pretty') { out.opts.pretty = true; continue; }
+    if (a === '--compact') { out.opts.compact = true; continue; }
+    if (a === '--no-color') { out.opts.noColor = true; continue; }
+    if (a === '--color') { out.opts.color = argv[++i]; continue; }
+    if (a === '--max-errors') {
+      const v = argv[++i];
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+        throw new Error(`--max-errors requires a non-negative integer (got "${v}")`);
+      }
+      out.opts.maxErrors = n;
+      continue;
+    }
     if (a.startsWith('-')) { throw new Error(`Unknown option: ${a}`); }
     out._.push(a);
   }
@@ -254,6 +290,69 @@ function cmdBuild(args) {
   });
 }
 
+function cmdValidate (args) {
+  if (args._.length < 2) {
+    process.stderr.write('error: ata validate <schema> <data-file>\n');
+    process.exit(2);
+  }
+  const [schemaPath, dataPath] = args._;
+
+  let schemaContent;
+  try {
+    schemaContent = fs.readFileSync(schemaPath, 'utf8');
+  } catch (e) {
+    process.stderr.write(`error: cannot read ${schemaPath}: ${e.message}\n`);
+    process.exit(2);
+  }
+
+  let schema;
+  try {
+    schema = JSON.parse(schemaContent);
+  } catch (e) {
+    process.stderr.write(`error: ${schemaPath} is not valid JSON: ${e.message}\n`);
+    process.exit(2);
+  }
+
+  let data;
+  try {
+    data = fs.readFileSync(dataPath, 'utf8');
+  } catch (e) {
+    process.stderr.write(`error: cannot read ${dataPath}: ${e.message}\n`);
+    process.exit(2);
+  }
+
+  const { Validator, renderPretty, renderCompact, renderJSON } = require('..');
+  let v;
+  try {
+    v = new Validator(schema, { source: { path: schemaPath, content: schemaContent } });
+  } catch (e) {
+    process.stderr.write(`error: schema compile failed: ${e.message}\n`);
+    process.exit(2);
+  }
+
+  const r = v.validateJSON(data);
+  if (r.valid) { process.exit(0); }
+
+  const fmt = args.opts.format
+    || (args.opts.pretty ? 'pretty' : args.opts.compact ? 'compact' : null)
+    || (process.stdout.isTTY ? 'pretty' : 'compact');
+  const colorOpt = args.opts.color || (args.opts.noColor ? 'never' : 'auto');
+  const ctx = `${dataPath} against ${schemaPath}`;
+  let out;
+  if (fmt === 'json') {
+    out = renderJSON(r.errors, { pretty: true, context: ctx });
+  } else if (fmt === 'pretty') {
+    out = renderPretty(r.errors, { color: colorOpt, context: ctx, maxErrors: args.opts.maxErrors });
+  } else if (fmt === 'compact') {
+    out = renderCompact(r.errors, { color: colorOpt, context: ctx });
+  } else {
+    process.stderr.write(`error: --format must be pretty, compact, or json (got "${fmt}")\n`);
+    process.exit(2);
+  }
+  process.stderr.write(out + '\n');
+  process.exit(1);
+}
+
 function main() {
   const argv = process.argv.slice(2);
   if (argv.length === 0) { usage(); process.exit(0); }
@@ -279,6 +378,11 @@ function main() {
 
   if (cmd === 'build') {
     cmdBuild(args);
+    return;
+  }
+
+  if (cmd === 'validate') {
+    cmdValidate(args);
     return;
   }
 
