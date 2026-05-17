@@ -38,6 +38,10 @@ assert.strictEqual(byCode.ATA3001.docUrl, 'https://ata-validator.com/e/ATA3001')
 assert.ok(byCode.ATA3001.schemaSource, 'runtime schemaSource missing');
 assert.strictEqual(byCode.ATA3001.schemaSource.file, 'schemas/user.json');
 
+// Source content should be retained as-is, but not re-stored in errors
+// (we don't want each error to embed the whole schema text).
+assert.ok(byCode.ATA3001.schemaSource.text.length < 200, 'schemaSource.text should be a single line');
+
 // Pre-parsed object: no dataFrame
 const r2 = v.validate({ name: 'M', email: 'not-an-email', age: -3 });
 for (const e of r2.errors) {
