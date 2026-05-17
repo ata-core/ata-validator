@@ -1532,6 +1532,42 @@ const { toTypeScript } = require("./lib/ts-gen");
 const { renderPretty } = require("./lib/render-pretty");
 const { renderCompact } = require("./lib/render-compact");
 const { renderJSON } = require("./lib/render-json");
+const { suggestFor } = require("./lib/suggestions");
+const { reprValue } = require("./lib/enrich-error");
+
+// Walk a JSON pointer (RFC 6901 escapes) into a data tree. Mirrors the helper
+// inside lib/suggestions.js — kept local to avoid exporting an internal.
+function _walkPointer (root, pointer) {
+  if (!pointer) return root;
+  const parts = pointer.replace(/^\//, '').split('/').map(s => s.replace(/~1/g, '/').replace(/~0/g, '~'));
+  let cur = root;
+  for (const p of parts) { if (cur == null) return undefined; cur = cur[p]; }
+  return cur;
+}
+
+// Post-hoc suggestion enrichment for AOT-compiled validators. The standalone
+// modules do not embed the suggestion engine (Levenshtein + format hints would
+// inflate the gzipped bundle beyond the size budget). Consumers who want
+// suggestions pass the error array through this helper after validation.
+// AOT errors don't carry `received`, so we re-derive it from `data` here.
+function attachSuggestions (errors, data) {
+  if (!errors) return errors;
+  for (const e of errors) {
+    if (!e || e.suggestion) continue;
+    let received = e.received;
+    if (received === undefined && data !== undefined) {
+      const ptr = e.instancePath != null ? e.instancePath : (e.path || '');
+      const raw = _walkPointer(data, ptr);
+      if (raw !== undefined || ptr === '') received = reprValue(raw);
+    }
+    const probe = received !== undefined && e.received === undefined
+      ? Object.assign({}, e, { received })
+      : e;
+    const s = suggestFor(probe, data);
+    if (s) e.suggestion = s;
+  }
+  return errors;
+}
 
 module.exports = {
   Validator,
@@ -1545,4 +1581,5 @@ module.exports = {
   renderPretty,
   renderCompact,
   renderJSON,
+  attachSuggestions,
 };

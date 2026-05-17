@@ -5,6 +5,7 @@ const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
 const assert = require('assert');
+const { attachSuggestions } = require('..');
 
 const fixturePath = path.join(__dirname, 'fixtures/error-dx/user.schema.json');
 const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-aot-dx-'));
@@ -35,6 +36,12 @@ const outFile2 = path.join(outDir, 'user.validator.min.mjs');
     assert.ok(byCode.ATA3001.schemaSource.line > 0, 'schemaSource.line must be positive');
     assert.ok(byCode.ATA3001.schemaSource.file.endsWith('user.schema.json'), 'schemaSource.file must point at fixture');
     assert.ok(typeof byCode.ATA3001.schemaSource.text === 'string', 'schemaSource.text must be a string');
+
+    // AOT modules do not embed the suggestion engine; attachSuggestions
+    // is the opt-in helper that runs the same engine over the result.
+    attachSuggestions(r.errors, { name: 'M', email: 'nope', age: -3 });
+    const emailErr = r.errors.find(e => e.code === 'ATA3001');
+    assert.ok(emailErr.suggestion, 'attachSuggestions should populate suggestion on AOT errors');
 
     console.log('ok: AOT --source compiled validator carries code/docUrl/schemaSource');
 
