@@ -1072,11 +1072,13 @@ module.exports = { boolFn, hybridFactory, errFn };
 
     // Schema-source frames are baked as literals inside each emitted error so
     // consumers don't need a runtime lookup. We still expose the schema file
-    // as a sentinel constant — handy for introspection and visible in source
-    // graphs — but skip the full position table to keep bundles small.
+    // as a sentinel constant when --source is on — handy for introspection
+    // and visible in source graphs. With --no-source, the constant is omitted
+    // entirely so size budgets and grep-based "is this source-mapped?" checks
+    // both work.
     const schemaSourceConst = (source && schemaFile)
       ? `const __ATA_SCHEMA_SOURCE__ = ${JSON.stringify({ file: schemaFile })};\n`
-      : 'const __ATA_SCHEMA_SOURCE__ = null;\n';
+      : '';
 
     // Serialize closure vars referenced in _fn body: regex, sub-validators, sets.
     let closureDecls = '';

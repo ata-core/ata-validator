@@ -190,6 +190,9 @@ function cmdBuild(args) {
     strict: !!args.opts.strict,
     types: args.opts.types,
     cacheFile: args.opts.cacheFile,
+    // Forward the explicit user choice (true / false / undefined). The
+    // aot-build module applies the NODE_ENV-aware default when undefined.
+    source: args.opts.source,
   };
 
   const printReport = (report) => {
