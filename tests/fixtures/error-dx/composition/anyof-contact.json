@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "contact": {
+      "anyOf": [
+        { "title": "by-email", "type": "object", "properties": { "email": { "type": "string", "format": "email" } }, "required": ["email"] },
+        { "title": "by-phone", "type": "object", "properties": { "phone": { "type": "string", "pattern": "^\\+?[0-9]{7,15}$" } }, "required": ["phone"] }
+      ]
+    }
+  },
+  "required": ["contact"]
+}

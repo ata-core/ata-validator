@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "payment": {
+      "oneOf": [
+        { "title": "wire", "type": "object", "properties": { "iban": { "type": "string", "minLength": 15 } }, "required": ["iban"] },
+        { "title": "card", "type": "object", "properties": { "number": { "type": "string", "minLength": 13 } }, "required": ["number"] },
+        { "title": "paypal", "type": "object", "properties": { "email": { "type": "string", "format": "email" } }, "required": ["email"] }
+      ]
+    }
+  },
+  "required": ["payment"]
+}
