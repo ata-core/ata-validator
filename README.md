@@ -39,6 +39,41 @@ Reproduce on your machine with `npm run bench:aot-vs-ajv`. Numbers measured on A
 
 The wins are largest on bundle size and compile time because AOT moves work from runtime to build time. Throughput and cold start are also faster because the compiled validator is a tight straight-line function with no schema-walk overhead.
 
+## Error messages
+
+ata's error output is compiler-grade: each error carries a stable code, an inline source frame pointing at the schema file, and another pointing at the offending bytes in the request payload. Renderers ship in three styles:
+
+```ts
+import { Validator, renderPretty, renderCompact, renderJSON } from 'ata-validator'
+
+const v = new Validator(schema, { source: { path: 'schemas/user.json', content: schemaText } })
+const r = v.validateJSON(input)
+if (!r.valid) {
+  console.error(renderPretty(r.errors))
+  // error[ATA3001]: value does not match format "email"
+  //   --> schemas/user.json:5:7
+  //    |
+  //  5 |       "email": { "type": "string", "format": "email" }
+  //    |       ^^^^^^^  expected format 'email'
+  //    |
+  //   --> input, byte 23
+  //    |
+  //  1 | {"name":"M","email":"not-an-email","age":-3}
+  //    |                     ^^^^^^^^^^^^^^  got "not-an-email"
+  //    |
+  //    = help: missing '@' and domain part
+  //    = note: see https://ata-validator.com/e/ATA3001
+}
+```
+
+The `ata` CLI ships `ata validate <schema> <data>` for one-off checks. TTY auto-renders pretty; pipes default to compact; `--format=json` produces structured output for tooling.
+
+Errors carry a stable `code` field (`ATA####`), see the [error code registry](docs/error-codes.md). Each code has a permalink at `https://ata-validator.com/e/<CODE>`.
+
+### Opting out
+
+For consumers who built log dashboards on the v0.14 error shape, `new Validator(schema, { richErrors: false })` returns the legacy shape exactly. For high-throughput paths, `abortEarly: true` continues to short-circuit; the returned error carries `code: 'ATA9000'` and no enrichment.
+
 ## When to use the runtime API instead
 
 `ata build` is for schemas you know at build time. If your schemas are user-supplied at runtime (form builders, no-code platforms, dynamic API ingestion), use the runtime API:
