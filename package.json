@@ -36,7 +36,8 @@
   },
   "scripts": {
     "install": "node scripts/install.js",
-    "prepublishOnly": "node scripts/check-prebuilds.js",
+    "prepublishOnly": "node scripts/check-prebuilds.js && ATA_ALLOW_DOC_PLACEHOLDERS=1 node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js",
+    "release:check": "node scripts/check-prebuilds.js && node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js",
     "build": "cmake-js build --target ata",
     "rebuild": "cmake-js rebuild --target ata",
     "prebuild": "pkg-prebuilds-copy --baseDir build/Release --source ata.node --name=ata --strip --napi_version=10",
