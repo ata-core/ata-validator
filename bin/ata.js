@@ -127,6 +127,27 @@ function inferOutput(inputPath, format) {
   return path.join(dir, base + ext);
 }
 
+// Renders a schema-compile failure through the structured error pipeline so
+// `ata compile` / `ata build` surface the same look-and-feel as runtime
+// validation errors. The actual position of the schema flaw isn't known here
+// (parsing or codegen already bailed), so schemaSource is left undefined.
+function reportCompileError (schemaFile, message) {
+  const { renderPretty, renderCompact } = require('..');
+  const fmt = process.stdout.isTTY ? 'pretty' : 'compact';
+  const err = {
+    code: 'ATA9002',
+    keyword: '__compile__',
+    path: '',
+    message,
+    schemaSource: undefined,
+    docUrl: 'https://ata-validator.com/e/ATA9002',
+  };
+  const out = fmt === 'pretty'
+    ? renderPretty([err], { color: 'auto', context: schemaFile })
+    : renderCompact([err], { color: 'auto', context: schemaFile });
+  process.stderr.write(out + '\n');
+}
+
 function cmdCompile(args) {
   if (args._.length === 0) {
     process.stderr.write('error: missing <schema-file>\n\n');
@@ -146,7 +167,7 @@ function cmdCompile(args) {
   try {
     schemaStr = fs.readFileSync(input, 'utf8');
   } catch (e) {
-    process.stderr.write(`error: cannot read ${input}: ${e.message}\n`);
+    reportCompileError(input, `cannot read ${input}: ${e.message}`);
     process.exit(1);
   }
 
@@ -154,12 +175,18 @@ function cmdCompile(args) {
   try {
     schema = JSON.parse(schemaStr);
   } catch (e) {
-    process.stderr.write(`error: ${input} is not valid JSON: ${e.message}\n`);
+    reportCompileError(input, `${input} is not valid JSON: ${e.message}`);
     process.exit(1);
   }
 
   const { Validator } = require('..');
-  const v = new Validator(schema);
+  let v;
+  try {
+    v = new Validator(schema);
+  } catch (e) {
+    reportCompileError(input, e.message);
+    process.exit(1);
+  }
   const source = resolveSourceDefault(args.opts);
   let sourceMap = null;
   if (source) {
@@ -173,7 +200,7 @@ function cmdCompile(args) {
   const schemaFile = path.relative(process.cwd(), input) || input;
   const src = v.toStandaloneModule({ format, abortEarly, source, sourceMap, schemaFile });
   if (!src) {
-    process.stderr.write('error: schema is too complex for standalone compilation\n');
+    reportCompileError(input, 'schema is too complex for standalone compilation');
     process.exit(1);
   }
 
@@ -246,7 +273,7 @@ function cmdBuild(args) {
       process.stdout.write(`ata: skipped ${s.input}: ${s.reason}\n`);
     }
     for (const f of report.failed) {
-      process.stderr.write(`ata: failed  ${f.input}: ${f.error}\n`);
+      reportCompileError(f.input, f.error);
     }
   };
 
