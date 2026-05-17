@@ -660,8 +660,10 @@ class Validator {
       }
 
       if (options.abortEarly && jsFn && !hasDynRef) {
-        // Abort-early fast path: skip detailed error collection on failure.
-        // Returns a shared frozen result, no per-call allocation, no errFn work.
+        // abortEarly: do NOT enrich. Skip position lookups, suggestions, source maps.
+        // This is the perf-critical path for edge gateways. The richErrors wrap
+        // below recognises the ATA9000 stub keyword and passes the frozen result
+        // through unchanged, so a single shared object is returned per failure.
         const _fn = jsFn;
         this.validate = preprocess
           ? (data) => { preprocess(data); return _fn(data) ? VALID_RESULT : ABORT_EARLY_RESULT; }
@@ -894,6 +896,9 @@ class Validator {
       this.validate = (data) => {
         const result = inner(data);
         if (result && !result.valid && result.errors && result.errors.length) {
+          // abortEarly returns the shared ATA9000 stub; preserve it as-is so the
+          // perf fast path stays allocation-free and the documented code stays stable.
+          if (result === ABORT_EARLY_RESULT) return result;
           const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
           const enriched = result.errors.map((e) => enrich(e, {
             data,
