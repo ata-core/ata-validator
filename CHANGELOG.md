@@ -2,6 +2,15 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased - v0.15.0 (in progress)
+
+### Added
+
+- Renderer API: `renderPretty`, `renderCompact`, `renderJSON` exported from `ata-validator`.
+- Structured error fields: `code` (`ATA####`), `expected`, `received`, `docUrl`, `dataFrame` (when input was JSON string/Buffer).
+- `Validator` accepts `{ source: { path, content }, richErrors }`.
+- `richErrors: false` opt-out preserves v0.14 error shape exactly.
+
 ## 0.14.0 - 2026-05-16
 
 ### Added
