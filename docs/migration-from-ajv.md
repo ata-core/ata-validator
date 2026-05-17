@@ -205,6 +205,19 @@ ata errors follow the ajv schema, so error handling code usually needs no change
 
 Messages match ajv's wording for the common keywords. If your tests snapshot messages, run them against ata to catch any string-level differences.
 
+## Error UX
+
+ata's errors are a superset of the ajv shape. Existing shim consumers (`ata-validator/compat`) continue to see `instancePath`, `schemaPath`, `keyword`, `message`, `params` unchanged.
+
+New consumers benefit from:
+
+- `code`, stable `ATA####` for log filtering and doc lookup.
+- `schemaSource`, `dataFrame`, code-frame data for rendering.
+- `suggestion`, confident nudges (typo against enum, format hint, coercion).
+- Renderers: `renderPretty`, `renderCompact`, `renderJSON` exported from the main package.
+
+`oneOf` and `anyOf` failures no longer produce branch-tree explosions. ata picks the closest matching branch and reports its errors as nested context. If you previously parsed the branch-tree shape to surface the real error to users, replace that with `result.errors[0].branchErrors` on a collapsed error.
+
 ## Fastify
 
 Replace the default ajv-based validator with `fastify-ata`:
