@@ -34,6 +34,9 @@ assert.strictEqual(byCode.ATA3001.dataFrame.text, '{"name":"M","email":"not-an-e
 // docUrl present
 assert.strictEqual(byCode.ATA3001.docUrl, 'https://ata-validator.com/e/ATA3001');
 
+// suggestion populated by the format hint for a clearly broken email
+assert.ok(byCode.ATA3001.suggestion, 'format email error should carry a suggestion');
+
 // schemaSource present and pointing at the user's schema file
 assert.ok(byCode.ATA3001.schemaSource, 'runtime schemaSource missing');
 assert.strictEqual(byCode.ATA3001.schemaSource.file, 'schemas/user.json');

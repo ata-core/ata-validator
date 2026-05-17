@@ -933,8 +933,13 @@ class Validator {
             const first = result.errors[0];
             if (!first || !first.code) {
               const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
+              // Re-parse the input once so the enrich pass can pluck `received`
+              // and feed the suggestion engine (required-typo, format hints,
+              // coercion nudges all need the live value tree).
+              let parsedData;
+              try { parsedData = JSON.parse(jsonStr); } catch { parsedData = undefined; }
               const enriched = result.errors.map((e) => enrich(e, {
-                data: undefined,
+                data: parsedData,
                 positions,
                 schemaPositions: this._schemaPositions,
                 schemaFile: this._source ? this._source.path : undefined,
