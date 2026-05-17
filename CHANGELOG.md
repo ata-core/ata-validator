@@ -15,6 +15,8 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 - `bench:size` npm script wires a gzipped-byte budget over the AOT codegen output to catch silent bundle bloat. Baseline lives at `benchmark/baselines/aot-size.json`; gates derive from the baseline (1.5x headroom).
 - Runtime `Validator({source})` attaches `schemaSource` to errors when given the original schema text.
 - `abortEarly: true` continues to short-circuit; new `ATA9000` stub carries the code without enrichment cost.
+- `oneOf` / `anyOf` failures collapse to a single best-branch error (`ATA4001` / `ATA4002` / `ATA4003`) instead of returning the full branch-tree explosion. Surfaces the closest matching variant's errors as nested context.
+- `allOf` errors continue to surface every failing branch (collapse would lose information).
 
 ## 0.14.0 - 2026-05-16
 
