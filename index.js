@@ -1051,18 +1051,32 @@ module.exports = { boolFn, hybridFactory, errFn };
     if (!jsFn || !jsFn._source) return null;
     const format = (opts && opts.format) || 'esm';
     const abortEarly = !!(opts && opts.abortEarly);
+    const source = !!(opts && opts.source);
+    const sourceMap = opts && opts.sourceMap ? opts.sourceMap : null;
+    const schemaFile = opts && opts.schemaFile ? opts.schemaFile : null;
     const src = jsFn._source;
 
     let errCore = '';
     if (!abortEarly) {
       const jsErrFn = compileToJSCodegenWithErrors(
         typeof this._schemaObj === 'object' ? this._schemaObj : {},
+        null,
+        undefined,
+        (source && sourceMap && schemaFile) ? { sourceMap, schemaFile } : null,
       );
       const errSrc = jsErrFn && jsErrFn._errSource ? jsErrFn._errSource : '';
       if (errSrc) {
         errCore = `const errFn = function(d, _all) {\n  ${errSrc}\n};\n`;
       }
     }
+
+    // Schema-source frames are baked as literals inside each emitted error so
+    // consumers don't need a runtime lookup. We still expose the schema file
+    // as a sentinel constant — handy for introspection and visible in source
+    // graphs — but skip the full position table to keep bundles small.
+    const schemaSourceConst = (source && schemaFile)
+      ? `const __ATA_SCHEMA_SOURCE__ = ${JSON.stringify({ file: schemaFile })};\n`
+      : 'const __ATA_SCHEMA_SOURCE__ = null;\n';
 
     // Serialize closure vars referenced in _fn body: regex, sub-validators, sets.
     let closureDecls = '';
@@ -1102,7 +1116,7 @@ module.exports = { boolFn, hybridFactory, errFn };
 // Schema is embedded; runtime has zero dependency on ata-validator.
 'use strict';
 ${_CP_LEN_SOURCE}
-const VALID = Object.freeze({ valid: true, errors: Object.freeze([]) });
+${schemaSourceConst}const VALID = Object.freeze({ valid: true, errors: Object.freeze([]) });
 const ABORT = Object.freeze({
   valid: false,
   errors: Object.freeze([Object.freeze({
