@@ -41,4 +41,14 @@ module.exports = {
       docUrl: 'https://ata-validator.com/e/ATA1001',
     },
   ],
+  collapsedOneOf: [{
+    code: 'ATA4001', message: 'value matched 0 of 3 oneOf variants',
+    keyword: 'oneOf', path: '/payment',
+    schemaPath: '/properties/payment/oneOf',
+    params: { variants: 3, closest: 1, closestName: 'card' },
+    branchErrors: [
+      { keyword: 'minLength', message: 'string shorter than minLength', path: '/payment/number' },
+    ],
+    docUrl: 'https://ata-validator.com/e/ATA4001',
+  }],
 };

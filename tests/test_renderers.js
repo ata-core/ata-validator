@@ -71,4 +71,11 @@ const noColor = { color: 'never', cwd: '/nowhere' };
   assert.ok(!out.includes('\x1b['), 'NO_COLOR=1 should suppress ANSI');
 }
 
+// renderPretty — branchErrors block for collapsed oneOf
+{
+  const out = renderPretty(fix.collapsedOneOf, noColor);
+  assert.ok(out.includes('closest match was card with 1 error'), 'expected closest-variant note');
+  assert.ok(out.includes('minLength: string shorter than minLength'), 'expected nested branch error');
+}
+
 console.log('ok: renderer snapshot tests');
