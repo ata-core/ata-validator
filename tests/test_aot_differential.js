@@ -96,7 +96,7 @@ const DOCS = {
   for (const schemaFile of SCHEMAS) {
     fs.copyFileSync(path.join(FIXTURES, schemaFile), path.join(dir, schemaFile));
   }
-  await build({ globs: [path.join(dir, '*.schema.json')] });
+  await build({ globs: [path.join(dir, '*.schema.json')], source: true });
 
   for (const schemaFile of SCHEMAS) {
     const schema = JSON.parse(fs.readFileSync(path.join(FIXTURES, schemaFile), 'utf8'));
@@ -106,7 +106,8 @@ const DOCS = {
     const aot = await import('file://' + compiledPath);
 
     for (const doc of DOCS[schemaFile]) {
-      const runtimeResult = runtime.validate(doc).valid;
+      const runtimeFull = runtime.validate(doc);
+      const runtimeResult = runtimeFull.valid;
       const aotResult = aot.isValid(doc);
       const name = `differential ${schemaFile} ${JSON.stringify(doc).slice(0, 40)}`;
       if (runtimeResult === aotResult) {
@@ -115,6 +116,42 @@ const DOCS = {
       } else {
         console.log(`  FAIL  ${name}: runtime=${runtimeResult} aot=${aotResult}`);
         failed++;
+      }
+
+      // For invalid docs, also compare error codes between runtime and AOT.
+      // Both paths are required to attach ATAxxxx codes to every error they
+      // report; the exact code set can differ for schemas that exercise
+      // patternProperties (runtime/native vs codegen-fallback) so we only
+      // assert "every code is well-formed", not full set equality.
+      if (runtimeResult === false) {
+        const aotFull = aot.validate(doc);
+        const runtimeCodes = (runtimeFull.errors || []).map(e => e.code);
+        const aotCodes = (aotFull.errors || []).map(e => e.code);
+        const codeName = `codes well-formed ${schemaFile} ${JSON.stringify(doc).slice(0, 40)}`;
+        const allWellFormed = runtimeCodes.every(c => typeof c === 'string' && /^ATA\d{4}$/.test(c))
+          && aotCodes.every(c => typeof c === 'string' && /^ATA\d{4}$/.test(c))
+          && runtimeCodes.length > 0 && aotCodes.length > 0;
+        if (allWellFormed) {
+          console.log(`  PASS  ${codeName} runtime=[${runtimeCodes.join(',')}] aot=[${aotCodes.join(',')}]`);
+          passed++;
+        } else {
+          console.log(`  FAIL  ${codeName}: runtime=[${runtimeCodes.join(',')}] aot=[${aotCodes.join(',')}]`);
+          failed++;
+        }
+
+        // AOT was built with source: true so emitted errors should carry a
+        // schemaSource frame whenever the codegen schemaPath corresponds to
+        // a real JSON node in the schema. Synthetic paths (e.g. internal
+        // patternProperties sub-schema paths) can legitimately have no
+        // matching position; we only require that at least one error in the
+        // result carries a frame so the source-map plumbing is exercised.
+        const withFrame = (aotFull.errors || []).filter(e => e.schemaSource);
+        if (withFrame.length > 0) {
+          passed++;
+        } else {
+          console.log(`  FAIL  no schemaSource on any AOT error (${schemaFile} doc ${JSON.stringify(doc).slice(0,40)})`);
+          failed++;
+        }
       }
     }
   }
