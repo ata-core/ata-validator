@@ -420,6 +420,12 @@ class Validator {
       ? { path: String(options.source.path || ''), content: String(options.source.content || '') }
       : null;
 
+    // Per-validate data position cache. Populated by validateJSON before
+    // dispatching to inner validate(); consulted by the rich-error wrap
+    // to attach dataFrame entries to each enriched error.
+    this._posCache = require('./lib/data-position-cache').createCache();
+    this._lastRawInput = null;
+
     // Lazy stubs: trigger compilation on first call, then re-dispatch
     this.validate = (data) => {
       this._ensureCompiled();
@@ -878,11 +884,57 @@ class Validator {
       this.validate = (data) => {
         const result = inner(data);
         if (result && !result.valid && result.errors && result.errors.length) {
-          const enriched = result.errors.map((e) => enrich(e, { data }));
+          const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
+          const enriched = result.errors.map((e) => enrich(e, { data, positions }));
+          if (positions) this._posCache.reset();
           return { valid: false, errors: enriched };
         }
         return result;
       };
+
+      // validateJSON also enriches: set _lastRawInput so the position cache
+      // can lazily build a map for dataFrame attachment. Only validateJSON
+      // wires this — validate(data) takes a pre-parsed object, by design.
+      if (this.validateJSON) {
+        const innerJson = this.validateJSON;
+        this.validateJSON = (jsonStr) => {
+          this._lastRawInput = jsonStr;
+          let result;
+          try {
+            result = innerJson(jsonStr);
+          } finally {
+            // Don't clear here; the enrich step below needs the cache. We
+            // clear after enrich, or in the early-return path.
+          }
+          if (result && !result.valid && result.errors && result.errors.length) {
+            // If errors came from the inner path that already ran through the
+            // wrapped this.validate (codegen jsonValidateFn -> validate path),
+            // they may already be enriched. Detect by presence of `code`.
+            const first = result.errors[0];
+            if (!first || !first.code) {
+              const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
+              const enriched = result.errors.map((e) => enrich(e, { data: undefined, positions }));
+              if (positions) this._posCache.reset();
+              this._lastRawInput = null;
+              return { valid: false, errors: enriched };
+            }
+            // Already-enriched path: still attach dataFrame if missing.
+            const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
+            if (positions) {
+              for (const e of result.errors) {
+                if (e && !e.dataFrame) {
+                  const path = e.path != null ? e.path : (e.instancePath || '');
+                  const p = positions[path];
+                  if (p) e.dataFrame = { byteOffset: p.byteOffset, length: p.length, line: p.line, col: p.col, text: p.text };
+                }
+              }
+              this._posCache.reset();
+            }
+          }
+          this._lastRawInput = null;
+          return result;
+        };
+      }
     }
 
     // Save to identity cache for ultra-fast reuse with same schema object
