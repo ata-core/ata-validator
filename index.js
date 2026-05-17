@@ -402,6 +402,16 @@ class Validator {
     // produced the error). Matches ajv's `verbose: true` behavior.
     this._verbose = !!options.verbose;
 
+    // richErrors: default true. Only the literal `false` opts back into the
+    // v0.14 error shape (no code/expected/received/docUrl, no aliases).
+    this._richErrors = options && options.richErrors === false ? false : true;
+
+    // Optional schema source descriptor. When supplied, the renderer pipeline
+    // can attach a `schemaSource` frame to enriched errors.
+    this._source = options && options.source && typeof options.source === 'object'
+      ? { path: String(options.source.path || ''), content: String(options.source.content || '') }
+      : null;
+
     // Lazy stubs: trigger compilation on first call, then re-dispatch
     this.validate = (data) => {
       this._ensureCompiled();
