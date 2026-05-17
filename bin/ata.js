@@ -17,6 +17,8 @@ Compile options:
   --name <TypeName>       Name of the top-level type in .d.ts. Default: inferred from filename
   --no-types              Skip .d.ts generation
   --abort-early           Use stub errors (smallest bundle)
+  --source                Embed schema source map (default in development)
+  --no-source             Omit source map (default in production, NODE_ENV=production)
 
 Build options:
   --out-dir <dir>         Write outputs into this directory instead of alongside sources
@@ -29,6 +31,9 @@ Build options:
   --strict                Treat any AOT-incompatible schema as a build error (default: skip + warn)
   --watch                 Re-emit on schema change (Ctrl-C to exit)
   --no-types              Skip .d.mts/.d.cts emission alongside compiled modules
+  --source                Embed schema source map (default in development)
+  --no-source             Omit source map (default in production, NODE_ENV=production)
+  --dual                  Emit both .compiled.mjs (with source) and .compiled.min.mjs (without)
 
   -h, --help              Show this message
 
@@ -64,10 +69,19 @@ function parseArgs(argv) {
       continue;
     }
     if (a === '--watch') { out.opts.watch = true; continue; }
+    if (a === '--source') { out.opts.source = true; continue; }
+    if (a === '--no-source') { out.opts.source = false; continue; }
+    if (a === '--dual') { out.opts.dual = true; continue; }
     if (a.startsWith('-')) { throw new Error(`Unknown option: ${a}`); }
     out._.push(a);
   }
   return out;
+}
+
+function resolveSourceDefault (opts) {
+  if (opts.source === true) return true;
+  if (opts.source === false) return false;
+  return process.env.NODE_ENV !== 'production';
 }
 
 function inferOutput(inputPath, format) {
@@ -110,7 +124,18 @@ function cmdCompile(args) {
 
   const { Validator } = require('..');
   const v = new Validator(schema);
-  const src = v.toStandaloneModule({ format, abortEarly });
+  const source = resolveSourceDefault(args.opts);
+  let sourceMap = null;
+  if (source) {
+    try {
+      const { buildPositionMap } = require('../lib/source-positions');
+      sourceMap = buildPositionMap(schemaStr);
+    } catch {
+      sourceMap = null;
+    }
+  }
+  const schemaFile = path.relative(process.cwd(), input) || input;
+  const src = v.toStandaloneModule({ format, abortEarly, source, sourceMap, schemaFile });
   if (!src) {
     process.stderr.write('error: schema is too complex for standalone compilation\n');
     process.exit(1);
