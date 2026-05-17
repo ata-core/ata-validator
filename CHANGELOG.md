@@ -2,22 +2,32 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased - v0.15.0 (in progress)
+## 0.15.0 - 2026-05-18
 
 ### Added
 
-- Renderer API: `renderPretty`, `renderCompact`, `renderJSON` exported from `ata-validator`.
-- Structured error fields: `code` (`ATA####`), `expected`, `received`, `docUrl`, `dataFrame` (when input was JSON string/Buffer).
-- `Validator` accepts `{ source: { path, content }, richErrors }`.
-- `richErrors: false` opt-out preserves v0.14 error shape exactly.
-- AOT-compiled validators carry the structured error fields (`code`, `docUrl`) and embed a per-error schema source frame (`schemaSource: { file, line, col, text }`) when built with the source map enabled. The map is on by default in development and off when `NODE_ENV=production` or `--no-source` is passed.
-- `ata compile` and `ata build`: new `--source` / `--no-source` flags. `ata build --dual` emits both a source-mapped artifact (`*.compiled.mjs`) and a stripped one (`*.compiled.min.mjs`) in a single run.
-- `bench:size` npm script wires a gzipped-byte budget over the AOT codegen output to catch silent bundle bloat. Baseline lives at `benchmark/baselines/aot-size.json`; gates derive from the baseline (1.5x headroom).
-- Runtime `Validator({source})` attaches `schemaSource` to errors when given the original schema text.
-- `abortEarly: true` continues to short-circuit; new `ATA9000` stub carries the code without enrichment cost.
-- `oneOf` / `anyOf` failures collapse to a single best-branch error (`ATA4001` / `ATA4002` / `ATA4003`) instead of returning the full branch-tree explosion. Surfaces the closest matching variant's errors as nested context.
-- `allOf` errors continue to surface every failing branch (collapse would lose information).
-- `suggestion` field on errors: typo against enum, missing-required typo, format-violation hint, type-coercion nudge. Runtime validators populate automatically; AOT validators expose `attachSuggestions(errors, data)` to keep AOT bundles small.
+- **Compiler-grade error output.** Every validation error now carries a stable `code` (`ATA####`), an `expected`/`received` pair, a `docUrl`, and, when the input came in as a JSON string or Buffer, a `dataFrame` pointing at the offending bytes. The full registry of 46 codes lives at [`docs/error-codes.md`](docs/error-codes.md) with permalinks at `https://ata-validator.com/e/<CODE>`.
+- **Renderer API.** `renderPretty`, `renderCompact`, and `renderJSON` are exported from `ata-validator`. Pretty output mirrors rustc-style code frames with carets, help, and note lines; compact collapses to one line per error; JSON is structured for tooling.
+- **`ata validate` subcommand.** `ata validate <schema> <data>` runs a schema against a JSON data file and prints renderer output. TTY auto-renders pretty; pipes default to compact; `--format=json` returns structured output. `--pretty`, `--compact`, `--max-errors`, `--color`, `--no-color` cover the rest of the surface.
+- **Runtime source maps.** `new Validator(schema, { source: { path, content } })` attaches per-error `schemaSource` (file, line, col, text) by re-parsing the schema with a position-aware scanner.
+- **AOT source maps.** AOT-compiled validators carry the structured error fields (`code`, `docUrl`) and embed per-error `schemaSource` when built with the source map enabled. On by default in development, off when `NODE_ENV=production` or `--no-source` is passed.
+- **`ata compile` / `ata build` flags.** New `--source` / `--no-source` flags. `ata build --dual` emits both a source-mapped artifact (`*.compiled.mjs`) and a stripped one (`*.compiled.min.mjs`) in a single run.
+- **Size budget gate.** `npm run bench:size` enforces a gzipped-byte budget over the AOT codegen output to catch silent bundle bloat. Baseline at `benchmark/baselines/aot-size.json`, gates derive from the baseline with 1.5x headroom.
+- **`oneOf` / `anyOf` collapse.** Branching failures collapse to a single best-branch error (`ATA4001` / `ATA4002` / `ATA4003`) instead of the full branch-tree. The closest matching variant's errors are still available under `branchErrors`. `allOf` errors continue to surface every failing branch.
+- **Suggestions.** A new `suggestion` field nudges users when ata is confident: typo against enum, missing-required typo, format-violation hint, type-coercion nudge. Runtime validators populate automatically; AOT validators expose `attachSuggestions(errors, data)` to keep AOT bundles small.
+- **`richErrors: false` opt-out.** `new Validator(schema, { richErrors: false })` preserves the v0.14 error shape byte-for-byte. `abortEarly: true` continues to short-circuit; the returned error carries `code: 'ATA9000'` and no enrichment.
+- **`release:check` npm script.** Runs the prebuilds, doc-coverage, and error-code lockfile checks in strict mode before a publish.
+
+### Changed
+
+- `prepublishOnly` now chains `check-prebuilds`, `check-doc-coverage` (lenient until per-code prose lands), and the error-code lockfile test.
+- `ata compile` and `ata build` failures route through the renderer with code `ATA9002`, so command-line schema errors look the same as runtime ones.
+
+### Notes
+
+- **Log scrapers**: errors now carry `code`, `dataFrame`, `suggestion`, and `docUrl` fields. If you serialize `result.errors` directly into logs, line size will grow. Pass `richErrors: false` for the v0.14 shape, or pipe through `renderCompact` for a stable one-line format.
+- **AOT bundle size**: source-mapped variants (`.compiled.mjs`) add up to 200 bytes gzipped for a 10-field schema. Production builds (`NODE_ENV=production` or `--no-source`) emit the no-source variant. Use `ata build --dual` to emit both.
+- **Fastify**: a companion `fastify-ata` release wires the new format into route error responses.
 
 ## 0.14.0 - 2026-05-16
 
