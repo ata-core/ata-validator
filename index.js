@@ -1483,6 +1483,9 @@ function compile(schema, opts) {
 }
 
 const { toTypeScript } = require("./lib/ts-gen");
+const { renderPretty } = require("./lib/render-pretty");
+const { renderCompact } = require("./lib/render-compact");
+const { renderJSON } = require("./lib/render-json");
 
 module.exports = {
   Validator,
@@ -1493,4 +1496,7 @@ module.exports = {
   SIMDJSON_PADDING,
   parseJSON,
   toTypeScript,
+  renderPretty,
+  renderCompact,
+  renderJSON,
 };
