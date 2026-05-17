@@ -12,6 +12,66 @@ export interface ValidationError {
   parentSchema?: object;
 }
 
+export interface SchemaSource {
+  file: string;
+  line: number;
+  col: number;
+  text: string;
+}
+
+export interface DataFrame {
+  byteOffset: number;
+  length: number;
+  line: number;
+  col: number;
+  text: string;
+}
+
+export interface Suggestion {
+  text: string;
+  kind: 'typo' | 'format' | 'coercion' | 'similar-key';
+}
+
+export type ErrorCode = `ATA${number}`;
+
+export interface RichValidationError {
+  code: ErrorCode;
+  message: string;
+  keyword: string;
+  path: string;
+  expected?: string;
+  received?: string;
+  schemaPath?: string;
+  schemaSource?: SchemaSource;
+  dataFrame?: DataFrame;
+  suggestion?: Suggestion;
+  docUrl?: string;
+  // Back-compat aliases retained indefinitely
+  instancePath?: string;
+  dataPath?: string;
+  params?: Record<string, unknown>;
+  parentSchema?: unknown;
+}
+
+export interface RenderOptions {
+  color?: 'auto' | 'always' | 'never';
+  cwd?: string;
+}
+
+export interface PrettyOptions extends RenderOptions {
+  maxErrors?: number;
+}
+
+export interface CompactOptions extends RenderOptions {}
+
+export interface JSONRenderOptions {
+  pretty?: boolean;
+}
+
+export function renderPretty(errors: RichValidationError[], opts?: PrettyOptions): string;
+export function renderCompact(errors: RichValidationError[], opts?: CompactOptions): string;
+export function renderJSON(errors: RichValidationError[], opts?: JSONRenderOptions): string;
+
 /** A user-supplied format checker. Receives the candidate value, returns true if valid. */
 export type FormatChecker = (value: string) => boolean;
 
@@ -42,6 +102,17 @@ export interface ValidatorOptions {
    * instead of collecting full error details. Smaller hot-path allocation.
    */
   abortEarly?: boolean;
+  /**
+   * Optional source descriptor for the schema. When supplied, validation errors
+   * carry a `schemaSource` frame pointing to the originating file/line/col.
+   */
+  source?: { path: string; content: string };
+  /**
+   * When true (default), validate() returns enriched errors with stable codes,
+   * docUrl, expected/received hints. Set to false to opt back into the
+   * v0.14 error shape.
+   */
+  richErrors?: boolean;
 }
 
 export interface BundleStandaloneOptions extends ValidatorOptions {
