@@ -1,0 +1,232 @@
+{
+  "ATA1001": {
+    "keyword": "type",
+    "category": "type",
+    "format": null
+  },
+  "ATA1002": {
+    "keyword": "type",
+    "category": "type",
+    "format": null
+  },
+  "ATA2001": {
+    "keyword": "minLength",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2002": {
+    "keyword": "maxLength",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2003": {
+    "keyword": "minimum",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2004": {
+    "keyword": "maximum",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2005": {
+    "keyword": "exclusiveMinimum",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2006": {
+    "keyword": "exclusiveMaximum",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2007": {
+    "keyword": "multipleOf",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2008": {
+    "keyword": "minItems",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2009": {
+    "keyword": "maxItems",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2010": {
+    "keyword": "minProperties",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2011": {
+    "keyword": "maxProperties",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2012": {
+    "keyword": "uniqueItems",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA2013": {
+    "keyword": "pattern",
+    "category": "constraint",
+    "format": null
+  },
+  "ATA3001": {
+    "keyword": "format",
+    "category": "format",
+    "format": "email"
+  },
+  "ATA3002": {
+    "keyword": "format",
+    "category": "format",
+    "format": "date"
+  },
+  "ATA3003": {
+    "keyword": "format",
+    "category": "format",
+    "format": "date-time"
+  },
+  "ATA3004": {
+    "keyword": "format",
+    "category": "format",
+    "format": "time"
+  },
+  "ATA3005": {
+    "keyword": "format",
+    "category": "format",
+    "format": "uri"
+  },
+  "ATA3006": {
+    "keyword": "format",
+    "category": "format",
+    "format": "uri-reference"
+  },
+  "ATA3007": {
+    "keyword": "format",
+    "category": "format",
+    "format": "ipv4"
+  },
+  "ATA3008": {
+    "keyword": "format",
+    "category": "format",
+    "format": "ipv6"
+  },
+  "ATA3009": {
+    "keyword": "format",
+    "category": "format",
+    "format": "uuid"
+  },
+  "ATA3010": {
+    "keyword": "format",
+    "category": "format",
+    "format": "hostname"
+  },
+  "ATA3099": {
+    "keyword": "format",
+    "category": "format",
+    "format": null
+  },
+  "ATA4001": {
+    "keyword": "oneOf",
+    "category": "composition",
+    "format": null
+  },
+  "ATA4002": {
+    "keyword": "oneOf",
+    "category": "composition",
+    "format": null
+  },
+  "ATA4003": {
+    "keyword": "anyOf",
+    "category": "composition",
+    "format": null
+  },
+  "ATA4004": {
+    "keyword": "allOf",
+    "category": "composition",
+    "format": null
+  },
+  "ATA4005": {
+    "keyword": "not",
+    "category": "composition",
+    "format": null
+  },
+  "ATA4006": {
+    "keyword": "if",
+    "category": "composition",
+    "format": null
+  },
+  "ATA5001": {
+    "keyword": "$ref",
+    "category": "ref",
+    "format": null
+  },
+  "ATA5002": {
+    "keyword": "$ref",
+    "category": "ref",
+    "format": null
+  },
+  "ATA6001": {
+    "keyword": "enum",
+    "category": "enum",
+    "format": null
+  },
+  "ATA6002": {
+    "keyword": "const",
+    "category": "enum",
+    "format": null
+  },
+  "ATA7001": {
+    "keyword": "required",
+    "category": "shape",
+    "format": null
+  },
+  "ATA7002": {
+    "keyword": "additionalProperties",
+    "category": "shape",
+    "format": null
+  },
+  "ATA7003": {
+    "keyword": "unevaluatedProperties",
+    "category": "shape",
+    "format": null
+  },
+  "ATA7004": {
+    "keyword": "unevaluatedItems",
+    "category": "shape",
+    "format": null
+  },
+  "ATA7005": {
+    "keyword": "dependentRequired",
+    "category": "shape",
+    "format": null
+  },
+  "ATA7006": {
+    "keyword": "propertyNames",
+    "category": "shape",
+    "format": null
+  },
+  "ATA7007": {
+    "keyword": "contains",
+    "category": "shape",
+    "format": null
+  },
+  "ATA9000": {
+    "keyword": "__abort_early__",
+    "category": "system",
+    "format": null
+  },
+  "ATA9001": {
+    "keyword": "__parse__",
+    "category": "system",
+    "format": null
+  },
+  "ATA9002": {
+    "keyword": "__compile__",
+    "category": "system",
+    "format": null
+  }
+}
