@@ -861,6 +861,22 @@ class Validator {
       }
     }
 
+    // richErrors enrichment: layered on top of whichever validate path was
+    // bound above. Verbose's parentSchema flows through because enrich()
+    // copies it. Opt-out (`richErrors: false`) leaves the raw v0.14 shape.
+    if (this._richErrors && this.validate) {
+      const inner = this.validate;
+      const enrich = require('./lib/enrich-error').enrich;
+      this.validate = (data) => {
+        const result = inner(data);
+        if (result && !result.valid && result.errors && result.errors.length) {
+          const enriched = result.errors.map((e) => enrich(e, { data }));
+          return { valid: false, errors: enriched };
+        }
+        return result;
+      };
+    }
+
     // Save to identity cache for ultra-fast reuse with same schema object
     if (this._schemaObj && typeof this._schemaObj === 'object') {
       _identityCache.set(this._schemaObj, this);
