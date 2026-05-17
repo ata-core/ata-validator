@@ -272,7 +272,15 @@ const _identityCache = new WeakMap();
 
 const SIMDJSON_PADDING = 64;
 const VALID_RESULT = Object.freeze({ valid: true, errors: Object.freeze([]) });
-const ABORT_EARLY_RESULT = Object.freeze({ valid: false, errors: Object.freeze([Object.freeze({ message: 'validation failed' })]) });
+const ABORT_EARLY_RESULT = Object.freeze({
+  valid: false,
+  errors: Object.freeze([Object.freeze({
+    code: 'ATA9000',
+    message: 'validation failed',
+    keyword: '__abort_early__',
+    path: '',
+  })]),
+});
 
 // Embedded verbatim in standalone modules so the output file has no runtime
 // dependency on ata-validator. ASCII fast-path plus surrogate-aware slow path.
@@ -1043,7 +1051,15 @@ module.exports = { boolFn, hybridFactory, errFn };
 'use strict';
 ${_CP_LEN_SOURCE}
 const VALID = Object.freeze({ valid: true, errors: Object.freeze([]) });
-const ABORT = Object.freeze({ valid: false, errors: Object.freeze([Object.freeze({ message: 'validation failed' })]) });
+const ABORT = Object.freeze({
+  valid: false,
+  errors: Object.freeze([Object.freeze({
+    code: 'ATA9000',
+    message: 'validation failed',
+    keyword: '__abort_early__',
+    path: '',
+  })]),
+});
 ${closureDecls}const _fn = function(d) {
   ${src}
 };
