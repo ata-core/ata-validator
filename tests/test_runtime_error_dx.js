@@ -34,6 +34,10 @@ assert.strictEqual(byCode.ATA3001.dataFrame.text, '{"name":"M","email":"not-an-e
 // docUrl present
 assert.strictEqual(byCode.ATA3001.docUrl, 'https://ata-validator.com/e/ATA3001');
 
+// schemaSource present and pointing at the user's schema file
+assert.ok(byCode.ATA3001.schemaSource, 'runtime schemaSource missing');
+assert.strictEqual(byCode.ATA3001.schemaSource.file, 'schemas/user.json');
+
 // Pre-parsed object: no dataFrame
 const r2 = v.validate({ name: 'M', email: 'not-an-email', age: -3 });
 for (const e of r2.errors) {

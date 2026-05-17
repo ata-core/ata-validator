@@ -420,6 +420,16 @@ class Validator {
       ? { path: String(options.source.path || ''), content: String(options.source.content || '') }
       : null;
 
+    // Build a JSON pointer -> position map for the schema text once at
+    // construction so each runtime error can resolve `schemaSource` without
+    // re-scanning the source on every validate() call.
+    if (this._source) {
+      const { buildPositionMap } = require('./lib/source-positions');
+      this._schemaPositions = buildPositionMap(this._source.content);
+    } else {
+      this._schemaPositions = null;
+    }
+
     // Per-validate data position cache. Populated by validateJSON before
     // dispatching to inner validate(); consulted by the rich-error wrap
     // to attach dataFrame entries to each enriched error.
@@ -885,7 +895,12 @@ class Validator {
         const result = inner(data);
         if (result && !result.valid && result.errors && result.errors.length) {
           const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
-          const enriched = result.errors.map((e) => enrich(e, { data, positions }));
+          const enriched = result.errors.map((e) => enrich(e, {
+            data,
+            positions,
+            schemaPositions: this._schemaPositions,
+            schemaFile: this._source ? this._source.path : undefined,
+          }));
           if (positions) this._posCache.reset();
           return { valid: false, errors: enriched };
         }
@@ -913,7 +928,12 @@ class Validator {
             const first = result.errors[0];
             if (!first || !first.code) {
               const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
-              const enriched = result.errors.map((e) => enrich(e, { data: undefined, positions }));
+              const enriched = result.errors.map((e) => enrich(e, {
+                data: undefined,
+                positions,
+                schemaPositions: this._schemaPositions,
+                schemaFile: this._source ? this._source.path : undefined,
+              }));
               if (positions) this._posCache.reset();
               this._lastRawInput = null;
               return { valid: false, errors: enriched };
