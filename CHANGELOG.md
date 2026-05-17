@@ -17,6 +17,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 - `abortEarly: true` continues to short-circuit; new `ATA9000` stub carries the code without enrichment cost.
 - `oneOf` / `anyOf` failures collapse to a single best-branch error (`ATA4001` / `ATA4002` / `ATA4003`) instead of returning the full branch-tree explosion. Surfaces the closest matching variant's errors as nested context.
 - `allOf` errors continue to surface every failing branch (collapse would lose information).
+- `suggestion` field on errors: typo against enum, missing-required typo, format-violation hint, type-coercion nudge. Runtime validators populate automatically; AOT validators expose `attachSuggestions(errors, data)` to keep AOT bundles small.
 
 ## 0.14.0 - 2026-05-16
 
