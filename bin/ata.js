@@ -227,11 +227,28 @@ function cmdBuild(args) {
     return;
   }
 
-  buildLib.build(buildOpts).then((report) => {
-    printReport(report);
-    if (args.opts.check && report.staleCount > 0) process.exit(1);
-    if (report.failed.length > 0) process.exit(1);
-  }).catch((e) => {
+  // --dual emits two artifacts per schema: one source-mapped (default suffix)
+  // and one stripped (suffix .compiled.min). Useful for shipping both a
+  // developer-friendly bundle and a production-lean one from a single build.
+  const dual = !!args.opts.dual;
+  const runs = dual
+    ? [
+      { ...buildOpts, source: true, suffix: args.opts.suffix || '.compiled' },
+      { ...buildOpts, source: false, suffix: (args.opts.suffix || '.compiled') + '.min' },
+    ]
+    : [buildOpts];
+
+  (async () => {
+    let anyFailed = false;
+    let anyStale = false;
+    for (const run of runs) {
+      const report = await buildLib.build(run);
+      printReport(report);
+      if (args.opts.check && report.staleCount > 0) anyStale = true;
+      if (report.failed.length > 0) anyFailed = true;
+    }
+    if (anyFailed || anyStale) process.exit(1);
+  })().catch((e) => {
     process.stderr.write(`error: ${e.message}\n`);
     process.exit(1);
   });
