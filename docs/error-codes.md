@@ -4,7 +4,7 @@ Stable registry of `ATA####` codes emitted by ata-validator. Each section is the
 
 ## type
 
-### ATA1001 — value has wrong type
+### ATA1001: value has wrong type
 
 Keyword: `type`
 
@@ -12,7 +12,7 @@ Keyword: `type`
 
 **Fix.** Send a value that matches one of the allowed types, or widen `type` to cover what you're sending. If a JSON string would coerce cleanly to the expected type (e.g. `"42"` for `integer`), set `coerceTypes: true` on the Validator.
 
-### ATA1002 — value is not an object
+### ATA1002: value is not an object
 
 Keyword: `type`
 
@@ -22,7 +22,7 @@ Keyword: `type`
 
 ## shape
 
-### ATA7001 — object missing required property
+### ATA7001: object missing required property
 
 Keyword: `required`
 
@@ -30,7 +30,7 @@ Keyword: `required`
 
 **Fix.** Add the missing property to the data, or remove it from `required` if it should be optional. When a present property has a name close to the missing one (e.g. `emial` vs `email`), ata attaches a `did you mean` suggestion to the error.
 
-### ATA7002 — object has property not allowed by schema
+### ATA7002: object has property not allowed by schema
 
 Keyword: `additionalProperties`
 
@@ -38,7 +38,7 @@ Keyword: `additionalProperties`
 
 **Fix.** Remove the stray key, declare it in `properties`, or set `additionalProperties: true` if extra keys are acceptable. Use `removeAdditional: true` on the Validator to strip unknown keys silently instead of erroring.
 
-### ATA7003 — object has unevaluated property
+### ATA7003: object has unevaluated property
 
 Keyword: `unevaluatedProperties`
 
@@ -46,7 +46,7 @@ Keyword: `unevaluatedProperties`
 
 **Fix.** Declare the property in one of the composed branches, or remove it from the data.
 
-### ATA7004 — array has unevaluated items
+### ATA7004: array has unevaluated items
 
 Keyword: `unevaluatedItems`
 
@@ -54,7 +54,7 @@ Keyword: `unevaluatedItems`
 
 **Fix.** Cover the position with `items` or `prefixItems`, declare it in a composed branch, or shorten the array.
 
-### ATA7005 — dependentRequired property missing
+### ATA7005: dependentRequired property missing
 
 Keyword: `dependentRequired`
 
@@ -62,7 +62,7 @@ Keyword: `dependentRequired`
 
 **Fix.** Add the dependent property, or remove the trigger from the data.
 
-### ATA7006 — property name violates schema
+### ATA7006: property name violates schema
 
 Keyword: `propertyNames`
 
@@ -70,7 +70,7 @@ Keyword: `propertyNames`
 
 **Fix.** Rename the offending keys to match the rule, or relax the `propertyNames` schema.
 
-### ATA7007 — array does not contain a matching item
+### ATA7007: array does not contain a matching item
 
 Keyword: `contains`
 
@@ -80,7 +80,7 @@ Keyword: `contains`
 
 ## constraint
 
-### ATA2001 — string shorter than minLength
+### ATA2001: string shorter than minLength
 
 Keyword: `minLength`
 
@@ -88,7 +88,7 @@ Keyword: `minLength`
 
 **Fix.** Lengthen the string, or lower `minLength`.
 
-### ATA2002 — string longer than maxLength
+### ATA2002: string longer than maxLength
 
 Keyword: `maxLength`
 
@@ -96,7 +96,7 @@ Keyword: `maxLength`
 
 **Fix.** Shorten the string, or raise `maxLength`.
 
-### ATA2003 — number below minimum
+### ATA2003: number below minimum
 
 Keyword: `minimum`
 
@@ -104,7 +104,7 @@ Keyword: `minimum`
 
 **Fix.** Send a number ≥ `minimum`, or lower the bound. Use `exclusiveMinimum` if the bound itself should be excluded.
 
-### ATA2004 — number above maximum
+### ATA2004: number above maximum
 
 Keyword: `maximum`
 
@@ -112,7 +112,7 @@ Keyword: `maximum`
 
 **Fix.** Send a number ≤ `maximum`, or raise the bound.
 
-### ATA2005 — number not above exclusiveMinimum
+### ATA2005: number not above exclusiveMinimum
 
 Keyword: `exclusiveMinimum`
 
@@ -120,7 +120,7 @@ Keyword: `exclusiveMinimum`
 
 **Fix.** Send a strictly greater number, or switch to `minimum` if the bound should be inclusive.
 
-### ATA2006 — number not below exclusiveMaximum
+### ATA2006: number not below exclusiveMaximum
 
 Keyword: `exclusiveMaximum`
 
@@ -128,7 +128,7 @@ Keyword: `exclusiveMaximum`
 
 **Fix.** Send a strictly smaller number, or switch to `maximum` if the bound should be inclusive.
 
-### ATA2007 — number not a multiple of expected divisor
+### ATA2007: number not a multiple of expected divisor
 
 Keyword: `multipleOf`
 
@@ -136,7 +136,7 @@ Keyword: `multipleOf`
 
 **Fix.** Send a multiple of the divisor, or change `multipleOf`.
 
-### ATA2008 — array shorter than minItems
+### ATA2008: array shorter than minItems
 
 Keyword: `minItems`
 
@@ -144,7 +144,7 @@ Keyword: `minItems`
 
 **Fix.** Add elements, or lower `minItems`.
 
-### ATA2009 — array longer than maxItems
+### ATA2009: array longer than maxItems
 
 Keyword: `maxItems`
 
@@ -152,7 +152,7 @@ Keyword: `maxItems`
 
 **Fix.** Drop elements, or raise `maxItems`.
 
-### ATA2010 — object has fewer than minProperties
+### ATA2010: object has fewer than minProperties
 
 Keyword: `minProperties`
 
@@ -160,7 +160,7 @@ Keyword: `minProperties`
 
 **Fix.** Add keys, or lower `minProperties`.
 
-### ATA2011 — object has more than maxProperties
+### ATA2011: object has more than maxProperties
 
 Keyword: `maxProperties`
 
@@ -168,7 +168,7 @@ Keyword: `maxProperties`
 
 **Fix.** Drop keys, or raise `maxProperties`.
 
-### ATA2012 — array has duplicate items
+### ATA2012: array has duplicate items
 
 Keyword: `uniqueItems`
 
@@ -176,7 +176,7 @@ Keyword: `uniqueItems`
 
 **Fix.** Deduplicate the array, or drop the `uniqueItems` constraint.
 
-### ATA2013 — string does not match pattern
+### ATA2013: string does not match pattern
 
 Keyword: `pattern`
 
@@ -186,7 +186,7 @@ Keyword: `pattern`
 
 ## format
 
-### ATA3001 — value does not match format "email"
+### ATA3001: value does not match format "email"
 
 Keyword: `format` (format: `email`)
 
@@ -194,7 +194,7 @@ Keyword: `format` (format: `email`)
 
 **Fix.** Send a valid email. If your domain accepts a looser definition, override with `formats: { email: () => true }` on the Validator (or with a stricter custom function).
 
-### ATA3002 — value does not match format "date"
+### ATA3002: value does not match format "date"
 
 Keyword: `format` (format: `date`)
 
@@ -202,7 +202,7 @@ Keyword: `format` (format: `date`)
 
 **Fix.** Use ISO 8601 calendar form. If you meant to include a time, switch the schema to `format: "date-time"`.
 
-### ATA3003 — value does not match format "date-time"
+### ATA3003: value does not match format "date-time"
 
 Keyword: `format` (format: `date-time`)
 
@@ -210,7 +210,7 @@ Keyword: `format` (format: `date-time`)
 
 **Fix.** Use the `T` separator between date and time, and include a timezone (`Z` or `+HH:MM`).
 
-### ATA3004 — value does not match format "time"
+### ATA3004: value does not match format "time"
 
 Keyword: `format` (format: `time`)
 
@@ -218,7 +218,7 @@ Keyword: `format` (format: `time`)
 
 **Fix.** Use 24-hour `HH:MM:SS`. Add `.sss` for sub-second precision and `Z`/`±HH:MM` for timezone if needed.
 
-### ATA3005 — value does not match format "uri"
+### ATA3005: value does not match format "uri"
 
 Keyword: `format` (format: `uri`)
 
@@ -226,7 +226,7 @@ Keyword: `format` (format: `uri`)
 
 **Fix.** Include the scheme, or relax the schema to `uri-reference` if relative paths are acceptable.
 
-### ATA3006 — value does not match format "uri-reference"
+### ATA3006: value does not match format "uri-reference"
 
 Keyword: `format` (format: `uri-reference`)
 
@@ -234,7 +234,7 @@ Keyword: `format` (format: `uri-reference`)
 
 **Fix.** Encode reserved characters properly, or strip them.
 
-### ATA3007 — value does not match format "ipv4"
+### ATA3007: value does not match format "ipv4"
 
 Keyword: `format` (format: `ipv4`)
 
@@ -242,7 +242,7 @@ Keyword: `format` (format: `ipv4`)
 
 **Fix.** Send a literal IPv4. To accept either IPv4 or IPv6, use `oneOf` with two branches.
 
-### ATA3008 — value does not match format "ipv6"
+### ATA3008: value does not match format "ipv6"
 
 Keyword: `format` (format: `ipv6`)
 
@@ -250,7 +250,7 @@ Keyword: `format` (format: `ipv6`)
 
 **Fix.** Send a well-formed IPv6. Square-bracket-wrapped forms from URLs (`[::1]`) need to be unwrapped first.
 
-### ATA3009 — value does not match format "uuid"
+### ATA3009: value does not match format "uuid"
 
 Keyword: `format` (format: `uuid`)
 
@@ -258,7 +258,7 @@ Keyword: `format` (format: `uuid`)
 
 **Fix.** Use the canonical form. Uppercase UUIDs from older libraries should be lowercased before validation; the nil UUID (`00000000-0000-0000-0000-000000000000`) is accepted.
 
-### ATA3010 — value does not match format "hostname"
+### ATA3010: value does not match format "hostname"
 
 Keyword: `format` (format: `hostname`)
 
@@ -266,7 +266,7 @@ Keyword: `format` (format: `hostname`)
 
 **Fix.** Use label-separated names like `api.example.com`. Each label must be 1-63 alphanumerics or hyphens, and the total length must not exceed 253.
 
-### ATA3099 — value does not match user-defined format
+### ATA3099: value does not match user-defined format
 
 Keyword: `format`
 
@@ -276,7 +276,7 @@ Keyword: `format`
 
 ## enum
 
-### ATA6001 — value is not one of the allowed enum values
+### ATA6001: value is not one of the allowed enum values
 
 Keyword: `enum`
 
@@ -284,7 +284,7 @@ Keyword: `enum`
 
 **Fix.** Pick a value from the enum, or add the value to the schema if it should be allowed.
 
-### ATA6002 — value does not equal const
+### ATA6002: value does not equal const
 
 Keyword: `const`
 
@@ -294,7 +294,7 @@ Keyword: `const`
 
 ## composition
 
-### ATA4001 — value matched 0 of N oneOf variants
+### ATA4001: value matched 0 of N oneOf variants
 
 Keyword: `oneOf`
 
@@ -302,7 +302,7 @@ Keyword: `oneOf`
 
 **Fix.** Resolve the errors in the closest branch, or adjust the data to match a different branch. Add a `title` to each branch schema to get readable variant names in the error output.
 
-### ATA4002 — value matched more than one oneOf variant
+### ATA4002: value matched more than one oneOf variant
 
 Keyword: `oneOf`
 
@@ -310,7 +310,7 @@ Keyword: `oneOf`
 
 **Fix.** Tighten the branches with a discriminator field or mutually exclusive constraints. If multiple matches are fine, switch to `anyOf`.
 
-### ATA4003 — value matched none of the anyOf variants
+### ATA4003: value matched none of the anyOf variants
 
 Keyword: `anyOf`
 
@@ -318,15 +318,15 @@ Keyword: `anyOf`
 
 **Fix.** Resolve the closest branch's errors, or add a new branch covering the shape you're sending.
 
-### ATA4004 — value failed one or more allOf branches
+### ATA4004: value failed one or more allOf branches
 
 Keyword: `allOf`
 
-**Cause.** `allOf` requires every branch to pass; at least one rejected the data. Unlike `oneOf`/`anyOf`, ata does not collapse — each failing branch's errors surface independently with their own codes.
+**Cause.** `allOf` requires every branch to pass; at least one rejected the data. Unlike `oneOf`/`anyOf`, ata does not collapse, each failing branch's errors surface independently with their own codes.
 
 **Fix.** Resolve each branch's errors individually.
 
-### ATA4005 — value matched a forbidden schema
+### ATA4005: value matched a forbidden schema
 
 Keyword: `not`
 
@@ -334,7 +334,7 @@ Keyword: `not`
 
 **Fix.** Change the data so the inner schema rejects it, or drop the `not` if the constraint isn't needed.
 
-### ATA4006 — value violated then/else branch
+### ATA4006: value violated then/else branch
 
 Keyword: `if`
 
@@ -344,7 +344,7 @@ Keyword: `if`
 
 ## ref
 
-### ATA5001 — $ref could not be resolved
+### ATA5001: $ref could not be resolved
 
 Keyword: `$ref`
 
@@ -352,7 +352,7 @@ Keyword: `$ref`
 
 **Fix.** Register the referenced schema via `new Validator(main, { schemas: [referenced] })` or `addSchema(...)`. ata does not fetch remote refs at runtime; mirror them locally first.
 
-### ATA5002 — recursive $ref cycle detected at validate time
+### ATA5002: recursive $ref cycle detected at validate time
 
 Keyword: `$ref`
 
@@ -362,7 +362,7 @@ Keyword: `$ref`
 
 ## system
 
-### ATA9000 — validation failed (abortEarly)
+### ATA9000: validation failed (abortEarly)
 
 Keyword: `__abort_early__`
 
@@ -370,7 +370,7 @@ Keyword: `__abort_early__`
 
 **Fix.** This is not a bug. To get detailed errors, send the same data through a Validator constructed without `abortEarly`. The two can coexist: keep `abortEarly` on the hot path, run a non-abortEarly instance for diagnostics.
 
-### ATA9001 — input is not valid JSON
+### ATA9001: input is not valid JSON
 
 Keyword: `__parse__`
 
@@ -378,10 +378,10 @@ Keyword: `__parse__`
 
 **Fix.** Fix the JSON syntax at the reported offset. If the input is already a parsed object, call `validate()` (or `validateObject()`) instead.
 
-### ATA9002 — schema failed to compile
+### ATA9002: schema failed to compile
 
 Keyword: `__compile__`
 
-**Cause.** The schema passed to `new Validator(schema)` or `ata compile` is structurally invalid — malformed JSON Schema, unsupported keyword combination, or broken `$ref`.
+**Cause.** The schema passed to `new Validator(schema)` or `ata compile` is structurally invalid: malformed JSON Schema, unsupported keyword combination, or broken `$ref`.
 
 **Fix.** Address the issue in the schema. The error message and source frame point at the offending location.
