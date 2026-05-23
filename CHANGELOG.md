@@ -2,6 +2,19 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.16.0 - 2026-05-23
+
+### Added
+
+- `defineSchema` helper and the exported `JSONSchema` type. Wrap a plain schema object in `defineSchema(...)` to author it inline in TypeScript with keyword autocomplete and value checking, no `as const` needed. It is an identity function at runtime, so the returned object drops straight into `Validator`, `toStandaloneModule`, and the rest of the API. Requires TypeScript >= 5.0 for the `const` type parameter.
+- OpenAPI `nullable` keyword. `{ type: 'string', nullable: true }` accepts `null` alongside the declared type, matching OpenAPI 3.0 schemas.
+
+### Fixed
+
+- `coerceTypes` with `type: 'array'` wraps a scalar into a single-element array instead of leaving it unchanged.
+- Codegen resolves a `$defs` entry that carries a fragment `$id` and is reached through a pointer `$ref`.
+- Preprocessing (defaults, coercion, `removeAdditional`) guards against `null` and non-object data instead of throwing.
+
 ## 0.15.1 - 2026-05-23
 
 ### Fixed
