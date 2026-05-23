@@ -8,7 +8,7 @@ const {
   compileToJSCodegenWithErrors,
   compileToJSCombined,
 } = require("./lib/js-compiler");
-const { normalizeDraft7 } = require("./lib/draft7");
+const { normalizeDraft7, normalizeNullable } = require("./lib/draft7");
 const { classify } = require("./lib/shape-classifier");
 const { buildTier0Plan, tier0Validate } = require("./lib/tier0");
 
@@ -352,6 +352,7 @@ function buildSchemaMap(schemas) {
   if (Array.isArray(schemas)) {
     for (const s of schemas) {
       normalizeDraft7(s)
+      normalizeNullable(s)
       const id = s.$id
       if (!id) throw new Error('Schema in schemas option must have $id')
       map.set(id, s)
@@ -359,6 +360,7 @@ function buildSchemaMap(schemas) {
   } else {
     for (const [key, s] of Object.entries(schemas)) {
       normalizeDraft7(s)
+      normalizeNullable(s)
       map.set(s.$id || key, s)
     }
   }
@@ -461,6 +463,8 @@ class Validator {
 
     // Draft 7 normalization — convert keywords to 2020-12 equivalents in-place
     normalizeDraft7(schemaObj);
+    // OpenAPI nullable -> type union with 'null'
+    normalizeNullable(schemaObj);
 
     this._schemaStr = null; // lazy: computed on first use
     this._schemaObj = schemaObj;
@@ -1076,6 +1080,7 @@ class Validator {
     }
     // Apply Draft 7 normalization if needed
     normalizeDraft7(schema)
+    normalizeNullable(schema)
     this._schemaMap.set(schema.$id, schema)
   }
 
