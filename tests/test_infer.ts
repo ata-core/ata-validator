@@ -46,3 +46,28 @@ void _bareArr;
 const _ref: Expect<Infer<{ $ref: 'other#' }>, unknown> = true;
 const _anyOf: Expect<Infer<{ anyOf: [{ type: 'string' }, { type: 'number' }] }>, unknown> = true;
 void _ref; void _anyOf;
+
+import { Validator } from '../index.js';
+
+const v = new Validator(defineSchema({
+  type: 'object',
+  properties: { id: { type: 'integer' }, name: { type: 'string' } },
+  required: ['id', 'name'],
+}));
+
+const r = v.validate({});
+if (r.valid) {
+  const _idNarrow: number = r.data.id;
+  const _nameNarrow: string = r.data.name;
+  void _idNarrow; void _nameNarrow;
+}
+
+// Explicit type parameter still works (fallback overload).
+const vExplicit = new Validator<{ a: boolean }>({ type: 'object' });
+const rx = vExplicit.validate({});
+if (rx.valid) { const _a: boolean = rx.data.a; void _a; }
+
+// String schema falls back to unknown data.
+const vStr = new Validator('{"type":"object"}');
+const rs = vStr.validate({});
+if (rs.valid) { const _u: unknown = rs.data; void _u; }

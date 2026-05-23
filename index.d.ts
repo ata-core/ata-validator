@@ -299,9 +299,8 @@ export interface StandaloneModule {
   errFn: ((data: unknown, allErrors?: boolean) => ValidationResult) | null;
 }
 
-export class Validator<T = unknown> {
-  constructor(schema: object | string, options?: ValidatorOptions);
-
+/** Instance surface of a compiled validator. */
+export interface Validator<T = unknown> {
   /** Add a schema to the registry for cross-schema $ref resolution */
   addSchema(schema: object): void;
 
@@ -344,40 +343,47 @@ export class Validator<T = unknown> {
   /**
    * Generate a self-contained module string with `validate`/`isValid` exports.
    * The output has zero runtime dependency on ata-validator.
-   *
-   * - format: 'esm' (default) or 'cjs'.
-   * - abortEarly: if true, invalid results are a shared frozen stub (smaller output, no error details).
-   *
-   * Returns null if the schema cannot be compiled to a standalone module.
    */
   toStandaloneModule(options?: { format?: 'esm' | 'cjs'; abortEarly?: boolean }): string | null;
 
+  /** Standard Schema V1 interface, compatible with Fastify, tRPC, TanStack, etc. */
+  readonly "~standard": StandardSchemaV1Props;
+}
+
+/** Constructor + statics for {@link Validator}. */
+export interface ValidatorConstructor {
+  /** Construct from a JSON Schema literal; the validated data type is inferred. */
+  new <const S extends JSONSchema>(schema: S, options?: ValidatorOptions): Validator<Infer<S>>;
+  /** Construct from a plain object/string schema, or with an explicit data type. */
+  new <T = unknown>(schema: object | string, options?: ValidatorOptions): Validator<T>;
+
   /** Load a pre-compiled standalone module. Zero schema compilation at startup. */
-  static fromStandalone<T = unknown>(mod: StandaloneModule, schema: object | string, options?: ValidatorOptions): Validator<T>;
+  fromStandalone<T = unknown>(mod: StandaloneModule, schema: object | string, options?: ValidatorOptions): Validator<T>;
 
   /** Bundle multiple schemas into a single JS module string. Load with Validator.loadBundle(). */
-  static bundle(schemas: object[], options?: ValidatorOptions): string;
+  bundle(schemas: object[], options?: ValidatorOptions): string;
 
   /**
    * Bundle multiple schemas into a self-contained JS module with no
    * ata-validator runtime dependency. Cross-schema `$ref` resolves between
    * the supplied schemas. Set `format: 'esm'` for ESM output (default 'cjs').
    */
-  static bundleStandalone(schemas: object[], options?: BundleStandaloneOptions): string;
+  bundleStandalone(schemas: object[], options?: BundleStandaloneOptions): string;
 
   /**
    * Bundle multiple schemas with deduplicated shared templates. Smaller output
-   * than bundle(). Accepts the same options as bundleStandalone, including
-   * `format: 'esm' | 'cjs'` and cross-schema `$ref` resolution.
+   * than bundle(). Accepts the same options as bundleStandalone.
    */
-  static bundleCompact(schemas: object[], options?: BundleStandaloneOptions): string;
+  bundleCompact(schemas: object[], options?: BundleStandaloneOptions): string;
 
   /** Load a bundle created by Validator.bundle(). Returns array of Validator instances. */
-  static loadBundle(mods: object[], schemas: object[], options?: ValidatorOptions): Validator[];
+  loadBundle(mods: object[], schemas: object[], options?: ValidatorOptions): Validator[];
 
-  /** Standard Schema V1 interface, compatible with Fastify, tRPC, TanStack, etc. */
-  readonly "~standard": StandardSchemaV1Props;
+  readonly prototype: Validator;
 }
+
+/** Compile a schema into a reusable validator. */
+export const Validator: ValidatorConstructor;
 
 /** One-shot validate: creates a Validator, validates data, returns result. */
 export function validate<T = unknown>(
