@@ -316,7 +316,7 @@ export interface Validator<T = unknown> {
   /** Fast boolean check for a JSON string */
   isValidJSON(jsonString: string): boolean;
 
-  /** Parse JSON with simdjson + validate against schema. Returns parsed value and validation result. Requires native addon. */
+  /** Parse JSON and validate against the schema. Returns the parsed value and the validation result. Works without the native addon. */
   validateAndParse(jsonString: string | Buffer): ValidateAndParseResult<T>;
 
   /** Ultra-fast buffer validation via native addon */

@@ -8,6 +8,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 - Static type inference from JSON Schema literals. The new exported `Infer<S>` type maps a schema literal to its data type, and `new Validator(defineSchema({...}))` now returns `Validator<Infer<S>>`, so `validate()` narrows `result.data` with no manual type annotation. Write plain JSON Schema, get the type for free, no builder DSL. Covers primitives, type-array unions, `const`, `enum`, objects (required vs optional keys), and arrays; `$ref`, tuples, and `anyOf`/`oneOf` infer `unknown` for now. Pure `.d.ts` change, no runtime impact.
 
+### Fixed
+
+- `validateAndParse()` is now implemented in JavaScript (`JSON.parse` then validate) and returns `{ valid, value, errors }`. It previously called a native method that does not exist and threw on every call. It now works with or without the native addon and in the browser; malformed JSON returns `valid: false` with an `ATA9001` error instead of throwing.
+
 ## 0.16.0 - 2026-05-23
 
 ### Added

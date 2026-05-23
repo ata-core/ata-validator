@@ -868,16 +868,20 @@ class Validator {
               return false;
             }
           };
-      // validateAndParse: requires native addon for simdjson parsing
-      if (native) {
+      // validateAndParse: parse the JSON, then validate. Pure JS (JSON.parse +
+      // validate) so it works with or without the native addon and in browsers.
+      {
         const self = this;
         this.validateAndParse = (jsonStr) => {
-          self._ensureNative();
-          self.validateAndParse = (s) => self._compiled.validateAndParse(s);
-          return self.validateAndParse(jsonStr);
+          let value;
+          try {
+            value = JSON.parse(typeof jsonStr === 'string' ? jsonStr : new TextDecoder().decode(jsonStr));
+          } catch (e) {
+            return { valid: false, value: undefined, errors: [{ code: 'ATA9001', message: 'invalid JSON: ' + e.message, keyword: '__parse__', instancePath: '', schemaPath: '', params: {} }] };
+          }
+          const r = self.validate(value);
+          return { valid: r.valid, value, errors: r.errors };
         };
-      } else {
-        this.validateAndParse = () => { throw new Error('Native addon required for validateAndParse()'); };
       }
       // Buffer APIs: lazy native init — only compile native schema on first buffer call.
       // This keeps cold start fast (JS codegen only) for users who only use validate().
