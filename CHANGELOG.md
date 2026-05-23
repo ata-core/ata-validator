@@ -2,6 +2,13 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.15.1 - 2026-05-23
+
+### Fixed
+
+- Coercion, defaults, and `removeAdditional` now follow a cross-schema `$ref` to the referenced shape. A whole-schema reference like `{ $ref: 'shared#' }` (used for shared route schemas) or a property reference like `{ id: { $ref: 'shared#/properties/id' } }` is preprocessed instead of skipped.
+- The compile cache now keys on referenced schema content, not just the `$id`. Two validators that share a root schema string and an `$id` pointing at different schemas no longer reuse the wrong compiled function.
+
 ## 0.15.0 - 2026-05-18
 
 ### Added
