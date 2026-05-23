@@ -41,4 +41,20 @@ test('nullable does not corrupt a default value that contains the key', () => {
   assert.deepStrictEqual(data.cfg, { nullable: true })
 })
 
+test('preprocessing does not crash on null data for a nullable object schema', () => {
+  const v = new Validator(
+    { type: ['object', 'null'], properties: { hello: { type: 'string' } } },
+    { coerceTypes: true, removeAdditional: true }
+  )
+  assert.strictEqual(v.validate(null).valid, true)
+})
+
+test('preprocessing with defaults does not crash on null data', () => {
+  const v = new Validator(
+    { type: ['object', 'null'], properties: { hello: { type: 'string', default: 'x' } } },
+    { coerceTypes: true }
+  )
+  assert.strictEqual(v.validate(null).valid, true)
+})
+
 console.log('\ndone.\n')

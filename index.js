@@ -258,6 +258,9 @@ function buildPreprocessCodegen(schema, options) {
   }
 
   if (lines.length === 0) return null;
+  // Data may legitimately be null or a non-object (e.g. a `['object','null']`
+  // schema), so the per-property mutations must not run on it.
+  lines.unshift(`if(d===null||typeof d!=='object')return`);
   try {
     return new Function('d', lines.join('\n'));
   } catch {
