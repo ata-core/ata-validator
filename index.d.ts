@@ -164,6 +164,74 @@ export interface JSONSchema {
   [keyword: string]: unknown;
 }
 
+/**
+ * Collapse an intersection of mapped object types into a single readable object
+ * type. `& {}` forces TypeScript to evaluate the mapped type eagerly.
+ */
+type Simplify<T> = { [K in keyof T]: T[K] } & {};
+
+/** Keys listed in a schema's `required` array, as a string union (or never). */
+type RequiredKeys<S> = S extends { required: infer R }
+  ? R extends ReadonlyArray<infer K extends string>
+    ? K
+    : never
+  : never;
+
+/** Object shape: required keys are required, all other declared keys optional. */
+type InferObject<S> = S extends { properties: infer P }
+  ? Simplify<
+      { [K in keyof P as K extends RequiredKeys<S> ? K : never]: Infer<P[K]> } &
+      { [K in keyof P as K extends RequiredKeys<S> ? never : K]?: Infer<P[K]> }
+    >
+  : Record<string, unknown>;
+
+/** Array shape: `items` as a single schema maps to an element type; tuple/absent -> unknown[]. */
+type InferArray<S> = S extends { items: infer I }
+  ? I extends ReadonlyArray<unknown>
+    ? unknown[]
+    : Infer<I>[]
+  : unknown[];
+
+/** Map a single JSON Schema type name (+ its schema) to a TS type. */
+type InferByTypeName<N, S> = N extends 'object'
+  ? InferObject<S>
+  : N extends 'array'
+    ? InferArray<S>
+    : N extends 'string'
+      ? string
+      : N extends 'number'
+        ? number
+        : N extends 'integer'
+          ? number
+          : N extends 'boolean'
+            ? boolean
+            : N extends 'null'
+              ? null
+              : unknown;
+
+/**
+ * Infer the TypeScript data type a JSON Schema literal describes (Core scope).
+ *
+ * Handles: primitives, `type` arrays (union), `const`, `enum`, objects
+ * (`properties` + `required` -> required/optional keys), and arrays
+ * (`items` as a single schema). `$ref`/`$defs`, tuples, and `anyOf`/`oneOf`/
+ * `allOf` are not yet inferred and resolve to `unknown` rather than erroring.
+ *
+ * Pair with {@link defineSchema}:
+ * `const s = defineSchema({...}); type T = Infer<typeof s>;`
+ */
+export type Infer<S> = S extends { const: infer C }
+  ? C
+  : S extends { enum: infer E }
+    ? E extends ReadonlyArray<infer U>
+      ? U
+      : unknown
+    : S extends { type: infer T }
+      ? T extends ReadonlyArray<infer N>
+        ? InferByTypeName<N, S>
+        : InferByTypeName<T, S>
+      : unknown;
+
 export type ValidationResult<T = unknown> =
   | { valid: true;  data: T;       errors: ValidationError[] }
   | { valid: false; data?: never;  errors: ValidationError[] };
