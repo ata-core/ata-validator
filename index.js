@@ -1652,6 +1652,14 @@ function attachSuggestions (errors, data) {
   return errors;
 }
 
+// Authoring helper: identity at runtime. Its only job is to attach the
+// JSONSchema type (see index.d.ts) to an inline schema object so TypeScript
+// gives autocomplete and value checking while authoring. Returns the schema
+// untouched so it can be passed straight to Validator, toStandaloneModule, etc.
+function defineSchema (schema) {
+  return schema;
+}
+
 module.exports = {
   Validator,
   compile,
@@ -1661,6 +1669,7 @@ module.exports = {
   SIMDJSON_PADDING,
   parseJSON,
   toTypeScript,
+  defineSchema,
   renderPretty,
   renderCompact,
   renderJSON,

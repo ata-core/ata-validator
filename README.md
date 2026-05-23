@@ -158,6 +158,28 @@ if (result.valid) {
 
 The same pattern works with Zod-from-JSON-Schema, Valibot, or a hand-written `type User = {...}` alongside a JSON Schema literal. `Validator<T>` makes no library-specific assumption.
 
+#### Authoring a schema inline: `defineSchema`
+
+If you would rather write a plain JSON Schema object than reach for a schema library, wrap it in `defineSchema`. It returns the schema untouched at runtime, but in TypeScript it gives you keyword autocomplete and an error when a value has the wrong shape, with no `as const` needed.
+
+```ts
+import { defineSchema, Validator } from 'ata-validator'
+
+const userSchema = defineSchema({
+  type: 'object',
+  properties: {
+    id: { type: 'integer', minimum: 1 },
+    role: { type: 'string', enum: ['admin', 'user'] },
+  },
+  required: ['id'],
+})
+
+// type: 123 or required: 'id' would be a compile error here.
+const v = new Validator(userSchema)
+```
+
+The exported `JSONSchema` type is also available directly if you want to annotate a schema yourself. Custom and vendor keywords are allowed, so exotic schemas still type-check. Requires TypeScript >= 5.0.
+
 ### Cross-Schema `$ref`
 
 ```javascript

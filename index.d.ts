@@ -75,6 +75,95 @@ export function renderJSON(errors: RichValidationError[], opts?: JSONRenderOptio
 /** A user-supplied format checker. Receives the candidate value, returns true if valid. */
 export type FormatChecker = (value: string) => boolean;
 
+/** The seven primitive `type` values defined by JSON Schema. */
+export type JSONSchemaTypeName =
+  | 'string'
+  | 'number'
+  | 'integer'
+  | 'boolean'
+  | 'object'
+  | 'array'
+  | 'null';
+
+/**
+ * A hand-written type for authoring JSON Schema (draft 2020-12) objects inline
+ * in TypeScript. Known keywords are typed, so you get autocomplete and an error
+ * when a value has the wrong shape (e.g. `type: 123` or `required: 'id'`).
+ * Unknown keywords are permitted, so custom/vendor keywords do not error.
+ *
+ * Pair it with {@link defineSchema} for inline authoring without `as const`.
+ */
+export interface JSONSchema {
+  $id?: string;
+  $schema?: string;
+  $ref?: string;
+  $defs?: Record<string, JSONSchema>;
+  definitions?: Record<string, JSONSchema>;
+  $comment?: string;
+
+  type?: JSONSchemaTypeName | JSONSchemaTypeName[];
+  enum?: ReadonlyArray<unknown>;
+  const?: unknown;
+
+  title?: string;
+  description?: string;
+  default?: unknown;
+  examples?: ReadonlyArray<unknown>;
+  deprecated?: boolean;
+  readOnly?: boolean;
+  writeOnly?: boolean;
+
+  // object
+  properties?: Record<string, JSONSchema>;
+  required?: ReadonlyArray<string>;
+  additionalProperties?: boolean | JSONSchema;
+  patternProperties?: Record<string, JSONSchema>;
+  propertyNames?: JSONSchema;
+  minProperties?: number;
+  maxProperties?: number;
+  dependentRequired?: Record<string, ReadonlyArray<string>>;
+  dependentSchemas?: Record<string, JSONSchema>;
+
+  // array
+  items?: JSONSchema | ReadonlyArray<JSONSchema>;
+  prefixItems?: ReadonlyArray<JSONSchema>;
+  additionalItems?: boolean | JSONSchema;
+  contains?: JSONSchema;
+  minContains?: number;
+  maxContains?: number;
+  minItems?: number;
+  maxItems?: number;
+  uniqueItems?: boolean;
+
+  // string
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  format?: string;
+
+  // number
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+  multipleOf?: number;
+
+  // composition
+  allOf?: ReadonlyArray<JSONSchema>;
+  anyOf?: ReadonlyArray<JSONSchema>;
+  oneOf?: ReadonlyArray<JSONSchema>;
+  not?: JSONSchema;
+  if?: JSONSchema;
+  then?: JSONSchema;
+  else?: JSONSchema;
+
+  /** OpenAPI compatibility: ata honors `nullable` as a JSON Schema extension. */
+  nullable?: boolean;
+
+  /** Custom and vendor keywords are allowed without error. */
+  [keyword: string]: unknown;
+}
+
 export type ValidationResult<T = unknown> =
   | { valid: true;  data: T;       errors: ValidationError[] }
   | { valid: false; data?: never;  errors: ValidationError[] };
@@ -253,3 +342,25 @@ export const SIMDJSON_PADDING: number;
  * build-time integrations (Vite plugin, custom build steps).
  */
 export function toTypeScript(schema: object, options?: { name?: string }): string;
+
+/**
+ * Authoring helper for writing a JSON Schema inline in TypeScript. Returns the
+ * schema unchanged at runtime; its purpose is to apply the {@link JSONSchema}
+ * type so you get keyword autocomplete and an error on malformed values, while
+ * the `const` type parameter preserves the literal shape (no `as const` needed).
+ *
+ * ```ts
+ * import { defineSchema, Validator } from 'ata-validator';
+ *
+ * const user = defineSchema({
+ *   type: 'object',
+ *   properties: { id: { type: 'integer', minimum: 1 } },
+ *   required: ['id'],
+ * });
+ *
+ * const v = new Validator(user);
+ * ```
+ *
+ * Requires TypeScript >= 5.0 for the `const` type parameter.
+ */
+export declare function defineSchema<const S extends JSONSchema>(schema: S): S;
