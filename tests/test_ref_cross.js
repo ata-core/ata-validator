@@ -240,6 +240,38 @@ test('coerceTypes resolves a property-level $ref with pointer fragment', () => {
   assert.strictEqual(typeof data.id, 'number')
 })
 
+console.log('\n=== coerceTypes "array" wrapping ===')
+
+test('coerceTypes:"array" wraps a scalar into a single-element array', () => {
+  const v = new Validator(
+    { type: 'object', properties: { tags: { type: 'array', items: { type: 'string' } } } },
+    { coerceTypes: 'array' }
+  )
+  const data = { tags: 'x' }
+  assert.strictEqual(v.validate(data).valid, true)
+  assert.deepStrictEqual(data.tags, ['x'])
+})
+
+test('coerceTypes:"array" wraps through a property $ref', () => {
+  const v = new Validator(
+    { type: 'object', properties: { msg: { $ref: 'arr#' } } },
+    { schemas: { arr: { $id: 'arr', type: 'array', items: { type: 'string' } } }, coerceTypes: 'array' }
+  )
+  const data = { msg: 'x' }
+  assert.strictEqual(v.validate(data).valid, true)
+  assert.deepStrictEqual(data.msg, ['x'])
+})
+
+test('coerceTypes:true (not "array") does NOT wrap scalars into arrays', () => {
+  const v = new Validator(
+    { type: 'object', properties: { tags: { type: 'array', items: { type: 'string' } } } },
+    { coerceTypes: true }
+  )
+  const data = { tags: 'x' }
+  // plain true keeps AJV semantics: no array wrapping, so a scalar stays invalid
+  assert.strictEqual(v.validate(data).valid, false)
+})
+
 console.log('\n=== compile cache keys on external schema content ===')
 
 test('same external $id with different content does not collide in cache', () => {

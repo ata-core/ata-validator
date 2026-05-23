@@ -242,6 +242,8 @@ function buildPreprocessCodegen(schema, options) {
       } else if (t === 'boolean') {
         lines.push(`if(d[${k}]==='true'||d[${k}]==='1')d[${k}]=true`);
         lines.push(`if(d[${k}]==='false'||d[${k}]==='0')d[${k}]=false`);
+      } else if (t === 'array' && options.coerceTypes === 'array') {
+        lines.push(`if(${k} in d&&d[${k}]!==undefined&&!Array.isArray(d[${k}]))d[${k}]=[d[${k}]]`);
       }
     }
   }
