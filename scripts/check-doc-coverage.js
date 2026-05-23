@@ -10,7 +10,7 @@ const doc = fs.readFileSync(path.join(__dirname, '..', 'docs', 'error-codes.md')
 const missing = [];
 const placeholder = [];
 for (const code of all()) {
-  const headingRe = new RegExp(`^### ${code} `, 'm');
+  const headingRe = new RegExp(`^### ${code}\\b`, 'm');
   if (!headingRe.test(doc)) {
     missing.push(code);
     continue;
