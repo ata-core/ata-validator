@@ -258,4 +258,37 @@ test('same external $id with different content does not collide in cache', () =>
   assert.strictEqual(v2.validate({ ip: '127.0.0.1' }).valid, true)
 })
 
+console.log('\n=== $defs entry with a fragment $id (draft-07 anchor) ===')
+
+test('codegen handles a $defs entry with fragment $id via pointer ref + external ref', () => {
+  const v = new Validator(
+    {
+      type: 'object',
+      definitions: { addr: { $id: '#otherId', type: 'object', properties: { city: { type: 'string' } }, required: ['city'] } },
+      properties: { box: { $ref: 'numbox#' }, addr: { $ref: '#/definitions/addr' } },
+      required: ['box', 'addr'],
+    },
+    { schemas: { numbox: { $id: 'numbox', type: 'object', properties: { id: { type: 'number' } } } } }
+  )
+  assert.strictEqual(v.validate({ box: { id: 5 }, addr: { city: 'X' } }).valid, true)
+  assert.strictEqual(v.validate({ box: { id: 5 }, addr: {} }).valid, false)
+})
+
+test('anchor ref to a fragment-$id $defs entry never silently accepts invalid data', () => {
+  // Known gap: the combined/error codegen paths do not resolve an anchor ref
+  // (`$ref: '#addr'`) to a $defs entry carrying a fragment $id, so codegenSafe
+  // bails these off the codegen path. The guard must keep them from silently
+  // passing invalid data (reject is fine, accept is not).
+  const v = new Validator(
+    {
+      type: 'object',
+      definitions: { addr: { $id: '#addr', type: 'object', properties: { city: { type: 'string' } }, required: ['city'] } },
+      properties: { box: { $ref: 'numbox#' }, addr: { $ref: '#addr' } },
+      required: ['box', 'addr'],
+    },
+    { schemas: { numbox: { $id: 'numbox', type: 'object', properties: { id: { type: 'number' } } } } }
+  )
+  assert.strictEqual(v.validate({ box: { id: 5 }, addr: {} }).valid, false)
+})
+
 console.log('\ndone.\n')
