@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.17.0 - 2026-05-23
+
+### Added
+
+- Static type inference from JSON Schema literals. The new exported `Infer<S>` type maps a schema literal to its data type, and `new Validator(defineSchema({...}))` now returns `Validator<Infer<S>>`, so `validate()` narrows `result.data` with no manual type annotation. Write plain JSON Schema, get the type for free, no builder DSL. Covers primitives, type-array unions, `const`, `enum`, objects (required vs optional keys), and arrays; `$ref`, tuples, and `anyOf`/`oneOf` infer `unknown` for now. Pure `.d.ts` change, no runtime impact.
+
 ## 0.16.0 - 2026-05-23
 
 ### Added
