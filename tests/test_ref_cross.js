@@ -205,4 +205,57 @@ test('addSchema() cross-ref validation', () => {
   assert.ok(!v.validate({ tag: '' }).valid)
 })
 
+console.log('\n=== coercion through top-level $ref ===')
+
+test('coerceTypes resolves a top-level $ref before coercing', () => {
+  const v = new Validator(
+    { $ref: 'test#' },
+    { schemas: { test: { $id: 'test', type: 'object', properties: { id: { type: 'number' } } } }, coerceTypes: true }
+  )
+  const data = { id: '123' }
+  const r = v.validate(data)
+  assert.strictEqual(r.valid, true)
+  assert.strictEqual(data.id, 123)
+  assert.strictEqual(typeof data.id, 'number')
+})
+
+test('coerceTypes via top-level $ref still rejects non-coercible values', () => {
+  const v = new Validator(
+    { $ref: 'test#' },
+    { schemas: { test: { $id: 'test', type: 'object', properties: { id: { type: 'number' } } } }, coerceTypes: true }
+  )
+  const r = v.validate({ id: 'abc' })
+  assert.strictEqual(r.valid, false)
+  assert.strictEqual(r.errors[0].message, 'must be number')
+})
+
+test('coerceTypes resolves a property-level $ref with pointer fragment', () => {
+  const v = new Validator(
+    { type: 'object', properties: { id: { $ref: 'test#/properties/id' } } },
+    { schemas: { test: { $id: 'test', type: 'object', properties: { id: { type: 'number' } } } }, coerceTypes: true }
+  )
+  const data = { id: '123' }
+  assert.strictEqual(v.validate(data).valid, true)
+  assert.strictEqual(data.id, 123)
+  assert.strictEqual(typeof data.id, 'number')
+})
+
+console.log('\n=== compile cache keys on external schema content ===')
+
+test('same external $id with different content does not collide in cache', () => {
+  const v1 = new Validator(
+    { $ref: 'shared#' },
+    { schemas: { shared: { $id: 'shared', type: 'object', properties: { id: { type: 'number' } } } } }
+  )
+  assert.strictEqual(v1.validate({ id: 1 }).valid, true)
+  // Same root schema string and same $id, but a DIFFERENT referenced schema.
+  // Must compile against this content, not reuse v1's compiled function.
+  const v2 = new Validator(
+    { $ref: 'shared#' },
+    { schemas: { shared: { $id: 'shared', type: 'object', properties: { ip: { type: 'string', format: 'ipv4' } } } } }
+  )
+  assert.strictEqual(v2.validate({ ip: 'localhost' }).valid, false)
+  assert.strictEqual(v2.validate({ ip: '127.0.0.1' }).valid, true)
+})
+
 console.log('\ndone.\n')

@@ -363,12 +363,85 @@ function buildSchemaMap(schemas) {
   return map
 }
 
+// Compile-cache key for a root schema plus its external schemas. Must include
+// the external schema CONTENT, not just their $ids: two validators can share a
+// root schema string and the same $id while pointing that $id at different
+// schemas (separate app instances, test suites, multi-tenant). Keying on $id
+// alone reuses the wrong compiled validator and silently mis-validates.
+function compileCacheKey(schemaStr, schemaMap) {
+  if (!schemaMap || schemaMap.size === 0) return schemaStr
+  const parts = []
+  for (const [id, s] of schemaMap) parts.push(id + '=' + JSON.stringify(s))
+  parts.sort()
+  return schemaStr + '\0' + parts.join('\0')
+}
+
 // Resolve a relative URI ref against a base URI
 function resolveRelativeRef(ref, baseId) {
   if (!baseId || ref.includes('://') || ref.startsWith('#')) return ref
   const lastSlash = baseId.lastIndexOf('/')
   if (lastSlash < 0) return ref
   return baseId.substring(0, lastSlash + 1) + ref
+}
+
+// Resolve a cross-schema $ref to its target schema for preprocessing purposes.
+// Handles whole-schema refs (`shared#`), relative-id matching, and JSON pointer
+// fragments (`shared#/properties/id`). Returns null for local-only refs or when
+// the target cannot be found. Used only to read `type`/`properties` for
+// coercion/defaults/removeAdditional, never for validation.
+function resolveRefForPreprocess(ref, schemaMap) {
+  if (!schemaMap || schemaMap.size === 0 || typeof ref !== 'string') return null
+  const hashIdx = ref.indexOf('#')
+  const baseId = hashIdx >= 0 ? ref.slice(0, hashIdx) : ref
+  const fragment = hashIdx >= 0 ? ref.slice(hashIdx + 1) : ''
+  if (!baseId) return null
+  let base = null
+  if (schemaMap.has(baseId)) base = schemaMap.get(baseId)
+  else if (!ref.includes('://')) {
+    for (const [id, s] of schemaMap) {
+      if (id.endsWith('/' + baseId)) { base = s; break }
+    }
+  }
+  if (!base) return null
+  if (!fragment) return base
+  let target = base
+  for (const part of fragment.split('/')) {
+    if (part === '') continue
+    if (target == null || typeof target !== 'object') return null
+    target = target[part.replace(/~1/g, '/').replace(/~0/g, '~')]
+  }
+  return target == null ? null : target
+}
+
+// Preprocessing (coerce/defaults/removeAdditional) reads `schema.properties` and
+// each property's `type`. When the data shape lives behind a cross-schema $ref
+// (a whole-schema ref like Fastify's `params: { $ref: 'shared#' }`, or a
+// property ref like `{ id: { $ref: 'shared#/properties/id' } }`), follow the
+// ref so the preprocessor can see the referenced shape. Returns the schema with
+// such refs resolved, cloning only when a substitution is made.
+function resolveSchemaForPreprocess(schema, schemaMap) {
+  if (!schema || typeof schema !== 'object' || !schemaMap || schemaMap.size === 0) return schema
+  let s = schema
+  // Whole-schema ref (only when it has no own properties, to avoid dropping
+  // sibling keywords on schemas that mix $ref with properties).
+  if (s.$ref && !s.properties) {
+    const t = resolveRefForPreprocess(s.$ref, schemaMap)
+    if (t && typeof t === 'object') s = t
+  }
+  if (!s.properties) return s
+  // Property-level refs: substitute the resolved target so coercion sees `type`.
+  let cloned = null
+  for (const key of Object.keys(s.properties)) {
+    const p = s.properties[key]
+    if (p && typeof p === 'object' && p.$ref && !p.type) {
+      const t = resolveRefForPreprocess(p.$ref, schemaMap)
+      if (t && typeof t === 'object') {
+        if (!cloned) { cloned = Object.assign({}, s); cloned.properties = Object.assign({}, s.properties) }
+        cloned.properties[key] = t
+      }
+    }
+  }
+  return cloned || s
 }
 
 class Validator {
@@ -531,9 +604,7 @@ class Validator {
 
     // Check cache first -- reuse compiled functions for same schema
     const sm = this._schemaMap.size > 0 ? this._schemaMap : null;
-    const mapKey = this._schemaMap.size > 0
-      ? this._schemaStr + '\0' + [...this._schemaMap.keys()].sort().join('\0')
-      : this._schemaStr;
+    const mapKey = compileCacheKey(this._schemaStr, this._schemaMap);
     // Custom formats are JS functions: bypass the compile cache since they can
     // differ between validators that share the same schema string.
     const cached = this._userFormats ? null : _compileCache.get(mapKey);
@@ -559,13 +630,17 @@ class Validator {
     }
     this._jsFn = jsFn;
 
-    // Data mutators -- try codegen first (12x faster), fallback to closure arrays
-    let preprocess = buildPreprocessCodegen(schemaObj, options);
+    // Data mutators -- try codegen first (12x faster), fallback to closure arrays.
+    // Follow cross-refs so coercion/defaults/removeAdditional see the referenced
+    // shape (e.g. Fastify `params: { $ref: 'shared#' }` or property refs like
+    // `{ id: { $ref: 'shared#/properties/id' } }`).
+    const preprocessSchema = resolveSchemaForPreprocess(schemaObj, this._schemaMap);
+    let preprocess = buildPreprocessCodegen(preprocessSchema, options);
     if (!preprocess) {
-      const applyDefaults = buildDefaultsApplier(schemaObj);
-      const applyCoerce = options.coerceTypes ? buildCoercer(schemaObj) : null;
+      const applyDefaults = buildDefaultsApplier(preprocessSchema);
+      const applyCoerce = options.coerceTypes ? buildCoercer(preprocessSchema) : null;
       const applyRemove = options.removeAdditional
-        ? buildRemover(schemaObj)
+        ? buildRemover(preprocessSchema)
         : null;
       const mutators = [applyRemove, applyCoerce, applyDefaults].filter(Boolean);
       preprocess =
@@ -1007,9 +1082,7 @@ class Validator {
     if (typeof process !== 'undefined' && process.env && process.env.ATA_FORCE_NAPI) return;
     if (!this._schemaStr) this._schemaStr = JSON.stringify(this._schemaObj);
     const sm = this._schemaMap.size > 0 ? this._schemaMap : null;
-    const mapKey = this._schemaMap.size > 0
-      ? this._schemaStr + '\0' + [...this._schemaMap.keys()].sort().join('\0')
-      : this._schemaStr;
+    const mapKey = compileCacheKey(this._schemaStr, this._schemaMap);
     // Custom formats are JS functions: skip the shared cache so different
     // validators with the same schema string but different formats don't collide.
     const cached = this._userFormats ? null : _compileCache.get(mapKey);
