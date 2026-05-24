@@ -126,5 +126,31 @@ console.log('\nReDoS-safe regex integration\n')
   check(v.isValidObject('ab') === false, 'fallback (backref): "ab" does not match')
 }
 
+// --- Built-in format checks must stay linear on adversarial data ---
+// The format keyword is ata-controlled, but the validated string is user input,
+// so a format regex with catastrophic backtracking would still be a ReDoS vector.
+// This guards against a future format being added with a vulnerable regex.
+{
+  const big = 50000
+  const formatAttacks = {
+    email: 'a'.repeat(big) + '@' + 'b'.repeat(big),
+    date: '9'.repeat(big),
+    uuid: 'a'.repeat(big),
+    'date-time': '2020-01-01T00:00:00.' + '9'.repeat(big) + 'X',
+    time: '00:00:00.' + '9'.repeat(big) + 'X',
+    duration: 'P' + '9'.repeat(big),
+    uri: 'a' + 'b'.repeat(big),
+    'uri-reference': 'a'.repeat(big),
+    ipv4: '2'.repeat(big),
+    ipv6: 'a'.repeat(big) + ':' + 'b'.repeat(big),
+    hostname: 'a-'.repeat(big / 2),
+  }
+  for (const [fmt, input] of Object.entries(formatAttacks)) {
+    const v = new Validator({ type: 'string', format: fmt })
+    const { ms } = timed(() => v.validate(input))
+    check(ms < BUDGET_MS, `format "${fmt}" stays linear on adversarial input: ${ms}ms (<${BUDGET_MS})`)
+  }
+}
+
 console.log(`\n${pass}/${pass + fail} passed\n`)
 process.exit(fail > 0 ? 1 : 0)
