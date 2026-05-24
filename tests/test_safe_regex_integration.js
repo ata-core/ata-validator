@@ -77,6 +77,40 @@ console.log('\nReDoS-safe regex integration\n')
   check(out && out.valid === false && ms < BUDGET_MS, `bundleCompact adversarial: ${ms}ms (<${BUDGET_MS}), valid=${out && out.valid}`)
 }
 
+// --- patternProperties: adversarial object key must not hang (runtime + standalone) ---
+{
+  const schema = { type: 'object', patternProperties: { [EVIL]: { type: 'string' } } }
+  const v = new Validator(schema)
+  const obj = { [EVIL_INPUT]: 'x' }
+  const r = timed(() => v.validate(obj))
+  check(r.out && r.ms < BUDGET_MS, `patternProperties runtime adversarial key: ${r.ms}ms (<${BUDGET_MS})`)
+  const mod = load(new Validator(schema).toStandaloneModule({ format: 'cjs' }))
+  const rs = timed(() => mod.validate(obj))
+  check(rs.out && rs.ms < BUDGET_MS, `patternProperties standalone adversarial key: ${rs.ms}ms (<${BUDGET_MS})`)
+}
+
+// --- propertyNames: adversarial object key must not hang (runtime + standalone) ---
+{
+  const schema = { type: 'object', propertyNames: { pattern: EVIL } }
+  const v = new Validator(schema)
+  const obj = { [EVIL_INPUT]: 'x' }
+  const r = timed(() => v.validate(obj))
+  check(r.out && r.out.valid === false && r.ms < BUDGET_MS, `propertyNames runtime adversarial key: ${r.ms}ms (<${BUDGET_MS}), valid=${r.out && r.out.valid}`)
+  const mod = load(new Validator(schema).toStandaloneModule({ format: 'cjs' }))
+  const rs = timed(() => mod.validate(obj))
+  check(rs.out && rs.out.valid === false && rs.ms < BUDGET_MS, `propertyNames standalone adversarial key: ${rs.ms}ms (<${BUDGET_MS}), valid=${rs.out && rs.out.valid}`)
+}
+
+// --- patternProperties/propertyNames correctness with a supported pattern ---
+{
+  const v = new Validator({ type: 'object', patternProperties: { '^x-': { type: 'number' } }, additionalProperties: false })
+  check(v.validate({ 'x-a': 1 }).valid === true, 'patternProperties: matching key with valid value accepted')
+  check(v.validate({ 'x-a': 'no' }).valid === false, 'patternProperties: matching key with bad value rejected')
+  const pn = new Validator({ type: 'object', propertyNames: { pattern: '^[a-z]+$' } })
+  check(pn.validate({ abc: 1 }).valid === true, 'propertyNames: lowercase key accepted')
+  check(pn.validate({ Abc: 1 }).valid === false, 'propertyNames: uppercase key rejected')
+}
+
 // --- Correctness: a supported pattern still accepts/rejects exactly like RegExp ---
 {
   const v = new Validator({ type: 'string', pattern: '^(cat|dog|bird)$' })

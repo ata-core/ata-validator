@@ -1242,7 +1242,9 @@ module.exports = { boolFn, hybridFactory, errFn };
           lines.push(`const ${name} = ${JSON.stringify(val)};`);
           continue;
         }
-        if (val instanceof RegExp) {
+        if (val && val.__ataSafe) {
+          lines.push(`const ${name} = __ataSafeRe(${JSON.stringify(val.source)});`);
+        } else if (val instanceof RegExp) {
           const flags = val.flags;
           lines.push(`const ${name} = new RegExp(${JSON.stringify(val.source)}${flags ? ', ' + JSON.stringify(flags) : ''});`);
         } else if (val instanceof Set) {
