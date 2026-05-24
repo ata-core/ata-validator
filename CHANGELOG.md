@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.17.2 - 2026-05-24
+
+### Fixed
+
+- `validate()` now returns the typed `data` on success, the validated input after any in-place coercion or defaults. The `ValidationResult<T>` type has carried `data: T` since 0.17.0, but the runtime never populated it, so `result.data` was `undefined`. `isValidObject()` and `abortEarly` stay allocation-free for callers that only need a boolean.
+
 ## 0.17.1 - 2026-05-24
 
 ### Fixed

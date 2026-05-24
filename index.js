@@ -1055,6 +1055,20 @@ class Validator {
       }
     }
 
+    // validate() resolves a typed `data` on success: the validated input, after
+    // any in-place coercion/defaults. This matches the ValidationResult<T>
+    // contract. isValidObject() and abortEarly stay allocation-free for hot
+    // paths that only need a boolean.
+    if (this.validate) {
+      const _bare = this.validate;
+      this.validate = (data) => {
+        const r = _bare(data);
+        return (r.valid === true && r.data === undefined)
+          ? { valid: true, data, errors: r.errors }
+          : r;
+      };
+    }
+
     // Save to identity cache for ultra-fast reuse with same schema object
     if (this._schemaObj && typeof this._schemaObj === 'object') {
       _identityCache.set(this._schemaObj, this);
@@ -1325,6 +1339,15 @@ ${exports}`;
             return mod.boolFn(data) ? VALID_RESULT : errFn(data);
           }
         : (data) => (mod.boolFn(data) ? VALID_RESULT : errFn(data));
+    {
+      const _bare = v.validate;
+      v.validate = (data) => {
+        const r = _bare(data);
+        return (r.valid === true && r.data === undefined)
+          ? { valid: true, data, errors: r.errors }
+          : r;
+      };
+    }
     v.isValidObject = mod.boolFn;
     v.isValidJSON = (jsonStr) => {
       try {
