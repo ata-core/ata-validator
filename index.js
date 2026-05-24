@@ -1223,6 +1223,11 @@ module.exports = { boolFn, hybridFactory, errFn };
       if (lines.length) closureDecls = lines.join('\n') + '\n';
     }
 
+    // Hoisted oneOf/anyOf branch checks live in the boolean fn's preamble (the
+    // runtime emits them before the function). The standalone module must declare
+    // them at module scope too, or _fn references undefined names (e.g. _af1_b0).
+    const preambleDecls = jsFn._preambleSource ? jsFn._preambleSource + '\n' : '';
+
     const validBody = errCore
       ? 'return _fn(data) ? VALID : { valid: false, errors: errFn(data, true).errors }'
       : 'return _fn(data) ? VALID : ABORT';
@@ -1245,7 +1250,7 @@ const ABORT = Object.freeze({
     path: '',
   })]),
 });
-${closureDecls}const _fn = function(d) {
+${closureDecls}${preambleDecls}const _fn = function(d) {
   ${src}
 };
 ${errCore}function isValid(data) { return _fn(data); }
@@ -1520,8 +1525,14 @@ Validator.bundleCompact = function (schemas, opts) {
       typeof schema === "string" ? JSON.parse(schema) : schema,
       v._schemaMap,
     );
+    // Hoisted anyOf/oneOf branch helpers (e.g. `_af1_b0`) must travel with the
+    // hybrid body or it references undefined names. Prepending keeps dedup honest:
+    // schemas with different branch sets no longer collide on body alone.
+    const hybrid = jsFn._preambleSource
+      ? `${jsFn._preambleSource}\n${jsFn._hybridSource}`
+      : jsFn._hybridSource;
     return {
-      hybrid: jsFn._hybridSource,
+      hybrid,
       err: jsErrFn && jsErrFn._errSource ? jsErrFn._errSource : null,
     };
   });

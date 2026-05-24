@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.17.1 - 2026-05-24
+
+### Fixed
+
+- Standalone output for schemas with `anyOf` or `oneOf` no longer references undefined branch helpers. `toStandaloneModule` and `bundleCompact` now emit the hoisted branch functions, so the generated module runs instead of throwing on the first validation. `bundleStandalone` already emitted them.
+
 ## 0.17.0 - 2026-05-23
 
 ### Added
