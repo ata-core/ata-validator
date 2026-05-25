@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.18.1 - 2026-05-26
+
+### Added
+
+- The browser entry (`index.browser.mjs`) re-exports `toTypeScript`, so the inferred TypeScript type for a schema can be generated client-side (for example in a web playground) alongside `Validator.toStandaloneModule()`. Pure re-export, no runtime change.
+
 ## 0.18.0 - 2026-05-25
 
 ### Added

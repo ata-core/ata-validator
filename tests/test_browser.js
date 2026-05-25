@@ -274,5 +274,26 @@ test("schema reuse across multiple validations", () => {
   assert(v.validate({}).valid === false, "missing x");
 });
 
-console.log(`\n${passed}/${passed + failed} tests passed`);
-if (failed > 0) process.exit(1);
+// --- index.browser.mjs entry exposes toTypeScript (used by the web playground) ---
+import("../index.browser.mjs")
+  .then((browser) => {
+    test("browser entry exports a working toTypeScript", () => {
+      assert(typeof browser.toTypeScript === "function", "expected toTypeScript export");
+      const ts = browser.toTypeScript(
+        { title: "U", type: "object", properties: { id: { type: "integer" } }, required: ["id"] },
+        { name: "U" }
+      );
+      assert(ts.includes("export interface U"), "expected `export interface U` in output");
+    });
+    test("browser entry exports Validator with toStandaloneModule", () => {
+      const code = new browser.Validator({ type: "object", properties: { id: { type: "integer" } }, required: ["id"] }).toStandaloneModule({ format: "esm" });
+      assert(typeof code === "string" && code.length > 0, "expected standalone code");
+      assert(!/\bimport |require\(/.test(code), "expected zero-import standalone output");
+    });
+    console.log(`\n${passed}/${passed + failed} tests passed`);
+    if (failed > 0) process.exit(1);
+  })
+  .catch((e) => {
+    console.log(`  FAIL  browser entry import: ${e.message}`);
+    process.exit(1);
+  });
