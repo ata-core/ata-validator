@@ -177,26 +177,55 @@ type RequiredKeys<S> = S extends { required: infer R }
     : never
   : never;
 
+/** Collapse a union of types into their intersection (used for `allOf`). */
+type UnionToIntersection<U> =
+  (U extends unknown ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
+
+/** The root `$defs`/`definitions` map, threaded through inference for `$ref` resolution. */
+type RootDefs<S> = S extends { $defs: infer D }
+  ? D
+  : S extends { definitions: infer D }
+    ? D
+    : {};
+
+/** Extract the definition name from a local `#/$defs/...` or `#/definitions/...` pointer. */
+type RefName<R> = R extends `#/$defs/${infer N}`
+  ? N
+  : R extends `#/definitions/${infer N}`
+    ? N
+    : never;
+
+/** Resolve a `$ref` against the root defs map; external/unresolvable refs -> unknown. */
+type ResolveRef<R, D> = [RefName<R>] extends [never]
+  ? unknown
+  : RefName<R> extends keyof D
+    ? InferWith<D[RefName<R>], D>
+    : unknown;
+
 /** Object shape: required keys are required, all other declared keys optional. */
-type InferObject<S> = S extends { properties: infer P }
+type InferObject<S, D> = S extends { properties: infer P }
   ? Simplify<
-      { [K in keyof P as K extends RequiredKeys<S> ? K : never]: Infer<P[K]> } &
-      { [K in keyof P as K extends RequiredKeys<S> ? never : K]?: Infer<P[K]> }
+      { [K in keyof P as K extends RequiredKeys<S> ? K : never]: InferWith<P[K], D> } &
+      { [K in keyof P as K extends RequiredKeys<S> ? never : K]?: InferWith<P[K], D> }
     >
   : Record<string, unknown>;
 
-/** Array shape: `items` as a single schema maps to an element type; tuple/absent -> unknown[]. */
-type InferArray<S> = S extends { items: infer I }
-  ? I extends ReadonlyArray<unknown>
-    ? unknown[]
-    : Infer<I>[]
-  : unknown[];
+/** Array shape: `prefixItems` -> tuple; `items` (single schema) -> element type; otherwise unknown[]. */
+type InferArray<S, D> = S extends { prefixItems: infer P }
+  ? P extends ReadonlyArray<unknown>
+    ? { -readonly [K in keyof P]: InferWith<P[K], D> }
+    : unknown[]
+  : S extends { items: infer I }
+    ? I extends ReadonlyArray<unknown>
+      ? unknown[]
+      : InferWith<I, D>[]
+    : unknown[];
 
 /** Map a single JSON Schema type name (+ its schema) to a TS type. */
-type InferByTypeName<N, S> = N extends 'object'
-  ? InferObject<S>
+type InferByTypeName<N, S, D> = N extends 'object'
+  ? InferObject<S, D>
   : N extends 'array'
-    ? InferArray<S>
+    ? InferArray<S, D>
     : N extends 'string'
       ? string
       : N extends 'number'
@@ -209,28 +238,46 @@ type InferByTypeName<N, S> = N extends 'object'
               ? null
               : unknown;
 
+/** Core inference with the root defs map `D` threaded for `$ref` resolution. */
+type InferWith<S, D> = S extends { $ref: infer R }
+  ? ResolveRef<R, D>
+  : S extends { const: infer C }
+    ? C
+    : S extends { enum: infer E }
+      ? E extends ReadonlyArray<infer U>
+        ? U
+        : unknown
+      : S extends { allOf: infer A }
+        ? A extends ReadonlyArray<unknown>
+          ? Simplify<UnionToIntersection<{ [K in keyof A]: InferWith<A[K], D> }[number]>>
+          : unknown
+        : S extends { anyOf: infer A }
+          ? A extends ReadonlyArray<unknown>
+            ? { [K in keyof A]: InferWith<A[K], D> }[number]
+            : unknown
+          : S extends { oneOf: infer A }
+            ? A extends ReadonlyArray<unknown>
+              ? { [K in keyof A]: InferWith<A[K], D> }[number]
+              : unknown
+            : S extends { type: infer T }
+              ? T extends ReadonlyArray<infer N>
+                ? InferByTypeName<N, S, D>
+                : InferByTypeName<T, S, D>
+              : unknown;
+
 /**
- * Infer the TypeScript data type a JSON Schema literal describes (Core scope).
+ * Infer the TypeScript data type a JSON Schema literal describes.
  *
  * Handles: primitives, `type` arrays (union), `const`, `enum`, objects
- * (`properties` + `required` -> required/optional keys), and arrays
- * (`items` as a single schema). `$ref`/`$defs`, tuples, and `anyOf`/`oneOf`/
- * `allOf` are not yet inferred and resolve to `unknown` rather than erroring.
+ * (`properties` + `required` -> required/optional keys), arrays (`items`),
+ * tuples (`prefixItems`), `anyOf`/`oneOf` (union), `allOf` (intersection),
+ * and `$ref` to local `#/$defs/...` or `#/definitions/...`. External or
+ * unresolvable `$ref` resolves to `unknown` rather than erroring.
  *
  * Pair with {@link defineSchema}:
  * `const s = defineSchema({...}); type T = Infer<typeof s>;`
  */
-export type Infer<S> = S extends { const: infer C }
-  ? C
-  : S extends { enum: infer E }
-    ? E extends ReadonlyArray<infer U>
-      ? U
-      : unknown
-    : S extends { type: infer T }
-      ? T extends ReadonlyArray<infer N>
-        ? InferByTypeName<N, S>
-        : InferByTypeName<T, S>
-      : unknown;
+export type Infer<S> = InferWith<S, RootDefs<S>>;
 
 export type ValidationResult<T = unknown> =
   | { valid: true;  data: T;       errors: ValidationError[] }

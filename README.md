@@ -180,6 +180,36 @@ const v = new Validator(userSchema)
 
 The exported `JSONSchema` type is also available directly if you want to annotate a schema yourself. Custom and vendor keywords are allowed, so exotic schemas still type-check. Requires TypeScript >= 5.0.
 
+#### Extracting the type: `Infer`
+
+Because `defineSchema` leaves the schema as a plain object, you can pull a TypeScript type straight out of it with `Infer`, with no second type declaration to keep in sync.
+
+```ts
+import { defineSchema, type Infer } from 'ata-validator'
+
+const event = defineSchema({
+  $defs: {
+    Point: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, required: ['x', 'y'] },
+  },
+  type: 'object',
+  properties: {
+    kind: { enum: ['click', 'scroll'] },
+    at: { $ref: '#/$defs/Point' },
+    path: { type: 'array', prefixItems: [{ type: 'string' }, { type: 'integer' }] },
+  },
+  required: ['kind', 'at'],
+})
+
+type Event = Infer<typeof event>
+// {
+//   kind: 'click' | 'scroll'
+//   at: { x: number; y: number }
+//   path?: [string, number]
+// }
+```
+
+`Infer` resolves `const`/`enum` to literals, `anyOf`/`oneOf` to unions, `allOf` to intersections, `prefixItems` to tuples, and local `$ref` into `#/$defs` or `#/definitions`, including recursive references. `new Validator(schema)` carries the same type, so a successful `validate` narrows `result.data` without a manual annotation. An external or unresolvable `$ref` resolves to `unknown` rather than erroring.
+
 ### Cross-Schema `$ref`
 
 ```javascript

@@ -42,10 +42,83 @@ void _arr;
 const _bareArr: Expect<Infer<{ type: 'array' }>, unknown[]> = true;
 void _bareArr;
 
-// --- out of scope falls back to unknown (never an error) ---
-const _ref: Expect<Infer<{ $ref: 'other#' }>, unknown> = true;
-const _anyOf: Expect<Infer<{ anyOf: [{ type: 'string' }, { type: 'number' }] }>, unknown> = true;
-void _ref; void _anyOf;
+// --- anyOf / oneOf -> union ---
+const _anyOf: Expect<Infer<{ anyOf: [{ type: 'string' }, { type: 'number' }] }>, string | number> = true;
+const _oneOf: Expect<Infer<{ oneOf: [{ type: 'boolean' }, { type: 'null' }] }>, boolean | null> = true;
+void _anyOf; void _oneOf;
+
+// --- allOf -> intersection ---
+const _allOf: Expect<
+  Infer<{ allOf: [
+    { type: 'object'; properties: { a: { type: 'number' } }; required: ['a'] },
+    { type: 'object'; properties: { b: { type: 'string' } }; required: ['b'] },
+  ] }>,
+  { a: number; b: string }
+> = true;
+void _allOf;
+
+// --- prefixItems -> tuple ---
+const _tuple: Expect<
+  Infer<{ type: 'array'; prefixItems: [{ type: 'string' }, { type: 'number' }] }>,
+  [string, number]
+> = true;
+void _tuple;
+
+// --- $ref to local $defs / definitions resolves by name ---
+const refSchema = defineSchema({
+  $defs: {
+    Point: {
+      type: 'object',
+      properties: { x: { type: 'number' }, y: { type: 'number' } },
+      required: ['x', 'y'],
+    },
+  },
+  type: 'object',
+  properties: { start: { $ref: '#/$defs/Point' } },
+  required: ['start'],
+});
+const _ref: Expect<Infer<typeof refSchema>, { start: { x: number; y: number } }> = true;
+void _ref;
+
+const defsSchema = defineSchema({
+  definitions: { Id: { type: 'integer' } },
+  type: 'object',
+  properties: { id: { $ref: '#/definitions/Id' } },
+  required: ['id'],
+});
+const _defs: Expect<Infer<typeof defsSchema>, { id: number }> = true;
+void _defs;
+
+// --- $ref nested inside array items ---
+const listSchema = defineSchema({
+  $defs: { Item: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] } },
+  type: 'array',
+  items: { $ref: '#/$defs/Item' },
+});
+const _list: Expect<Infer<typeof listSchema>, { id: number }[]> = true;
+void _list;
+
+// --- recursive $ref resolves to a real (non-any) recursive type ---
+const treeSchema = defineSchema({
+  $defs: {
+    Node: {
+      type: 'object',
+      properties: { value: { type: 'number' }, children: { type: 'array', items: { $ref: '#/$defs/Node' } } },
+      required: ['value'],
+    },
+  },
+  $ref: '#/$defs/Node',
+});
+type Tree = Infer<typeof treeSchema>;
+const _treeOk: Tree = { value: 1, children: [{ value: 2, children: [{ value: 3 }] }] };
+void _treeOk;
+// @ts-expect-error value must be number (proves the type is real, not `any`)
+const _treeBad: Tree = { value: 'nope' };
+void _treeBad;
+
+// --- external / unresolvable $ref still falls back to unknown (never an error) ---
+const _extRef: Expect<Infer<{ $ref: 'other#' }>, unknown> = true;
+void _extRef;
 
 import { Validator } from '../index.js';
 
