@@ -45,6 +45,7 @@ Build options:
   --dual                  Emit both .compiled.mjs (with source) and .compiled.min.mjs (without)
 
   -h, --help              Show this message
+  -V, --version           Print the ata-validator version
 
 Examples:
   ata compile schemas/user.json -o src/generated/user.validator.mjs
@@ -386,6 +387,10 @@ function main() {
 
   const cmd = argv[0];
   if (cmd === '-h' || cmd === '--help' || cmd === 'help') { usage(); return; }
+  if (cmd === '-V' || cmd === '--version' || cmd === 'version') {
+    process.stdout.write(require('../package.json').version + '\n');
+    return;
+  }
 
   const rest = argv.slice(1);
   let args;
