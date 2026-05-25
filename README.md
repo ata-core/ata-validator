@@ -127,40 +127,7 @@ v.countValid(ndjson);        // number
 
 ### Type-safe schemas
 
-`Validator` is generic. Pair it with any schema authoring tool, or a hand-written type, to get TypeScript narrowing in your handler code.
-
-```ts
-import { Type, type Static } from '@sinclair/typebox'
-import { Validator } from 'ata-validator'
-
-const UserSchema = Type.Object({
-  id: Type.Integer({ minimum: 1 }),
-  name: Type.String({ minLength: 1 }),
-  email: Type.String({ format: 'email' }),
-})
-
-type User = Static<typeof UserSchema>
-
-const v = new Validator<User>(UserSchema)
-
-if (v.isValidObject(data)) {
-  // data is narrowed to User, no cast needed
-  console.log(data.name)
-}
-
-const result = v.validate(data)
-if (result.valid) {
-  // result.data is User
-} else {
-  // result.errors: ValidationError[]
-}
-```
-
-The same pattern works with Zod-from-JSON-Schema, Valibot, or a hand-written `type User = {...}` alongside a JSON Schema literal. `Validator<T>` makes no library-specific assumption.
-
-#### Authoring a schema inline: `defineSchema`
-
-If you would rather write a plain JSON Schema object than reach for a schema library, wrap it in `defineSchema`. It returns the schema untouched at runtime, but in TypeScript it gives you keyword autocomplete and an error when a value has the wrong shape, with no `as const` needed.
+ata infers TypeScript types straight from plain JSON Schema. Write the schema once with `defineSchema`, and both runtime validation and the static type come from it, with no builder DSL and no second type declaration to keep in sync.
 
 ```ts
 import { defineSchema, Validator } from 'ata-validator'
@@ -174,15 +141,21 @@ const userSchema = defineSchema({
   required: ['id'],
 })
 
-// type: 123 or required: 'id' would be a compile error here.
 const v = new Validator(userSchema)
+const result = v.validate(data)
+if (result.valid) {
+  result.data.id   // number
+  result.data.role // 'admin' | 'user' | undefined
+} else {
+  // result.errors: ValidationError[]
+}
 ```
 
-The exported `JSONSchema` type is also available directly if you want to annotate a schema yourself. Custom and vendor keywords are allowed, so exotic schemas still type-check. Requires TypeScript >= 5.0.
+`defineSchema` returns the schema untouched at runtime; in TypeScript it gives keyword autocomplete and an error when a value has the wrong shape, with no `as const` needed. `new Validator(schema)` carries the inferred type, so a successful `validate` narrows `result.data` with no manual annotation.
 
 #### Extracting the type: `Infer`
 
-Because `defineSchema` leaves the schema as a plain object, you can pull a TypeScript type straight out of it with `Infer`, with no second type declaration to keep in sync.
+You can also pull the type out directly with `Infer`, with no second declaration to keep in sync.
 
 ```ts
 import { defineSchema, type Infer } from 'ata-validator'
@@ -208,7 +181,25 @@ type Event = Infer<typeof event>
 // }
 ```
 
-`Infer` resolves `const`/`enum` to literals, `anyOf`/`oneOf` to unions, `allOf` to intersections, `prefixItems` to tuples, and local `$ref` into `#/$defs` or `#/definitions`, including recursive references. `new Validator(schema)` carries the same type, so a successful `validate` narrows `result.data` without a manual annotation. An external or unresolvable `$ref` resolves to `unknown` rather than erroring.
+`Infer` resolves `const`/`enum` to literals, `anyOf`/`oneOf` to unions, `allOf` to intersections, `prefixItems` to tuples, and local `$ref` into `#/$defs` or `#/definitions`, including recursive references. An external or unresolvable `$ref` resolves to `unknown` rather than erroring. The exported `JSONSchema` type is available if you want to annotate a schema by hand; custom and vendor keywords are allowed. Requires TypeScript >= 5.0.
+
+#### Composes with TypeBox, Zod, or your own types
+
+`Validator<T>` is generic, so if you already author schemas with a library, pass the type and ata narrows to it. No library-specific assumption.
+
+```ts
+import { Type, type Static } from '@sinclair/typebox'
+import { Validator } from 'ata-validator'
+
+const UserSchema = Type.Object({
+  id: Type.Integer({ minimum: 1 }),
+  name: Type.String({ minLength: 1 }),
+})
+
+const v = new Validator<Static<typeof UserSchema>>(UserSchema)
+```
+
+The same works with Zod-from-JSON-Schema, Valibot, or a hand-written `type User = {...}` alongside a JSON Schema literal.
 
 ### Cross-Schema `$ref`
 
