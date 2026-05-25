@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.18.0 - 2026-05-25
+
+### Added
+
+- `Infer<S>` resolves the shapes 0.17.0 left as `unknown`. `anyOf` and `oneOf` map to unions, `allOf` to an intersection, `prefixItems` to a tuple, and a `$ref` to a local `#/$defs/...` or `#/definitions/...` entry resolves to the referenced type, including recursive references. An external or otherwise unresolvable `$ref` still resolves to `unknown` rather than erroring. `new Validator(schema)` carries the wider inference, so handlers narrow `result.data` for these schemas with no manual annotation, and the same applies to the Fastify type provider that builds on `Infer`. Pure `.d.ts` change, no runtime impact.
+
 ## 0.17.5 - 2026-05-25
 
 ### Fixed
