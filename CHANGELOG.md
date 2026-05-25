@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.18.2 - 2026-05-26
+
+### Fixed
+
+- The browser and edge build no longer touches the filesystem at import. The safe-regex engine source was embedded into standalone output through a `fs.readFileSync` that ran at module load, which crashed bundlers that stub `fs`/`path` for the browser (a regression from 0.17.3). The read is deferred to the first standalone compile that actually embeds the engine, so importing ata, validating, generating types, and compiling pattern-free schemas now run with no filesystem access in browsers and Cloudflare Workers. Added a regression test that bundles the browser entry and runs it with `fs`/`path` stubbed.
+
 ## 0.18.1 - 2026-05-26
 
 ### Added
