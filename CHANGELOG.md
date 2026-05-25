@@ -2,6 +2,14 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.17.4 - 2026-05-25
+
+### Fixed
+
+- Standalone output now embeds user-supplied format functions. `toStandaloneModule` and `bundleCompact` referenced the `_uf_<name>` format helpers without declaring them, so the generated module threw `_uf_<name> is not defined` on the first validation, and their error path skipped the custom format entirely (so `validate` disagreed with `isValid`). Both now serialize the format functions via `Function#toString` and run them on the error path too, matching `bundleStandalone`.
+- Compiled validators report per-property errors for schema-valued `additionalProperties`. The AOT error path previously emitted a single generic `validation failed`; it now validates each undeclared property against the subschema and reports the precise `/<key>` error, matching the runtime validator.
+- `ata --version` (and `-V`) prints the CLI version instead of failing with `unknown command`.
+
 ## 0.17.3 - 2026-05-25
 
 ### Security
