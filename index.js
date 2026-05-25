@@ -1214,7 +1214,7 @@ module.exports = { boolFn, hybridFactory, errFn };
       jsErrFn = compileToJSCodegenWithErrors(
         typeof this._schemaObj === 'object' ? this._schemaObj : {},
         null,
-        undefined,
+        this._userFormats,
         (source && sourceMap && schemaFile) ? { sourceMap, schemaFile } : null,
       );
       const errSrc = jsErrFn && jsErrFn._errSource ? jsErrFn._errSource : '';
@@ -1266,6 +1266,16 @@ module.exports = { boolFn, hybridFactory, errFn };
     // them at module scope too, or _fn references undefined names (e.g. _af1_b0).
     const preambleDecls = jsFn._preambleSource ? jsFn._preambleSource + '\n' : '';
 
+    // User-supplied format functions are referenced as _uf_<name> by both the
+    // boolean (_fn) and error (errFn) bodies. Embed them via Function#toString
+    // so the standalone module stays self-contained.
+    let formatDecls = '';
+    if (jsFn._formatClosures && jsFn._formatClosures.length > 0) {
+      formatDecls = jsFn._formatClosures
+        .map(({ name, fn }) => `const ${name} = ${fn.toString()};`)
+        .join('\n') + '\n';
+    }
+
     const validBody = errCore
       ? 'return _fn(data) ? VALID : { valid: false, errors: errFn(data, true).errors }'
       : 'return _fn(data) ? VALID : ABORT';
@@ -1288,7 +1298,7 @@ const ABORT = Object.freeze({
     path: '',
   })]),
 });
-${closureDecls}${preambleDecls}const _fn = function(d) {
+${closureDecls}${preambleDecls}${formatDecls}const _fn = function(d) {
   ${src}
 };
 ${errCore}function isValid(data) { return _fn(data); }
