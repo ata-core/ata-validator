@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.17.3 - 2026-05-25
+
+### Security
+
+- User-supplied `pattern`, `patternProperties`, and `propertyNames` regexes now run through a linear-time matching engine, so a crafted schema or input can no longer trigger catastrophic backtracking (ReDoS). Patterns the engine cannot represent, such as those using backreferences, fall back to the native `RegExp`. The built-in `format` checks (`email`, `uri`, `uri-reference`, `hostname`, `ipv4`, `ipv6`, `date`, `date-time`, `time`, `duration`, `uuid`) were routed through the same engine and stay linear on adversarial input.
+
 ## 0.17.2 - 2026-05-24
 
 ### Fixed
