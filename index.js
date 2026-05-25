@@ -1585,6 +1585,7 @@ Validator.bundleCompact = function (schemas, opts) {
     const jsErrFn = compileToJSCodegenWithErrors(
       typeof schema === "string" ? JSON.parse(schema) : schema,
       v._schemaMap,
+      v._userFormats,
     );
     if (jsFn._usesSafeRe || (jsErrFn && jsErrFn._usesSafeRe)) bundleUsesSafeRe = true;
     // Hoisted anyOf/oneOf branch helpers (e.g. `_af1_b0`) must travel with the
@@ -1596,6 +1597,7 @@ Validator.bundleCompact = function (schemas, opts) {
     return {
       hybrid,
       err: jsErrFn && jsErrFn._errSource ? jsErrFn._errSource : null,
+      fmt: jsFn._formatClosures || null,
     };
   });
 
@@ -1633,6 +1635,19 @@ Validator.bundleCompact = function (schemas, opts) {
   if (bundleUsesSafeRe) out += SAFE_REGEX_EMBED + "\n";
   const declKW = isEsm ? "const" : "var";
   out += `${declKW} R=Object.freeze({valid:true,errors:Object.freeze([])});\n`;
+
+  // User format functions are referenced as _uf_<name> by the hybrid and error
+  // bodies. Collect them across all schemas (deduped by name) and embed via
+  // Function#toString so the bundle stays self-contained.
+  const fmtSeen = new Set();
+  for (const e of entries) {
+    if (!e || !e.fmt) continue;
+    for (const { name, fn } of e.fmt) {
+      if (fmtSeen.has(name)) continue;
+      fmtSeen.add(name);
+      out += `${declKW} ${name}=${fn.toString()};\n`;
+    }
+  }
 
   // Shared hybrid factories
   out += `${declKW} H=[\n`;
