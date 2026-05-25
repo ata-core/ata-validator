@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.17.5 - 2026-05-25
+
+### Fixed
+
+- Compiled validators resolve draft-07 plain-name anchors. A `$defs`/`definitions` entry that declares an anchor with `$id: "#name"` and is referenced by `$ref: "#name"` now compiles through the codegen on every path (boolean, error, combined) instead of bailing. The bail forced a fallback that could not resolve sibling cross-schema refs, which surfaced as `cannot resolve $ref`. This is how shared schemas are referenced under Fastify.
+
 ## 0.17.4 - 2026-05-25
 
 ### Fixed
