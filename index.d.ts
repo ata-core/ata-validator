@@ -202,13 +202,19 @@ type ResolveRef<R, D> = [RefName<R>] extends [never]
     ? InferWith<D[RefName<R>], D>
     : unknown;
 
-/** Object shape: required keys are required, all other declared keys optional. */
+/** Object shape: required keys are required, all other declared keys optional.
+ * When `properties` is absent and `additionalProperties` is a schema, infer
+ * a `Record<string, V>` (the JSON Schema "dictionary"/"record" shape). */
 type InferObject<S, D> = S extends { properties: infer P }
   ? Simplify<
       { [K in keyof P as K extends RequiredKeys<S> ? K : never]: InferWith<P[K], D> } &
       { [K in keyof P as K extends RequiredKeys<S> ? never : K]?: InferWith<P[K], D> }
     >
-  : Record<string, unknown>;
+  : S extends { additionalProperties: infer A }
+    ? A extends boolean
+      ? Record<string, unknown>
+      : Record<string, InferWith<A, D>>
+    : Record<string, unknown>;
 
 /** Array shape: `prefixItems` -> tuple; `items` (single schema) -> element type; otherwise unknown[]. */
 type InferArray<S, D> = S extends { prefixItems: infer P }

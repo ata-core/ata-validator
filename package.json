@@ -25,6 +25,11 @@
       "import": "./build.mjs",
       "require": "./build.js"
     },
+    "./t": {
+      "types": "./t.d.ts",
+      "import": "./t.mjs",
+      "require": "./t.js"
+    },
     "./package.json": "./package.json"
   },
   "sideEffects": false,
@@ -43,7 +48,7 @@
     "rebuild": "cmake-js rebuild --target ata",
     "prebuild": "pkg-prebuilds-copy --baseDir build/Release --source ata.node --name=ata --strip --napi_version=10",
     "prebuild-all": "npm run prebuild -- --arch x64 && npm run prebuild -- --arch arm64",
-    "test": "node test.js && node tests/test_no_native.js && node tests/test_browser_nofs.js && node tests/test_browser_imports_guard.js && node tests/test_version_sync.js && node tests/test_safe_regex_source_sync.js && node tests/test_safe_regex.js && node tests/test_safe_regex_integration.js && node tests/test_aot_build.js && node tests/test_aot_differential.js && node tests/test_aot_cli_build.js && node tests/test_aot_cli_smoke.js && node tests/test_bundle_standalone.js && node tests/test_standalone_anyof.js && node tests/test_standalone_formats.js && node tests/test_aot_additional_props_errors.js && node tests/test_id_anchor_refs.js && node tests/test_typed_validator_runner.js && node tests/test_define_schema.js && node tests/test_error_codes_lock.js && node tests/test_nullable.js && node tests/test_validate_and_parse.js && node tests/test_validate_data.js && node tests/test_enrich_error.js && node tests/test_rich_errors_optout.js && node tests/test_source_positions.js && node tests/fuzz_positions.js && node tests/test_data_positions.js && node tests/test_render_shared.js && node tests/test_renderers.js && node tests/test_runtime_error_dx.js && node tests/test_aot_error_dx.js && node tests/test_abort_early.js && node tests/test_branch_collapse.js && node tests/test_suggestions.js && node tests/test_cli_validate.js && node tests/test_cli_version.js && node benchmark/bench_aot_size.mjs",
+    "test": "node test.js && node tests/test_no_native.js && node tests/test_browser_nofs.js && node tests/test_browser_imports_guard.js && node tests/test_version_sync.js && node tests/test_safe_regex_source_sync.js && node tests/test_t_builder.js && node tests/test_safe_regex.js && node tests/test_safe_regex_integration.js && node tests/test_aot_build.js && node tests/test_aot_differential.js && node tests/test_aot_cli_build.js && node tests/test_aot_cli_smoke.js && node tests/test_bundle_standalone.js && node tests/test_standalone_anyof.js && node tests/test_standalone_formats.js && node tests/test_aot_additional_props_errors.js && node tests/test_id_anchor_refs.js && node tests/test_typed_validator_runner.js && node tests/test_define_schema.js && node tests/test_error_codes_lock.js && node tests/test_nullable.js && node tests/test_validate_and_parse.js && node tests/test_validate_data.js && node tests/test_enrich_error.js && node tests/test_rich_errors_optout.js && node tests/test_source_positions.js && node tests/fuzz_positions.js && node tests/test_data_positions.js && node tests/test_render_shared.js && node tests/test_renderers.js && node tests/test_runtime_error_dx.js && node tests/test_aot_error_dx.js && node tests/test_abort_early.js && node tests/test_branch_collapse.js && node tests/test_suggestions.js && node tests/test_cli_validate.js && node tests/test_cli_version.js && node benchmark/bench_aot_size.mjs",
     "bench:size": "node benchmark/bench_aot_size.mjs",
     "test:suite": "node tests/run_suite.js",
     "test:compat": "node tests/test_compat.js",
@@ -102,6 +107,9 @@
     "build.js",
     "build.mjs",
     "build.d.ts",
+    "t.js",
+    "t.mjs",
+    "t.d.ts",
     "binding-options.js",
     "binding/",
     "include/",

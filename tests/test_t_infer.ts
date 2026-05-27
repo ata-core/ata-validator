@@ -1,0 +1,83 @@
+// Type-level tests for the `ata-validator/t` builder. Compiled (no emit)
+// by tests/test_typed_validator_runner.js. The contract: builder output is
+// plain JSON Schema, so `Infer<typeof X>` from the main entry produces the
+// expected TS type without any builder-specific inference plumbing.
+
+import { Validator, type Infer } from '../index.js';
+import { t } from '../t.js';
+
+type Expect<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+// --- primitives ---
+const _str: Expect<Infer<ReturnType<typeof t.string>>, string> = true;
+const _num: Expect<Infer<ReturnType<typeof t.number>>, number> = true;
+const _int: Expect<Infer<ReturnType<typeof t.integer>>, number> = true;
+const _bool: Expect<Infer<ReturnType<typeof t.boolean>>, boolean> = true;
+const _null: Expect<Infer<ReturnType<typeof t.null>>, null> = true;
+void _str; void _num; void _int; void _bool; void _null;
+
+// --- literal / enum ---
+const lit = t.literal('admin');
+type Lit = Infer<typeof lit>;
+const _lit: Expect<Lit, 'admin'> = true;
+void _lit;
+
+const en = t.enum(['a', 'b'] as const);
+type En = Infer<typeof en>;
+const _en: Expect<En, 'a' | 'b'> = true;
+void _en;
+
+// --- object: required + optional ---
+const user = t.object({
+  id: t.integer(),
+  name: t.string(),
+  email: t.optional(t.string({ format: 'email' })),
+  age: t.optional(t.integer({ minimum: 0 })),
+});
+type User = Infer<typeof user>;
+const _user: Expect<User, { id: number; name: string; email?: string; age?: number }> = true;
+void _user;
+
+// --- nested objects and arrays ---
+const post = t.object({
+  id: t.integer(),
+  author: t.object({
+    name: t.string(),
+    handle: t.optional(t.string()),
+  }),
+  tags: t.array(t.string()),
+});
+type Post = Infer<typeof post>;
+const _post: Expect<
+  Post,
+  { id: number; author: { name: string; handle?: string }; tags: string[] }
+> = true;
+void _post;
+
+// --- union (anyOf) ---
+const status = t.union([t.literal('draft'), t.literal('published')]);
+type Status = Infer<typeof status>;
+const _status: Expect<Status, 'draft' | 'published'> = true;
+void _status;
+
+// --- tuple ---
+const pair = t.tuple([t.string(), t.number()]);
+type Pair = Infer<typeof pair>;
+const _pair: Expect<Pair, [string, number]> = true;
+void _pair;
+
+// --- record ---
+const headers = t.record(t.string());
+type Headers = Infer<typeof headers>;
+const _headers: Expect<Headers, Record<string, string>> = true;
+void _headers;
+
+// --- Validator constructor accepts builder output and narrows ---
+const v = new Validator(user);
+const r = v.validate({ id: 1, name: 'a' });
+if (r.valid) {
+  const _id: number = r.data.id;
+  const _name: string = r.data.name;
+  const _email: string | undefined = r.data.email;
+  void _id; void _name; void _email;
+}
