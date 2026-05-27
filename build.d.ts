@@ -67,3 +67,31 @@ export interface WatchHandle {
   close(): void;
 }
 export function watch(opts: BuildOptions, onReport?: (r: BuildReport) => void): Promise<WatchHandle>;
+
+// --- AOT primitives ---
+// Programmatic counterparts to `Validator.bundleStandalone` / `bundleCompact`
+// and `validator.toStandaloneModule`. Kept here so callers that only want the
+// build surface (e.g. a bundler plugin) don't have to import the full runtime.
+
+export interface BundleStandaloneOptions {
+  format?: 'cjs' | 'esm';
+  formats?: Record<string, (value: unknown) => boolean>;
+  verbose?: boolean;
+}
+
+export interface ToStandaloneModuleOptions {
+  format?: 'cjs' | 'esm';
+  abortEarly?: boolean;
+  source?: boolean;
+  sourceMap?: unknown;
+  schemaFile?: string;
+}
+
+/** Bundle multiple schemas into one self-contained module (no ata-validator runtime). */
+export function bundleStandalone(schemas: unknown[], options?: BundleStandaloneOptions): string;
+
+/** Like {@link bundleStandalone} but deduplicates shared bodies for smaller output. */
+export function bundleCompact(schemas: unknown[], options?: BundleStandaloneOptions): string;
+
+/** Emit a self-contained `validate`/`isValid` module string for a single schema. */
+export function toStandaloneModule(schema: unknown, options?: ToStandaloneModuleOptions): string | null;
