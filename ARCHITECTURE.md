@@ -7,7 +7,7 @@ are inferred from plain JSON Schema, with no builder DSL. The native C++ engine
 (simdjson) is optional and only powers the buffer and batch paths; core
 `validate()` runs on pure JS and works in the browser.
 
-This document describes the architecture as of 0.19.0.
+This document describes the architecture as of 0.20.0.
 
 ## Design principles
 
@@ -67,7 +67,8 @@ flowchart TD
 | `index.mjs` | ESM entry (re-exports the CJS core). |
 | `index.browser.mjs` | Browser build. No native addon, pure JS codegen only. |
 | `index.d.ts` | Public types: `Validator<T>`, `Infer<S>`, `defineSchema`, `JSONSchema`, Standard Schema. |
-| `build.js` / `build.mjs` / `build.d.ts` | Programmatic AOT build API (`build`, `watch`, `expandGlobs`). |
+| `build.js` / `build.mjs` / `build.d.ts` | Programmatic AOT build API (`build`, `watch`, `expandGlobs`, `bundleStandalone`, `bundleCompact`, `toStandaloneModule`). |
+| `t.js` / `t.mjs` / `t.d.ts` | Chainable builder (`t.object`, `t.string`, `t.union`, …) that emits plain JSON Schema literals; the TypeBox migration target. |
 | `compat.js` / `compat.mjs` / `compat.d.ts` | Drop-in shim for the default validator's API. |
 | `bin/ata.js` | CLI: `ata compile`, `ata build`, `ata validate`. |
 

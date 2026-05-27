@@ -2,6 +2,32 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.20.0 - 2026-05-27
+
+### Added
+
+- New chainable schema builder at `ata-validator/t`. Each `t.X(...)` returns a plain JSON Schema literal, so the output drops straight into `new Validator(...)`, `defineSchema`, `Infer<S>`, and the AOT pipeline with no adapter. The migration target is TypeBox: rename `import { Type } from '@sinclair/typebox'` to `import { t } from 'ata-validator/t'` and keep the same authoring shape while picking up ata's runtime and AOT precompile.
+
+  ```ts
+  import { t } from 'ata-validator/t'
+  import { Validator, type Infer } from 'ata-validator'
+
+  const User = t.object({
+    id: t.integer(),
+    name: t.string({ minLength: 1 }),
+    email: t.optional(t.string({ format: 'email' })),
+    role: t.union([t.literal('admin'), t.literal('user')]),
+  })
+  type User = Infer<typeof User>
+  const v = new Validator(User)
+  ```
+
+  Covered: primitives (`string`, `number`, `integer`, `boolean`, `null`), composites (`object` with `optional` keys, `array`, `tuple`, `record`, `union`, `intersect`, `literal`, `const`, `enum`), and refs (`ref`). Optionality is carried by a Symbol-keyed marker that the emitted JSON Schema, `Object.keys`, `JSON.stringify`, and ata's codegen never see; the parent `t.object` reads it to compute `required`.
+
+### Changed
+
+- `Infer<S>` now resolves object schemas without `properties` but with a schema-valued `additionalProperties` to `Record<string, V>` instead of `Record<string, unknown>`. Closes the last common JSON Schema shape that was not inferred.
+
 ## 0.19.0 - 2026-05-27
 
 ### Added
