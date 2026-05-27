@@ -183,6 +183,29 @@ type Event = Infer<typeof event>
 
 `Infer` resolves `const`/`enum` to literals, `anyOf`/`oneOf` to unions, `allOf` to intersections, `prefixItems` to tuples, and local `$ref` into `#/$defs` or `#/definitions`, including recursive references. An external or unresolvable `$ref` resolves to `unknown` rather than erroring. The exported `JSONSchema` type is available if you want to annotate a schema by hand; custom and vendor keywords are allowed. Requires TypeScript >= 5.0.
 
+#### Chainable authoring with `ata-validator/t`
+
+If you prefer a chainable builder over JSON Schema literals, `ata-validator/t` ships one whose output is still plain JSON Schema. The runtime validator, `Infer<S>`, and the AOT pipeline all keep working without an adapter. The migration from TypeBox is one import rename, then the same authoring shape:
+
+```ts
+import { t } from 'ata-validator/t'
+import { Validator, type Infer } from 'ata-validator'
+
+const User = t.object({
+  id: t.integer(),
+  name: t.string({ minLength: 1 }),
+  email: t.optional(t.string({ format: 'email' })),
+  role: t.union([t.literal('admin'), t.literal('user')]),
+})
+
+type User = Infer<typeof User>
+// { id: number; name: string; role: 'admin' | 'user'; email?: string }
+
+const v = new Validator(User)
+```
+
+The builder covers primitives (`string`, `number`, `integer`, `boolean`, `null`), composites (`object` with `optional` keys, `array`, `tuple`, `record`, `union`, `intersect`, `literal`, `const`, `enum`), and refs (`ref`). Optionality is carried by a Symbol marker that the emitted JSON Schema and ata's codegen never see, so the output is still a plain JSON Schema literal that you can pass to anything that takes one.
+
 #### Composes with TypeBox, Zod, or your own types
 
 `Validator<T>` is generic, so if you already author schemas with a library, pass the type and ata narrows to it. No library-specific assumption.
