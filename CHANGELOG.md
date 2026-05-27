@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.20.1 - 2026-05-27
+
+### Fixed
+
+- `JSONSchema.items` now accepts `boolean` so the typed `t.tuple([...])` output (which sets `items: false` to close the tail) type-checks against `JSONSchema` without a constraint error. `items: false` is valid JSON Schema and the runtime already honoured it; the type definition just had not been widened. Anyone consuming `t.tuple` from outside a project with `skipLibCheck` ran into a `TTuple incorrectly extends JSONSchema` error.
+
 ## 0.20.0 - 2026-05-27
 
 ### Added

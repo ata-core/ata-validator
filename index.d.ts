@@ -125,7 +125,7 @@ export interface JSONSchema {
   dependentSchemas?: Record<string, JSONSchema>;
 
   // array
-  items?: JSONSchema | ReadonlyArray<JSONSchema>;
+  items?: JSONSchema | ReadonlyArray<JSONSchema> | boolean;
   prefixItems?: ReadonlyArray<JSONSchema>;
   additionalItems?: boolean | JSONSchema;
   contains?: JSONSchema;
