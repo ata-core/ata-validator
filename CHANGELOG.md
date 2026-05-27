@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.19.0 - 2026-05-27
+
+### Added
+
+- `ata-validator/build` now exports the AOT primitives `bundleStandalone`, `bundleCompact`, and `toStandaloneModule` as named functions, so callers that want the build surface in one place (bundler plugins, build scripts) no longer have to go through the `Validator` class. Same code paths as the Validator-bound forms, no behaviour difference.
+- New top-level `ARCHITECTURE.md` reference document covering design principles, runtime dispatch, AOT pipeline, error enrichment, the two TypeScript paths, and the native layer.
+
+### Changed
+
+- Internal refactor: AOT (`toStandalone`, `toStandaloneModule`, `bundle`, `bundleStandalone`, `bundleCompact`, `loadBundle`) lives in `lib/aot.js`, the native addon loader in `lib/native-load.js`, the version string in `lib/version.js`. `index.js` lazy-requires the AOT module so a plain import never pays for code it does not call. The browser bundle drops `pkg-prebuilds`, `__dirname`, and `package.json` (with its dependency strings) entirely; it is roughly 15 KB smaller and contains no Node-only identifiers outside comments.
+- The safe-regex engine is now embedded into standalone output from a baked string (`lib/safe-regex-source.js`, generated from `lib/safe-regex.js`) instead of a runtime `fs.readFileSync`. Browser AOT calls (`Validator.bundle`, `toStandaloneModule`, …) work in any bundler without an fs polyfill. A structural test (`tests/test_browser_imports_guard.js`) bundles both entries with esbuild and asserts no `readFileSync`, `pkg-prebuilds`, or `__dirname` survives outside comments; sync tests catch drift between the bundled strings and their sources.
+
 ## 0.18.2 - 2026-05-26
 
 ### Fixed

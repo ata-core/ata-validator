@@ -1,6 +1,6 @@
 {
   "name": "ata-validator",
-  "version": "0.18.2",
+  "version": "0.19.0",
   "description": "JSON Schema validation with first-class TypeScript and zero runtime cost. AOT compile to per-schema ESM modules with zero validator dependency. Generic Validator<T> for TypeBox/Zod/Valibot composition. Optional runtime API. Standard Schema V1 compatible.",
   "main": "index.js",
   "module": "index.mjs",
