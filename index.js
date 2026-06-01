@@ -1064,6 +1064,44 @@ class Validator {
       };
     }
 
+    // Custom error messages: if any subschema declares an `errorMessage`
+    // keyword, install an outermost decorator that overrides the `message`
+    // field of the errors it owns. Gated on a one-time scan so schemas without
+    // errorMessage keep the validate hot path untouched. Layered after rich
+    // enrichment so `code`/`keyword`/`path` are already final and only the
+    // human-facing message changes.
+    {
+      const emLib = require('./lib/error-messages');
+      const schemaStr = this._schemaStr || (this._schemaObj ? JSON.stringify(this._schemaObj) : '');
+      if (emLib.schemaHasErrorMessages(schemaStr)) {
+        const root = this._schemaObj;
+        const wrap = (inner) => (arg) => {
+          const result = inner(arg);
+          if (result && result.valid === false && result.errors && result.errors.length && result !== ABORT_EARLY_RESULT) {
+            const overridden = emLib.applyErrorMessages(result.errors, root);
+            if (overridden !== result.errors) return { valid: false, errors: overridden };
+          }
+          return result;
+        };
+        if (this.validate) this.validate = wrap(this.validate);
+        if (this.validateJSON) this.validateJSON = wrap(this.validateJSON);
+        // validateAndParse routes through self.validate on the codegen path, but
+        // the native-only path returns directly from the addon — wrap it so both
+        // paths get overrides. The result shape carries `value`, preserved here.
+        if (this.validateAndParse) {
+          const innerVP = this.validateAndParse;
+          this.validateAndParse = (arg) => {
+            const result = innerVP(arg);
+            if (result && result.valid === false && result.errors && result.errors.length) {
+              const overridden = emLib.applyErrorMessages(result.errors, root);
+              if (overridden !== result.errors) return { valid: false, value: result.value, errors: overridden };
+            }
+            return result;
+          };
+        }
+      }
+    }
+
     // Save to identity cache for ultra-fast reuse with same schema object
     if (this._schemaObj && typeof this._schemaObj === 'object') {
       _identityCache.set(this._schemaObj, this);
@@ -1322,6 +1360,41 @@ function validate(schema, data) {
   return v.validate(data);
 }
 
+// Async validation for schemas built with `t.refine(...)`. Structural
+// validation runs synchronously first; refinements are awaited only when the
+// value is structurally valid (a refinement body may assume the right shape).
+// Accepts a schema literal or an existing Validator instance plus its schema.
+// Returns a Promise<ValidationResult>.
+async function validateAsync(schemaOrValidator, data) {
+  const refineLib = require('./lib/refine');
+  let validator, schema;
+  if (schemaOrValidator instanceof Validator) {
+    validator = schemaOrValidator;
+    schema = validator._schemaObj;
+  } else {
+    schema = schemaOrValidator;
+    validator = new Validator(schema);
+  }
+  const structural = validator.validate(data);
+  if (!structural.valid) return structural;
+  const refinements = refineLib.getRefinements(schema);
+  if (!refinements) return structural;
+  const issues = await refineLib.runRefinements(refinements, structural.data !== undefined ? structural.data : data);
+  if (issues.length) return { valid: false, errors: issues };
+  return structural;
+}
+
+// parseAsync resolves to the validated data, or rejects with an Error whose
+// `.errors` carries the ValidationError list. Mirrors the parse/validate split
+// used by Zod-style callers.
+async function parseAsync(schemaOrValidator, data) {
+  const result = await validateAsync(schemaOrValidator, data);
+  if (result.valid) return result.data !== undefined ? result.data : data;
+  const err = new Error('ata: async validation failed');
+  err.errors = result.errors;
+  throw err;
+}
+
 function version() {
   if (native) return native.version();
   try { return require("./lib/version"); } catch { return "unknown"; }
@@ -1420,6 +1493,8 @@ module.exports = {
   Validator,
   compile,
   validate,
+  validateAsync,
+  parseAsync,
   version,
   createPaddedBuffer,
   SIMDJSON_PADDING,

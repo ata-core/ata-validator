@@ -75,6 +75,18 @@ export function renderJSON(errors: RichValidationError[], opts?: JSONRenderOptio
 /** A user-supplied format checker. Receives the candidate value, returns true if valid. */
 export type FormatChecker = (value: string) => boolean;
 
+/**
+ * Per-keyword custom error messages for a subschema's `errorMessage`. Keys are
+ * keyword names (`type`, `minimum`, `pattern`, ...). `required` may be a single
+ * string or a map keyed by the missing property name. `_` is the fallback used
+ * when no keyword-specific entry matches.
+ */
+export interface ErrorMessageMap {
+  required?: string | Record<string, string>;
+  _?: string;
+  [keyword: string]: string | Record<string, string> | undefined;
+}
+
 /** The seven primitive `type` values defined by JSON Schema. */
 export type JSONSchemaTypeName =
   | 'string'
@@ -159,6 +171,15 @@ export interface JSONSchema {
 
   /** OpenAPI compatibility: ata honors `nullable` as a JSON Schema extension. */
   nullable?: boolean;
+
+  /**
+   * Override the human-facing `message` on errors this subschema produces.
+   * A string replaces the message for any failing keyword; an object overrides
+   * per keyword, with `required` keyed by missing property name (or a single
+   * string) and `_` as a fallback. Other fields (`code`, `keyword`, `path`)
+   * are unaffected.
+   */
+  errorMessage?: string | ErrorMessageMap;
 
   /** Custom and vendor keywords are allowed without error. */
   [keyword: string]: unknown;
@@ -443,6 +464,34 @@ export function validate<T = unknown>(
   schema: object | string,
   data: unknown
 ): ValidationResult<T>;
+
+/**
+ * Async validate for schemas built with `t.refine(...)`. Structural JSON Schema
+ * validation runs synchronously first; refinements are awaited only when the
+ * value is structurally valid. Failing refinements surface as errors with
+ * `keyword: 'refine'`. Accepts a schema literal or an existing {@link Validator}.
+ */
+export function validateAsync<T>(
+  validator: Validator<T>,
+  data: unknown
+): Promise<ValidationResult<T>>;
+export function validateAsync<const S extends JSONSchema>(
+  schema: S,
+  data: unknown
+): Promise<ValidationResult<Infer<S>>>;
+export function validateAsync<T = unknown>(
+  schema: object,
+  data: unknown
+): Promise<ValidationResult<T>>;
+
+/**
+ * Like {@link validateAsync}, but resolves to the validated data on success and
+ * rejects with an `Error` whose `errors` property holds the
+ * {@link ValidationError} list on failure.
+ */
+export function parseAsync<T>(validator: Validator<T>, data: unknown): Promise<T>;
+export function parseAsync<const S extends JSONSchema>(schema: S, data: unknown): Promise<Infer<S>>;
+export function parseAsync<T = unknown>(schema: object, data: unknown): Promise<T>;
 
 /** Fast compile: returns a validate function directly. WeakMap cached, second call with same schema is near-zero cost. */
 export function compile<T = unknown>(

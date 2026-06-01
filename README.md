@@ -70,6 +70,27 @@ The `ata` CLI ships `ata validate <schema> <data>` for one-off checks. TTY auto-
 
 Errors carry a stable `code` field (`ATA####`), see the [error code registry](docs/error-codes.md). Each code has a permalink at `https://ata-validator.com/e/<CODE>`.
 
+### Custom messages
+
+A subschema can override the human-facing message with an `errorMessage` keyword. A string replaces the message for any failing keyword on that subschema; an object overrides per keyword, with `required` keyed by the missing property name (or a single string) and `_` as a fallback. The `code`, `keyword`, and `path` fields are untouched, so dashboards and renderers keep working.
+
+```js
+const v = new Validator({
+  type: 'object',
+  properties: {
+    age: { type: 'integer', minimum: 18, errorMessage: { minimum: 'must be 18 or older', type: 'age has to be a number' } },
+    email: { type: 'string', format: 'email', errorMessage: 'enter a valid email address' },
+  },
+  required: ['email'],
+  errorMessage: { required: { email: 'email is required' } },
+})
+
+v.validate({ age: 5 }).errors[0].message      // 'must be 18 or older'
+v.validate({}).errors[0].message              // 'email is required'
+```
+
+Schemas without an `errorMessage` keyword pay nothing: the override pass is only installed when one is present.
+
 ### Opting out
 
 For consumers who built log dashboards on the v0.14 error shape, `new Validator(schema, { richErrors: false })` returns the legacy shape exactly. For high-throughput paths, `abortEarly: true` continues to short-circuit; the returned error carries `code: 'ATA9000'` and no enrichment.
@@ -205,6 +226,29 @@ const v = new Validator(User)
 ```
 
 The builder covers primitives (`string`, `number`, `integer`, `boolean`, `null`), composites (`object` with `optional` keys, `array`, `tuple`, `record`, `union`, `intersect`, `literal`, `const`, `enum`), and refs (`ref`). Optionality is carried by a Symbol marker that the emitted JSON Schema and ata's codegen never see, so the output is still a plain JSON Schema literal that you can pass to anything that takes one.
+
+#### Async refinement
+
+JSON Schema is synchronous, so checks that need to await, a uniqueness lookup, a remote call, a cross-field rule, attach to a schema with `t.refine` and run through `validateAsync`. The refinement rides on a Symbol marker, so `new Validator(schema)` still does plain structural validation and ignores it; only `validateAsync`/`parseAsync` evaluate it, and only after the value is structurally valid.
+
+```ts
+import { t } from 'ata-validator/t'
+import { validateAsync, parseAsync } from 'ata-validator'
+
+const Signup = t.refine(
+  t.object({ username: t.string({ minLength: 3 }), email: t.string({ format: 'email' }) }),
+  async (value) => !(await usernameTaken(value.username)),
+  { message: 'username is already taken', path: '/username' },
+)
+
+const r = await validateAsync(Signup, body)
+if (!r.valid) return reply.code(400).send(r.errors)
+
+// or: resolves to the typed value, throws on failure with err.errors
+const user = await parseAsync(Signup, body)
+```
+
+Refinements compose by wrapping again, and a failing one surfaces as an error with `keyword: 'refine'` carrying your `message` and `path`. A `check` may be sync or async.
 
 #### Composes with TypeBox, Zod, or your own types
 

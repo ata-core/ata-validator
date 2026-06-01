@@ -15,9 +15,20 @@
 //
 //   const v = new Validator(User)  // schema is plain JSON Schema
 
-import type { JSONSchema } from './index.js';
+import type { JSONSchema, Infer } from './index.js';
 
 export declare const OPTIONAL: unique symbol;
+
+/** Options for {@link TBuilder.refine}. */
+export interface RefineOptions {
+  /** Message attached to the error when the refinement fails. */
+  message?: string;
+  /** instancePath the error points at (e.g. `/email`). Defaults to the root. */
+  path?: string;
+}
+
+/** A refinement check: receives the structurally-valid value, returns (a promise of) a boolean. */
+export type RefineCheck<T> = (value: T) => boolean | Promise<boolean>;
 
 export type TOptional<S> = S & { readonly [OPTIONAL]: true };
 
@@ -181,6 +192,14 @@ export interface TBuilder {
   any(): TAny;
   unknown(): TAny;
   never(): TNever;
+
+  /**
+   * Attach an async (or sync) refinement to a schema. The schema stays plain
+   * JSON Schema for structural validation; the refinement runs only via
+   * `validateAsync()` / `parseAsync()`. Compose by wrapping again. The returned
+   * schema infers the same type, so `Infer<typeof refined>` is unchanged.
+   */
+  refine<S extends JSONSchema>(schema: S, check: RefineCheck<Infer<S>>, opts?: RefineOptions): S;
 }
 
 export declare const t: TBuilder;
