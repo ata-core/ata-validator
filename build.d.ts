@@ -75,7 +75,7 @@ export function watch(opts: BuildOptions, onReport?: (r: BuildReport) => void): 
 
 export interface BundleStandaloneOptions {
   format?: 'cjs' | 'esm';
-  formats?: Record<string, (value: unknown) => boolean>;
+  formats?: Record<string, (value: string) => boolean>;
   verbose?: boolean;
 }
 
