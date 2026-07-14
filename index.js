@@ -446,6 +446,21 @@ function resolveSchemaForPreprocess(schema, schemaMap) {
   return cloned || s
 }
 
+// Deprecated-method warning: once per method name per process. Guarded so the
+// browser entry (no `process`) never touches it.
+const deprecationWarned = new Set();
+function warnDeprecated(method) {
+  if (deprecationWarned.has(method)) return;
+  deprecationWarned.add(method);
+  if (typeof process !== 'undefined' && typeof process.emitWarning === 'function') {
+    process.emitWarning(
+      `Validator.prototype.${method}() is deprecated and will be removed in ata-validator 1.0. ` +
+      `Use toStandaloneModule()/bundleStandalone() from 'ata-validator/build' instead.`,
+      'DeprecationWarning',
+    );
+  }
+}
+
 class Validator {
   constructor(schema, opts) {
     const options = opts || {};
@@ -1172,10 +1187,12 @@ class Validator {
   // bundlers swap `lib/aot.js` with `lib/aot.browser.js`, which throws a
   // pointed error instead of attempting to read source from disk.
   toStandalone() {
+    warnDeprecated('toStandalone');
     return require('./lib/aot').toStandalone(this);
   }
 
   toStandaloneModule(opts) {
+    warnDeprecated('toStandaloneModule');
     return require('./lib/aot').toStandaloneModule(this, opts);
   }
 
