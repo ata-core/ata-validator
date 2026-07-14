@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.22.0 - 2026-07-14
+
+### Deprecated
+
+- `Validator.prototype.toStandalone()` and `Validator.prototype.toStandaloneModule()` now emit a one-time DeprecationWarning. Both will be removed in 1.0. The replacements have been stable since 0.19: `toStandaloneModule()`/`bundleStandalone()`/`bundleCompact()` from `ata-validator/build`, and the `Validator.bundle*()` statics.
+
 ## 0.21.0 - 2026-06-01
 
 ### Added
