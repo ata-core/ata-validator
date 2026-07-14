@@ -2,6 +2,13 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 0.21.0 - 2026-06-01
+
+### Added
+
+- `errorMessage` keyword for custom error messages. A string on a subschema replaces the message for any failing keyword there; an object overrides per keyword, with `required` keyed by missing property name and `_` as fallback. `code`, `keyword`, and `path` fields are untouched. Schemas without `errorMessage` pay nothing; the override pass is only installed when one is present.
+- Async refinement: `t.refine(schema, fn, { message, path })` attaches an async (or sync) check that runs through `validateAsync`/`parseAsync` after structural validation passes. `new Validator(schema)` ignores the refinement marker, so plain structural validation is unchanged. Failing refinements surface as errors with `keyword: 'refine'`.
+
 ## 0.20.1 - 2026-05-27
 
 ### Fixed
