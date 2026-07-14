@@ -5,6 +5,8 @@ JSON Schema validation with first-class TypeScript and zero runtime cost. AOT co
 [![npm](https://img.shields.io/npm/v/ata-validator)](https://www.npmjs.com/package/ata-validator)
 [![License](https://img.shields.io/npm/l/ata-validator)](LICENSE)
 
+1.0 is a stability commitment: see [docs/STABILITY.md](docs/STABILITY.md) for the semver, deprecation, and error-code guarantees.
+
 ## Quick start
 
 ```bash
