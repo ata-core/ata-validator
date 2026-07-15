@@ -456,6 +456,7 @@ The 98.5% Draft 2020-12 pass rate excludes areas that are deliberate scope decis
 - **`contentEncoding` / `contentMediaType` / `contentSchema`** are annotation-only, as the spec permits, and are not validated.
 - **`minLength`/`maxLength`** count UTF-16 code units, not grapheme clusters.
 - **Infinite-loop detection** suite cases are skipped; circular `$ref` chains are cut off by a recursion depth guard instead.
+- **`default`** optional suite tests are excluded; ata applies `default` values to validated data, where the spec treats `default` as a non-enforcing annotation.
 
 If one of these blocks you, open an issue; scope decisions get revisited with real use cases.
 

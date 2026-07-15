@@ -21,7 +21,7 @@ Anything under `lib/`, `src/`, `include/`, or `deps/` is internal. Reaching into
 
 ## Error codes
 
-Error codes (`ATA1001` through `ATA9002`) are locked: a code is never deleted, renamed, or reassigned to a different meaning. Retired codes are marked deprecated in the registry and keep their permalink at https://ata-validator.com/e/<CODE>. The lock is enforced in CI (`tests/test_error_codes_lock.js`).
+Error codes (`ATA1001` through `ATA9002`) are locked: a code is never deleted, renamed, or reassigned to a different meaning. Retired codes are marked deprecated in the registry and keep their permalink at `https://ata-validator.com/e/<CODE>`. The lock is enforced in CI (`tests/test_error_codes_lock.js`).
 
 ## Deprecation policy
 

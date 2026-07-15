@@ -1490,5 +1490,5 @@ module.exports = {
   renderPretty,
   renderCompact,
   renderJSON,
-  attachSuggestions,
+  attachSuggestions, // internal: used by the renderers; not public API
 };

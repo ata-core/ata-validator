@@ -17,9 +17,7 @@ if (fs.existsSync(REMOTES_DIR)) {
   }
 }
 
-// Test files we support (skip: refRemote, dynamicRef, vocabulary, anchor,
-// contains, prefixItems, unevaluatedItems, unevaluatedProperties,
-// dependentRequired, dependentSchemas, propertyNames, content, default,
+// Test files we support (skip: refRemote, vocabulary, content, default,
 // infinite-loop-detection)
 const SUPPORTED_FILES = [
   "type.json",
