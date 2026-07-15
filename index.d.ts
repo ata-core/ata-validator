@@ -411,19 +411,6 @@ export interface Validator<T = unknown> {
   /** Single-thread NDJSON batch validation. Requires native addon. */
   isValidNDJSON(ndjsonBuffer: Buffer): boolean[];
 
-  /**
-   * Generate a standalone JS module string for zero-compile loading. Returns null if schema can't be standalone-compiled.
-   * @deprecated Removed in 1.0. Use `toStandaloneModule()` from `ata-validator/build` instead.
-   */
-  toStandalone(): string | null;
-
-  /**
-   * Generate a self-contained module string with `validate`/`isValid` exports.
-   * The output has zero runtime dependency on ata-validator.
-   * @deprecated Removed in 1.0. Use `toStandaloneModule()` from `ata-validator/build` instead.
-   */
-  toStandaloneModule(options?: { format?: 'esm' | 'cjs'; abortEarly?: boolean }): string | null;
-
   /** Standard Schema V1 interface, compatible with Fastify, tRPC, TanStack, etc. */
   readonly "~standard": StandardSchemaV1Props;
 }

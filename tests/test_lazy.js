@@ -1,4 +1,5 @@
 const { Validator } = require("../index");
+const aot = require('../lib/aot');
 
 let passed = 0;
 let failed = 0;
@@ -90,7 +91,7 @@ test("second validate() call works correctly (stub replaced)", () => {
 
 test("toStandalone() works without calling validate() first", () => {
   const v = new Validator(schema);
-  const standalone = v.toStandalone();
+  const standalone = aot.toStandalone(v);
   assert(typeof standalone === "string", "toStandalone should return string");
   assert(standalone.includes("boolFn"), "should contain boolFn");
   assert(v._initialized === true, "_initialized should be true after toStandalone");

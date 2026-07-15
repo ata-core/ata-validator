@@ -9,6 +9,7 @@
  */
 
 const { Validator } = require('../index')
+const aot = require('../lib/aot')
 const autocannon = require('autocannon')
 const fs = require('fs')
 const path = require('path')
@@ -104,7 +105,7 @@ const invalidBody = JSON.stringify({
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-heavy-'))
 const compiledPath = path.join(tmpDir, 'compiled.cjs')
 const v = new Validator(schema)
-fs.writeFileSync(compiledPath, v.toStandaloneModule({ format: 'cjs' }))
+fs.writeFileSync(compiledPath, aot.toStandaloneModule(v, { format: 'cjs' }))
 const vAbort = new Validator(schema, { abortEarly: true })
 const compiledMod = require(compiledPath)
 

@@ -17,6 +17,7 @@ Module._resolveFilename = function (request, parent, isMain, options) {
 delete require.cache[require.resolve("../index")];
 
 const { Validator, validate, version, createPaddedBuffer, SIMDJSON_PADDING } = require("../index");
+const aot = require("../lib/aot");
 
 // Restore original resolve
 Module._resolveFilename = origResolve;
@@ -285,8 +286,8 @@ import("../index.browser.mjs")
       );
       assert(ts.includes("export interface U"), "expected `export interface U` in output");
     });
-    test("browser entry exports Validator with toStandaloneModule", () => {
-      const code = new browser.Validator({ type: "object", properties: { id: { type: "integer" } }, required: ["id"] }).toStandaloneModule({ format: "esm" });
+    test("browser Validator works with aot.toStandaloneModule", () => {
+      const code = aot.toStandaloneModule(new browser.Validator({ type: "object", properties: { id: { type: "integer" } }, required: ["id"] }), { format: "esm" });
       assert(typeof code === "string" && code.length > 0, "expected standalone code");
       assert(!/\bimport |require\(/.test(code), "expected zero-import standalone output");
     });

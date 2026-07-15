@@ -28,7 +28,7 @@
  *    producing stable numbers — the ratio is what matters.)
  *
  * COMPILE TIME (microseconds, median of 200 runs)
- *   ata-AOT : time `new Validator(schema).toStandaloneModule()` per schema.
+ *   ata-AOT : time `aot.toStandaloneModule(new Validator(schema))` per schema.
  *   AJV     : time `new Ajv() + addFormats() + .compile(schema)` per schema.
  */
 
@@ -46,6 +46,7 @@ const BENCH_DIR = __dirname;
 
 const req         = createRequire(join(BENCH_DIR, 'x.js'));
 const { Validator } = req(join(ROOT, 'index.js'));
+const aot           = req(join(ROOT, 'lib', 'aot.js'));
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -207,7 +208,7 @@ process.stdout.write(JSON.stringify({ rawBytes: combined.length, gzBytes: gz.len
   const results = [];
   for (const { label, schema } of schemas) {
     const v   = new Validator(schema);
-    const src = v.toStandaloneModule({ format: 'esm' });
+    const src = aot.toStandaloneModule(v, { format: 'esm' });
     const aotGz = gzipSync(Buffer.from(src, 'utf8')).length;
 
     // AJV "total bundle" = runtime + schema-as-data (schema JSON is small but included for completeness)
@@ -240,7 +241,7 @@ function measureColdStart(schemas, docs) {
 
     // Write AOT compiled module to temp file
     const v       = new Validator(schema);
-    const src     = v.toStandaloneModule({ format: 'esm' });
+    const src     = aot.toStandaloneModule(v, { format: 'esm' });
     const aotFile = join(TMP, `ata_bench_aot_${i}.mjs`);
     writeFileSync(aotFile, src);
 
@@ -355,7 +356,7 @@ function measureCompileTime(schemas) {
     const aotTimes = [];
     for (let i = 0; i < RUNS; i++) {
       const t0 = process.hrtime.bigint();
-      new Validator(schema).toStandaloneModule({ format: 'esm' });
+      aot.toStandaloneModule(new Validator(schema), { format: 'esm' });
       const t1 = process.hrtime.bigint();
       aotTimes.push(Number(t1 - t0) / 1000);
     }

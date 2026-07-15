@@ -213,11 +213,10 @@ before running `ata compile` if you need them resolved.
 Yes. The same code path is exposed programmatically:
 
 ```ts
-import { Validator } from 'ata-validator'
+import { toStandaloneModule } from 'ata-validator/build'
 import { toTypeScript } from 'ata-validator/lib/ts-gen'
 
-const v = new Validator(schema)
-const mjs = v.toStandaloneModule({ format: 'esm' })
+const mjs = toStandaloneModule(schema, { format: 'esm' })
 const dts = toTypeScript(schema, { name: 'User' })
 ```
 

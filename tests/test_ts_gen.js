@@ -22,6 +22,7 @@ const { spawnSync } = require('child_process');
 
 const { Validator } = require('..');
 const { toTypeScript } = require('../lib/ts-gen');
+const aot = require('../lib/aot');
 
 const FIXTURES_DIR = path.join(__dirname, 'ts_fixtures');
 const TSC_BIN = require.resolve('typescript/lib/tsc.js');
@@ -54,7 +55,7 @@ function discoverFixtures() {
 function generate(fixture) {
   const schema = JSON.parse(fs.readFileSync(fixture.schemaPath, 'utf8'));
   const v = new Validator(schema);
-  const src = v.toStandaloneModule({ format: 'esm' });
+  const src = aot.toStandaloneModule(v, { format: 'esm' });
   if (!src) throw new Error(`schema in ${fixture.dir} produced no standalone module`);
   const typeName = toTypeName(fixture.meta.typeName || fixture.name);
   const dts = toTypeScript(schema, { name: typeName });

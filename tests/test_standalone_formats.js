@@ -7,6 +7,7 @@
 // with the boolean isValid().
 
 const { Validator } = require('..')
+const aot = require('../lib/aot')
 
 let pass = 0, fail = 0
 function check(cond, msg) { if (cond) { pass++; console.log('  PASS', msg) } else { fail++; console.log('  FAIL', msg) } }
@@ -38,7 +39,7 @@ console.log('\nstandalone emit paths embed custom (function) formats\n')
 
 // 1. toStandaloneModule
 {
-  const code = new Validator(schema, { formats }).toStandaloneModule({ format: 'cjs' })
+  const code = aot.toStandaloneModule(new Validator(schema, { formats }), { format: 'cjs' })
   check(code != null, 'toStandaloneModule: produces a module')
   const mod = code ? load(code) : null
   if (mod) checkValidator('toStandaloneModule', mod.validate)

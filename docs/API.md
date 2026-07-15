@@ -124,13 +124,15 @@ Zero-copy path for pre-padded buffers (simdjson requires 64 bytes padding).
 
 Skip compilation at startup by saving compiled validators to disk.
 
-### v.toStandalone()
+### toStandaloneModule(schema, options?)
 
-Returns JS module source string.
+From the `ata-validator/build` entry. Returns a self-contained JS module
+string with `validate`/`isValid` exports and zero runtime dependency on
+ata-validator.
 
 ```javascript
-const source = v.toStandalone();
-fs.writeFileSync('./compiled.js', source);
+const { toStandaloneModule } = require('ata-validator/build');
+fs.writeFileSync('./compiled.mjs', toStandaloneModule(schema, { format: 'esm' }));
 ```
 
 ### Validator.fromStandalone(module, schema, options?)

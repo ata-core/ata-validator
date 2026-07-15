@@ -181,6 +181,7 @@ function cmdCompile(args) {
   }
 
   const { Validator } = require('..');
+  const aot = require('../lib/aot');
   let v;
   try {
     v = new Validator(schema);
@@ -199,7 +200,7 @@ function cmdCompile(args) {
     }
   }
   const schemaFile = path.relative(process.cwd(), input) || input;
-  const src = v.toStandaloneModule({ format, abortEarly, source, sourceMap, schemaFile });
+  const src = aot.toStandaloneModule(v, { format, abortEarly, source, sourceMap, schemaFile });
   if (!src) {
     reportCompileError(input, 'schema is too complex for standalone compilation');
     process.exit(1);

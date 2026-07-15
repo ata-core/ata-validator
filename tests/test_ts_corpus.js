@@ -23,6 +23,7 @@ const { spawnSync } = require('child_process');
 
 const { Validator } = require('..');
 const { toTypeScript } = require('../lib/ts-gen');
+const aot = require('../lib/aot');
 
 const DRAFT = process.env.CORPUS_DRAFT || 'draft2020-12';
 const SUITE_DIR = path.join(__dirname, 'suite', 'tests', DRAFT);
@@ -81,7 +82,7 @@ function runOne(workDir, schema) {
 
   let modSrc;
   try {
-    modSrc = v.toStandaloneModule({ format: 'esm' });
+    modSrc = aot.toStandaloneModule(v, { format: 'esm' });
   } catch (err) {
     return { kind: 'fail', reason: `toStandaloneModule threw: ${err.message}` };
   }

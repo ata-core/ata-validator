@@ -69,9 +69,9 @@ export interface WatchHandle {
 export function watch(opts: BuildOptions, onReport?: (r: BuildReport) => void): Promise<WatchHandle>;
 
 // --- AOT primitives ---
-// Programmatic counterparts to `Validator.bundleStandalone` / `bundleCompact`
-// and `validator.toStandaloneModule`. Kept here so callers that only want the
-// build surface (e.g. a bundler plugin) don't have to import the full runtime.
+// Programmatic counterparts to `Validator.bundleStandalone` / `bundleCompact`.
+// Kept here so callers that only want the build surface (e.g. a bundler
+// plugin) don't have to import the full runtime.
 
 export interface BundleStandaloneOptions {
   format?: 'cjs' | 'esm';

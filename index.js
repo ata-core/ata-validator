@@ -290,9 +290,9 @@ const ABORT_EARLY_RESULT = Object.freeze({
 
 // `_CP_LEN_SOURCE`, the safe-regex embed, and the AOT helpers that consume them
 // now live in `lib/aot.js` — keeping this file free of `fs`/`path`/`__dirname`
-// references so a default import never touches disk. The instance and static
-// AOT methods further down lazily require `./lib/aot`, so they pay nothing
-// until a user calls `toStandaloneModule`/`bundleStandalone`/etc.
+// references so a default import never touches disk. The static AOT methods
+// further down lazily require `./lib/aot`, so they pay nothing until a user
+// calls `bundleStandalone`/`bundle`/etc.
 
 // Above this size, simdjson On Demand (selective field access) beats JSON.parse
 // (which must materialize the full JS object tree). Buffer.from + NAPI ~2x faster.
@@ -444,21 +444,6 @@ function resolveSchemaForPreprocess(schema, schemaMap) {
     }
   }
   return cloned || s
-}
-
-// Deprecated-method warning: once per method name per process. Guarded so the
-// browser entry (no `process`) never touches it.
-const deprecationWarned = new Set();
-function warnDeprecated(method) {
-  if (deprecationWarned.has(method)) return;
-  deprecationWarned.add(method);
-  if (typeof process !== 'undefined' && typeof process.emitWarning === 'function') {
-    process.emitWarning(
-      `Validator.prototype.${method}() is deprecated and will be removed in ata-validator 1.0. ` +
-      `Use toStandaloneModule()/bundleStandalone() from 'ata-validator/build' instead.`,
-      'DeprecationWarning',
-    );
-  }
 }
 
 class Validator {
@@ -1178,22 +1163,6 @@ class Validator {
         else cached.jsFn = jsFn;
       }
     }
-  }
-
-  // --- AOT pre-compilation ---
-  // The bodies of `toStandalone` and `toStandaloneModule` live in `lib/aot.js`
-  // so this entry stays free of `fs`/`path`/`__dirname`. The lazy require runs
-  // only on first call, never during a plain `import 'ata-validator'`. Browser
-  // bundlers swap `lib/aot.js` with `lib/aot.browser.js`, which throws a
-  // pointed error instead of attempting to read source from disk.
-  toStandalone() {
-    warnDeprecated('toStandalone');
-    return require('./lib/aot').toStandalone(this);
-  }
-
-  toStandaloneModule(opts) {
-    warnDeprecated('toStandaloneModule');
-    return require('./lib/aot').toStandaloneModule(this, opts);
   }
 
   // Load a pre-compiled standalone module. Zero schema compilation.

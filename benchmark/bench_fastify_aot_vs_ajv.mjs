@@ -25,6 +25,7 @@ const BENCH_DIR = __dirname;
 
 const req         = createRequire(join(BENCH_DIR, 'package.json'));
 const { Validator } = req(join(ROOT, 'index.js'));
+const aot           = req(join(ROOT, 'lib', 'aot.js'));
 const Fastify       = req('fastify');
 const autocannon    = req('autocannon');
 
@@ -162,7 +163,7 @@ process.stderr.write('Each config: 3s warmup + 10s measurement, 50 connections\n
 // Pre-compile AOT module once before any servers start
 process.stderr.write('Pre-compiling AOT module...\n');
 const v = new Validator(schema);
-const aotSrc = v.toStandaloneModule({ format: 'esm' });
+const aotSrc = aot.toStandaloneModule(v, { format: 'esm' });
 if (!aotSrc) {
   process.stderr.write('ERROR: toStandaloneModule returned null — cannot run AOT config\n');
   process.exit(1);

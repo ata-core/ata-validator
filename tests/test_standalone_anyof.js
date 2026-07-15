@@ -5,6 +5,7 @@
 // undefined names (e.g. _af1_b0) and throws on load.
 
 const { Validator } = require('..')
+const aot = require('../lib/aot')
 
 let pass = 0, fail = 0
 function check(cond, msg) { if (cond) { pass++; console.log('  PASS', msg) } else { fail++; console.log('  FAIL', msg) } }
@@ -24,7 +25,7 @@ const anyOfSchema = {
   },
 }
 
-const anyOfCode = new Validator(anyOfSchema).toStandaloneModule({ format: 'cjs' })
+const anyOfCode = aot.toStandaloneModule(new Validator(anyOfSchema), { format: 'cjs' })
 check(anyOfCode != null, 'anyOf schema produces a standalone module')
 let anyOfMod
 try { anyOfMod = load(anyOfCode) } catch (e) { console.log('        load threw:', e.message) }
@@ -46,7 +47,7 @@ const oneOfSchema = {
     },
   },
 }
-const oneOfCode = new Validator(oneOfSchema).toStandaloneModule({ format: 'cjs' })
+const oneOfCode = aot.toStandaloneModule(new Validator(oneOfSchema), { format: 'cjs' })
 let oneOfMod
 try { oneOfMod = load(oneOfCode) } catch (e) { console.log('        load threw:', e.message) }
 check(oneOfMod && typeof oneOfMod.validate === 'function', 'oneOf module loads without ReferenceError')

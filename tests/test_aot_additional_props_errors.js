@@ -7,6 +7,7 @@
 // same field-level errors.
 
 const { Validator } = require('..')
+const aot = require('../lib/aot')
 
 let pass = 0, fail = 0
 function check(cond, msg) { if (cond) { pass++; console.log('  PASS', msg) } else { fail++; console.log('  FAIL', msg) } }
@@ -36,7 +37,7 @@ for (const { name, schema, bad } of cases) {
   check(rt.valid === false, `${name}: runtime rejects (sanity)`)
 
   // toStandaloneModule
-  const saCode = new Validator(schema).toStandaloneModule({ format: 'cjs' })
+  const saCode = aot.toStandaloneModule(new Validator(schema), { format: 'cjs' })
   const sa = saCode ? load(saCode) : null
   check(sa != null, `${name}: toStandaloneModule produces a module`)
   if (sa) check(norm(sa.validate(bad).errors) === expected, `${name}: toStandaloneModule errors match runtime ${expected}`)

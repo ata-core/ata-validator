@@ -361,10 +361,9 @@ Programmatic API if you prefer to script it:
 
 ```javascript
 const fs = require('fs');
-const { Validator } = require('ata-validator');
+const { toStandaloneModule } = require('ata-validator/build');
 
-const v = new Validator(schema);
-fs.writeFileSync('./user.validator.mjs', v.toStandaloneModule({ format: 'esm' }));
+fs.writeFileSync('./user.validator.mjs', toStandaloneModule(schema, { format: 'esm' }));
 ```
 
 **Fastify startup (10 routes cold): ajv 12.6ms → ata 0.5ms (24x faster boot, no build step required)**

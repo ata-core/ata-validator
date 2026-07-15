@@ -20,7 +20,7 @@ const result = esbuild.buildSync({
       globalThis.__ATA_RESULT = {
         valid: v.validate({ id: 1 }).valid,
         invalid: v.validate({}).valid,
-        hasCode: !!v.toStandaloneModule({ format: 'esm' }),
+        hasCode: !!Validator.bundleStandalone([schema]),
         tsOK: toTypeScript(schema, { name: 'X' }).includes('interface X'),
       }
     `,
@@ -63,7 +63,7 @@ try {
 const r = globalThis.__ATA_RESULT;
 check(r && r.valid === true, "validates a valid object without fs");
 check(r && r.invalid === false, "rejects an invalid object without fs");
-check(r && r.hasCode === true, "toStandaloneModule (no pattern) works without fs");
+check(r && r.hasCode === true, "bundleStandalone (no pattern) works without fs");
 check(r && r.tsOK === true, "toTypeScript works without fs");
 
 console.log(`\n${failed === 0 ? "ok" : "FAILED"}: ata bundles for the browser and runs without fs`);

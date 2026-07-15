@@ -6,6 +6,7 @@
 // JS RegExp, so behavior for those is unchanged.
 
 const { Validator } = require('..')
+const aot = require('../lib/aot')
 
 let pass = 0, fail = 0
 function check (cond, msg) { if (cond) { pass++; console.log('  PASS', msg) } else { fail++; console.log('  FAIL', msg) } }
@@ -44,7 +45,7 @@ console.log('\nReDoS-safe regex integration\n')
 
 // --- Standalone module: same adversarial schema must be safe once loaded ---
 {
-  const code = new Validator({ type: 'object', properties: { s: { type: 'string', pattern: EVIL } }, required: ['s'] }).toStandaloneModule({ format: 'cjs' })
+  const code = aot.toStandaloneModule(new Validator({ type: 'object', properties: { s: { type: 'string', pattern: EVIL } }, required: ['s'] }), { format: 'cjs' })
   const mod = load(code)
   const { out, ms } = timed(() => mod.validate({ s: EVIL_INPUT }))
   check(out && out.valid === false && ms < BUDGET_MS, `standalone validate adversarial: ${ms}ms (<${BUDGET_MS}), valid=${out && out.valid}`)
@@ -52,7 +53,7 @@ console.log('\nReDoS-safe regex integration\n')
 
 // --- toStandalone (boolFn + errFn) must be safe on adversarial input ---
 {
-  const code = new Validator({ type: 'object', properties: { s: { type: 'string', pattern: EVIL } }, required: ['s'] }).toStandalone()
+  const code = aot.toStandalone(new Validator({ type: 'object', properties: { s: { type: 'string', pattern: EVIL } }, required: ['s'] }))
   const mod = load(code)
   const input = { s: EVIL_INPUT }
   const r1 = timed(() => mod.boolFn(input))
@@ -84,7 +85,7 @@ console.log('\nReDoS-safe regex integration\n')
   const obj = { [EVIL_INPUT]: 'x' }
   const r = timed(() => v.validate(obj))
   check(r.out && r.ms < BUDGET_MS, `patternProperties runtime adversarial key: ${r.ms}ms (<${BUDGET_MS})`)
-  const mod = load(new Validator(schema).toStandaloneModule({ format: 'cjs' }))
+  const mod = load(aot.toStandaloneModule(new Validator(schema), { format: 'cjs' }))
   const rs = timed(() => mod.validate(obj))
   check(rs.out && rs.ms < BUDGET_MS, `patternProperties standalone adversarial key: ${rs.ms}ms (<${BUDGET_MS})`)
 }
@@ -96,7 +97,7 @@ console.log('\nReDoS-safe regex integration\n')
   const obj = { [EVIL_INPUT]: 'x' }
   const r = timed(() => v.validate(obj))
   check(r.out && r.out.valid === false && r.ms < BUDGET_MS, `propertyNames runtime adversarial key: ${r.ms}ms (<${BUDGET_MS}), valid=${r.out && r.out.valid}`)
-  const mod = load(new Validator(schema).toStandaloneModule({ format: 'cjs' }))
+  const mod = load(aot.toStandaloneModule(new Validator(schema), { format: 'cjs' }))
   const rs = timed(() => mod.validate(obj))
   check(rs.out && rs.out.valid === false && rs.ms < BUDGET_MS, `propertyNames standalone adversarial key: ${rs.ms}ms (<${BUDGET_MS}), valid=${rs.out && rs.out.valid}`)
 }
