@@ -8,11 +8,10 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 
-const REPO_ROOT = path.resolve(__dirname, '..');
-const TSC = path.join(REPO_ROOT, 'node_modules', '.bin', 'tsc');
+const TSC_JS = require.resolve('typescript/lib/tsc.js');
 const TSCONFIG = path.join(__dirname, 'tsconfig.types.json');
 
-const tsc = spawnSync(TSC, ['--project', TSCONFIG], { encoding: 'utf8' });
+const tsc = spawnSync(process.execPath, [TSC_JS, '--project', TSCONFIG], { encoding: 'utf8' });
 if (tsc.status !== 0) {
   console.error('FAIL: tsc exited with status', tsc.status);
   if (tsc.stdout) process.stdout.write(tsc.stdout);

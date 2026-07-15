@@ -24,7 +24,7 @@ const { Validator } = require('..');
 const { toTypeScript } = require('../lib/ts-gen');
 
 const FIXTURES_DIR = path.join(__dirname, 'ts_fixtures');
-const TSC_BIN = path.resolve(__dirname, '..', 'node_modules', '.bin', 'tsc');
+const TSC_BIN = require.resolve('typescript/lib/tsc.js');
 
 function toTypeName(name) {
   const cleaned = String(name).replace(/[^A-Za-z0-9_]/g, '_');
@@ -63,7 +63,7 @@ function generate(fixture) {
 }
 
 function compile(fixture) {
-  const result = spawnSync(TSC_BIN, [
+  const result = spawnSync(process.execPath, [TSC_BIN,
     '--target', 'ES2022',
     '--module', 'ESNext',
     '--moduleResolution', 'bundler',

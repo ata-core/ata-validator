@@ -26,7 +26,7 @@ const { toTypeScript } = require('../lib/ts-gen');
 
 const DRAFT = process.env.CORPUS_DRAFT || 'draft2020-12';
 const SUITE_DIR = path.join(__dirname, 'suite', 'tests', DRAFT);
-const TSC_BIN = path.resolve(__dirname, '..', 'node_modules', '.bin', 'tsc');
+const TSC_BIN = require.resolve('typescript/lib/tsc.js');
 const FAIL_BUDGET_PCT = Number(process.env.CORPUS_TS_FAIL_BUDGET || '0');
 const ONLY = process.env.CORPUS_ONLY ? new Set(process.env.CORPUS_ONLY.split(',')) : null;
 
@@ -104,7 +104,7 @@ function runOne(workDir, schema) {
   fs.writeFileSync(path.join(workDir, 'validator.d.mts'), dts);
   fs.writeFileSync(path.join(workDir, 'use.ts'), USE_TS);
 
-  const result = spawnSync(TSC_BIN, [
+  const result = spawnSync(process.execPath, [TSC_BIN,
     '--target', 'ES2022',
     '--module', 'ESNext',
     '--moduleResolution', 'bundler',
