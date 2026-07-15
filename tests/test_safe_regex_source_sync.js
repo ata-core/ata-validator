@@ -10,8 +10,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const engine = fs.readFileSync(path.join(root, 'lib', 'safe-regex.js'), 'utf8');
-const bundled = require(path.join(root, 'lib', 'safe-regex-source'));
+const engine = fs.readFileSync(path.join(root, 'lib', 'safe-regex.js'), 'utf8').replace(/\r\n/g, '\n');
+const bundled = require(path.join(root, 'lib', 'safe-regex-source')).replace(/\r\n/g, '\n');
 
 assert.strictEqual(
   bundled,

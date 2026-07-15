@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const src = fs.readFileSync(path.join(root, 'lib', 'safe-regex.js'), 'utf8');
+const src = fs.readFileSync(path.join(root, 'lib', 'safe-regex.js'), 'utf8').replace(/\r\n/g, '\n');
 
 const out =
   "'use strict';\n\n" +
