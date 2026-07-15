@@ -1,0 +1,24 @@
+# Force LF for all text source files so Windows checkouts don't introduce CRLF.
+* text=auto eol=lf
+
+# Explicit text types
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.cjs  text eol=lf
+*.ts   text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.sh   text eol=lf
+*.lock text eol=lf
+
+# Binary — never mangle
+*.node binary
+prebuilds/** binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.wasm binary
