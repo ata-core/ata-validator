@@ -86,10 +86,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mertcanaltin/ata-validator.git"
+    "url": "git+https://github.com/ata-core/ata-validator.git"
   },
   "bugs": {
-    "url": "https://github.com/mertcanaltin/ata-validator/issues"
+    "url": "https://github.com/ata-core/ata-validator/issues"
   },
   "homepage": "https://ata-validator.com",
   "engines": {
