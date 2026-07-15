@@ -448,6 +448,18 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 
 `email`, `date`, `date-time`, `time`, `uri`, `uri-reference`, `ipv4`, `ipv6`, `uuid`, `hostname`
 
+### Known limitations
+
+The 98.5% Draft 2020-12 pass rate excludes areas that are deliberate scope decisions for 1.x:
+
+- **Remote `$ref` over the network** is not fetched. Register cross-schema refs explicitly with `schemas: [...]` or `addSchema()`.
+- **`$vocabulary`** is not implemented; custom vocabularies are ignored rather than enforced.
+- **`contentEncoding` / `contentMediaType` / `contentSchema`** are annotation-only, as the spec permits, and are not validated.
+- **`minLength`/`maxLength`** count UTF-16 code units, not grapheme clusters.
+- **Infinite-loop detection** suite cases are skipped; circular `$ref` chains are cut off by a recursion depth guard instead.
+
+If one of these blocks you, open an issue; scope decisions get revisited with real use cases.
+
 ## Building from Source
 
 ### Development prerequisites
