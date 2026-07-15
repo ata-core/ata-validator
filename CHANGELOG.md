@@ -2,6 +2,23 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.0.0 - 2026-07-15
+
+1.0 is a stability commitment, not a feature release. The API surface, the error result shape, and the error code registry are now covered by the semver guarantees in [docs/STABILITY.md](docs/STABILITY.md).
+
+### Removed
+
+- `Validator.prototype.toStandalone()` and `Validator.prototype.toStandaloneModule()`, deprecated in 0.22.0. Use `toStandaloneModule()`/`bundleStandalone()`/`bundleCompact()` from `ata-validator/build`. See [docs/migration-to-1.0.md](docs/migration-to-1.0.md).
+
+### Changed
+
+- Node.js 20 or newer is required. Node 18 reached end of life in April 2025.
+
+### Added
+
+- [docs/STABILITY.md](docs/STABILITY.md): semver, deprecation, and error-code guarantees.
+- README "Known limitations" section documenting the deliberate 1.x scope edges.
+
 ## 0.22.0 - 2026-07-14
 
 ### Deprecated
