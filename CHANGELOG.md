@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.0.1 - 2026-07-16
+
+### Fixed
+
+- `version()` reported 0.10.4 on platforms with a native prebuild: the `ATA_VERSION` constant in `include/ata.h` had not been bumped since 0.10.4 and the native answer takes precedence over `lib/version.js`. The header now carries the real version and the version-sync test checks it, so it cannot drift again.
+
 ## 1.0.0 - 2026-07-15
 
 1.0 is a stability commitment, not a feature release. The API surface, the error result shape, and the error code registry are now covered by the semver guarantees in [docs/STABILITY.md](docs/STABILITY.md).
