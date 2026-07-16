@@ -344,6 +344,26 @@ function createPaddedBuffer(jsonStr) {
   return { buffer: padded, length: jsonBuf.length };
 }
 
+// Deep-clone a value, copying own symbol keys by reference at every level.
+// Arrays and plain objects are cloned recursively; primitives, RegExp,
+// functions, and other non-plain values are returned as-is. Symbol values
+// (e.g. refinement lists, OPTIONAL markers) are owned by the caller's builder
+// and sharing them is correct — they are never mutated by normalization.
+function _deepCloneWithSymbols(v) {
+  if (v === null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) {
+    const a = new Array(v.length);
+    for (let i = 0; i < v.length; i++) a[i] = _deepCloneWithSymbols(v[i]);
+    return a;
+  }
+  // Only clone plain objects (skip RegExp, Date, etc.).
+  if (Object.getPrototypeOf(v) !== Object.prototype && Object.getPrototypeOf(v) !== null) return v;
+  const out = Object.create(null);
+  for (const k of Object.keys(v)) Object.defineProperty(out, k, { value: _deepCloneWithSymbols(v[k]), writable: true, enumerable: true, configurable: true });
+  for (const sym of Object.getOwnPropertySymbols(v)) out[sym] = v[sym];
+  return Object.setPrototypeOf(out, Object.prototype);
+}
+
 // Normalize a caller-provided schema without mutating the original.
 // Clones only when normalization would change the object (draft-07 keys
 // present or nullable fields present). Internal-only — not exported.
@@ -353,10 +373,11 @@ function _normalizeCallerSchema(s) {
     s.$schema === 'http://json-schema.org/draft-07/schema'
   )
   const str = JSON.stringify(s)
-  const copy = JSON.parse(str)
+  const copy = _deepCloneWithSymbols(s)
   if (needsDraft7) normalizeDraft7(copy)
   normalizeNullable(copy)
   // Return original when normalization produced no change, copy otherwise.
+  // Change-detection uses JSON content only; symbols do not affect it.
   return JSON.stringify(copy) === str ? s : copy
 }
 

@@ -9,7 +9,8 @@
 // to the validator; the renamed key makes the serializer throw.
 
 const assert = require('assert')
-const { Validator } = require('..')
+const { Validator, validateAsync } = require('..')
+const { t } = require('../t.js')
 
 // Shared fixture used across all cases.
 function makeAsset () {
@@ -111,5 +112,78 @@ function makeAsset () {
     '(d) invalid email accepted — format check through definitions ref broken'
   )
 }
+
+// (e) Refined schema with a nullable field: normalization clones the schema,
+//     but the clone must preserve the Symbol-keyed refinement so that
+//     validateAsync(validatorInstance, data) still enforces it.
+//     The nullable field forces _normalizeCallerSchema to produce a clone
+//     (nullable gets rewritten to type array), so this directly exercises the
+//     symbol-stripping bug.
+;(async () => {
+  const S = t.refine(
+    t.object({ n: t.integer({ nullable: true }) }),
+    async (v) => v.n >= 0,
+    { message: 'n must be non-negative', path: '/n' }
+  )
+
+  const v = new Validator(S)
+
+  // The stored _schemaObj must be a clone (normalization changed nullable).
+  assert.notStrictEqual(
+    v._schemaObj, S,
+    '(e) _schemaObj should be a clone when normalization changes the schema'
+  )
+
+  // n=-1 is structurally valid (integer, nullable covered) but fails the
+  // refinement. With the bug the refinement is silently skipped and the
+  // result is valid=true. After the fix it must be invalid.
+  const bad = await validateAsync(v, { n: -1 })
+  assert.strictEqual(
+    bad.valid, false,
+    `(e) refinement skipped after normalization: n=-1 must be invalid but got valid=${bad.valid}`
+  )
+  assert.ok(
+    bad.errors && bad.errors.some((e) => e.message === 'n must be non-negative'),
+    `(e) expected refinement error message, got: ${JSON.stringify(bad.errors)}`
+  )
+
+  // n=5 satisfies both the structure and the refinement.
+  const good = await validateAsync(v, { n: 5 })
+  assert.strictEqual(
+    good.valid, true,
+    `(e) n=5 must be valid, got: ${JSON.stringify(good.errors)}`
+  )
+
+  console.log('ok (e): refinement symbol survives normalization clone')
+})().catch((e) => { console.error(e); process.exit(1) })
+
+// (f) OPTIONAL symbol survives normalization: a t.optional field in a schema
+//     that triggers normalization must still be treated as optional after
+//     construction (missing property validates).
+;(async () => {
+  // The nullable on the sibling field forces normalization to clone the schema.
+  const S = t.object({
+    n: t.integer({ nullable: true }),
+    x: t.optional(t.string()),
+  })
+
+  const v = new Validator(S)
+
+  // x is optional — omitting it must be valid.
+  const withoutX = v.validate({ n: 1 })
+  assert.strictEqual(
+    withoutX.valid, true,
+    `(f) omitting optional x must be valid, got: ${JSON.stringify(withoutX.errors)}`
+  )
+
+  // x present is also valid.
+  const withX = v.validate({ n: 1, x: 'hello' })
+  assert.strictEqual(
+    withX.valid, true,
+    `(f) x present must be valid, got: ${JSON.stringify(withX.errors)}`
+  )
+
+  console.log('ok (f): OPTIONAL symbol survives normalization clone')
+})().catch((e) => { console.error(e); process.exit(1) })
 
 console.log('ok: caller-provided schema objects are not mutated during compilation')
