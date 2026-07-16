@@ -12,12 +12,16 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: x64
+            target: linux-x64-gnu
           - os: ubuntu-24.04-arm
             arch: arm64
+            target: linux-arm64-gnu
           - os: macos-latest
             arch: arm64
+            target: darwin-arm64
           - os: windows-latest
             arch: x64
+            target: win32-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -62,8 +66,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Prebuild
-        run: npm run prebuild
+      - name: Build native addon
+        run: npm run build
 
       # `strip -Sx` rewrites the Mach-O and invalidates the ad-hoc signature
       # the linker applied. arm64 macOS refuses to load unsigned code, so the
@@ -71,16 +75,17 @@ jobs:
       - name: Re-sign and verify macOS prebuild
         if: runner.os == 'macOS'
         run: |
-          for f in prebuilds/*/node-napi-v10.node; do
-            codesign --force --sign - "$f"
-            codesign --verify --verbose "$f"
-          done
+          codesign --force --sign - build/Release/ata.node
+          codesign --verify --verbose build/Release/ata.node
 
-      - name: Upload prebuilds
+      - name: Assemble native package
+        run: node scripts/make-native-package.js --binary build/Release/ata.node --target ${{ matrix.target }} --out native-packages
+
+      - name: Upload native package
         uses: actions/upload-artifact@v4
         with:
-          name: prebuild-${{ matrix.os }}-${{ matrix.arch }}
-          path: prebuilds/
+          name: native-pkg-${{ matrix.target }}
+          path: native-packages/
 
   prebuild-musl:
     runs-on: ubuntu-latest
@@ -90,8 +95,10 @@ jobs:
         include:
           - arch: x64
             platform: linux/amd64
+            target: linux-x64-musl
           - arch: arm64
             platform: linux/arm64
+            target: linux-arm64-musl
     steps:
       - uses: actions/checkout@v4
 
@@ -105,14 +112,21 @@ jobs:
             node:22-alpine sh -c "
               apk add --no-cache git python3 make g++ cmake re2-dev abseil-cpp-dev linux-headers &&
               npm install &&
-              npx pkg-prebuilds-copy --baseDir build/Release --source ata.node --name=ata --strip --napi_version=10 --libc=musl
+              npx cmake-js build --target ata
             "
 
-      - name: Upload prebuilds
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Assemble native package
+        run: node scripts/make-native-package.js --binary build/Release/ata.node --target ${{ matrix.target }} --out native-packages
+
+      - name: Upload native package
         uses: actions/upload-artifact@v4
         with:
-          name: prebuild-linux-musl-${{ matrix.arch }}
-          path: prebuilds/
+          name: native-pkg-${{ matrix.target }}
+          path: native-packages/
 
   publish:
     needs: [prebuild, prebuild-musl]
@@ -134,19 +148,26 @@ jobs:
       - name: Install dependencies
         run: npm install --ignore-scripts
 
-      - name: Download all prebuilds
+      - name: Download native packages
         uses: actions/download-artifact@v4
         with:
-          path: prebuilds/
-          pattern: prebuild-*
+          path: native-packages/
+          pattern: native-pkg-*
           merge-multiple: true
 
-      - name: List prebuilds
+      - name: Publish native packages
         run: |
-          echo "=== Prebuild contents ==="
-          find prebuilds -type f -name "*.node"
-          echo "=== Total size ==="
-          du -sh prebuilds/
+          VERSION=$(node -p "require('./package.json').version")
+          for dir in native-packages/native-*; do
+            (cd "$dir" && npm publish --access public)
+          done
+          for t in darwin-arm64 linux-x64-gnu linux-arm64-gnu linux-x64-musl linux-arm64-musl win32-x64; do
+            for i in $(seq 1 30); do
+              npm view "@ata-validator/native-$t@$VERSION" version > /dev/null 2>&1 && break
+              [ "$i" = "30" ] && { echo "native-$t@$VERSION not visible after 5 minutes"; exit 1; }
+              sleep 10
+            done
+          done
 
-      - name: Publish to npm
+      - name: Publish core
         run: npm publish
