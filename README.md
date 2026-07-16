@@ -14,6 +14,14 @@ npm install --save-dev ata-validator
 npx ata build 'schemas/*.json' --out-dir src/generated
 ```
 
+The `ata-validator` package itself is pure JavaScript. The native accelerator (simdjson parsing, parallel NDJSON, buffer APIs) ships as per-platform optional packages that npm installs automatically where they fit, the same pattern Vite uses for esbuild. For a guaranteed zero-binary install:
+
+```bash
+npm install ata-validator --omit=optional
+```
+
+or set `ATA_NO_NATIVE=1` at runtime. Validation behavior is identical either way; the buffer and parallel APIs simply report that they need the native engine.
+
 In your code:
 
 ```ts
@@ -461,6 +469,8 @@ The 98.5% Draft 2020-12 pass rate excludes areas that are deliberate scope decis
 If one of these blocks you, open an issue; scope decisions get revisited with real use cases.
 
 ## Building from Source
+
+This section applies to contributors building the repository. Regular `npm install` users need not have a C++ toolchain.
 
 ### Development prerequisites
 

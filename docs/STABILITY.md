@@ -38,6 +38,6 @@ ata-validator targets JSON Schema Draft 2020-12 (plus Draft 7) and passes 98.5% 
 
 ## Platform support
 
-Native prebuilds ship for Linux x64/arm64 (glibc and musl), macOS arm64, and Windows x64. On any other platform the package installs and runs on the pure-JS engine; the buffer-based APIs that require the native addon say so in their documentation and error clearly.
+Native prebuilds ship as `@ata-validator/native-*` optional packages for linux x64/arm64 (glibc and musl), macOS arm64, and windows x64. Every other platform runs the pure-JS engine. The core package contains no binaries.
 
 Node.js 20 or newer is required as of 1.0.0.

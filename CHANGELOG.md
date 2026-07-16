@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.1.0 - <set on release day>
+
+### Changed
+
+- The `ata-validator` package is now pure JavaScript: no bundled binaries, no vendored C++ sources, no install script. The native engine moved to per-platform `@ata-validator/native-*` packages, installed automatically as optional dependencies (the same pattern Vite uses for esbuild). The tarball shrinks from ~5.3 MB to under 300 KB. `npm install --omit=optional` or `ATA_NO_NATIVE=1` gives a guaranteed zero-binary setup with identical validation behavior.
+
 ## 1.0.2 - 2026-07-17
 
 ### Fixed
