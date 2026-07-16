@@ -41,14 +41,13 @@
     "./lib/native-load.js": "./lib/native-load.browser.js"
   },
   "scripts": {
-    "install": "node scripts/install.js",
-    "prepublishOnly": "node scripts/regen-safe-regex-source.js && node scripts/check-prebuilds.js && ATA_ALLOW_DOC_PLACEHOLDERS=1 node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js && node tests/test_safe_regex_source_sync.js && node tests/test_version_sync.js",
-    "release:check": "node scripts/regen-safe-regex-source.js && node scripts/check-prebuilds.js && node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js && node tests/test_safe_regex_source_sync.js && node tests/test_version_sync.js",
+    "prepublishOnly": "node scripts/regen-safe-regex-source.js && node tests/test_pack_purity.js && ATA_ALLOW_DOC_PLACEHOLDERS=1 node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js && node tests/test_safe_regex_source_sync.js && node tests/test_version_sync.js",
+    "release:check": "node scripts/regen-safe-regex-source.js && node tests/test_pack_purity.js && node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js && node tests/test_safe_regex_source_sync.js && node tests/test_version_sync.js",
     "build": "cmake-js build --target ata",
     "rebuild": "cmake-js rebuild --target ata",
     "prebuild": "pkg-prebuilds-copy --baseDir build/Release --source ata.node --name=ata --strip --napi_version=10",
     "prebuild-all": "npm run prebuild -- --arch x64 && npm run prebuild -- --arch arm64",
-    "test": "node test.js && node tests/test_removed_aot_methods.js && node tests/test_no_native.js && node tests/test_native_load_order.js && node tests/test_browser_nofs.js && node tests/test_browser_imports_guard.js && node tests/test_version_sync.js && node tests/test_safe_regex_source_sync.js && node tests/test_t_builder.js && node tests/test_async_refine.js && node tests/test_safe_regex.js && node tests/test_safe_regex_integration.js && node tests/test_aot_build.js && node tests/test_aot_differential.js && node tests/test_aot_cli_build.js && node tests/test_aot_cli_smoke.js && node tests/test_bundle_standalone.js && node tests/test_standalone_anyof.js && node tests/test_standalone_formats.js && node tests/test_aot_additional_props_errors.js && node tests/test_id_anchor_refs.js && node tests/test_defs_pointer_alias.js && node tests/test_no_input_mutation.js && node tests/test_typed_validator_runner.js && node tests/test_define_schema.js && node tests/test_error_codes_lock.js && node tests/test_nullable.js && node tests/test_validate_and_parse.js && node tests/test_validate_data.js && node tests/test_enrich_error.js && node tests/test_rich_errors_optout.js && node tests/test_error_messages.js && node tests/test_source_positions.js && node tests/fuzz_positions.js && node tests/test_data_positions.js && node tests/test_render_shared.js && node tests/test_renderers.js && node tests/test_runtime_error_dx.js && node tests/test_aot_error_dx.js && node tests/test_abort_early.js && node tests/test_branch_collapse.js && node tests/test_suggestions.js && node tests/test_cli_validate.js && node tests/test_cli_version.js && node benchmark/bench_aot_size.mjs",
+    "test": "node test.js && node tests/test_removed_aot_methods.js && node tests/test_no_native.js && node tests/test_native_load_order.js && node tests/test_pack_purity.js && node tests/test_browser_nofs.js && node tests/test_browser_imports_guard.js && node tests/test_version_sync.js && node tests/test_safe_regex_source_sync.js && node tests/test_t_builder.js && node tests/test_async_refine.js && node tests/test_safe_regex.js && node tests/test_safe_regex_integration.js && node tests/test_aot_build.js && node tests/test_aot_differential.js && node tests/test_aot_cli_build.js && node tests/test_aot_cli_smoke.js && node tests/test_bundle_standalone.js && node tests/test_standalone_anyof.js && node tests/test_standalone_formats.js && node tests/test_aot_additional_props_errors.js && node tests/test_id_anchor_refs.js && node tests/test_defs_pointer_alias.js && node tests/test_no_input_mutation.js && node tests/test_typed_validator_runner.js && node tests/test_define_schema.js && node tests/test_error_codes_lock.js && node tests/test_nullable.js && node tests/test_validate_and_parse.js && node tests/test_validate_data.js && node tests/test_enrich_error.js && node tests/test_rich_errors_optout.js && node tests/test_error_messages.js && node tests/test_source_positions.js && node tests/fuzz_positions.js && node tests/test_data_positions.js && node tests/test_render_shared.js && node tests/test_renderers.js && node tests/test_runtime_error_dx.js && node tests/test_aot_error_dx.js && node tests/test_abort_early.js && node tests/test_branch_collapse.js && node tests/test_suggestions.js && node tests/test_cli_validate.js && node tests/test_cli_version.js && node benchmark/bench_aot_size.mjs",
     "bench:size": "node benchmark/bench_aot_size.mjs",
     "test:suite": "node tests/run_suite.js",
     "test:compat": "node tests/test_compat.js",
@@ -110,22 +109,18 @@
     "t.js",
     "t.mjs",
     "t.d.ts",
-    "binding-options.js",
-    "binding/",
-    "include/",
-    "src/",
-    "deps/",
-    "prebuilds/",
-    "scripts/",
-    "CMakeLists.txt",
+    "bin/",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
-  "dependencies": {
-    "node-addon-api": "^8.7.0",
-    "node-api-headers": "^1.8.0",
-    "pkg-prebuilds": "^1.0.0"
+  "optionalDependencies": {
+    "@ata-validator/native-darwin-arm64": "1.1.0",
+    "@ata-validator/native-linux-x64-gnu": "1.1.0",
+    "@ata-validator/native-linux-arm64-gnu": "1.1.0",
+    "@ata-validator/native-linux-x64-musl": "1.1.0",
+    "@ata-validator/native-linux-arm64-musl": "1.1.0",
+    "@ata-validator/native-win32-x64": "1.1.0"
   },
   "peerDependencies": {
     "yaml": "^2.0.0"
