@@ -480,7 +480,7 @@ Native builds require C/C++ toolchain support and the following libraries:
 - `abseil`
 - `mimalloc`
 
-Install them before running `npm install` / `npm run build`:
+Install them before running `npm run build`:
 
 ```bash
 # macOS (Homebrew)
