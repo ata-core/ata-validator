@@ -344,22 +344,36 @@ function createPaddedBuffer(jsonStr) {
   return { buffer: padded, length: jsonBuf.length };
 }
 
+// Normalize a caller-provided schema without mutating the original.
+// Clones only when normalization would change the object (draft-07 keys
+// present or nullable fields present). Internal-only — not exported.
+function _normalizeCallerSchema(s) {
+  const needsDraft7 = s && s.$schema && (
+    s.$schema === 'http://json-schema.org/draft-07/schema#' ||
+    s.$schema === 'http://json-schema.org/draft-07/schema'
+  )
+  const str = JSON.stringify(s)
+  const copy = JSON.parse(str)
+  if (needsDraft7) normalizeDraft7(copy)
+  normalizeNullable(copy)
+  // Return original when normalization produced no change, copy otherwise.
+  return JSON.stringify(copy) === str ? s : copy
+}
+
 function buildSchemaMap(schemas) {
   if (!schemas) return null
   const map = new Map()
   if (Array.isArray(schemas)) {
     for (const s of schemas) {
-      normalizeDraft7(s)
-      normalizeNullable(s)
-      const id = s.$id
+      const normalized = _normalizeCallerSchema(s)
+      const id = normalized.$id
       if (!id) throw new Error('Schema in schemas option must have $id')
-      map.set(id, s)
+      map.set(id, normalized)
     }
   } else {
     for (const [key, s] of Object.entries(schemas)) {
-      normalizeDraft7(s)
-      normalizeNullable(s)
-      map.set(s.$id || key, s)
+      const normalized = _normalizeCallerSchema(s)
+      map.set(normalized.$id || key, normalized)
     }
   }
   return map
@@ -449,7 +463,6 @@ function resolveSchemaForPreprocess(schema, schemaMap) {
 class Validator {
   constructor(schema, opts) {
     const options = opts || {};
-    const schemaObj = typeof schema === "string" ? JSON.parse(schema) : schema;
 
     // Ultra-fast path: same schema object reference -> return cached instance
     // JS constructor returning an object makes `new` return that object
@@ -459,10 +472,12 @@ class Validator {
       if (hit) return hit;
     }
 
-    // Draft 7 normalization — convert keywords to 2020-12 equivalents in-place
-    normalizeDraft7(schemaObj);
-    // OpenAPI nullable -> type union with 'null'
-    normalizeNullable(schemaObj);
+    // When schema is a string, JSON.parse already produces a fresh object.
+    // When schema is an object, normalization runs on a clone so the caller's
+    // object is never touched.
+    const schemaObj = typeof schema === "string"
+      ? JSON.parse(schema)
+      : _normalizeCallerSchema(schema);
 
     this._schemaStr = null; // lazy: computed on first use
     this._schemaObj = schemaObj;
@@ -1132,10 +1147,9 @@ class Validator {
     if (!schema || !schema.$id) {
       throw new Error('Schema must have $id')
     }
-    // Apply Draft 7 normalization if needed
-    normalizeDraft7(schema)
-    normalizeNullable(schema)
-    this._schemaMap.set(schema.$id, schema)
+    // Normalize a copy so the caller's object is never mutated.
+    const normalized = _normalizeCallerSchema(schema)
+    this._schemaMap.set(normalized.$id, normalized)
   }
 
   _ensureCodegen() {
