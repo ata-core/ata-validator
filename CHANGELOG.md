@@ -2,6 +2,14 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.0.2 - 2026-07-17
+
+### Fixed
+
+- Cross-schema `$ref` pointers into `#/definitions/...` resolved to nothing after draft-07 normalization renamed the target to `$defs`, and the generated validator silently accepted invalid data. The pointer walk now treats `definitions` and `$defs` as aliases.
+- Schemas passed by the caller (the `schemas` option, `addSchema()`, and the root schema) were normalized in place, mutating objects the caller still owns. Anyone reusing those objects afterwards, such as Fastify handing the same shared schema to its serializer, saw corrupted keys. Normalization now works on a copy; caller objects are never touched.
+- The new copy preserves symbol-keyed markers, so `t.refine` refinements survive normalization and `validateAsync` keeps enforcing them.
+
 ## 1.0.1 - 2026-07-16
 
 ### Fixed
