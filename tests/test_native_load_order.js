@@ -34,7 +34,8 @@ const mismatch = spawnSync(process.execPath, ['-e', `
   const fakeName = require(${JSON.stringify(path.join(__dirname, '..', 'lib', 'native-load.js'))}).nativePackageName(process.platform, process.arch, false);
   Module._load = function (request, ...rest) {
     if (fakeName && request === fakeName) return { version: () => '0.0.1-fake' };
-    if (request.includes('build/Release')) throw new Error('no dev build in this test');
+    // Path separator differs per platform; match both so Windows blocks too.
+    if (/build[\\\\\\/]Release/.test(request)) throw new Error('no dev build in this test');
     return orig.call(this, request, ...rest);
   };
   const warnings = [];
