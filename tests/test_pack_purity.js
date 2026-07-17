@@ -12,7 +12,10 @@ const root = path.join(__dirname, '..');
 // execSync (shell) rather than execFileSync: on Windows npm is npm.cmd,
 // which cannot be spawned directly. The command is a static string.
 const out = execSync('npm pack --dry-run --json', { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-const manifest = JSON.parse(out)[0];
+// npm <=11 prints an array of manifests, npm 12 an object keyed by package name
+const parsed = JSON.parse(out);
+const manifest = Array.isArray(parsed) ? parsed[0] : parsed[Object.keys(parsed)[0]];
+assert.ok(manifest && manifest.files, `unrecognized npm pack --json output: ${out.slice(0, 200)}`);
 const files = manifest.files.map((f) => f.path);
 
 const forbidden = [
