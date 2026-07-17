@@ -203,7 +203,7 @@ export interface TRequiredAll<S extends TObjectLike> extends JSONSchema {
 export interface TRequiredWith<S extends TObjectLike, K extends ReadonlyArray<string>> extends JSONSchema {
   type: 'object';
   properties: S['properties'];
-  required: ReadonlyArray<Extract<ReqUnion<S> | K[number], keyof S['properties']>>;
+  required: ReadonlyArray<Extract<ReqUnion<S> | K[number], Extract<keyof S['properties'], string>>>;
 }
 
 type MergeProps<A, B> = { [K in Extract<keyof A | keyof B, string>]: K extends keyof B ? B[K] : K extends keyof A ? A[K] : never };
@@ -264,6 +264,13 @@ export interface TBuilder {
 
   composite<const S extends ReadonlyArray<TObjectLike>>(schemas: S, opts?: ObjectOptions): TComposite<S>;
 
+  /**
+   * Build a recursive (self-referential) schema. The `self` argument passed to
+   * `build` is a `$ref` pointing to `#/$defs/self`, and the emitted schema
+   * routes through the interpreted engine at runtime. Nesting `t.recursive`
+   * inside itself is unsupported: both layers would claim `#/$defs/self` and
+   * the inner definition would silently overwrite the outer one.
+   */
   recursive<S extends JSONSchema>(build: (self: TSelf) => S, opts?: { title?: string; description?: string }): TRecursive<S>;
 
   any(): TAny;
