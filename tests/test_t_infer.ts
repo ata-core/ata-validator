@@ -107,6 +107,16 @@ type Strict = Infer<typeof strict>;
 const _required: Expect<Strict, { id: number; email: string }> = true;
 void _required;
 
+// --- composite ---
+{
+  const A = t.object({ id: t.integer(), tag: t.string() });
+  const B = t.object({ tag: t.integer(), name: t.optional(t.string()) });
+  const AB = t.composite([A, B]);
+  type AB = Infer<typeof AB>;
+  const _composite: Expect<AB, { id: number; tag: number; name?: string }> = true;
+  void _composite;
+}
+
 // --- Validator constructor accepts builder output and narrows ---
 const v = new Validator(user);
 const r = v.validate({ id: 1, name: 'a' });

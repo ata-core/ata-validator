@@ -206,6 +206,26 @@ export interface TRequiredWith<S extends TObjectLike, K extends ReadonlyArray<st
   required: ReadonlyArray<Extract<ReqUnion<S> | K[number], keyof S['properties']>>;
 }
 
+type MergeProps<A, B> = { [K in Extract<keyof A | keyof B, string>]: K extends keyof B ? B[K] : K extends keyof A ? A[K] : never };
+
+type CompositeProps<S extends ReadonlyArray<TObjectLike>> =
+  S extends readonly [] ? {} :
+  S extends readonly [infer H extends TObjectLike, ...infer R extends ReadonlyArray<TObjectLike>]
+    ? MergeProps<H['properties'], CompositeProps<R>>
+    : Record<string, JSONSchema>;
+
+type CompositeReq<S extends ReadonlyArray<TObjectLike>> =
+  S extends readonly [] ? never :
+  S extends readonly [infer H extends TObjectLike, ...infer R extends ReadonlyArray<TObjectLike>]
+    ? ReqUnion<H> | CompositeReq<R>
+    : never;
+
+export interface TComposite<S extends ReadonlyArray<TObjectLike>> extends JSONSchema {
+  type: 'object';
+  properties: CompositeProps<S>;
+  required: ReadonlyArray<Extract<CompositeReq<S>, string>>;
+}
+
 export interface TBuilder {
   string(opts?: StringOptions): TString;
   number(opts?: NumericOptions): TNumber;
@@ -234,6 +254,8 @@ export interface TBuilder {
   partial<const S extends TObjectLike>(schema: S): TPartial<S>;
   required<const S extends TObjectLike>(schema: S): TRequiredAll<S>;
   required<const S extends TObjectLike, const K extends ReadonlyArray<Extract<keyof S['properties'], string>>>(schema: S, keys: K): TRequiredWith<S, K>;
+
+  composite<const S extends ReadonlyArray<TObjectLike>>(schemas: S, opts?: ObjectOptions): TComposite<S>;
 
   any(): TAny;
   unknown(): TAny;

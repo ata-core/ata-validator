@@ -219,5 +219,25 @@ ok('t.partial and t.required', () => {
   assert.strictEqual(v2.validate({ id: 1, name: 'a' }).valid, false, 'email now required');
 });
 
+// --- composite ---
+ok('t.composite merges properties, later schema wins, required is dedup union filtered to final props', () => {
+  const A = t.object({ id: t.integer(), tag: t.string() });
+  const B = t.object({ tag: t.integer(), name: t.optional(t.string()) });
+
+  const AB = t.composite([A, B], { additionalProperties: false });
+  assert.deepStrictEqual(Object.keys(AB.properties), ['id', 'tag', 'name']);
+  assert.strictEqual(AB.properties.tag.type, 'integer', 'later schema wins on key conflict');
+  assert.deepStrictEqual(AB.required, ['id', 'tag'], 'required is the union, dedup, filtered');
+  assert.strictEqual(AB.additionalProperties, false, 'options come from the opts param');
+  assert.ok(!('title' in AB), 'source options are not merged');
+
+  assert.deepStrictEqual(Object.keys(A.properties), ['id', 'tag'], 'inputs not mutated');
+  assert.throws(() => t.composite([A, t.string()]), /t\.composite: expected an object schema/);
+
+  const v = new Validator(AB);
+  assert.strictEqual(v.validate({ id: 1, tag: 2 }).valid, true);
+  assert.strictEqual(v.validate({ id: 1, tag: 'x' }).valid, false, 'conflict resolved to integer');
+});
+
 console.log(`\n${failed === 0 ? 'ok' : 'FAILED'}: t builder behaviour`);
 process.exit(failed > 0 ? 1 : 0);
