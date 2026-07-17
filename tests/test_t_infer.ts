@@ -72,6 +72,28 @@ type Headers = Infer<typeof headers>;
 const _headers: Expect<Headers, Record<string, string>> = true;
 void _headers;
 
+// --- pick / omit ---
+{
+  const User = t.object({
+    id: t.integer(),
+    name: t.string(),
+    email: t.optional(t.string()),
+  });
+
+  const IdName = t.pick(User, ['id', 'name']);
+  type IdName = Infer<typeof IdName>;
+  const _pick: Expect<IdName, { id: number; name: string }> = true;
+  void _pick;
+
+  const NoId = t.omit(User, ['id']);
+  type NoId = Infer<typeof NoId>;
+  const _omit: Expect<NoId, { name: string; email?: string }> = true;
+  void _omit;
+
+  // @ts-expect-error unknown key rejected at the type level
+  t.pick(User, ['nope']);
+}
+
 // --- Validator constructor accepts builder output and narrows ---
 const v = new Validator(user);
 const r = v.validate({ id: 1, name: 'a' });

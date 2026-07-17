@@ -167,6 +167,27 @@ export interface TRef extends JSONSchema { $ref: string }
 export interface TAny extends JSONSchema {}
 export interface TNever extends JSONSchema { not: {} }
 
+/** Any object schema the modifier combinators accept. */
+export interface TObjectLike extends JSONSchema {
+  type: 'object';
+  properties: Record<string, JSONSchema>;
+  required?: ReadonlyArray<string>;
+}
+
+type ReqUnion<S> = S extends { required: ReadonlyArray<infer R> } ? R : never;
+
+export interface TPick<S extends TObjectLike, K extends ReadonlyArray<string>> extends JSONSchema {
+  type: 'object';
+  properties: { [P in Extract<keyof S['properties'], K[number]>]: S['properties'][P] };
+  required: ReadonlyArray<Extract<ReqUnion<S>, K[number]>>;
+}
+
+export interface TOmit<S extends TObjectLike, K extends ReadonlyArray<string>> extends JSONSchema {
+  type: 'object';
+  properties: { [P in Exclude<Extract<keyof S['properties'], string>, K[number]>]: S['properties'][P] };
+  required: ReadonlyArray<Exclude<Extract<ReqUnion<S>, string>, K[number]>>;
+}
+
 export interface TBuilder {
   string(opts?: StringOptions): TString;
   number(opts?: NumericOptions): TNumber;
@@ -188,6 +209,9 @@ export interface TBuilder {
   union<const S extends ReadonlyArray<JSONSchema>>(schemas: S): TUnion<S>;
   intersect<const S extends ReadonlyArray<JSONSchema>>(schemas: S): TIntersect<S>;
   ref(pointer: string): TRef;
+
+  pick<const S extends TObjectLike, const K extends ReadonlyArray<Extract<keyof S['properties'], string>>>(schema: S, keys: K): TPick<S, K>;
+  omit<const S extends TObjectLike, const K extends ReadonlyArray<Extract<keyof S['properties'], string>>>(schema: S, keys: K): TOmit<S, K>;
 
   any(): TAny;
   unknown(): TAny;

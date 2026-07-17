@@ -148,5 +148,45 @@ ok('t.tuple closes the tail', () => {
   assert.strictEqual(v.validate(['a']).valid, false, 'missing element rejected');
 });
 
+// --- pick / omit ---
+ok('t.pick selects properties and required subset', () => {
+  const User = t.object({
+    id: t.integer(),
+    name: t.string({ minLength: 1 }),
+    email: t.optional(t.string({ format: 'email' })),
+  }, { additionalProperties: false, title: 'User' });
+
+  const IdName = t.pick(User, ['id', 'name']);
+  assert.deepStrictEqual(Object.keys(IdName.properties), ['id', 'name']);
+  assert.deepStrictEqual(IdName.required, ['id', 'name']);
+  assert.strictEqual(IdName.additionalProperties, false, 'pick preserves other keywords');
+  assert.strictEqual(IdName.title, 'User');
+
+  const NoId = t.omit(User, ['id']);
+  assert.deepStrictEqual(Object.keys(NoId.properties), ['name', 'email']);
+  assert.deepStrictEqual(NoId.required, ['name'], 'omit drops picked-away required entries');
+
+  // required disappears when the subset has no required keys
+  const OnlyEmail = t.pick(User, ['email']);
+  assert.ok(!('required' in OnlyEmail), 'no empty required array');
+
+  // unknown keys are ignored at runtime
+  const Loose = t.pick(User, ['id', 'nope']);
+  assert.deepStrictEqual(Object.keys(Loose.properties), ['id']);
+
+  // inputs are not mutated
+  assert.deepStrictEqual(Object.keys(User.properties), ['id', 'name', 'email']);
+  assert.deepStrictEqual(User.required, ['id', 'name']);
+
+  // non-object schemas throw
+  assert.throws(() => t.pick(t.string(), ['x']), /t\.pick: expected an object schema/);
+  assert.throws(() => t.omit(t.union([t.string()]), ['x']), /t\.omit: expected an object schema/);
+
+  // the output validates like plain JSON Schema
+  const v = new Validator(IdName);
+  assert.strictEqual(v.validate({ id: 1, name: 'a' }).valid, true);
+  assert.strictEqual(v.validate({ id: 1 }).valid, false, 'name still required after pick');
+});
+
 console.log(`\n${failed === 0 ? 'ok' : 'FAILED'}: t builder behaviour`);
 process.exit(failed > 0 ? 1 : 0);
