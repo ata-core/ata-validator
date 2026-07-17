@@ -6,7 +6,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Added
 
-- TypeBox-style modifier combinators on `ata-validator/t`: `t.pick`, `t.omit`, `t.partial`, `t.required`, `t.composite`, and `t.recursive`. All six emit plain JSON Schema, so `Infer`, the runtime validator, and the AOT pipeline consume them with no adapter. This closes the authoring-parity gap for TypeBox migrations.
+- TypeBox-style modifier combinators on `ata-validator/t`: `t.pick`, `t.omit`, `t.partial`, `t.required`, `t.composite`, and `t.recursive`. All six emit plain JSON Schema, so `Infer`, the runtime validator, and the AOT pipeline consume them with no adapter. This closes the authoring-parity gap for TypeBox migrations. Note: `t.recursive` schemas validate through the interpreted engine and are not AOT-precompilable; the other five combinators AOT-compile like any schema.
 
 ### Changed
 

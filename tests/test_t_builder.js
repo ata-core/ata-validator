@@ -256,5 +256,32 @@ ok('t.recursive emits $ref + $defs.self + opts', () => {
   assert.strictEqual(v.validate({ value: 1, next: { value: 2, next: { value: 3 } } }).valid, true);
 });
 
+ok('t.recursive without opts validates nested schemas (interpreted engine)', () => {
+  const schema = t.recursive((self) => t.object({
+    value: t.integer(),
+    next: t.optional(self),
+  }));
+  // No title/description opts — must still route to the interpreted engine
+  // because the schema contains a cyclic local $defs ref.
+  const v = new Validator(schema);
+  assert.strictEqual(v.validate({ value: 1, next: { value: 2 } }).valid, true, 'valid depth-2 accepted');
+  assert.strictEqual(v.validate({ value: 1, next: { value: 'x' } }).valid, false, 'invalid depth-2 rejected');
+  assert.strictEqual(v.validate({ value: 1, next: { value: 2, next: { value: 3 } } }).valid, true, 'valid depth-3 accepted');
+});
+
+ok('non-recursive local $defs ref still AOT-compiles', () => {
+  // A schema with a non-cyclic local $defs ref must keep compiling via codegen.
+  const schema = {
+    $defs: { Name: { type: 'string', minLength: 1 } },
+    type: 'object',
+    properties: { name: { $ref: '#/$defs/Name' } },
+    required: ['name'],
+  };
+  const v = new Validator(schema);
+  assert.strictEqual(v.validate({ name: 'alice' }).valid, true);
+  assert.strictEqual(v.validate({ name: '' }).valid, false, 'minLength enforced via $defs ref');
+  assert.strictEqual(v.validate({ name: 42 }).valid, false, 'type enforced via $defs ref');
+});
+
 console.log(`\n${failed === 0 ? 'ok' : 'FAILED'}: t builder behaviour`);
 process.exit(failed > 0 ? 1 : 0);
