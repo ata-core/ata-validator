@@ -117,6 +117,18 @@ void _required;
   void _composite;
 }
 
+// --- recursive ---
+{
+  const Node = t.recursive((self) => t.object({ value: t.integer(), next: t.optional(self) }));
+  type Node = Infer<typeof Node>;
+  type Assert<T extends true> = T;
+  type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+  type _value = Assert<Equal<Node['value'], number>>;
+  type _next = Assert<Equal<NonNullable<Node['next']>['value'], number>>;
+  void (null as unknown as _value);
+  void (null as unknown as _next);
+}
+
 // --- Validator constructor accepts builder output and narrows ---
 const v = new Validator(user);
 const r = v.validate({ id: 1, name: 'a' });

@@ -226,6 +226,13 @@ export interface TComposite<S extends ReadonlyArray<TObjectLike>> extends JSONSc
   required: ReadonlyArray<Extract<CompositeReq<S>, string>>;
 }
 
+export interface TSelf extends JSONSchema { $ref: '#/$defs/self' }
+
+export interface TRecursive<S extends JSONSchema> extends JSONSchema {
+  $ref: '#/$defs/self';
+  $defs: { self: S };
+}
+
 export interface TBuilder {
   string(opts?: StringOptions): TString;
   number(opts?: NumericOptions): TNumber;
@@ -256,6 +263,8 @@ export interface TBuilder {
   required<const S extends TObjectLike, const K extends ReadonlyArray<Extract<keyof S['properties'], string>>>(schema: S, keys: K): TRequiredWith<S, K>;
 
   composite<const S extends ReadonlyArray<TObjectLike>>(schemas: S, opts?: ObjectOptions): TComposite<S>;
+
+  recursive<S extends JSONSchema>(build: (self: TSelf) => S, opts?: { title?: string; description?: string }): TRecursive<S>;
 
   any(): TAny;
   unknown(): TAny;

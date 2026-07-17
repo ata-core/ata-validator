@@ -239,5 +239,22 @@ ok('t.composite merges properties, later schema wins, required is dedup union fi
   assert.strictEqual(v.validate({ id: 1, tag: 'x' }).valid, false, 'conflict resolved to integer');
 });
 
+// --- recursive ---
+ok('t.recursive emits $ref + $defs.self + opts', () => {
+  const Node = t.recursive((self) => t.object({
+    value: t.integer(),
+    next: t.optional(self),
+  }), { title: 'Node' });
+
+  assert.strictEqual(Node.$ref, '#/$defs/self');
+  assert.strictEqual(Node.title, 'Node');
+  assert.strictEqual(Node.$defs.self.properties.next.$ref, '#/$defs/self');
+
+  const v = new Validator(Node);
+  assert.strictEqual(v.validate({ value: 1, next: { value: 2 } }).valid, true);
+  assert.strictEqual(v.validate({ value: 1, next: { value: 'x' } }).valid, false, 'nested level enforced');
+  assert.strictEqual(v.validate({ value: 1, next: { value: 2, next: { value: 3 } } }).valid, true);
+});
+
 console.log(`\n${failed === 0 ? 'ok' : 'FAILED'}: t builder behaviour`);
 process.exit(failed > 0 ? 1 : 0);
