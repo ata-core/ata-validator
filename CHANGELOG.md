@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## 1.1.0 - <set on release day>
 
+### Added
+
+- TypeBox-style modifier combinators on `ata-validator/t`: `t.pick`, `t.omit`, `t.partial`, `t.required`, `t.composite`, and `t.recursive`. All six emit plain JSON Schema, so `Infer`, the runtime validator, and the AOT pipeline consume them with no adapter. This closes the authoring-parity gap for TypeBox migrations.
+
 ### Changed
 
 - The `ata-validator` package is now pure JavaScript: no bundled binaries, no vendored C++ sources, no install script. The native engine moved to per-platform `@ata-validator/native-*` packages, installed automatically as optional dependencies (the same pattern Vite uses for esbuild). The tarball shrinks from ~5.3 MB to under 300 KB. `npm install --omit=optional` or `ATA_NO_NATIVE=1` gives a guaranteed zero-binary setup with identical validation behavior.

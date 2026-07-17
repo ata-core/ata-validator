@@ -235,7 +235,14 @@ type User = Infer<typeof User>
 const v = new Validator(User)
 ```
 
-The builder covers primitives (`string`, `number`, `integer`, `boolean`, `null`), composites (`object` with `optional` keys, `array`, `tuple`, `record`, `union`, `intersect`, `literal`, `const`, `enum`), and refs (`ref`). Optionality is carried by a Symbol marker that the emitted JSON Schema and ata's codegen never see, so the output is still a plain JSON Schema literal that you can pass to anything that takes one.
+The builder covers primitives (`string`, `number`, `integer`, `boolean`, `null`), composites (`object` with optional keys, `array`, `tuple`, `record`, `union`, `intersect`, `literal`, `const`, `enum`), plus the TypeBox-style modifiers `pick`, `omit`, `partial`, `required`, `composite`, and `recursive`. Optionality is carried by a Symbol marker that the emitted JSON Schema and ata's codegen never see, so the output is still a plain JSON Schema literal that you can pass to anything that takes one.
+
+```ts
+const User = t.object({ id: t.integer(), name: t.string(), email: t.optional(t.string()) })
+const Patch = t.partial(t.omit(User, ['id']))
+type Patch = Infer<typeof Patch>
+// { name?: string; email?: string }
+```
 
 #### Async refinement
 
