@@ -111,8 +111,10 @@ flowchart TD
 - **Native C++** (`src/ata.cpp`, `binding/ata_napi.cpp`, `deps/simdjson`): powers
   `isValid(Buffer)`, `countValid`, `isValidParallel`, `validateAndParse`, and the
   interpretive fallback for cases JS codegen does not cover (e.g. `$dynamicRef`).
-  Loaded via `pkg-prebuilds`; absent native, the buffer/batch methods throw and
-  everything else keeps working on JS.
+  Loaded via `lib/native-load.js`, which resolves the per-platform
+  `@ata-validator/native-*` optional package (falling back to a local dev build);
+  absent native, the buffer/batch methods throw and everything else keeps working
+  on JS.
 
 ## AOT build pipeline
 
@@ -188,7 +190,8 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  IDX["index.js"] -->|pkg-prebuilds| ADDON["prebuilt addon<br/>(6 platforms)"]
+  IDX["index.js"] -->|native-load.js| PKG["@ata-validator/native-&lt;platform&gt;<br/>(optional package, 6 platforms)"]
+  PKG --> ADDON["native addon (.node)"]
   ADDON --> NAPI["binding/ata_napi.cpp"]
   NAPI --> CORE["src/ata.cpp + src/ata_c.cpp"]
   CORE --> SIMD["deps/simdjson"]

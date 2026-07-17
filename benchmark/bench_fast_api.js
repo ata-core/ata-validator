@@ -1,8 +1,7 @@
 const { bench, group, run, summary } = require("mitata");
 const { Validator } = require("../index");
-const path = require('path');
 
-const native = require("pkg-prebuilds")(path.join(__dirname, ".."), require(path.join(__dirname, "..", "binding-options")));
+const native = require('../lib/native-load')();
 
 const schema = {
   type: "object",

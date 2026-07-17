@@ -24,11 +24,12 @@ for (const f of files) {
 const pkg = require(path.join(root, 'package.json'));
 assert.ok(!pkg.scripts.install, 'core must have no install script');
 assert.ok(!pkg.dependencies || !pkg.dependencies['pkg-prebuilds'], 'pkg-prebuilds must be gone');
-assert.ok(pkg.optionalDependencies && pkg.optionalDependencies['@ata-validator/native-darwin-arm64'] === pkg.version,
-  'native packages must be exact-pinned to the core version');
+assert.ok(pkg.optionalDependencies, 'optionalDependencies must exist');
+for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
+  assert.ok(ver === pkg.version, `${name} must be exact-pinned to the core version (got ${ver})`);
+}
 
-// Size ceiling: measure the real packed size once, then freeze ceiling at
-// actual rounded up to the next 50 KB plus one 50 KB step of headroom.
+// Size ceiling: 300 KB hard cap; adjust only with a reviewed reason.
 assert.ok(manifest.size < 300 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

@@ -1,7 +1,7 @@
 // Native addon: optional. Core validate() uses JS codegen and works without it.
 // Buffer APIs (isValid, countValid, isValidParallel) require native.
-// Loading is delegated so this file stays free of `pkg-prebuilds`/`__dirname`/
-// `path` (the browser entry must not pull those in via the bundler).
+// Loading is delegated to lib/native-load.js so this file stays free of
+// platform probing and `path` (the browser entry must not pull those in).
 const native = require("./lib/native-load")();
 const {
   compileToJS,

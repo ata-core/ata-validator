@@ -18,7 +18,7 @@ If your codebase relies on ajv-specific features like custom keywords, custom fo
 npm install ata-validator
 ```
 
-The native addon is optional. Pure JS codegen works without it. For simdjson-backed buffer APIs (`isValid(buffer)`, `countValid(ndjson)`), a platform prebuild or a local `cmake-js` build is needed. Most platforms ship with prebuilds.
+The native addon is optional. Pure JS codegen works without it. For simdjson-backed buffer APIs (`isValid(buffer)`, `countValid(ndjson)`), the platform-specific `@ata-validator/native-*` package is needed. It is listed as an optional dependency and npm installs the correct one automatically on supported platforms; on others, ata falls back to the JS engine.
 
 ## The core switch
 
@@ -306,7 +306,7 @@ If you rely on any of the unsupported items, file an issue at [github.com/ata-co
 ## FAQ
 
 **Do I need the native addon?**
-No. The pure JS codegen path handles `validate`, `isValidObject`, `validateJSON` without any native code. The simdjson path (`isValid(buffer)`, `countValid`) requires the native addon. Every major platform has a prebuild on npm.
+No. The pure JS codegen path handles `validate`, `isValidObject`, `validateJSON` without any native code. The simdjson path (`isValid(buffer)`, `countValid`) requires the native addon, shipped as `@ata-validator/native-<platform>` optional packages installed automatically by npm on supported platforms.
 
 **Can I run both validators side by side during migration?**
 Yes. `ata-validator/compat` is an ajv-shaped subpath that coexists with the real `ajv` package if you need parallel verification.
