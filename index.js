@@ -569,6 +569,10 @@ class Validator {
         };
       } else {
         this._ensureCodegen();
+        // Codegen can bail on shapes it cannot represent; the full compile
+        // binds the native path or the unsupported thrower instead of
+        // leaving this stub to re-dispatch to itself.
+        if (!this._jsFn) this._ensureCompiled();
       }
       return this.isValidObject(data);
     };
@@ -1004,6 +1008,18 @@ class Validator {
           return valid;
         };
       }
+    } else {
+      // No JS codegen and no native engine. Leaving the lazy stubs in place
+      // makes them re-dispatch to themselves forever, so bind a clear error.
+      const unsupported = () => {
+        throw new Error(
+          'This schema is not supported by the pure-JS engine and the native addon is unavailable in this environment'
+        );
+      };
+      this.validate = unsupported;
+      this.isValidObject = unsupported;
+      this.validateJSON = unsupported;
+      this.isValidJSON = unsupported;
     }
 
     // richErrors enrichment: layered on top of whichever validate path was
