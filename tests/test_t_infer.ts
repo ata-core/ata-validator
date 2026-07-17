@@ -94,6 +94,19 @@ void _headers;
   t.pick(User, ['nope']);
 }
 
+// --- partial / required ---
+const user2 = t.object({ id: t.integer(), email: t.optional(t.string()) });
+
+const draft = t.partial(user2);
+type Draft = Infer<typeof draft>;
+const _partial: Expect<Draft, { id?: number; email?: string }> = true;
+void _partial;
+
+const strict = t.required(user2);
+type Strict = Infer<typeof strict>;
+const _required: Expect<Strict, { id: number; email: string }> = true;
+void _required;
+
 // --- Validator constructor accepts builder output and narrows ---
 const v = new Validator(user);
 const r = v.validate({ id: 1, name: 'a' });

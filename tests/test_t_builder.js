@@ -188,5 +188,36 @@ ok('t.pick selects properties and required subset', () => {
   assert.strictEqual(v.validate({ id: 1 }).valid, false, 'name still required after pick');
 });
 
+// --- partial / required ---
+ok('t.partial and t.required', () => {
+  const User = t.object({
+    id: t.integer(),
+    name: t.string(),
+    email: t.optional(t.string()),
+  }, { additionalProperties: false });
+
+  const Draft = t.partial(User);
+  assert.ok(!('required' in Draft), 'partial drops required');
+  assert.deepStrictEqual(Object.keys(Draft.properties), ['id', 'name', 'email']);
+  assert.strictEqual(Draft.additionalProperties, false, 'partial preserves other keywords');
+
+  const Strict = t.required(User);
+  assert.deepStrictEqual(Strict.required, ['id', 'name', 'email'], 'required() marks all keys');
+
+  const WithEmail = t.required(User, ['email']);
+  assert.deepStrictEqual(WithEmail.required, ['id', 'name', 'email'], 'required(keys) extends and dedups');
+
+  const Unknown = t.required(User, ['nope']);
+  assert.deepStrictEqual(Unknown.required, ['id', 'name'], 'unknown keys filtered out');
+
+  assert.deepStrictEqual(User.required, ['id', 'name'], 'input not mutated');
+  assert.throws(() => t.partial(t.array(t.string())), /t\.partial: expected an object schema/);
+
+  const v = new Validator(Draft);
+  assert.strictEqual(v.validate({}).valid, true, 'everything optional after partial');
+  const v2 = new Validator(Strict);
+  assert.strictEqual(v2.validate({ id: 1, name: 'a' }).valid, false, 'email now required');
+});
+
 console.log(`\n${failed === 0 ? 'ok' : 'FAILED'}: t builder behaviour`);
 process.exit(failed > 0 ? 1 : 0);

@@ -188,6 +188,24 @@ export interface TOmit<S extends TObjectLike, K extends ReadonlyArray<string>> e
   required: ReadonlyArray<Exclude<Extract<ReqUnion<S>, string>, K[number]>>;
 }
 
+export interface TPartial<S extends TObjectLike> extends JSONSchema {
+  type: 'object';
+  properties: S['properties'];
+  required: ReadonlyArray<never>;
+}
+
+export interface TRequiredAll<S extends TObjectLike> extends JSONSchema {
+  type: 'object';
+  properties: S['properties'];
+  required: ReadonlyArray<Extract<keyof S['properties'], string>>;
+}
+
+export interface TRequiredWith<S extends TObjectLike, K extends ReadonlyArray<string>> extends JSONSchema {
+  type: 'object';
+  properties: S['properties'];
+  required: ReadonlyArray<Extract<ReqUnion<S> | K[number], keyof S['properties']>>;
+}
+
 export interface TBuilder {
   string(opts?: StringOptions): TString;
   number(opts?: NumericOptions): TNumber;
@@ -212,6 +230,10 @@ export interface TBuilder {
 
   pick<const S extends TObjectLike, const K extends ReadonlyArray<Extract<keyof S['properties'], string>>>(schema: S, keys: K): TPick<S, K>;
   omit<const S extends TObjectLike, const K extends ReadonlyArray<Extract<keyof S['properties'], string>>>(schema: S, keys: K): TOmit<S, K>;
+
+  partial<const S extends TObjectLike>(schema: S): TPartial<S>;
+  required<const S extends TObjectLike>(schema: S): TRequiredAll<S>;
+  required<const S extends TObjectLike, const K extends ReadonlyArray<Extract<keyof S['properties'], string>>>(schema: S, keys: K): TRequiredWith<S, K>;
 
   any(): TAny;
   unknown(): TAny;
