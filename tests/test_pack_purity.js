@@ -5,11 +5,13 @@
 // inspects the manifest. Sibling of the browser-imports guard.
 
 const assert = require('node:assert');
-const { execFileSync } = require('node:child_process');
+const { execSync } = require('node:child_process');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const out = execFileSync('npm', ['pack', '--dry-run', '--json'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+// execSync (shell) rather than execFileSync: on Windows npm is npm.cmd,
+// which cannot be spawned directly. The command is a static string.
+const out = execSync('npm pack --dry-run --json', { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 const manifest = JSON.parse(out)[0];
 const files = manifest.files.map((f) => f.path);
 
