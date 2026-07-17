@@ -2,7 +2,7 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## 1.1.0 - <set on release day>
+## 1.1.0 - 2026-07-18
 
 ### Added
 
@@ -10,7 +10,11 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
-- The `ata-validator` package is now pure JavaScript: no bundled binaries, no vendored C++ sources, no install script. The native engine moved to per-platform `@ata-validator/native-*` packages, installed automatically as optional dependencies (the same pattern Vite uses for esbuild). The tarball shrinks from ~5.3 MB to under 300 KB. `npm install --omit=optional` or `ATA_NO_NATIVE=1` gives a guaranteed zero-binary setup with identical validation behavior.
+- The `ata-validator` package is now pure JavaScript: no bundled binaries, no vendored C++ sources, no install script. The native engine moved to per-platform `@ata-validator/native-*` packages, installed automatically as optional dependencies (the same pattern Vite uses for esbuild). The tarball shrinks from ~5.3 MB to under 300 KB. `npm install --omit=optional` or `ATA_NO_NATIVE=1` gives a guaranteed zero-binary setup; validation behavior is identical for every schema shape the JS engine compiles, and the few shapes that still need the native engine now throw a clear error instead (see Fixed below).
+
+### Fixed
+
+- Schemas the JS engine cannot compile (some `$dynamicRef`, cyclic `$ref`, and unusual keyword interactions) crashed with `Maximum call stack size exceeded` in environments without the native addon: the lazy `validate` stub and the rich-error wrapper dispatched to each other forever. These schemas now throw a clear "not supported by the pure-JS engine" error on first use. The same cycle could hit `isValidObject` even with the native addon present when it was the first method called; it now falls through to the full compile and validates correctly.
 
 ## 1.0.2 - 2026-07-17
 
