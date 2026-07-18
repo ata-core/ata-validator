@@ -106,14 +106,22 @@ jobs:
         if: matrix.arch == 'arm64'
 
       - name: Build in Alpine container
+        # QEMU-emulated arm64 builds crash sporadically with SIGILL (exit 132)
+        # right after container start; a fresh attempt succeeds. Retry up to 3x.
         run: |
-          docker run --rm --platform ${{ matrix.platform }} \
-            -v ${{ github.workspace }}:/work -w /work \
-            node:22-alpine sh -c "
-              apk add --no-cache git python3 make g++ cmake re2-dev abseil-cpp-dev linux-headers &&
-              npm install &&
-              npx cmake-js build --target ata
-            "
+          for attempt in 1 2 3; do
+            docker run --rm --platform ${{ matrix.platform }} \
+              -v ${{ github.workspace }}:/work -w /work \
+              node:22-alpine sh -c "
+                apk add --no-cache git python3 make g++ cmake re2-dev abseil-cpp-dev linux-headers &&
+                npm install &&
+                npx cmake-js build --target ata
+              " && break
+            status=$?
+            if [ "$attempt" = "3" ]; then exit "$status"; fi
+            echo "build attempt $attempt failed with $status; retrying"
+            sleep 15
+          done
 
       - uses: actions/setup-node@v4
         with:
