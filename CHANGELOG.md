@@ -2,7 +2,7 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## 1.2.0 - unreleased
+## 1.2.0 - 2026-07-18
 
 ### Added
 
