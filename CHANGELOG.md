@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## 1.2.0 - unreleased
 
+### Added
+
+- An interpreted engine (`lib/interpreter.js`) now backs schemas the JS compiler cannot represent when the native addon is absent (browser, edge workers, `ATA_NO_NATIVE=1`). These schemas validated only with the native engine before, and 1.1.0 made them throw a clear error in native-less environments; they now just validate. Full draft 2020-12 semantics: `$id`/`$anchor` resolution, `$dynamicRef` dynamic scoping, annotation tracking for `unevaluatedProperties`/`unevaluatedItems`. The pure-JS configuration now passes 1184 of 1190 applicable cases (99.5%) in the official test suite, up from 974, and the six remaining failures are shared with the native engine. Error results on the native-less path also carry full per-keyword detail now instead of a single generic message.
+
 ### Changed
 
 - Validation errors now follow the schema's keyword declaration order instead of a fixed required-first order: a schema declaring `properties` before `required` reports the property errors first, matching what schema authors read top to bottom and what the previous default validator emitted. Order within one keyword is unchanged (`required` errors still follow the array). Single-error and `abortEarly` results are untouched. With this change ata passes every applicable test in Fastify's validation suite (181 of 187; the remaining 6 test the incumbent validator's own extension API rather than validation behavior).

@@ -766,16 +766,32 @@ class Validator {
       // invalid path doesn't dereference a null _compiled.
       const hasUnevaluated = schemaObj && (schemaObj.unevaluatedProperties !== undefined || schemaObj.unevaluatedItems !== undefined || this._schemaStr.includes('unevaluatedProperties') || this._schemaStr.includes('unevaluatedItems'))
       const hasDynRef = this._schemaStr.includes('"$dynamicRef"') || this._schemaStr.includes('"$dynamicAnchor"')
-      const jsOnlyFallback = (d) => ({
-        valid: jsFn(d),
-        errors: jsFn(d) ? [] : [{
-          keyword: 'validation',
-          instancePath: '',
-          schemaPath: '',
-          params: {},
-          message: 'schema validation failed (detailed errors unavailable without native addon)'
-        }]
-      });
+      // Native-less error path: the interpreted engine re-validates failing
+      // data to produce full errors. If it disagrees with the codegen verdict
+      // (it should not), a generic error keeps the result consistent.
+      let _interp = null;
+      const jsOnlyFallback = (d) => {
+        if (jsFn(d)) return { valid: true, data: d, errors: [] };
+        if (!_interp) {
+          const { createInterpreter } = require('./lib/interpreter');
+          _interp = createInterpreter(schemaObj, {
+            schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
+            formats: this._userFormats,
+          });
+        }
+        const r = _interp.validate(d);
+        if (!r.valid) return r;
+        return {
+          valid: false,
+          errors: [{
+            keyword: 'validation',
+            instancePath: '',
+            schemaPath: '',
+            params: {},
+            message: 'schema validation failed'
+          }]
+        };
+      };
       const errFn =
         safeErrFn ||
         (hasUnevaluated
@@ -1050,17 +1066,27 @@ class Validator {
         };
       }
     } else {
-      // No JS codegen and no native engine. Leaving the lazy stubs in place
-      // makes them re-dispatch to themselves forever, so bind a clear error.
-      const unsupported = () => {
-        throw new Error(
-          'This schema is not supported by the pure-JS engine and the native addon is unavailable in this environment'
-        );
+      // No JS codegen and no native engine: fall back to the interpreted
+      // engine. Slow but correct, and strictly better than the previous
+      // behavior (the lazy stubs re-dispatched to themselves forever).
+      const { createInterpreter } = require('./lib/interpreter');
+      const interp = createInterpreter(schemaObj, {
+        schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
+        formats: this._userFormats,
+      });
+      const run = preprocess
+        ? (data) => { preprocess(data); return interp.validate(data); }
+        : (data) => interp.validate(data);
+      this.validate = run;
+      this.isValidObject = (data) => run(data).valid;
+      this.validateJSON = (jsonStr) => {
+        try {
+          return run(JSON.parse(jsonStr));
+        } catch (e) {
+          return { valid: false, errors: [{ keyword: 'syntax', instancePath: '', schemaPath: '#', params: {}, message: e.message }] };
+        }
       };
-      this.validate = unsupported;
-      this.isValidObject = unsupported;
-      this.validateJSON = unsupported;
-      this.isValidJSON = unsupported;
+      this.isValidJSON = (jsonStr) => this.validateJSON(jsonStr).valid;
     }
 
     // Declaration-order errors: whichever engine produced them, multi-error

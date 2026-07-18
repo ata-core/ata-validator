@@ -1,8 +1,10 @@
 'use strict';
 
-// Schemas the JS codegen cannot compile must fail with a clear error in
-// native-less environments (browser, edge workers, ATA_NO_NATIVE), not
-// recurse through the lazy stub until the stack overflows.
+// Schemas the JS codegen cannot compile must still validate correctly in
+// native-less environments (browser, edge workers, ATA_NO_NATIVE) via the
+// interpreted engine. Historically these schemas recursed through the lazy
+// stub until the stack overflowed; then they threw a clear error; now they
+// validate.
 
 const { spawnSync } = require('child_process');
 const path = require('path');
@@ -16,70 +18,90 @@ const child = `
     else { console.log('  FAIL ' + msg); failed++; }
   }
 
-  function expectClearError(schema, data, label) {
+  function expectVerdicts(schema, cases, label) {
     const v = new Validator(schema);
-    try {
-      v.validate(data);
-      // Reaching here is fine only if the engine actually supports the schema.
-      passed++;
-    } catch (e) {
-      assert(!(e instanceof RangeError), label + ': must not overflow the stack');
-      assert(/native/i.test(e.message), label + ': error message should point at the missing native engine, got: ' + e.message);
+    for (const [data, want] of cases) {
+      let got;
+      try {
+        got = v.validate(data).valid;
+      } catch (e) {
+        assert(false, label + ': threw ' + e.constructor.name + ': ' + e.message);
+        continue;
+      }
+      assert(got === want, label + ': ' + JSON.stringify(data) + ' expected ' + want + ', got ' + got);
     }
   }
 
-  console.log('\\nata pure-JS unsupported-schema tests\\n');
+  console.log('\\nata interpreted-engine fallback tests\\n');
 
   // properties + patternProperties + additionalProperties interaction
   // (codegen bails on the combination)
-  expectClearError({
+  expectVerdicts({
     properties: { foo: { type: 'array', maxItems: 3 }, bar: { type: 'array' } },
     patternProperties: { 'f.o': { minItems: 2 } },
     additionalProperties: { type: 'integer' }
-  }, { foo: [1, 2] }, 'properties interaction');
+  }, [
+    [{ foo: [1, 2] }, true],
+    [{ foo: [] }, false],
+    [{ foo: [1, 2, 3, 4] }, false],
+    [{ fxo: [1, 2] }, true],
+    [{ fxo: [] }, false],
+    [{ extra: 1 }, true],
+    [{ extra: 'x' }, false],
+  ], 'properties interaction');
 
   // cyclic $defs ref (routed off codegen since 4a04fb6)
-  expectClearError({
-    \$defs: { node: { properties: { next: { \$ref: '#/\$defs/node' } } } },
+  expectVerdicts({
+    \$defs: { node: { type: 'object', properties: { next: { \$ref: '#/\$defs/node' } } } },
     \$ref: '#/\$defs/node'
-  }, { next: { next: {} } }, 'cyclic defs ref');
+  }, [
+    [{ next: { next: {} } }, true],
+    [{ next: { next: 3 } }, false],
+    [{}, true],
+  ], 'cyclic defs ref');
 
   // relative pointer ref into properties
-  expectClearError({
+  expectVerdicts({
     properties: { foo: { type: 'integer' }, bar: { \$ref: '#/properties/foo' } }
-  }, { bar: 3 }, 'relative pointer ref');
+  }, [
+    [{ bar: 3 }, true],
+    [{ bar: 'x' }, false],
+  ], 'relative pointer ref');
 
-  // validateJSON path must not recurse either
+  // unevaluatedProperties with a ref (annotation tracking)
+  expectVerdicts({
+    \$defs: { base: { properties: { a: { type: 'string' } } } },
+    \$ref: '#/\$defs/base',
+    properties: { b: { type: 'number' } },
+    unevaluatedProperties: false
+  }, [
+    [{ a: 'x', b: 1 }, true],
+    [{ a: 'x', b: 1, c: 2 }, false],
+  ], 'unevaluatedProperties via ref');
+
+  // errors carry real details on the interpreted path
   {
     const v = new Validator({
       properties: { foo: { type: 'array' } },
       patternProperties: { 'f.o': { minItems: 2 } },
       additionalProperties: { type: 'integer' }
     });
-    try {
-      v.validateJSON('{"foo":[1,2]}');
-      passed++;
-    } catch (e) {
-      assert(!(e instanceof RangeError), 'validateJSON: must not overflow the stack');
-      assert(/native/i.test(e.message), 'validateJSON: clear error, got: ' + e.message);
-    }
+    const r = v.validate({ foo: 'nope' });
+    assert(r.valid === false, 'detail: should be invalid');
+    assert(r.errors.length > 0 && r.errors[0].keyword === 'type' && r.errors[0].instancePath === '/foo',
+      'detail: expected a type error at /foo, got ' + JSON.stringify(r.errors[0]));
   }
 
-  // isValidObject called before validate goes through _ensureCodegen; when
-  // codegen bails it must fall through to the full compile, not recurse.
+  // validateJSON path works too
   {
     const v = new Validator({
-      properties: { foo: { type: 'array', maxItems: 3 } },
+      properties: { foo: { type: 'array' } },
       patternProperties: { 'f.o': { minItems: 2 } },
       additionalProperties: { type: 'integer' }
     });
-    try {
-      v.isValidObject({ foo: [1, 2] });
-      passed++;
-    } catch (e) {
-      assert(!(e instanceof RangeError), 'isValidObject-first: must not overflow the stack');
-      assert(/native/i.test(e.message), 'isValidObject-first: clear error, got: ' + e.message);
-    }
+    assert(v.validateJSON('{"foo":[1,2]}').valid === true, 'validateJSON valid case');
+    assert(v.validateJSON('{"foo":1}').valid === false, 'validateJSON invalid case');
+    assert(v.validateJSON('{oops').valid === false, 'validateJSON syntax error');
   }
 
   console.log('\\n  ' + passed + ' passed, ' + failed + ' failed');
@@ -94,10 +116,10 @@ const r = spawnSync(process.execPath, ['-e', child], {
 process.stdout.write(r.stdout || '');
 process.stderr.write(r.stderr || '');
 if (r.status !== 0) {
-  console.error('not ok: pure-JS unsupported-schema handling');
+  console.error('not ok: interpreted-engine fallback');
   process.exit(1);
 }
-console.log('ok: pure-JS unsupported-schema handling');
+console.log('ok: interpreted-engine fallback');
 
 // With the native addon present, isValidObject-first on a codegen-bailing
 // schema must dispatch to the native engine, not recurse through the stub.

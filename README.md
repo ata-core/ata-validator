@@ -20,7 +20,7 @@ The `ata-validator` package itself is pure JavaScript. The native accelerator (s
 npm install ata-validator --omit=optional
 ```
 
-or set `ATA_NO_NATIVE=1` at runtime. Validation behavior is identical for the schema shapes the JS engine compiles, which covers typical API payload schemas. The buffer and parallel APIs, plus a small set of complex shapes (some `$dynamicRef`, cyclic `$ref`, and unusual keyword interactions), currently need the native engine and throw a clear error without it rather than validating incorrectly.
+or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup passes 99.5% of the official draft 2020-12 test suite. Only the buffer and parallel APIs (`isValid` on raw buffers, `countValid`, `batchIsValid`, `validateAndParse`) need the native engine and say so with a clear error.
 
 In your code:
 
