@@ -396,6 +396,8 @@ const result = v['~standard'].validate(data);
 
 ### Fastify Plugin
 
+Measured against Fastify's own schema and validation test files with ata swapped in as the default validator: 181 of 187 tests pass, and the remaining six assert the default validator's own extension API rather than validation behavior. Validation errors follow the schema's keyword declaration order, so error-message plugins and `transformErrors` hooks written against the default validator see the same order.
+
 ```bash
 npm install fastify-ata
 ```
@@ -464,7 +466,7 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 
 ### Known limitations
 
-The 98.5% Draft 2020-12 pass rate excludes areas that are deliberate scope decisions for 1.x:
+The Draft 2020-12 pass rate (1184 of 1190 applicable cases, 99.5%, in the pure-JS configuration; 1175 with the native engine) excludes areas that are deliberate scope decisions for 1.x:
 
 - **Remote `$ref` over the network** is not fetched. Register cross-schema refs explicitly with `schemas: [...]` or `addSchema()`.
 - **`$vocabulary`** is not implemented; custom vocabularies are ignored rather than enforced.
