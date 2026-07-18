@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.2.0 - unreleased
+
+### Changed
+
+- Validation errors now follow the schema's keyword declaration order instead of a fixed required-first order: a schema declaring `properties` before `required` reports the property errors first, matching what schema authors read top to bottom and what the previous default validator emitted. Order within one keyword is unchanged (`required` errors still follow the array). Single-error and `abortEarly` results are untouched. With this change ata passes every applicable test in Fastify's validation suite (181 of 187; the remaining 6 test the incumbent validator's own extension API rather than validation behavior).
+
 ## 1.1.0 - 2026-07-18
 
 ### Added

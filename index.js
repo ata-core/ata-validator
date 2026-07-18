@@ -319,6 +319,47 @@ function resolveSchemaByPath(rootSchema, schemaPath) {
   return target;
 }
 
+// Rank an error by walking its schemaPath through the schema object: at each
+// level the segment's index among the node's declared keys. Comparing ranks
+// lexicographically orders errors by keyword declaration order, which is the
+// order AJV emits and what schema authors read top to bottom. Segments that
+// cannot be resolved (cross-schema refs, normalized keys) end the walk; the
+// stable sort then keeps such errors in engine emission order.
+function schemaOrderRank(rootSchema, schemaPath) {
+  if (!schemaPath || typeof schemaPath !== 'string' || !schemaPath.startsWith('#')) return null;
+  const parts = schemaPath.slice(1).split('/').filter(Boolean).map((s) => s.replace(/~1/g, '/').replace(/~0/g, '~'));
+  const rank = [];
+  let node = rootSchema;
+  for (const seg of parts) {
+    if (node == null || typeof node !== 'object') break;
+    if (Array.isArray(node)) {
+      const idx = Number(seg);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= node.length) break;
+      rank.push(idx);
+      node = node[idx];
+    } else {
+      const idx = Object.keys(node).indexOf(seg);
+      if (idx < 0) break;
+      rank.push(idx);
+      node = node[seg];
+    }
+  }
+  return rank;
+}
+
+function sortErrorsBySchemaOrder(rootSchema, errors) {
+  const ranked = errors.map((e, i) => ({ e, i, rank: schemaOrderRank(rootSchema, e.schemaPath) }));
+  ranked.sort((a, b) => {
+    if (!a.rank || !b.rank) return a.i - b.i;
+    const n = Math.min(a.rank.length, b.rank.length);
+    for (let k = 0; k < n; k++) {
+      if (a.rank[k] !== b.rank[k]) return a.rank[k] - b.rank[k];
+    }
+    return a.i - b.i;
+  });
+  return ranked.map((r) => r.e);
+}
+
 function parsePointerPath(path) {
   if (!path) return [];
   return path
@@ -1020,6 +1061,21 @@ class Validator {
       this.isValidObject = unsupported;
       this.validateJSON = unsupported;
       this.isValidJSON = unsupported;
+    }
+
+    // Declaration-order errors: whichever engine produced them, multi-error
+    // results are sorted by the schema's keyword declaration order before
+    // enrichment. Single-error and abortEarly results pass through untouched.
+    if (this.validate) {
+      const inner = this.validate;
+      const root = this._schemaObj;
+      this.validate = (data) => {
+        const result = inner(data);
+        if (result && !result.valid && result.errors && result.errors.length > 1 && result !== ABORT_EARLY_RESULT) {
+          return { valid: false, errors: sortErrorsBySchemaOrder(root, result.errors) };
+        }
+        return result;
+      };
     }
 
     // richErrors enrichment: layered on top of whichever validate path was
