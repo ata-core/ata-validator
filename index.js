@@ -1017,14 +1017,38 @@ class Validator {
         };
       }
     } else if (native) {
-      // Native-only path: no JS codegen, use native for everything
+      // No JS codegen: buffer/parallel APIs always come from the native
+      // engine, but the object-validation entry points go to whichever
+      // engine is more correct for the schema shape. Pure dynamic-ref
+      // schemas stay on the C++ path (full $dynamicRef scope tracking);
+      // everything else uses the interpreted engine, which handles the
+      // $id/URN base-URI resolution corners the native resolver gets wrong.
       this._ensureNative();
-      const _hasDynamic = this._schemaStr.includes('"$dynamicRef"') || this._schemaStr.includes('"$dynamicAnchor"') || this._schemaStr.includes('"$anchor"')
-      // For schemas with dynamic refs/anchors, use validateJSON (C++ path with full support)
-      // instead of validate (NAPI direct V8 path without anchor maps)
-      const _validate = _hasDynamic
-        ? (data) => this._compiled.validateJSON(JSON.stringify(data))
-        : (data) => this._compiled.validate(data);
+      const _hasDynRef = this._schemaStr.includes('"$dynamicRef"') || this._schemaStr.includes('"$dynamicAnchor"')
+      const _hasUneval = this._schemaStr.includes('"unevaluatedProperties"') || this._schemaStr.includes('"unevaluatedItems"')
+      let _validate;
+      if (_hasDynRef && !_hasUneval) {
+        // validateJSON is the C++ path with full anchor-map support; the NAPI
+        // direct V8 `validate` path has no anchor maps.
+        _validate = (data) => this._compiled.validateJSON(JSON.stringify(data));
+        this.validateJSON = (jsonStr) => this._compiled.validateJSON(jsonStr);
+        this.isValidJSON = (jsonStr) => this._compiled.isValidJSON(jsonStr);
+      } else {
+        const { createInterpreter } = require('./lib/interpreter');
+        const interp = createInterpreter(schemaObj, {
+          schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
+          formats: this._userFormats,
+        });
+        _validate = (data) => interp.validate(data);
+        this.validateJSON = (jsonStr) => {
+          try {
+            return _validate(JSON.parse(jsonStr));
+          } catch (e) {
+            return { valid: false, errors: [{ keyword: 'syntax', instancePath: '', schemaPath: '#', params: {}, message: e.message }] };
+          }
+        };
+        this.isValidJSON = (jsonStr) => this.validateJSON(jsonStr).valid;
+      }
       this.validate = preprocess
         ? (data) => {
             preprocess(data);
@@ -1032,8 +1056,6 @@ class Validator {
           }
         : _validate;
       this.isValidObject = (data) => _validate(data).valid;
-      this.validateJSON = (jsonStr) => this._compiled.validateJSON(jsonStr);
-      this.isValidJSON = (jsonStr) => this._compiled.isValidJSON(jsonStr);
       this.validateAndParse = (jsonStr) => this._compiled.validateAndParse(jsonStr);
       {
         const slot = this._fastSlot;

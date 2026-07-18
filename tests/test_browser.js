@@ -3,12 +3,18 @@
 
 const Module = require("module");
 
-// Intercept pkg-prebuilds to simulate browser "browser" field stubbing
+// Intercept module resolution to simulate the browser "browser" field:
+// bundlers swap lib/native-load.js for lib/native-load.browser.js (always
+// null), so no native engine can load regardless of what is installed or
+// built locally. The pkg-prebuilds stub covers older bundler setups.
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, isMain, options) {
   if (request === "pkg-prebuilds") {
     // Return a module that throws when called, same as bundler stub
     return require.resolve("./browser_stub");
+  }
+  if (request.endsWith("native-load") || request.endsWith("native-load.js")) {
+    return require.resolve("../lib/native-load.browser.js");
   }
   return origResolve.call(this, request, parent, isMain, options);
 };

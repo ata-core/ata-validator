@@ -2,6 +2,14 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.2.1 - 2026-07-18
+
+### Fixed
+
+- Schemas the JS compiler cannot represent now validate on the engine that gets them right, instead of always preferring the native addon when it is installed. The native resolver mishandles several `$id` base-URI corners (URN bases, absolute-path references, empty JSON-pointer tokens, nested `$id` scopes) and silently skips regex patterns its engine cannot parse; all of these now route to the interpreted engine. Pure dynamic-ref schemas stay on the native path, which tracks `$dynamicRef` scopes more completely. Buffer and parallel APIs are unchanged.
+- The JS compiler no longer compiles two shapes it got wrong: `unevaluatedItems` with `contains` in scope (contains-matched items were never credited as evaluated, rejecting valid arrays) and plain-anchor schemas that open nested `$id` scopes (same-named anchors in different base-URI scopes resolved to the wrong target). Both now go to the interpreted engine.
+- Official draft 2020-12 suite: 1190 of 1190 applicable cases with the native accelerator (up from 1175), 1188 of 1190 (99.8%) pure-JS (up from 1184). Draft 7 suite gains four `ref.json` cases.
+
 ## 1.2.0 - 2026-07-18
 
 ### Added

@@ -20,7 +20,7 @@ The `ata-validator` package itself is pure JavaScript. The native accelerator (s
 npm install ata-validator --omit=optional
 ```
 
-or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup passes 99.5% of the official draft 2020-12 test suite. Only the buffer and parallel APIs (`isValid` on raw buffers, `countValid`, `batchIsValid`, `validateAndParse`) need the native engine and say so with a clear error.
+or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup passes 99.8% of the official draft 2020-12 test suite. Only the buffer and parallel APIs (`isValid` on raw buffers, `countValid`, `batchIsValid`, `validateAndParse`) need the native engine and say so with a clear error.
 
 In your code:
 
@@ -466,7 +466,7 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 
 ### Known limitations
 
-The Draft 2020-12 pass rate (1184 of 1190 applicable cases, 99.5%, in the pure-JS configuration; 1175 with the native engine) excludes areas that are deliberate scope decisions for 1.x:
+The Draft 2020-12 pass rate (1188 of 1190 applicable cases, 99.8%, in the pure-JS configuration; 1190 of 1190 with the native accelerator installed, which covers the two remaining `$dynamicRef` scope corners) excludes areas that are deliberate scope decisions for 1.x:
 
 - **Remote `$ref` over the network** is not fetched. Register cross-schema refs explicitly with `schemas: [...]` or `addSchema()`.
 - **`$vocabulary`** is not implemented; custom vocabularies are ignored rather than enforced.
