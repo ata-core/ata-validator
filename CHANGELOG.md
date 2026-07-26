@@ -2,6 +2,14 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.2.2 - 2026-07-26
+
+### Fixed
+
+- The `uri` format was too permissive: it only checked for a scheme prefix, so a string like `https: not a url` passed. It now also rejects any whitespace or control character, so values that carry a scheme but are not URIs are caught. Real URIs, including `mailto:` and `urn:` forms and hyphenated hosts, still pass. `uri-reference` now rejects the same characters and accepts the empty string (a valid same-document reference), which the codegen path had wrongly rejected.
+- `date-time` now accepts lowercase `t` and `z` separators per RFC 3339, matching the interpreted engine. `duration` now rejects a trailing `T` with no time component (`PT`, `P1DT`), which are not valid ISO 8601 durations.
+- These format checks are emitted in two places, the JS compiler and the interpreted engine, and had drifted apart on the cases above. A new differential test (`tests/test_format_engine_parity.js`) runs every built-in format through both engines over a shared corpus and fails on any disagreement, so the two stay in lockstep.
+
 ## 1.2.1 - 2026-07-18
 
 ### Fixed
