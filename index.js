@@ -9,7 +9,7 @@ const {
   compileToJSCodegenWithErrors,
   compileToJSCombined,
 } = require("./lib/js-compiler");
-const { normalizeDraft7, normalizeNullable } = require("./lib/draft7");
+const { normalizeDraft7, normalizeNullable, stripFormatAssertions } = require("./lib/draft7");
 const { classify } = require("./lib/shape-classifier");
 const { buildTier0Plan, tier0Validate } = require("./lib/tier0");
 
@@ -250,11 +250,13 @@ function buildPreprocessCodegen(schema, options) {
   }
 
   // defaults: inline per property
-  for (const [key, prop] of Object.entries(props)) {
-    if (prop && typeof prop === 'object' && prop.default !== undefined) {
-      const k = JSON.stringify(key);
-      const def = JSON.stringify(prop.default);
-      lines.push(`if(!(${k} in d))d[${k}]=${def}`);
+  if (options.useDefaults !== false) {
+    for (const [key, prop] of Object.entries(props)) {
+      if (prop && typeof prop === 'object' && prop.default !== undefined) {
+        const k = JSON.stringify(key);
+        const def = JSON.stringify(prop.default);
+        lines.push(`if(!(${k} in d))d[${k}]=${def}`);
+      }
     }
   }
 
@@ -541,9 +543,17 @@ class Validator {
     // When schema is a string, JSON.parse already produces a fresh object.
     // When schema is an object, normalization runs on a clone so the caller's
     // object is never touched.
-    const schemaObj = typeof schema === "string"
+    let schemaObj = typeof schema === "string"
       ? JSON.parse(schema)
       : _normalizeCallerSchema(schema);
+
+    // assertFormat: false makes `format` annotation-only. Strip it on a clone
+    // so the caller's schema keeps the keyword.
+    if (options.assertFormat === false) {
+      schemaObj = stripFormatAssertions(
+        schemaObj === schema ? _deepCloneWithSymbols(schemaObj) : schemaObj,
+      );
+    }
 
     this._schemaStr = null; // lazy: computed on first use
     this._schemaObj = schemaObj;
@@ -726,7 +736,7 @@ class Validator {
     const preprocessSchema = resolveSchemaForPreprocess(schemaObj, this._schemaMap);
     let preprocess = buildPreprocessCodegen(preprocessSchema, options);
     if (!preprocess) {
-      const applyDefaults = buildDefaultsApplier(preprocessSchema);
+      const applyDefaults = options.useDefaults === false ? null : buildDefaultsApplier(preprocessSchema);
       const applyCoerce = options.coerceTypes ? buildCoercer(preprocessSchema) : null;
       const applyRemove = options.removeAdditional
         ? buildRemover(preprocessSchema)

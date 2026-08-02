@@ -317,6 +317,19 @@ export type ValidateAndParseResult<T = unknown> =
 export interface ValidatorOptions {
   coerceTypes?: boolean;
   removeAdditional?: boolean;
+  /**
+   * When true (default), missing properties are filled in from their `default`
+   * before validation. Set to false to leave the instance untouched, which is
+   * what the specification describes: `default` is an annotation and never
+   * affects whether an instance is valid.
+   */
+  useDefaults?: boolean;
+  /**
+   * When true (default), `format` is asserted and a value that does not match
+   * its format fails. Set to false to treat `format` as an annotation, the
+   * Draft 2020-12 behavior when the format-assertion vocabulary is not in use.
+   */
+  assertFormat?: boolean;
   schemas?: Record<string, object> | object[];
   /**
    * Custom format checkers. Keys are format names referenced from `format` in

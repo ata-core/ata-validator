@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## 1.3.0 - 2026-08-02
 
+### Added
+
+- `useDefaults` and `assertFormat` validator options, both defaulting to `true` so existing behavior is unchanged. `useDefaults: false` stops missing properties being filled in from their `default` before validation, which matters because a `default` that does not satisfy its own subschema currently makes an otherwise valid instance fail. `assertFormat: false` treats `format` as an annotation rather than an assertion, the Draft 2020-12 reading when the format-assertion vocabulary is not in use. With both off, ata passes every case in the suite's `format` and `default` files.
+
 ### Fixed
 
 - A `$ref` that could not be resolved validated everything instead of failing. The JS compiler emitted no check at all for an unresolved reference, so a typo in a `$ref`, or a reference into a schema that was never registered, silently turned off every constraint behind it rather than reporting an error. Both compiler paths now decline to compile such a schema and it validates on the interpreted engine, which reports `ATA5001` naming the reference it could not resolve.
