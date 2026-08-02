@@ -435,7 +435,11 @@ function buildSchemaMap(schemas) {
   } else {
     for (const [key, s] of Object.entries(schemas)) {
       const normalized = _normalizeCallerSchema(s)
-      map.set(normalized.$id || key, normalized)
+      // A retrieved document is addressable both by the URI it was registered
+      // under and by the $id it declares. Registering only the $id makes
+      // references to the retrieval URI unresolvable.
+      map.set(key, normalized)
+      if (normalized.$id && normalized.$id !== key) map.set(normalized.$id, normalized)
     }
   }
   return map

@@ -2,6 +2,15 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.3.0 - 2026-08-02
+
+### Fixed
+
+- A `$ref` that could not be resolved validated everything instead of failing. The JS compiler emitted no check at all for an unresolved reference, so a typo in a `$ref`, or a reference into a schema that was never registered, silently turned off every constraint behind it rather than reporting an error. Both compiler paths now decline to compile such a schema and it validates on the interpreted engine, which reports `ATA5001` naming the reference it could not resolve.
+- References that resolve relative to an enclosing base URI are no longer compiled by the JS paths, which match registry entries by exact key or path suffix and have no notion of a base. Nested `$id` scopes, relative references, and documents registered under a URI different from the `$id` they declare now route to the interpreted engine, which tracks the base properly. Schemas that reference a flat registry of ids, the common `$ref: 'shared#'` shape, still take the compiled fast path.
+- A schema supplied through the `schemas` option as a URI-keyed record was registered only under the `$id` it declared, so references to the URI it was registered under could not resolve. It is now addressable by both.
+- Official draft 2020-12 remote-reference suite: 30 of 31 cases, up from 21. Pure-JS configuration on the full suite: 1189 of 1190, up from 1188. The native configuration stays at 1190 of 1190.
+
 ## 1.2.2 - 2026-07-26
 
 ### Fixed
