@@ -20,7 +20,7 @@ The `ata-validator` package itself is pure JavaScript. The native accelerator (s
 npm install ata-validator --omit=optional
 ```
 
-or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup passes 99.8% of the official draft 2020-12 test suite. Only the buffer and parallel APIs (`isValid` on raw buffers, `countValid`, `batchIsValid`, `validateAndParse`) need the native engine and say so with a clear error.
+or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup scores the same on the official suite as the native one, 1285 of 1290 Draft 2020-12 cases; the two miss a different `$dynamicRef` scope corner each. Only the buffer and parallel APIs (`isValid` on raw buffers, `countValid`, `batchIsValid`, `validateAndParse`) need the native engine and say so with a clear error.
 
 In your code:
 
@@ -466,14 +466,17 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 
 ### Known limitations
 
-The Draft 2020-12 pass rate (1188 of 1190 applicable cases, 99.8%, in the pure-JS configuration; 1190 of 1190 with the native accelerator installed, which covers the two remaining `$dynamicRef` scope corners) excludes areas that are deliberate scope decisions for 1.x:
+Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1285 of 1290 cases, 99.6%. Draft 7 gives 911 of 922, 98.8%. `npm run test:suite` reproduces both and lists the remaining failures by name.
+
+Areas that remain deliberate scope decisions for 1.x:
 
 - **Remote `$ref` over the network** is not fetched. Register cross-schema refs explicitly with `schemas: [...]` or `addSchema()`.
 - **`$vocabulary`** is not implemented; custom vocabularies are ignored rather than enforced.
 - **`contentEncoding` / `contentMediaType` / `contentSchema`** are annotation-only, as the spec permits, and are not validated.
 - **`minLength`/`maxLength`** count UTF-16 code units, not grapheme clusters.
-- **Infinite-loop detection** suite cases are skipped; circular `$ref` chains are cut off by a recursion depth guard instead.
-- **`default`** optional suite tests are excluded; ata applies `default` values to validated data, where the spec treats `default` as a non-enforcing annotation.
+- **Infinite-loop detection** relies on a recursion depth guard that cuts off circular `$ref` chains.
+- **`default`** values are applied to validated data by default, where the spec treats `default` as a non-enforcing annotation. Pass `useDefaults: false` for the specification behavior.
+- **`format`** is asserted by default rather than treated as an annotation. Pass `assertFormat: false` for the specification behavior.
 
 If one of these blocks you, open an issue; scope decisions get revisited with real use cases.
 
