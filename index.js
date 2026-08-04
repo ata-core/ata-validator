@@ -271,6 +271,21 @@ function buildPreprocessCodegen(schema, options) {
   }
 }
 
+// Cloudflare Workers, Deno Deploy and pages under a strict Content-Security-
+// Policy refuse `new Function`. Probed once, lazily, because the answer cannot
+// change within a realm and the probe itself is a code generation attempt.
+let _codegenAvailable = null;
+function codegenAvailable() {
+  if (_codegenAvailable === null) {
+    try {
+      _codegenAvailable = new Function('return 1')() === 1;
+    } catch {
+      _codegenAvailable = false;
+    }
+  }
+  return _codegenAvailable;
+}
+
 // Schema compilation cache: same schema string -> reuse compiled functions
 const _compileCache = new Map();
 
@@ -709,7 +724,13 @@ class Validator {
     const cached = this._userFormats ? null : _compileCache.get(mapKey);
     let jsFn, jsCombinedFn, jsErrFn, _isCodegen = false;
     var _forceNapi = typeof process !== 'undefined' && process.env && process.env.ATA_FORCE_NAPI;
-    if (cached && !_forceNapi) {
+    // Where source cannot be turned into a function, neither JS path is usable.
+    // The closure path does not call `new Function` itself, so it survives the
+    // block and would quietly handle schemas it gets wrong; the interpreted
+    // engine is both eval-free and more correct, so go straight there.
+    if (!codegenAvailable()) {
+      jsFn = null; jsCombinedFn = null; jsErrFn = null;
+    } else if (cached && !_forceNapi) {
       jsFn = cached.jsFn;
       jsCombinedFn = cached.combined;
       jsErrFn = cached.errFn;

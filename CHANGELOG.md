@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.4.0 - 2026-08-04
+
+### Fixed
+
+- Where `new Function` is unavailable, validation now runs on the interpreted engine instead of degrading quietly. Cloudflare Workers, Deno Deploy and pages under a strict Content-Security-Policy refuse code generation; the closure-based path does not call `new Function` itself, so it survived the refusal and went on to handle schemas it gets wrong. Against the full suite with code generation blocked, ata scored 1188 of 1290 with 30 schemas failing to build. It now scores 1286 of 1290 with none, which is the same as the compiled path within one case. Draft 7 is 910 of 922. `tests/test_no_eval.js` runs the whole suite with `eval` and `new Function` blocked so this is checked rather than assumed.
+
 ## 1.3.0 - 2026-08-02
 
 ### Added
