@@ -2,6 +2,13 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.5.0 - 2026-08-05
+
+### Added
+
+- `propertyDependencies`, a JSON Schema v1 [proposal](https://github.com/json-schema-org/json-schema-spec/blob/main/specs/proposals/propertyDependencies.md), selects a subschema by the value of a property rather than by its presence. It replaces the `oneOf` and `if`/`then` patterns normally used to branch on a discriminator field, and reads as `{ "propertyDependencies": { "type": { "customer": { ... }, "employee": { ... } } } }`. The proposal defines the keyword as equivalent to an `if`/`then` on `const`, and `tests/test_property_dependencies.js` checks that equivalence case by case rather than asserting a separate expectation, alongside the proposal's own test files from the official suite: 36 of 38, the two remaining being a `$dynamicRef` scope gap the `if`/`then` form of the same schema hits identically.
+- The keyword is implemented in the interpreted engine. Both JS compiler paths decline a schema that uses it rather than emitting nothing for a keyword they do not know, which would make the constraint vacuous.
+
 ## 1.4.0 - 2026-08-04
 
 ### Fixed

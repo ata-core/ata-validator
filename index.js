@@ -1061,8 +1061,11 @@ class Validator {
       this._ensureNative();
       const _hasDynRef = this._schemaStr.includes('"$dynamicRef"') || this._schemaStr.includes('"$dynamicAnchor"')
       const _hasUneval = this._schemaStr.includes('"unevaluatedProperties"') || this._schemaStr.includes('"unevaluatedItems"')
+      // propertyDependencies exists only in the interpreted engine, so a schema
+      // using it goes there even when it also uses $dynamicRef.
+      const _hasPropDeps = this._schemaStr.includes('"propertyDependencies"')
       let _validate;
-      if (_hasDynRef && !_hasUneval) {
+      if (_hasDynRef && !_hasUneval && !_hasPropDeps) {
         // validateJSON is the C++ path with full anchor-map support; the NAPI
         // direct V8 `validate` path has no anchor maps.
         _validate = (data) => this._compiled.validateJSON(JSON.stringify(data));
