@@ -22,6 +22,8 @@ npm install ata-validator --omit=optional
 
 or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup scores the same on the official suite as the native one, 1285 of 1290 Draft 2020-12 cases; the two miss a different `$dynamicRef` scope corner each. Only the buffer and parallel APIs (`isValid` on raw buffers, `countValid`, `batchIsValid`, `validateAndParse`) need the native engine and say so with a clear error.
 
+Where `new Function` is refused altogether, on Cloudflare Workers, Deno Deploy or under a strict Content-Security-Policy, ata drops to the interpreted engine and scores 1286 of 1290 with code generation blocked. No flags, and on Workers no `nodejs_compat` either. See [docs/edge-runtimes.md](docs/edge-runtimes.md).
+
 In your code:
 
 ```ts
