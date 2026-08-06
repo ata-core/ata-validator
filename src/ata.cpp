@@ -1,7 +1,12 @@
 #include "ata.h"
 
 // mimalloc: faster new/delete for small allocations.
-#if __has_include(<mimalloc-new-delete.h>)
+//
+// ATA_NO_MIMALLOC opts out. A toolchain can ship the headers while providing
+// its own operator new/delete over the same allocator, and including this one
+// on top of that is a duplicate-symbol link error rather than a speedup.
+// Emscripten with -sMALLOC=mimalloc is the case that prompted the flag.
+#if !defined(ATA_NO_MIMALLOC) && __has_include(<mimalloc-new-delete.h>)
 #include <mimalloc-new-delete.h>
 #endif
 
