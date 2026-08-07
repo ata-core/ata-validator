@@ -2,6 +2,17 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.5.1 - 2026-08-07
+
+### Fixed
+
+- `isValid()` on a buffer disagreed with `validate()` on the parsed value for 294 of 2208 cases in the official suite, in both directions. Two causes: the path returned the code generator's `false` directly, which is ambiguous between "invalid" and "the plan stopped at a composition opcode and the walker should finish", so every schema using `allOf`, `anyOf`, `oneOf` or `$ref` was rejected outright; and it ended in a second, simpler walker that had drifted from the one `validate()` uses. It now calls the same walker with all errors off, so there is one set of semantics rather than two kept in step by hand. The disagreement drops to 243 cases, the rest being the on-demand plan answering before the walker runs, which is engine work rather than a setting.
+- `tests/test_buffer_path_parity.js` records that number so it cannot widen, and the README and the edge runtimes guide now state the gap, since `isValid`, `countValid` and `batchIsValid` are shipped APIs and a caller has no way to know otherwise.
+
+### Changed
+
+- `ATA_NO_MIMALLOC` skips the bundled `mimalloc-new-delete.h` include. A toolchain that ships the mimalloc headers along with its own `operator new`/`delete` over the same allocator hits a duplicate symbol at link time; Emscripten with `-sMALLOC=mimalloc` is that case, so the source could not be compiled to WebAssembly at all. The native build does not define it and is unchanged.
+
 ## 1.5.0 - 2026-08-05
 
 ### Added
