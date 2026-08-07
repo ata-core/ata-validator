@@ -15,7 +15,12 @@ jobs:
         node: [20, 22]
     runs-on: ${{ matrix.os }}
     steps:
+      # `npm test` runs the official suite with code generation blocked
+      # (tests/test_no_eval.js), so this job needs the submodule the same way
+      # test-suite does.
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - uses: actions/setup-node@v4
         with:
