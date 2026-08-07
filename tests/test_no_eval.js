@@ -55,6 +55,7 @@ const { Validator } = require('../index')
 const DIALECTS = {
   'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
   draft7: 'http://json-schema.org/draft-07/schema#',
+  v1: 'https://json-schema.org/v1',
 }
 
 const REMOTES_DIR = path.join(__dirname, 'suite/remotes')
@@ -80,6 +81,7 @@ const registry = {}
 const FLOOR = {
   'draft2020-12': { total: 1290, minPass: 1280 },
   draft7: { total: 922, minPass: 905 },
+  v1: { total: 1127, minPass: 1118 },
 }
 
 console.log('\nata with eval and new Function blocked\n')

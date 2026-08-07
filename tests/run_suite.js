@@ -11,7 +11,7 @@
 // (annotation, not assertion; no instance mutation), which is how the suite
 // expects them to behave and how the Bowtie harness configures ata.
 //
-// Usage: node tests/run_suite.js [draft2020-12|draft7]
+// Usage: node tests/run_suite.js [draft2020-12|draft7|v1]
 
 const fs = require("fs");
 const path = require("path");
@@ -20,6 +20,7 @@ const { Validator } = require("../index");
 const DIALECTS = {
   "draft2020-12": "https://json-schema.org/draft/2020-12/schema",
   draft7: "http://json-schema.org/draft-07/schema#",
+  v1: "https://json-schema.org/v1",
 };
 
 const dialect = process.argv[2] || "draft2020-12";
@@ -53,6 +54,13 @@ const KNOWN_FAILURES = {
     "ref.json :: URN base URI with URN and anchor ref :: a string is valid",
     "refRemote.json :: Location-independent identifier in remote ref :: integer is valid",
     "refRemote.json :: $ref to $ref finds location-independent $id :: number is valid",
+  ]),
+  // The three v1 failures are the same three that fail on 2020-12; nothing
+  // here is specific to the dialect.
+  v1: new Set([
+    "defs.json :: validate definition against metaschema :: valid definition schema",
+    "ref.json :: remote ref, containing refs itself :: remote ref valid",
+    "refRemote.json :: remote HTTP ref with nested absolute ref :: number is invalid",
   ]),
 };
 

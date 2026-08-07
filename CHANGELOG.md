@@ -2,6 +2,14 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.6.0 - unreleased
+
+### Added
+
+- The JSON Schema v1 dialect. A schema declaring `"$schema": "https://json-schema.org/v1"`, or the dated `https://json-schema.org/v1/2026` the specification repository's meta-schema carries, is now validated under v1 rather than under 2020-12. The difference ata implements is `$dynamicRef`: v1 removes the bookending requirement, so a reference resolves through the dynamic scope whether or not the schema it initially lands on carries a matching `$dynamicAnchor`, and also when it resolves to nothing on its own. The outermost matching anchor still in scope wins, as before. `propertyDependencies`, the other v1 addition, shipped in 1.5.0.
+- Against the suite's `v1` directory with nothing excluded, ata scores 1123 of 1127. The four it misses are the same four that fail on 2020-12: one `$dynamicRef` scope corner each engine misses, a definition validated against the meta-schema, and two remote-reference cases. `npm run test:suite` now runs the dialect alongside 2020-12 and draft 7, `tests/test_no_eval.js` runs it with code generation blocked (1124 of 1127 there), and `tests/test_v1_dialect.js` checks the switch itself: the same document must not validate the same way under both dialects.
+- Only `$dynamicRef` routing changes. Everything else ata implements is identical under v1 and 2020-12, so a v1 schema that does not use the keyword takes the same compiled path it always did. One that does use it validates on the interpreted engine, since the JS compiler and the native addon both resolve the 2020-12 way. The native engine does not implement bookending at all, which is invisible to the official 2020-12 suite but means it cannot be trusted to answer for either dialect here.
+
 ## 1.5.1 - 2026-08-07
 
 ### Fixed

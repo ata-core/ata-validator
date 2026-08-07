@@ -10,6 +10,7 @@ const {
   compileToJSCombined,
 } = require("./lib/js-compiler");
 const { normalizeDraft7, normalizeNullable, stripFormatAssertions } = require("./lib/draft7");
+const { isV1Dialect } = require("./lib/dialect");
 const { classify } = require("./lib/shape-classifier");
 const { buildTier0Plan, tier0Validate } = require("./lib/tier0");
 
@@ -724,11 +725,22 @@ class Validator {
     const cached = this._userFormats ? null : _compileCache.get(mapKey);
     let jsFn, jsCombinedFn, jsErrFn, _isCodegen = false;
     var _forceNapi = typeof process !== 'undefined' && process.env && process.env.ATA_FORCE_NAPI;
-    // Where source cannot be turned into a function, neither JS path is usable.
-    // The closure path does not call `new Function` itself, so it survives the
-    // block and would quietly handle schemas it gets wrong; the interpreted
-    // engine is both eval-free and more correct, so go straight there.
-    if (!codegenAvailable()) {
+    // v1 removes the bookending requirement for $dynamicRef. Only the
+    // interpreted engine implements that; the JS compiler and the native
+    // engine both resolve the 2020-12 way, so a v1 schema using the keyword
+    // goes to the interpreter rather than being validated under the wrong
+    // dialect. Schemas without $dynamicRef are unaffected: v1 and 2020-12
+    // agree on everything else ata implements.
+    this._v1Dynamic =
+      isV1Dialect(schemaObj) &&
+      (this._schemaStr.includes('"$dynamicRef"') || this._schemaStr.includes('"$dynamicAnchor"'));
+    //
+    // Where source cannot be turned into a function, neither JS path is usable
+    // either. The closure path does not call `new Function` itself, so it
+    // survives the block and would quietly handle schemas it gets wrong; the
+    // interpreted engine is both eval-free and more correct, so go straight
+    // there.
+    if (this._v1Dynamic || !codegenAvailable()) {
       jsFn = null; jsCombinedFn = null; jsErrFn = null;
     } else if (cached && !_forceNapi) {
       jsFn = cached.jsFn;
@@ -812,6 +824,7 @@ class Validator {
           _interp = createInterpreter(schemaObj, {
             schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
             formats: this._userFormats,
+            v1: isV1Dialect(schemaObj),
           });
         }
         const r = _interp.validate(d);
@@ -1065,7 +1078,7 @@ class Validator {
       // using it goes there even when it also uses $dynamicRef.
       const _hasPropDeps = this._schemaStr.includes('"propertyDependencies"')
       let _validate;
-      if (_hasDynRef && !_hasUneval && !_hasPropDeps) {
+      if (_hasDynRef && !_hasUneval && !_hasPropDeps && !this._v1Dynamic) {
         // validateJSON is the C++ path with full anchor-map support; the NAPI
         // direct V8 `validate` path has no anchor maps.
         _validate = (data) => this._compiled.validateJSON(JSON.stringify(data));
@@ -1076,6 +1089,7 @@ class Validator {
         const interp = createInterpreter(schemaObj, {
           schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
           formats: this._userFormats,
+          v1: isV1Dialect(schemaObj),
         });
         _validate = (data) => interp.validate(data);
         this.validateJSON = (jsonStr) => {
@@ -1133,6 +1147,7 @@ class Validator {
       const interp = createInterpreter(schemaObj, {
         schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
         formats: this._userFormats,
+        v1: isV1Dialect(schemaObj),
       });
       const run = preprocess
         ? (data) => { preprocess(data); return interp.validate(data); }

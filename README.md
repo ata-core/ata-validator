@@ -461,8 +461,17 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 | Enum/Const | `enum`, `const` |
 | Composition | `allOf`, `anyOf`, `oneOf`, `not` |
 | Conditional | `if`, `then`, `else` |
-| References | `$ref`, `$defs`, `definitions`, `$id` |
+| References | `$ref`, `$defs`, `definitions`, `$id`, `$anchor`, `$dynamicRef`, `$dynamicAnchor` |
 | Boolean | `true`, `false` |
+| v1 | `propertyDependencies` |
+
+### Dialects
+
+`$schema` selects the dialect. Draft 2020-12 is the default, draft-07 is normalized on the way in, and `https://json-schema.org/v1` (or the dated `https://json-schema.org/v1/2026`) selects JSON Schema v1.
+
+Two things differ under v1. `propertyDependencies` selects a subschema by the value of a property rather than by its presence, which is what `dependentSchemas` does. And `$dynamicRef` no longer requires bookending: the reference resolves through the dynamic scope whether or not the schema it first lands on carries a matching `$dynamicAnchor`, so the outermost matching anchor still in scope wins. Everything else ata implements is identical under both dialects, so a schema that declares no `$schema` behaves exactly as before.
+
+Both are implemented in the interpreted engine, so a v1 schema that uses `$dynamicRef` validates there rather than through the compiler or the native addon, which resolve the 2020-12 way. Schemas that use neither keyword take the same compiled path they always did.
 
 ### Format Validators (hand-written, no regex)
 
@@ -470,12 +479,12 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 
 ### Known limitations
 
-Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1285 of 1290 cases, 99.6%. Draft 7 gives 911 of 922, 98.8%. `npm run test:suite` reproduces both and lists the remaining failures by name.
+Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1285 of 1290 cases, 99.6%. Draft 7 gives 911 of 922, 98.8%. The v1 dialect gives 1123 of 1127, 99.6%, and the four it misses are the same four that fail on 2020-12. `npm run test:suite` reproduces all three and lists the remaining failures by name.
 
 Areas that remain deliberate scope decisions for 1.x:
 
 - **Remote `$ref` over the network** is not fetched. Register cross-schema refs explicitly with `schemas: [...]` or `addSchema()`.
-- **`$vocabulary`** is not implemented; custom vocabularies are ignored rather than enforced.
+- **`$vocabulary`** is not implemented; custom vocabularies are ignored rather than enforced. The keyword was extracted from the specification for the stable release as incomplete, so it is not part of v1.
 - **`contentEncoding` / `contentMediaType` / `contentSchema`** are annotation-only, as the spec permits, and are not validated.
 - **`minLength`/`maxLength`** count UTF-16 code units, not grapheme clusters.
 - **Infinite-loop detection** relies on a recursion depth guard that cuts off circular `$ref` chains.
