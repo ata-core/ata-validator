@@ -3128,11 +3128,42 @@ bool is_valid_prepadded(const schema_ref& schema, const char* data, size_t lengt
   auto result = tl_dom_parser().parse(psv);
   if (result.error()) return false;
 
+  // A false from cg_exec is ambiguous: the document is invalid, or the plan hit
+  // a COMPOSITION opcode it cannot decide (allOf, anyOf, oneOf, $ref) and wants
+  // the tree walker to finish. validate() falls through on false for exactly
+  // this reason; returning it directly here rejected valid documents whenever
+  // the schema used one of those keywords.
   if (!schema.impl->gen_plan.code.empty()) {
-    return cg_exec(schema.impl->gen_plan, schema.impl->gen_plan.code, result.value_unsafe());
+    if (cg_exec(schema.impl->gen_plan, schema.impl->gen_plan.code, result.value_unsafe())) {
+      return true;
+    }
   }
 
-  return validate_fast(schema.impl->root, result.value_unsafe(), *schema.impl);
+  // validate_fast was a second, simpler walker, and it disagreed with the one
+  // validate() uses on 13% of the official suite: unevaluated*, $dynamicRef,
+  // remote $ref, patternProperties and dependent* among others, in both
+  // directions. Two walkers meant two sets of semantics to keep in step, and
+  // they drifted. This one now answers from validate_node, the same walker,
+  // asked to stop at the first error since only the verdict is wanted.
+  std::vector<validation_error> errors;
+  if (schema.impl->has_dynamic_refs) {
+    dynamic_scope_t scope;
+    auto rit = schema.impl->resource_dynamic_anchors.find("");
+    if (rit != schema.impl->resource_dynamic_anchors.end()) {
+      scope.push_back(&rit->second);
+    }
+    if (!schema.impl->root->id.empty()) {
+      auto iit = schema.impl->resource_dynamic_anchors.find(schema.impl->root->id);
+      if (iit != schema.impl->resource_dynamic_anchors.end()) {
+        scope.push_back(&iit->second);
+      }
+    }
+    validate_node(schema.impl->root, result.value_unsafe(), "", *schema.impl, errors, false,
+                  &scope);
+  } else {
+    validate_node(schema.impl->root, result.value_unsafe(), "", *schema.impl, errors, false);
+  }
+  return errors.empty();
 }
 
 bool is_valid_buf(const schema_ref& schema, const uint8_t* data, size_t length) {
