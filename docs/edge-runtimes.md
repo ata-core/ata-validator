@@ -166,3 +166,10 @@ quietly:
 Use `validate()` and `isValidObject()`, which take already-parsed values and work
 everywhere. Everything else, including formats, `$ref`, `$dynamicRef`,
 `unevaluatedProperties` and the full error output, behaves the same.
+
+Their absence here is not a loss at present. Those four do not yet agree with
+`validate()`: over the official suite they differ on 243 of 2208 cases, in both
+directions, concentrated in `unevaluatedProperties`, `contains`, `const` and the
+`$ref` family. `tests/test_buffer_path_parity.js` measures the gap on every run
+so it cannot widen. Until it is closed, reach for them only where throughput
+matters more than exactness, and never as the only check on untrusted input.
