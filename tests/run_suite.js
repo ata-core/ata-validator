@@ -55,11 +55,12 @@ const KNOWN_FAILURES = {
     "refRemote.json :: Location-independent identifier in remote ref :: integer is valid",
     "refRemote.json :: $ref to $ref finds location-independent $id :: number is valid",
   ]),
-  // The three v1 failures are the same three that fail on 2020-12; nothing
-  // here is specific to the dialect.
+  // Both v1 failures also fail on 2020-12; nothing here is specific to the
+  // dialect. The v1 copy of "remote ref, containing refs itself" points at a
+  // document in the suite's own remotes rather than at the metaschema, so it
+  // resolves and passes; the 2020-12 copy still references the metaschema.
   v1: new Set([
     "defs.json :: validate definition against metaschema :: valid definition schema",
-    "ref.json :: remote ref, containing refs itself :: remote ref valid",
     "refRemote.json :: remote HTTP ref with nested absolute ref :: number is invalid",
   ]),
 };

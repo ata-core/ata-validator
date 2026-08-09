@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.6.1 - 2026-08-09
+
+### Fixed
+
+- A `$ref` into another document whose own root carries a fragment-only `$ref` validated everything. The code generator has three entry points and only one of them, the boolean path, ran the bail that routes a reference it cannot follow to the interpreted engine. The other two emitted no lines for the reference and returned the empty program as always-valid, so every constraint behind it was dropped without an error. `{ "$ref": "other.json" }` against a document holding its constraints under `#/$defs/...` accepted any input at all. Both paths now run the same two bails the boolean path runs. This is the third silent-accept defect in `$ref` resolution after the two fixed in 1.3.0, and it affects Draft 2020-12 as well as the v1 dialect.
+- `tests/test_cross_doc_root_ref.js` states the case directly, including a cross-document reference to a target that holds its constraints inline, which must stay on the compiled path so the bail is not widened into "any cross-document reference".
+
+### Changed
+
+- The official test suite moved on five months, from the March snapshot to 6 August. Every published figure is remeasured against it. Draft 2020-12 is 1294 of 1299, draft 7 is 916 of 927, and the v1 dialect is 1131 of 1133. With code generation blocked, Draft 2020-12 is 1295 of 1299 and v1 is 1132 of 1133. One case that the fix above corrects is no longer a known failure under v1.
+- The buffer path disagrees with `validate()` on 245 of 2222 suite cases rather than 243 of 2208. The two additional disagreements are new suite cases, not a widening: measured against the March snapshot the number is still exactly 243.
+
 ## 1.6.0 - 2026-08-08
 
 ### Added

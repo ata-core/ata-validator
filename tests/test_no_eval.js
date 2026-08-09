@@ -79,9 +79,9 @@ const registry = {}
 // interpreted path is not meaningfully worse, so a drop in either engine fails
 // rather than being absorbed silently.
 const FLOOR = {
-  'draft2020-12': { total: 1290, minPass: 1280 },
-  draft7: { total: 922, minPass: 905 },
-  v1: { total: 1127, minPass: 1118 },
+  'draft2020-12': { total: 1299, minPass: 1289 },
+  draft7: { total: 927, minPass: 910 },
+  v1: { total: 1133, minPass: 1124 },
 }
 
 console.log('\nata with eval and new Function blocked\n')

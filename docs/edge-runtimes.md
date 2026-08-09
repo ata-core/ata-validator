@@ -149,9 +149,9 @@ happens to allow. `tests/test_no_eval.js` blocks `eval` and `new Function`
 before ata is loaded and runs the entire official test suite through it. It runs
 as part of `npm test`, and the run fails if the result drops.
 
-With code generation blocked, ata passes **1286 of 1290** cases on Draft 2020-12
-and **910 of 922** on Draft 7. For comparison, the compiled path scores 1285 and
-911 on the same suite: the difference either way is a single case.
+With code generation blocked, ata passes **1295 of 1299** cases on Draft 2020-12
+and **915 of 927** on Draft 7. For comparison, the compiled path scores 1294 and
+916 on the same suite: the difference either way is a single case.
 
 ## What needs the native addon
 
@@ -168,7 +168,7 @@ everywhere. Everything else, including formats, `$ref`, `$dynamicRef`,
 `unevaluatedProperties` and the full error output, behaves the same.
 
 Their absence here is not a loss at present. Those four do not yet agree with
-`validate()`: over the official suite they differ on 243 of 2208 cases, in both
+`validate()`: over the official suite they differ on 245 of 2222 cases, in both
 directions, concentrated in `unevaluatedProperties`, `contains`, `const` and the
 `$ref` family. `tests/test_buffer_path_parity.js` measures the gap on every run
 so it cannot widen. Until it is closed, reach for them only where throughput
