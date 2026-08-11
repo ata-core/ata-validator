@@ -171,7 +171,7 @@ const { Validator } = require('..')
         required: ['name'],
         properties: {
           name: { type: 'string' },
-          Comment: { $ref: '#/definitions/Comment' },
+          comment: { $ref: '#/definitions/Comment' },
         },
       },
     },
@@ -179,17 +179,17 @@ const { Validator } = require('..')
   }
   const v = new Validator(schema)
   assert.strictEqual(
-    v.validate({ user: { name: 'Alice', Comment: { title: 'Hi', content: 'World' } } }).valid,
+    v.validate({ user: { name: 'Alice', comment: { title: 'Hi', content: 'World' } } }).valid,
     true,
     'cross-def ref: valid user with valid comment'
   )
   assert.strictEqual(
-    v.validate({ user: { name: 'Alice', Comment: { title: 'Hi' } } }).valid,
+    v.validate({ user: { name: 'Alice', comment: { title: 'Hi' } } }).valid,
     false,
     'cross-def ref: comment missing required field "content"'
   )
   assert.strictEqual(
-    v.validate({ user: { Comment: { title: 'Hi', content: 'World' } } }).valid,
+    v.validate({ user: { comment: { title: 'Hi', content: 'World' } } }).valid,
     false,
     'cross-def ref: user missing required field "name"'
   )
