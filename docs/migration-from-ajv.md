@@ -238,7 +238,10 @@ fastify.register(require('fastify-ata'), {
 // Every existing schema-driven route works unchanged.
 ```
 
-On serverless cold start (10 routes, first request after boot), the plugin registers in about 0.5 ms versus ~12 ms for the default ajv pipeline.
+On serverless cold start (10 route schemas, from a cold process to the first validated
+request) the plugin path costs about 3.1 ms against 19.6 ms for the default ajv pipeline.
+Registration itself is about 1.1 ms; ata compiles lazily, so the rest lands on the first
+request rather than at boot. Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
 ## Standard Schema V1
 
@@ -285,7 +288,7 @@ These numbers are from M4 Pro / Node 25. Run-to-run variance is about +/- 5%.
 | Warm path, simple schema (S1) | ~9 ns | ~9 ns | tied |
 | Warm path, 10 fields (S2) | ~18 ns | ~19 ns | tied |
 | Invalid with `abortEarly` | ~15 ns | ~4 ns | 4x faster |
-| Serverless cold start (10 Fastify routes) | 12 ms | 0.5 ms | 24x faster |
+| Serverless cold start (10 Fastify route schemas, to first validated request) | 19.6 ms | 3.1 ms | 6.4x faster |
 | Fastify HTTP throughput | ~70k req/s | ~70k req/s | tied |
 | JSON Schema Test Suite | ~98% | 98.5% | parity |
 

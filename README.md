@@ -43,15 +43,29 @@ The `.compiled.mjs` modules are self-contained: zero runtime dependency on ata-v
 
 | Dimension | Schema | ata-AOT | AJV-runtime | Difference |
 |---|---|---|---|---|
-| Bundle (gzipped) | simple | 955 B | 52.7 KB | 56x smaller |
-| Bundle (gzipped) | complex | 1.6 KB | 52.7 KB | 32x smaller |
-| Cold start | simple | 21 ms | 38 ms | 1.8x faster |
-| Throughput (10M ops) | simple | 345 Mops/s | 116 Mops/s | 3.0x faster |
-| Compile time | simple | 6 µs | 1.5 ms | 246x faster |
+| Bundle (gzipped) | simple | 1.0 KB | 52.7 KB | 50.5x smaller |
+| Bundle (gzipped) | complex | 4.8 KB | 52.7 KB | 11.0x smaller |
+| Bundle (gzipped) | nested | 2.3 KB | 52.7 KB | 23.1x smaller |
+| Cold start | simple | 21 ms | 40 ms | 1.9x faster |
+| Throughput (1M ops) | simple | 258 Mops/s | 102 Mops/s | 2.5x faster |
+| Compile time | simple | 8 µs | 1.61 ms | 191x faster |
 
-Reproduce on your machine with `npm run bench:aot-vs-ajv`. Numbers measured on Apple M4 Pro, Node 25.2.1.
+Reproduce on your machine with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple
+M4 Pro, Node 25.2.1, 2026-08-13. Across three runs throughput moved between 258 and 278
+Mops/s and the compile ratio between 150x and 199x, so treat the last two rows as an order
+of magnitude rather than a constant.
 
-The wins are largest on bundle size and compile time because AOT moves work from runtime to build time. Throughput and cold start are also faster because the compiled validator is a tight straight-line function with no schema-walk overhead.
+The wins are largest on bundle size and compile time because AOT moves work from runtime to
+build time. Throughput and cold start are also faster because the compiled validator is a
+tight straight-line function with no schema-walk overhead.
+
+What the table does not cover is data that fails. It measures compiled modules on input that
+passes, and a rejection costs more than a verdict: ata builds an error carrying a code, the
+offending value, a documentation link and a suggestion. On a five-field object schema a
+passing payload costs about 17 ns and a rejected one about 250 ns. `abortEarly: true` or
+`isValidObject()` skips that work when only the verdict matters. Schemas ata declines to
+compile, mostly cross-document `$ref`, `$dynamicRef` and `unevaluated*`, run on the
+interpreted engine and are slower again.
 
 ## Error messages
 
@@ -385,7 +399,10 @@ const { toStandaloneModule } = require('ata-validator/build');
 fs.writeFileSync('./user.validator.mjs', toStandaloneModule(schema, { format: 'esm' }));
 ```
 
-**Fastify startup (10 routes cold): ajv 12.6ms → ata 0.5ms (24x faster boot, no build step required)**
+**Fastify startup, 10 route schemas, from a cold process to the first validated request:
+ajv 19.6 ms, ata 3.1 ms, no build step required.** ata registers in 1.1 ms of that and
+compiles on the first request, so counting only registration would overstate the gap.
+Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
 ### Standard Schema V1
 
