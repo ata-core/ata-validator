@@ -62,7 +62,7 @@ tight straight-line function with no schema-walk overhead.
 What the table does not cover is data that fails. It measures compiled modules on input that
 passes, and a rejection costs more than a verdict: ata builds an error carrying a code, the
 offending value, a documentation link and a suggestion. On a five-field object schema a
-passing payload costs about 17 ns and a rejected one about 250 ns. `abortEarly: true` or
+passing payload costs about 17 ns and a rejected one about 155 ns. `abortEarly: true` or
 `isValidObject()` skips that work when only the verdict matters. Schemas ata declines to
 compile, mostly cross-document `$ref`, `$dynamicRef` and `unevaluated*`, run on the
 interpreted engine and are slower again.
