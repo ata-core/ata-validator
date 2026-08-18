@@ -11,6 +11,6 @@
     "types": ["node"],
     "lib": ["ES2022"]
   },
-  "include": ["test_typed_validator.ts", "test_define_schema.ts", "test_infer.ts", "test_t_infer.ts"],
+  "include": ["test_typed_validator.ts", "test_define_schema.ts", "test_infer.ts", "test_t_infer.ts", "test_interop_types.ts"],
   "exclude": ["node_modules"]
 }

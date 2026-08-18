@@ -21,6 +21,14 @@ const v = new Validator({
 });
 ```
 
+The schema can also be a boolean, which JSON Schema allows anywhere a schema is
+allowed: `true` accepts every instance, `false` rejects every instance.
+
+```javascript
+new Validator(true).isValidObject(anything);  // true
+new Validator(false).isValidObject(anything); // false
+```
+
 **Options:**
 
 | Option | Type | Default | Description |
@@ -192,6 +200,27 @@ const result = v['~standard'].validate(data);
 ```
 
 Works with Fastify v5, tRPC, TanStack Form, Drizzle ORM.
+
+In TypeScript the validated type travels with the interface. A validator built
+from a schema literal carries its inferred type on `~standard.types.output`,
+which is where Standard Schema consumers read it from, so a handler typed by the
+schema needs no cast:
+
+```typescript
+const v = new Validator({
+  type: 'object',
+  properties: { id: { type: 'number' } },
+  required: ['id'],
+});
+
+const result = v['~standard'].validate(input);
+if ('value' in result) {
+  result.value.id; // number
+}
+```
+
+`types` exists only in the type system. The spec defines it as type-only, and
+nothing reads it at runtime.
 
 ## Utility Functions
 

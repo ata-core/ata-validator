@@ -34,7 +34,18 @@ export type TOptional<S> = S & { readonly [OPTIONAL]: true };
 
 export type TSchema = JSONSchema;
 
-export interface StringOptions {
+/**
+ * Shared by every builder option bag. Annotations and vendor keywords (custom
+ * keywords outside the JSON Schema vocabulary) are carried through to the
+ * emitted schema, so the option types accept them.
+ */
+export interface CommonOptions {
+  description?: string;
+  title?: string;
+  [keyword: string]: unknown;
+}
+
+export interface StringOptions extends CommonOptions {
   minLength?: number;
   maxLength?: number;
   pattern?: string;
@@ -45,7 +56,7 @@ export interface StringOptions {
   examples?: readonly string[];
 }
 
-export interface NumericOptions {
+export interface NumericOptions extends CommonOptions {
   minimum?: number;
   maximum?: number;
   exclusiveMinimum?: number;
@@ -57,7 +68,7 @@ export interface NumericOptions {
   examples?: readonly number[];
 }
 
-export interface ArrayOptions {
+export interface ArrayOptions extends CommonOptions {
   minItems?: number;
   maxItems?: number;
   uniqueItems?: boolean;
@@ -65,13 +76,13 @@ export interface ArrayOptions {
   title?: string;
 }
 
-export interface ObjectOptions {
+export interface ObjectOptions extends CommonOptions {
   additionalProperties?: boolean | JSONSchema;
   description?: string;
   title?: string;
 }
 
-export interface RecordOptions {
+export interface RecordOptions extends CommonOptions {
   minProperties?: number;
   maxProperties?: number;
   description?: string;

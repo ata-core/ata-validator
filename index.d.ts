@@ -364,13 +364,13 @@ export interface BundleStandaloneOptions extends ValidatorOptions {
   format?: 'esm' | 'cjs';
 }
 
-export interface StandardSchemaV1Props {
+export interface StandardSchemaV1Props<Output = unknown, Input = unknown> {
   version: 1;
   vendor: "ata-validator";
   validate(
     value: unknown
   ):
-    | { value: unknown }
+    | { value: Output }
     | {
         issues: Array<{
           message: string;
@@ -378,6 +378,11 @@ export interface StandardSchemaV1Props {
           path?: ReadonlyArray<{ key: PropertyKey }>;
         }>;
       };
+  /**
+   * Type-only carrier the Standard Schema spec uses for inference: consumers
+   * read the validated type off `types.output`. Never present at runtime.
+   */
+  readonly types?: { readonly input: Input; readonly output: Output } | undefined;
 }
 
 export interface StandaloneModule {
@@ -425,7 +430,7 @@ export interface Validator<T = unknown> {
   isValidNDJSON(ndjsonBuffer: Buffer): boolean[];
 
   /** Standard Schema V1 interface, compatible with Fastify, tRPC, TanStack, etc. */
-  readonly "~standard": StandardSchemaV1Props;
+  readonly "~standard": StandardSchemaV1Props<T>;
 }
 
 /** Constructor + statics for {@link Validator}. */
@@ -433,7 +438,7 @@ export interface ValidatorConstructor {
   /** Construct from a JSON Schema literal; the validated data type is inferred. */
   new <const S extends JSONSchema>(schema: S, options?: ValidatorOptions): Validator<Infer<S>>;
   /** Construct from a plain object/string schema, or with an explicit data type. */
-  new <T = unknown>(schema: object | string, options?: ValidatorOptions): Validator<T>;
+  new <T = unknown>(schema: object | string | boolean, options?: ValidatorOptions): Validator<T>;
 
   /** Load a pre-compiled standalone module. Zero schema compilation at startup. */
   fromStandalone<T = unknown>(mod: StandaloneModule, schema: object | string, options?: ValidatorOptions): Validator<T>;

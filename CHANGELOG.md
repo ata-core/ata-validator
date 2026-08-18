@@ -2,6 +2,15 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.6.2 - 2026-08-19
+
+### Fixed
+
+- The Standard Schema surface carried no output type. `~standard.validate()` returned `{ value: unknown }` and the `types` carrier the specification defines for inference was missing, so every consumer that reads the validated type off `~standard` (Fastify, tRPC, TanStack Form, Drizzle) saw `unknown` and needed a cast. `~standard` is now typed against the validator's own data type, and `types.output` carries it. Type-only: the runtime object is unchanged, and the specification defines `types` as never present at runtime.
+- Boolean schemas were rejected by the `Validator` constructor's TypeScript signature. `true` and `false` are schemas anywhere JSON Schema allows one, and both have always worked at runtime; only the types disagreed, which made a schema of unknown shape (`object | boolean`) impossible to pass without a cast. Nested boolean subschemas are still typed as objects, so `{ properties: { a: true } }` needs `defineSchema` or a cast.
+- The `t` builder's option bags rejected vendor keywords. `t.object({}, { instanceof: 'Date' })` is what a custom keyword package expects to be given, and the option types only allowed the keywords the builder itself emits, so callers wrote `as never`. Every option bag now accepts unknown keywords alongside the typed ones.
+- `tests/test_interop_types.ts` covers all three under `tsc --noEmit`.
+
 ## 1.6.1 - 2026-08-09
 
 ### Fixed
