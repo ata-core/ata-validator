@@ -154,4 +154,81 @@ const { Validator } = require('..')
   assert.strictEqual(v.validate([1]).valid, false, 'number invalid via $dynamicRef')
 }
 
+// Cross-definition $ref (acyclic) must compile via JS codegen and validate
+// correctly. Before this fix, any inter-definition $ref was treated as a cycle
+// and the schema fell back to the interpreted engine.
+{
+  // One-way: User -> Comment (no cycle)
+  const schema = {
+    definitions: {
+      Comment: {
+        type: 'object',
+        required: ['title', 'content'],
+        properties: { title: { type: 'string' }, content: { type: 'string' } },
+      },
+      User: {
+        type: 'object',
+        required: ['name'],
+        properties: {
+          name: { type: 'string' },
+          comment: { $ref: '#/definitions/Comment' },
+        },
+      },
+    },
+    properties: { user: { $ref: '#/definitions/User' } },
+  }
+  const v = new Validator(schema)
+  assert.strictEqual(
+    v.validate({ user: { name: 'Alice', comment: { title: 'Hi', content: 'World' } } }).valid,
+    true,
+    'cross-def ref: valid user with valid comment'
+  )
+  assert.strictEqual(
+    v.validate({ user: { name: 'Alice', comment: { title: 'Hi' } } }).valid,
+    false,
+    'cross-def ref: comment missing required field "content"'
+  )
+  assert.strictEqual(
+    v.validate({ user: { comment: { title: 'Hi', content: 'World' } } }).valid,
+    false,
+    'cross-def ref: user missing required field "name"'
+  )
+}
+
+// Chain of acyclic cross-definition refs (A -> B -> C) must also compile and validate.
+{
+  const schema = {
+    definitions: {
+      C: { type: 'object', required: ['z'], properties: { z: { type: 'number' } } },
+      B: { type: 'object', required: ['c'], properties: { c: { $ref: '#/definitions/C' } } },
+      A: { type: 'object', required: ['b'], properties: { b: { $ref: '#/definitions/B' } } },
+    },
+    $ref: '#/definitions/A',
+  }
+  const v = new Validator(schema)
+  assert.strictEqual(v.validate({ b: { c: { z: 1 } } }).valid, true, 'chain A->B->C: valid')
+  assert.strictEqual(v.validate({ b: { c: { z: 'bad' } } }).valid, false, 'chain A->B->C: z must be number')
+  assert.strictEqual(v.validate({ b: {} }).valid, false, 'chain A->B->C: c required in B')
+}
+
+// True circular definition refs must still fall back to the interpreted engine
+// and give correct (permissive) results.
+{
+  const schema = {
+    definitions: {
+      Node: {
+        type: 'object',
+        properties: {
+          value: { type: 'number' },
+          next: { $ref: '#/definitions/Node' },
+        },
+      },
+    },
+    $ref: '#/definitions/Node',
+  }
+  const v = new Validator(schema)
+  assert.strictEqual(v.validate({ value: 1, next: { value: 2 } }).valid, true, 'cyclic def: valid linked list')
+  assert.strictEqual(v.validate({ value: 'bad' }).valid, false, 'cyclic def: value must be number')
+}
+
 console.log('test_engine_routing: all assertions passed')
