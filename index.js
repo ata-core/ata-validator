@@ -314,6 +314,34 @@ const ABORT_EARLY_RESULT = Object.freeze({
 
 // Above this size, simdjson On Demand (selective field access) beats JSON.parse
 // (which must materialize the full JS object tree). Buffer.from + NAPI ~2x faster.
+
+// Rejection result with errors materialized on first read. The accessor
+// lives on the prototype so constructing one is a plain allocation; an
+// object-literal getter would create a closure and define an accessor
+// property on every rejection, which showed up as the single largest cost
+// on the rejection path. `toJSON` keeps JSON.stringify output identical to
+// the eager shape. Note for tests: deepStrictEqual against a plain object
+// compares prototypes; read `.errors` and compare that.
+class LazyRejection {
+  constructor(build, data) {
+    this.valid = false;
+    this._build = build;
+    this._data = data;
+    this._errors = null;
+  }
+  toJSON() {
+    return { valid: false, errors: this.errors };
+  }
+}
+Object.defineProperty(LazyRejection.prototype, 'errors', {
+  enumerable: true,
+  configurable: true,
+  get() {
+    if (this._errors === null) this._errors = this._build(this._data);
+    return this._errors;
+  },
+});
+
 const SIMDJSON_THRESHOLD = 8192;
 
 // Resolve a JSON Schema path like "#/properties/name/type" to the schema object
@@ -1369,23 +1397,17 @@ class Validator {
       const _full = this.validate;
       const _fast = this._fastVerdict;
       const EMPTY_ERRORS = Object.freeze([]);
+      const _buildErrors = (data) => {
+        const r = _full(data);
+        return (r && r.valid === false && r.errors && r.errors.length)
+          ? r.errors
+          // The data changed between the verdict and this read; keep the
+          // verdict and say so rather than inventing a specific error.
+          : [{ keyword: 'validation', instancePath: '', schemaPath: '#', params: {}, message: 'schema validation failed' }];
+      };
       this.validate = (data) => {
         if (_fast(data)) return { valid: true, data, errors: EMPTY_ERRORS };
-        let cached = null;
-        return {
-          valid: false,
-          get errors() {
-            if (cached === null) {
-              const r = _full(data);
-              cached = (r && r.valid === false && r.errors && r.errors.length)
-                ? r.errors
-                // The data changed between the verdict and this read; keep the
-                // verdict and say so rather than inventing a specific error.
-                : [{ keyword: 'validation', instancePath: '', schemaPath: '#', params: {}, message: 'schema validation failed' }];
-            }
-            return cached;
-          },
-        };
+        return new LazyRejection(_buildErrors, data);
       };
     }
 

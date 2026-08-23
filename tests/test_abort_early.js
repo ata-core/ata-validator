@@ -40,8 +40,11 @@ const schema = {
   // Warm
   for (let i = 0; i < 1000; i++) { vFull.validate(bad); vAbort.validate(bad); }
 
+  // Since errors are materialized on first read, the default path does no
+  // error work when only `.valid` is consumed, so abortEarly's edge shows
+  // against a caller that actually reads the errors.
   const t1 = process.hrtime.bigint();
-  for (let i = 0; i < N; i++) vFull.validate(bad);
+  for (let i = 0; i < N; i++) { const r = vFull.validate(bad); if (r.errors.length === 0) throw new Error('expected errors'); }
   const dFull = Number(process.hrtime.bigint() - t1);
 
   const t2 = process.hrtime.bigint();
@@ -49,8 +52,17 @@ const schema = {
   const dAbort = Number(process.hrtime.bigint() - t2);
 
   const ratio = dFull / dAbort;
-  console.log(`abortEarly speedup vs full: ${ratio.toFixed(2)}x (full ${(dFull/1e6).toFixed(1)}ms, abort ${(dAbort/1e6).toFixed(1)}ms over ${N} ops)`);
-  assert.ok(ratio > 3, `abortEarly should be >3x faster than full enrichment, got ${ratio.toFixed(2)}x`);
+  console.log(`abortEarly speedup vs full+read: ${ratio.toFixed(2)}x (full ${(dFull/1e6).toFixed(1)}ms, abort ${(dAbort/1e6).toFixed(1)}ms over ${N} ops)`);
+  assert.ok(ratio > 3, `abortEarly should be >3x faster than reading enriched errors, got ${ratio.toFixed(2)}x`);
+
+  // And the verdict-only default path must now be in abortEarly's class:
+  // within 3x, where it used to be 10x and more behind.
+  const t3 = process.hrtime.bigint();
+  for (let i = 0; i < N; i++) vFull.validate(bad);
+  const dVerdict = Number(process.hrtime.bigint() - t3);
+  const vRatio = dVerdict / dAbort;
+  console.log(`default verdict vs abortEarly: ${vRatio.toFixed(2)}x`);
+  assert.ok(vRatio < 3, `reading only .valid should cost about what abortEarly costs, got ${vRatio.toFixed(2)}x`);
 }
 
 console.log('ok: abortEarly regression');
