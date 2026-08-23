@@ -44,6 +44,13 @@ const cases = [
   ['^a*$', 'aaa', true],
   ['colou?r', 'color', true],
   ['colou?r', 'colour', true],
+  // anchoring: only a leading ^ may skip the per-position restart
+  ['$', 'ab', true],
+  ['a$', 'ba', true],
+  ['^$', '', true],
+  ['^$', 'a', false],
+  ['(^a|b)', 'cb', true],
+  ['(^a|b)', 'ca', false],
 ]
 
 for (const [pattern, input, expected] of cases) {
