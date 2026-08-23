@@ -2,6 +2,20 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.7.0 - 2026-08-23
+
+### Fixed
+
+- The four code generation entry points disagreed with each other on 157 instances of the official suite. Most of it was the closure compiler, the boolean fallback behind `isValidObject()` when the code generator declines a schema: it ignored `unevaluatedProperties` and `unevaluatedItems` outright, treated a self-referencing `$ref: "#"` as always true, skipped `additionalProperties` whenever no `properties` map sat next to it, and passed strings in `date-time`, `time`, `uri` and `duration` format without checking them. Each of those accepted input it should have rejected. It now declines those schemas, so they reach an engine that handles them. The remaining disagreements were wrong rejections shared by both boolean paths: `required`, `minProperties` and `maxProperties` applied to non-objects, `multipleOf` had no tolerance for fractional divisors, `const` and `enum` compared objects by key order, and `items` started at index 0 when `prefixItems` was present. `isValidObject()` and `validate()` now agree on every suite instance.
+- A `dependentSchemas` branch carrying `additionalProperties: false` had that check hoisted out of its condition to the top level of the compiled function, so the restriction applied whether or not the triggering property was present.
+- The error path counted a property matched by `patternProperties` as additional under `additionalProperties: false`. The same path now reports the real pointer (`#/patternProperties/<pattern>/...`) for a failing pattern subschema instead of the synthetic `#/patternProperties`, so source frames resolve for those errors.
+- `tests/test_codegen_entrypoint_agreement.js` drives the whole suite through each entry point directly and fails on any split verdict. It runs as part of `npm test`.
+
+### Changed
+
+- The interpreted engine is between 4 and 14 times faster depending on the schema. Each schema node is resolved once into a fixed-shape plan (type bitmask, compiled pattern, looked-up format, one flag per keyword group) and children are linked at plan time, so the walk reads no schema properties and does no map lookups. On a six-field object schema a warm `validate()` went from 3786 ns to 343 ns; a `$ref`-heavy schema from 5354 ns to 366 ns; a recursive `$dynamicRef` tree from 5302 ns to 526 ns. The compiled path is unchanged at about 44 ns on the same schema.
+- The linear-time pattern matcher now runs a lazily built DFA over the Thompson NFA, with cached ASCII transitions and a fallback to the NFA walk past 256 states. On typical anchored patterns it is within 1.2 to 3.5 times of V8's backtracking engine (`^[0-9]{5}$` 14 ns against 12 ns, an email pattern 70 ns against 21 ns) while keeping the linear bound: `^(a+)+$` against 100,000 characters takes 1 ms. This matcher backs `pattern`, `patternProperties` and `propertyNames` in every engine and in standalone output, so all of them gain.
+
 ## 1.6.2 - 2026-08-19
 
 ### Fixed
