@@ -78,6 +78,21 @@ v.isValidObject({ name: 'Mert', age: 26 }); // true
 v.isValidObject({ name: 123 }); // false
 ```
 
+### v.engine()
+
+Which engine answers `validate()` for this schema: `'codegen'` (generated JS,
+the common case), `'closure'` (the closure compiler, the boolean fallback when
+the generator declines), `'native'` (the C++ engine, used for some
+`$dynamicRef` schemas) or `'interpreter'` (schemas the generator cannot
+represent, and every schema where `new Function` is blocked). The verdict is
+the same on every engine; the cost is not. A diagnostic for startup logs and
+benchmarks, not a setting.
+
+```javascript
+new Validator({ type: 'object', properties: { id: { type: 'integer' } } }).engine(); // 'codegen'
+new Validator({ patternProperties: { '^x-': {} }, additionalProperties: false }).engine(); // 'interpreter'
+```
+
 ### v.validateJSON(jsonString)
 
 Validates a JSON string. Uses simdjson for large documents (>8KB).

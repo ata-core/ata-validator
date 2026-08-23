@@ -401,6 +401,13 @@ export interface Validator<T = unknown> {
 
   /** Fast boolean check via JS codegen or tier 0 interpreter. No error collection. */
   isValidObject(data: unknown): data is T;
+  /**
+   * Which engine answers `validate()` for this schema: 'codegen' (generated
+   * JS), 'closure' (the closure compiler), 'native' (the C++ engine, only
+   * for some $dynamicRef schemas) or 'interpreter'. The verdict is the same
+   * on every engine; the cost is not. A diagnostic, not a configuration.
+   */
+  engine(): 'codegen' | 'closure' | 'native' | 'interpreter';
 
   /** Validate a JSON string. Uses simdjson fast path for large documents. */
   validateJSON(jsonString: string): ValidationResult<T>;

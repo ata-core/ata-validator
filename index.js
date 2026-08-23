@@ -583,6 +583,7 @@ class Validator {
     this._compiled = null;
     this._fastSlot = -1;
     this._jsFn = null;
+    this._engine = undefined;
     this._preprocess = null;
     this._applyDefaults = null;
 
@@ -772,6 +773,7 @@ class Validator {
       jsCombinedFn = compileToJSCombined(schemaObj, VALID_RESULT, sm, uf);
       jsErrFn = compileToJSCodegenWithErrors(schemaObj, sm, uf);
       _isCodegen = !!_cgFn;
+      this._engine = _cgFn ? 'codegen' : jsFn ? 'closure' : null;
       if (!uf) {
         _compileCache.set(mapKey, { jsFn, combined: jsCombinedFn, errFn: jsErrFn, isCodegen: _isCodegen });
       }
@@ -779,6 +781,7 @@ class Validator {
       jsFn = null; jsCombinedFn = null; jsErrFn = null;
     }
     this._jsFn = jsFn;
+    if (this._engine === undefined) this._engine = cached ? (cached.isCodegen ? 'codegen' : jsFn ? 'closure' : null) : null;
 
     // Data mutators -- try codegen first (12x faster), fallback to closure arrays.
     // Follow cross-refs so coercion/defaults/removeAdditional see the referenced
@@ -1099,6 +1102,7 @@ class Validator {
       if (_hasDynRef && !_hasUneval && !_hasPropDeps && !this._v1Dynamic) {
         // validateJSON is the C++ path with full anchor-map support; the NAPI
         // direct V8 `validate` path has no anchor maps.
+        this._engine = 'native';
         _validate = (data) => this._compiled.validateJSON(JSON.stringify(data));
         this.validateJSON = (jsonStr) => this._compiled.validateJSON(jsonStr);
         this.isValidJSON = (jsonStr) => this._compiled.isValidJSON(jsonStr);
@@ -1109,6 +1113,7 @@ class Validator {
           formats: this._userFormats,
           v1: isV1Dialect(schemaObj),
         });
+        this._engine = 'interpreter';
         _validate = (data) => interp.validate(data);
         this.validateJSON = (jsonStr) => {
           try {
@@ -1167,6 +1172,7 @@ class Validator {
         formats: this._userFormats,
         v1: isV1Dialect(schemaObj),
       });
+      this._engine = 'interpreter';
       const run = preprocess
         ? (data) => { preprocess(data); return interp.validate(data); }
         : (data) => interp.validate(data);
@@ -1341,6 +1347,15 @@ class Validator {
     if (this._schemaObj && typeof this._schemaObj === 'object') {
       _identityCache.set(this._schemaObj, this);
     }
+  }
+
+  // Which engine answers validate() for this schema: 'codegen' (generated
+  // JS), 'closure' (the closure compiler, the boolean fallback), 'native'
+  // (the C++ engine, only for some $dynamicRef schemas), or 'interpreter'.
+  // A diagnostic: the answer is the same on every engine, the cost is not.
+  engine() {
+    this._ensureCompiled();
+    return this._engine || 'interpreter';
   }
 
   _ensureNative() {
