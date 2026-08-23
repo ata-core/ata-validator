@@ -904,6 +904,10 @@ class Validator {
         } catch {}
       }
 
+      // The boolean engine is the verdict authority for these paths; the
+      // final lazy wrapper uses it to skip error construction entirely.
+      if (!hasDynRef || _isCodegen) this._fastVerdict = preprocess ? null : jsFn;
+
       if (options.abortEarly && jsFn && !hasDynRef) {
         // abortEarly: do NOT enrich. Skip position lookups, suggestions, source maps.
         // This is the perf-critical path for edge gateways. The richErrors wrap
@@ -920,10 +924,22 @@ class Validator {
           ? (data) => { preprocess(data); return _fn(data) ? _R : _efn(data); }
           : (data) => _fn(data) ? _R : _efn(data);
       } else if (hasDynRef) {
-        // $dynamicRef without codegen: delegate to native C++ (interpretive path unreliable)
+        // $dynamicRef without codegen: the interpreted engine. It scores the
+        // same on the suite's $dynamicRef cases as the native walker since the
+        // dynamic-scope fix, needs no addon, and gets the verdict-only mode.
+        if (!_interp) {
+          const { createInterpreter } = require('./lib/interpreter');
+          _interp = createInterpreter(schemaObj, {
+            schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
+            formats: this._userFormats,
+            v1: isV1Dialect(schemaObj),
+          });
+        }
+        const interp = _interp;
+        this._fastVerdict = preprocess ? null : (d) => interp.isValid(d);
         this.validate = preprocess
-          ? (data) => { preprocess(data); return errFn(data); }
-          : errFn;
+          ? (data) => { preprocess(data); return interp.validate(data); }
+          : (data) => interp.validate(data);
       } else if (jsFn && jsFn._hybridFactory) {
         // Zero-wrapper: hybridFactory bakes VALID_RESULT + errFn into a single function
         // No arrow function wrapper, no ternary, one function call
@@ -1098,15 +1114,11 @@ class Validator {
       // propertyDependencies exists only in the interpreted engine, so a schema
       // using it goes there even when it also uses $dynamicRef.
       const _hasPropDeps = this._schemaStr.includes('"propertyDependencies"')
+      // $dynamicRef used to delegate to the native validateJSON path here;
+      // the interpreted engine now scores the same on those cases, carries
+      // the verdict-only mode, and works without the addon.
       let _validate;
-      if (_hasDynRef && !_hasUneval && !_hasPropDeps && !this._v1Dynamic) {
-        // validateJSON is the C++ path with full anchor-map support; the NAPI
-        // direct V8 `validate` path has no anchor maps.
-        this._engine = 'native';
-        _validate = (data) => this._compiled.validateJSON(JSON.stringify(data));
-        this.validateJSON = (jsonStr) => this._compiled.validateJSON(jsonStr);
-        this.isValidJSON = (jsonStr) => this._compiled.isValidJSON(jsonStr);
-      } else {
+      {
         const { createInterpreter } = require('./lib/interpreter');
         const interp = createInterpreter(schemaObj, {
           schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
@@ -1115,6 +1127,7 @@ class Validator {
         });
         this._engine = 'interpreter';
         _validate = (data) => interp.validate(data);
+        this._fastVerdict = preprocess ? null : (d) => interp.isValid(d);
         this.validateJSON = (jsonStr) => {
           try {
             return _validate(JSON.parse(jsonStr));
@@ -1130,7 +1143,9 @@ class Validator {
             return _validate(data);
           }
         : _validate;
-      this.isValidObject = (data) => _validate(data).valid;
+      this.isValidObject = this._fastVerdict
+        ? this._fastVerdict
+        : (data) => _validate(data).valid;
       this.validateAndParse = (jsonStr) => this._compiled.validateAndParse(jsonStr);
       {
         const slot = this._fastSlot;
@@ -1173,11 +1188,14 @@ class Validator {
         v1: isV1Dialect(schemaObj),
       });
       this._engine = 'interpreter';
+      if (!preprocess) this._fastVerdict = (d) => interp.isValid(d);
       const run = preprocess
         ? (data) => { preprocess(data); return interp.validate(data); }
         : (data) => interp.validate(data);
       this.validate = run;
-      this.isValidObject = (data) => run(data).valid;
+      this.isValidObject = this._fastVerdict
+        ? this._fastVerdict
+        : (data) => run(data).valid;
       this.validateJSON = (jsonStr) => {
         try {
           return run(JSON.parse(jsonStr));
@@ -1347,10 +1365,9 @@ class Validator {
     // schema coerces or defaults (preprocess mutates before the verdict),
     // under abortEarly (already a frozen stub), and for $dynamicRef (the
     // boolean engine is not the authority there).
-    if (jsFn && !preprocess && !options.abortEarly && this.validate &&
-        !(this._schemaStr.includes('"$dynamicRef"') || this._schemaStr.includes('"$dynamicAnchor"'))) {
+    if (this._fastVerdict && !preprocess && !options.abortEarly && this.validate) {
       const _full = this.validate;
-      const _fast = jsFn;
+      const _fast = this._fastVerdict;
       const EMPTY_ERRORS = Object.freeze([]);
       this.validate = (data) => {
         if (_fast(data)) return { valid: true, data, errors: EMPTY_ERRORS };

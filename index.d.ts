@@ -403,9 +403,9 @@ export interface Validator<T = unknown> {
   isValidObject(data: unknown): data is T;
   /**
    * Which engine answers `validate()` for this schema: 'codegen' (generated
-   * JS), 'closure' (the closure compiler), 'native' (the C++ engine, only
-   * for some $dynamicRef schemas) or 'interpreter'. The verdict is the same
-   * on every engine; the cost is not. A diagnostic, not a configuration.
+   * JS), 'closure' (the closure compiler) or 'interpreter'; 'native' is
+   * reserved. The verdict is the same on every engine; the cost is not.
+   * A diagnostic, not a configuration.
    */
   engine(): 'codegen' | 'closure' | 'native' | 'interpreter';
 

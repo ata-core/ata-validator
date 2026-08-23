@@ -82,9 +82,9 @@ v.isValidObject({ name: 123 }); // false
 
 Which engine answers `validate()` for this schema: `'codegen'` (generated JS,
 the common case), `'closure'` (the closure compiler, the boolean fallback when
-the generator declines), `'native'` (the C++ engine, used for some
-`$dynamicRef` schemas) or `'interpreter'` (schemas the generator cannot
-represent, and every schema where `new Function` is blocked). The verdict is
+the generator declines), `'interpreter'` (schemas the generator cannot
+represent, and every schema where `new Function` is blocked) or `'native'`
+(reserved; object validation no longer routes to the C++ engine). The verdict is
 the same on every engine; the cost is not. A diagnostic for startup logs and
 benchmarks, not a setting.
 
