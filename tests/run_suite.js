@@ -37,42 +37,18 @@ const REMOTES_DIR = path.join(__dirname, "suite/remotes");
 // and so fixing one shows up as a line to delete rather than a silent pass.
 const KNOWN_FAILURES = {
   "draft2020-12": new Set([
-    "defs.json :: validate definition against metaschema :: valid definition schema",
-    "ref.json :: remote ref, containing refs itself :: remote ref valid",
-    "refRemote.json :: remote HTTP ref with nested absolute ref :: number is invalid",
+    // $vocabulary is not implemented: a custom meta-schema that drops the
+    // validation vocabulary still has its validation keywords applied.
     "vocabulary.json :: schema that uses custom metaschema with with no validation vocabulary :: no validation: invalid number, but it still validates",
   ]),
   draft7: new Set([
-    "definitions.json :: validate definition against metaschema :: valid definition schema",
-    "ref.json :: relative pointer ref to array :: match array",
-    "ref.json :: ref overrides any sibling keywords :: ref valid, maxItems ignored",
-    "ref.json :: $ref prevents a sibling $id from changing the base uri :: $ref resolves to /definitions/base_foo, data does not validate",
-    "ref.json :: $ref prevents a sibling $id from changing the base uri :: $ref resolves to /definitions/base_foo, data validates",
-    "ref.json :: remote ref, containing refs itself :: remote ref valid",
-    "ref.json :: Reference an anchor with a non-relative URI :: match",
-    "ref.json :: Location-independent identifier with base URI change in subschema :: match",
-    "ref.json :: URN base URI with URN and anchor ref :: a string is valid",
-    "refRemote.json :: Location-independent identifier in remote ref :: integer is valid",
-    "refRemote.json :: $ref to $ref finds location-independent $id :: number is valid",
   ]),
-  // Both v1 failures also fail on 2020-12; nothing here is specific to the
-  // dialect. The v1 copy of "remote ref, containing refs itself" points at a
-  // document in the suite's own remotes rather than at the metaschema, so it
-  // resolves and passes; the 2020-12 copy still references the metaschema.
-  v1: new Set([
-    "defs.json :: validate definition against metaschema :: valid definition schema",
-    "refRemote.json :: remote HTTP ref with nested absolute ref :: number is invalid",
-  ]),
+  v1: new Set([]),
 };
 
-// Two $dynamicRef scope corners are missed by one engine each: the native
-// accelerator misses the first, the interpreted engine the second. Both
-// configurations therefore land on the same total, and neither case may turn
-// the run red whichever engine is in use.
-const ENGINE_SPECIFIC = new Set([
-  "dynamicRef.json :: A $dynamicRef that initially resolves to a schema without a matching $dynamicAnchor behaves like a normal $ref to $anchor :: The recursive part doesn't need to validate against the root",
-  "dynamicRef.json :: $dynamicRef avoids the root of each schema, but scopes are still registered :: data is not sufficient for schema at second#/$defs/length",
-]);
+// Cases one engine misses and another passes would hide behind a shared
+// total. There are none at present; a new one is a regression, not an entry.
+const ENGINE_SPECIFIC = new Set([]);
 
 // The suite serves its remote schemas from http://localhost:1234/<relative path>.
 // Keying the registry by that URI is what lets a reference to the retrieval URI

@@ -426,33 +426,35 @@ function _deepCloneWithSymbols(v) {
 // Normalize a caller-provided schema without mutating the original.
 // Clones only when normalization would change the object (draft-07 keys
 // present or nullable fields present). Internal-only — not exported.
-function _normalizeCallerSchema(s) {
-  const needsDraft7 = s && s.$schema && (
-    s.$schema === 'http://json-schema.org/draft-07/schema#' ||
-    s.$schema === 'http://json-schema.org/draft-07/schema'
-  )
+function _normalizeCallerSchema(s, inheritDraft7) {
+  const declares = s && typeof s === 'object' && s.$schema !== undefined
+  const needsDraft7 = declares
+    ? (s.$schema === 'http://json-schema.org/draft-07/schema#' || s.$schema === 'http://json-schema.org/draft-07/schema')
+    : !!inheritDraft7
   const str = JSON.stringify(s)
   const copy = _deepCloneWithSymbols(s)
-  if (needsDraft7) normalizeDraft7(copy)
+  if (needsDraft7) normalizeDraft7(copy, true)
   normalizeNullable(copy)
   // Return original when normalization produced no change, copy otherwise.
   // Change-detection uses JSON content only; symbols do not affect it.
   return JSON.stringify(copy) === str ? s : copy
 }
 
-function buildSchemaMap(schemas) {
+// `inheritDraft7` is true when the root schema is draft-07: a retrieved
+// document that declares no dialect is read under the root's draft.
+function buildSchemaMap(schemas, inheritDraft7) {
   if (!schemas) return null
   const map = new Map()
   if (Array.isArray(schemas)) {
     for (const s of schemas) {
-      const normalized = _normalizeCallerSchema(s)
+      const normalized = _normalizeCallerSchema(s, inheritDraft7)
       const id = normalized.$id
       if (!id) throw new Error('Schema in schemas option must have $id')
       map.set(id, normalized)
     }
   } else {
     for (const [key, s] of Object.entries(schemas)) {
-      const normalized = _normalizeCallerSchema(s)
+      const normalized = _normalizeCallerSchema(s, inheritDraft7)
       // A retrieved document is addressable both by the URI it was registered
       // under and by the $id it declares. Registering only the $id makes
       // references to the retrieval URI unresolvable.
@@ -560,8 +562,10 @@ class Validator {
     // When schema is an object, normalization runs on a clone so the caller's
     // object is never touched.
     let schemaObj = typeof schema === "string"
-      ? JSON.parse(schema)
+      ? _normalizeCallerSchema(JSON.parse(schema))
       : _normalizeCallerSchema(schema);
+    const rootIsDraft7 = !!(schemaObj && typeof schemaObj === 'object' && typeof schemaObj.$schema === 'string' &&
+      (schemaObj.$schema === 'http://json-schema.org/draft-07/schema#' || schemaObj.$schema === 'http://json-schema.org/draft-07/schema'));
 
     // assertFormat: false makes `format` annotation-only. Strip it on a clone
     // so the caller's schema keeps the keyword.
@@ -583,7 +587,7 @@ class Validator {
     this._applyDefaults = null;
 
     // Schema map for cross-schema $ref resolution
-    this._schemaMap = buildSchemaMap(options.schemas) || new Map();
+    this._schemaMap = buildSchemaMap(options.schemas, rootIsDraft7) || new Map();
 
     // User-supplied format checkers: { formatName: (value) => boolean }.
     // Looked up at runtime when a schema references a format the built-in
@@ -716,6 +720,20 @@ class Validator {
 
     // Lazy stringify — only computed here, not in constructor
     if (!this._schemaStr) this._schemaStr = JSON.stringify(schemaObj);
+
+    // A $ref to a meta-schema resolves from the vendored copies, so
+    // "validate this schema against its dialect" needs no network and no
+    // caller-supplied registry. Only schemas that mention json-schema.org in a
+    // reference pay for the lookup.
+    if (this._schemaStr.includes('json-schema.org/draft')) {
+      const { METASCHEMAS } = require('./lib/metaschemas');
+      for (const [id, meta] of METASCHEMAS) {
+        const bare = id.replace(/#$/, '');
+        for (const key of [id, bare, bare + '#', bare.replace(/^https:/, 'http:'), bare.replace(/^http:/, 'https:')]) {
+          if (!this._schemaMap.has(key)) this._schemaMap.set(key, meta);
+        }
+      }
+    }
 
     // Check cache first -- reuse compiled functions for same schema
     const sm = this._schemaMap.size > 0 ? this._schemaMap : null;
@@ -1349,8 +1367,12 @@ class Validator {
     if (!schema || !schema.$id) {
       throw new Error('Schema must have $id')
     }
-    // Normalize a copy so the caller's object is never mutated.
-    const normalized = _normalizeCallerSchema(schema)
+    // Normalize a copy so the caller's object is never mutated. A document
+    // without a dialect of its own is read under the root's draft.
+    const root = this._schemaObj
+    const rootIsDraft7 = !!(root && typeof root === 'object' && typeof root.$schema === 'string' &&
+      (root.$schema === 'http://json-schema.org/draft-07/schema#' || root.$schema === 'http://json-schema.org/draft-07/schema'))
+    const normalized = _normalizeCallerSchema(schema, rootIsDraft7)
     this._schemaMap.set(normalized.$id, normalized)
   }
 

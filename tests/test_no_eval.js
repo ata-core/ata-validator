@@ -79,9 +79,9 @@ const registry = {}
 // interpreted path is not meaningfully worse, so a drop in either engine fails
 // rather than being absorbed silently.
 const FLOOR = {
-  'draft2020-12': { total: 1299, minPass: 1289 },
-  draft7: { total: 927, minPass: 910 },
-  v1: { total: 1133, minPass: 1124 },
+  'draft2020-12': { total: 1299, minPass: 1298 },
+  draft7: { total: 927, minPass: 927 },
+  v1: { total: 1133, minPass: 1133 },
 }
 
 console.log('\nata with eval and new Function blocked\n')
@@ -113,7 +113,11 @@ for (const [dialect, dialectUri] of Object.entries(DIALECTS)) {
       }
       for (const test of group.tests) {
         try {
-          validator.validate(test.data).valid === test.valid ? pass++ : fail++
+          if (validator.validate(test.data).valid === test.valid) pass++
+          else {
+            fail++
+            if (process.env.ATA_LIST_FAILURES) console.log(`    FAIL  ${file} :: ${group.description} :: ${test.description}`)
+          }
         } catch {
           errored++
         }

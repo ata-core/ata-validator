@@ -20,11 +20,11 @@ The `ata-validator` package itself is pure JavaScript. The native accelerator (s
 npm install ata-validator --omit=optional
 ```
 
-or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup scores the same on the official suite as the native one, 1294 of 1299 Draft 2020-12 cases; the two miss a different `$dynamicRef` scope corner each. Only the buffer and parallel APIs (`isValid` on raw buffers, `countValid`, `batchIsValid`, `validateAndParse`) need the native engine and say so with a clear error.
+or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup scores the same on the official suite as the native one, 1298 of 1299 Draft 2020-12 cases; the one case both miss needs `$vocabulary`, which ata does not implement. Only the buffer and parallel APIs (`isValid` on raw buffers, `countValid`, `batchIsValid`, `validateAndParse`) need the native engine and say so with a clear error.
 
 Those four now agree with `validate()` on every case of the official suite, 3359 across three dialects. The native walker behind them does not handle every shape (`contains`, `unevaluatedProperties`, `patternProperties`, tuple `items`, cross-document `$ref`, a few formats), so for schemas using one of those the buffer APIs parse the bytes and answer through `validate()`; the list is in `lib/buffer-gate.js`. Typical request schemas stay on the zero-copy path. `npm test` holds the disagreement count at zero.
 
-Where `new Function` is refused altogether, on Cloudflare Workers, Deno Deploy or under a strict Content-Security-Policy, ata drops to the interpreted engine and scores 1295 of 1299 with code generation blocked. No flags, and on Workers no `nodejs_compat` either. See [docs/edge-runtimes.md](docs/edge-runtimes.md).
+Where `new Function` is refused altogether, on Cloudflare Workers, Deno Deploy or under a strict Content-Security-Policy, ata drops to the interpreted engine and scores the same 1298 of 1299 with code generation blocked. No flags, and on Workers no `nodejs_compat` either. See [docs/edge-runtimes.md](docs/edge-runtimes.md).
 
 In your code:
 
@@ -497,7 +497,7 @@ Both are implemented in the interpreted engine, so a v1 schema that uses `$dynam
 
 ### Known limitations
 
-Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1294 of 1299 cases, 99.6%. Draft 7 gives 916 of 927, 98.8%. The v1 dialect gives 1131 of 1133, 99.8%, and the two it misses are among the five that fail on 2020-12. `npm run test:suite` reproduces all three and lists the remaining failures by name.
+Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1298 of 1299 cases, 99.9%. Draft 7 gives 927 of 927. The v1 dialect gives 1133 of 1133. The one 2020-12 case that fails uses a custom meta-schema that drops the validation vocabulary through `$vocabulary`, which ata does not implement, so the validation keywords still apply. `npm run test:suite` reproduces all three and names it.
 
 Areas that remain deliberate scope decisions for 1.x:
 
