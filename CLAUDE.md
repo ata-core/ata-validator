@@ -51,7 +51,8 @@ Every figure in the README, the docs and on the site is measured, not estimated.
 change moves one, remeasure and update all of them together. Current figures, all with
 zero regressions: Draft 2020-12 1294 of 1299, draft 7 916 of 927, the v1 dialect 1131
 of 1133; with code generation blocked, 1295 of 1299 and 1132 of 1133. The buffer path
-disagrees with `validate()` on 245 of 2222 cases and that number may not grow.
+agrees with `validate()` on all 3359 suite cases; `lib/buffer-gate.js` routes the shapes
+the native walker gets wrong, and that count must stay at zero.
 
 Do not write a number you have not run. Do not round a measured figure into a claim.
 

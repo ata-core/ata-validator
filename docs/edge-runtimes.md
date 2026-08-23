@@ -167,9 +167,10 @@ Use `validate()` and `isValidObject()`, which take already-parsed values and wor
 everywhere. Everything else, including formats, `$ref`, `$dynamicRef`,
 `unevaluatedProperties` and the full error output, behaves the same.
 
-Their absence here is not a loss at present. Those four do not yet agree with
-`validate()`: over the official suite they differ on 245 of 2222 cases, in both
-directions, concentrated in `unevaluatedProperties`, `contains`, `const` and the
-`$ref` family. `tests/test_buffer_path_parity.js` measures the gap on every run
-so it cannot widen. Until it is closed, reach for them only where throughput
-matters more than exactness, and never as the only check on untrusted input.
+Those four agree with `validate()` on every case of the official suite. The
+native walker behind them does not handle every shape, so for schemas using
+`contains`, `unevaluatedProperties`, `patternProperties`, tuple `items`,
+cross-document `$ref` and a few formats (the list is in `lib/buffer-gate.js`)
+they parse the bytes and answer through `validate()`. Typical request schemas
+stay on the zero-copy path. `tests/test_buffer_path_parity.js` holds the
+disagreement count at zero on every run.

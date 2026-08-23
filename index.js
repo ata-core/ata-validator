@@ -1311,6 +1311,14 @@ class Validator {
       }
     }
 
+    // The buffer APIs answer from the native walker, which disagrees with
+    // validate() on shapes listed in lib/buffer-gate.js. For those schemas
+    // every buffer entry point goes through validate() instead.
+    if (native) {
+      const { bufferNeedsSlowPath, installSlowBufferApis } = require('./lib/buffer-gate');
+      if (bufferNeedsSlowPath(schemaObj, this._schemaMap)) installSlowBufferApis(this);
+    }
+
     // Save to identity cache for ultra-fast reuse with same schema object
     if (this._schemaObj && typeof this._schemaObj === 'object') {
       _identityCache.set(this._schemaObj, this);

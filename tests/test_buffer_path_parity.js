@@ -19,6 +19,7 @@ const { Validator } = require('..')
 const DIALECTS = {
   'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
   draft7: 'http://json-schema.org/draft-07/schema#',
+  v1: 'https://json-schema.org/v1',
 }
 
 console.log('\nbuffer path parity: isValid(buffer) against validate(value)\n')
@@ -95,13 +96,12 @@ for (const [dialect, dialectUri] of Object.entries(DIALECTS)) {
   }
 }
 
-// The gap is real and larger than one change can close. It is recorded so it
-// cannot grow, and so that closing it shows up as a number to lower rather than
-// as a test that was always red. Turning the fast paths off entirely takes it
-// to 139 rather than to 0, so this is engine work, not configuration.
-const KNOWN_GAP = 245
+// The gap was 245 until lib/buffer-gate.js started routing the shapes the
+// native walker gets wrong through validate(). It is held at zero: a new
+// disagreement is a new entry in that gate, not a new number here.
+const KNOWN_GAP = 0
 
-console.log(`  compared ${compared} cases across both dialects`)
+console.log(`  compared ${compared} cases across ${Object.keys(DIALECTS).length} dialects`)
 console.log(`  ${disagreements.length} disagreements, known gap is ${KNOWN_GAP}\n`)
 
 if (disagreements.length > KNOWN_GAP) {
