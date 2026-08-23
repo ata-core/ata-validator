@@ -1188,42 +1188,44 @@ class Validator {
       this.isValidJSON = (jsonStr) => this.validateJSON(jsonStr).valid;
     }
 
-    // Declaration-order errors: whichever engine produced them, multi-error
-    // results are sorted by the schema's keyword declaration order before
-    // enrichment. Single-error and abortEarly results pass through untouched.
+    // Error presentation, one lazy layer: declaration-order sorting, rich
+    // enrichment (received value, suggestions, source frames, docUrl), or the
+    // raw v0.14 shape under `richErrors: false`. All of it is work a caller
+    // that only reads `.valid` never sees, so it runs on first access to
+    // `.errors` and is cached. One wrapper, one allocation per rejection.
     if (this.validate) {
       const inner = this.validate;
+      const enrich = this._richErrors ? require('./lib/enrich-error').enrich : null;
       const root = this._schemaObj;
+      const self = this;
       this.validate = (data) => {
         const result = inner(data);
-        if (result && !result.valid && result.errors && result.errors.length > 1 && result !== ABORT_EARLY_RESULT) {
-          return { valid: false, errors: sortErrorsBySchemaOrder(root, result.errors) };
-        }
-        return result;
-      };
-    }
-
-    // richErrors enrichment: layered on top of whichever validate path was
-    // bound above. Verbose's parentSchema flows through because enrich()
-    // copies it. Opt-out (`richErrors: false`) leaves the raw v0.14 shape.
-    if (this._richErrors && this.validate) {
-      const inner = this.validate;
-      const enrich = require('./lib/enrich-error').enrich;
-      this.validate = (data) => {
-        const result = inner(data);
-        if (result && !result.valid && result.errors && result.errors.length) {
-          // abortEarly returns the shared ATA9000 stub; preserve it as-is so the
-          // perf fast path stays allocation-free and the documented code stays stable.
-          if (result === ABORT_EARLY_RESULT) return result;
-          const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
-          const enriched = result.errors.map((e) => enrich(e, {
-            data,
-            positions,
-            schemaPositions: this._schemaPositions,
-            schemaFile: this._source ? this._source.path : undefined,
-          }));
-          if (positions) this._posCache.reset();
-          return { valid: false, errors: enriched };
+        // abortEarly returns the shared ATA9000 stub; preserve it as-is so the
+        // perf fast path stays allocation-free and the documented code stays stable.
+        if (result && result.valid === false && result !== ABORT_EARLY_RESULT) {
+          // Positions come from the raw input when validateJSON set one;
+          // resolved eagerly since the cache is reset per call.
+          const positions = (enrich && self._lastRawInput != null) ? self._posCache.get(self._lastRawInput) : null;
+          if (positions) self._posCache.reset();
+          let cached = null;
+          return {
+            valid: false,
+            get errors() {
+              if (cached === null) {
+                let raw = result.errors || [];
+                if (raw.length > 1) raw = sortErrorsBySchemaOrder(root, raw);
+                cached = (enrich && raw.length)
+                  ? raw.map((e) => enrich(e, {
+                      data,
+                      positions,
+                      schemaPositions: self._schemaPositions,
+                      schemaFile: self._source ? self._source.path : undefined,
+                    }))
+                  : raw;
+              }
+              return cached;
+            },
+          };
         }
         return result;
       };
@@ -1231,7 +1233,7 @@ class Validator {
       // validateJSON also enriches: set _lastRawInput so the position cache
       // can lazily build a map for dataFrame attachment. Only validateJSON
       // wires this — validate(data) takes a pre-parsed object, by design.
-      if (this.validateJSON) {
+      if (this._richErrors && this.validateJSON) {
         const innerJson = this.validateJSON;
         this.validateJSON = (jsonStr) => {
           this._lastRawInput = jsonStr;
@@ -1333,6 +1335,41 @@ class Validator {
           };
         }
       }
+    }
+
+    // Errors are paid for when read, not when produced. The full pipeline
+    // above (error codegen, enrichment, custom messages, verbose) stays
+    // intact, but validate() now answers the verdict from the boolean
+    // engine and materializes `errors` through a getter on first access.
+    // A caller that only reads `.valid`, which is every gateway check and
+    // every benchmark, skips error construction entirely; a caller that
+    // reads `.errors` pays once and the result is cached. Skipped when the
+    // schema coerces or defaults (preprocess mutates before the verdict),
+    // under abortEarly (already a frozen stub), and for $dynamicRef (the
+    // boolean engine is not the authority there).
+    if (jsFn && !preprocess && !options.abortEarly && this.validate &&
+        !(this._schemaStr.includes('"$dynamicRef"') || this._schemaStr.includes('"$dynamicAnchor"'))) {
+      const _full = this.validate;
+      const _fast = jsFn;
+      const EMPTY_ERRORS = Object.freeze([]);
+      this.validate = (data) => {
+        if (_fast(data)) return { valid: true, data, errors: EMPTY_ERRORS };
+        let cached = null;
+        return {
+          valid: false,
+          get errors() {
+            if (cached === null) {
+              const r = _full(data);
+              cached = (r && r.valid === false && r.errors && r.errors.length)
+                ? r.errors
+                // The data changed between the verdict and this read; keep the
+                // verdict and say so rather than inventing a specific error.
+                : [{ keyword: 'validation', instancePath: '', schemaPath: '#', params: {}, message: 'schema validation failed' }];
+            }
+            return cached;
+          },
+        };
+      };
     }
 
     // The buffer APIs answer from the native walker, which disagrees with

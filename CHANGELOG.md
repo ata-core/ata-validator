@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.7.1 - 2026-08-23
+
+### Changed
+
+- Errors are paid for when read, not when produced. `validate()` answers the verdict from the fastest engine for the schema and materializes `errors` through a cached getter on first access; declaration-order sorting and enrichment (received value, suggestions, source frames) moved with it into one presentation layer. A caller that only reads `.valid`, which is every gateway check, no longer pays for error construction at all. The output of `.errors` is byte-for-byte what it was. Measured on a suite-shaped benchmark of prebuilt validators over 1,052 mixed valid and invalid cases, ata went from 778 ns to 282 ns per call. One observable edge: mutating the data between `validate()` and the first read of `.errors` now reflects the mutated data in the errors, and if the mutation makes the data valid the errors fall back to a single generic entry.
+
 ## 1.7.0 - 2026-08-23
 
 ### Fixed
