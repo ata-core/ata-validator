@@ -137,6 +137,18 @@ for (const [dialect, dialectUri] of Object.entries(DIALECTS)) {
 // other reason and the block was never actually exercised.
 assert.ok(blockedCalls > 0, 'expected at least one blocked codegen attempt')
 
+// The Standard Schema surface rides on validate(), so it must work here too:
+// this is what a Hono or tRPC app on a Worker calls.
+{
+  const std = new Validator({ type: 'object', required: ['id'], properties: { id: { type: 'integer' } } })['~standard']
+  assert.strictEqual(std.version, 1)
+  assert.deepStrictEqual(std.validate({ id: 1 }), { value: { id: 1 } })
+  const bad = std.validate({ id: 'x' })
+  assert.ok(Array.isArray(bad.issues) && bad.issues.length === 1)
+  assert.deepStrictEqual(bad.issues[0].path, [{ key: 'id' }])
+  console.log('  PASS  ~standard answers with code generation blocked')
+}
+
 console.log(`\n  ${blockedCalls} code generation attempts blocked and recovered from\n`)
 
 if (exitCode !== 0) {
