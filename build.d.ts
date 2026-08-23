@@ -76,6 +76,15 @@ export function watch(opts: BuildOptions, onReport?: (r: BuildReport) => void): 
 export interface BundleStandaloneOptions {
   format?: 'cjs' | 'esm';
   formats?: Record<string, (value: string) => boolean>;
+  /**
+   * How custom format functions reach the output. 'embed' (default) writes
+   * each function's source into the module; it must be a plain function
+   * with no closed-over variables and no coverage instrumentation, or the
+   * build throws. 'inject' writes no function source: the module exports
+   * `setFormats(map)` and looks formats up from that registry at validation
+   * time, so the caller supplies them at load time.
+   */
+  formatMode?: 'embed' | 'inject';
   verbose?: boolean;
 }
 
@@ -85,6 +94,9 @@ export interface ToStandaloneModuleOptions {
   source?: boolean;
   sourceMap?: unknown;
   schemaFile?: string;
+  formats?: Record<string, (value: string) => boolean>;
+  /** See {@link BundleStandaloneOptions.formatMode}. */
+  formatMode?: 'embed' | 'inject';
 }
 
 /** Bundle multiple schemas into one self-contained module (no ata-validator runtime). */

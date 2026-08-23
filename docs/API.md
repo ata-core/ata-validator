@@ -143,6 +143,27 @@ const { toStandaloneModule } = require('ata-validator/build');
 fs.writeFileSync('./compiled.mjs', toStandaloneModule(schema, { format: 'esm' }));
 ```
 
+Custom formats (`formats: { name: fn }`) reach the output in one of two ways,
+chosen with `formatMode`:
+
+- `'embed'` (default) writes each function's source into the module through
+  `Function#toString`. The function has to be plain: no closed-over variables,
+  not bound, not rewritten by a coverage or transpile step. The build throws a
+  named error when it is not, rather than emitting a module that fails on first
+  use.
+- `'inject'` writes no function source. The module exports `setFormats(map)`
+  and looks each format up from that registry when a value is checked, so the
+  functions are supplied at load time. Validating before `setFormats` throws
+  with the format's name. `bundleStandalone` and `bundleCompact` accept the
+  same option and export one `setFormats` for the whole bundle.
+
+```javascript
+const src = toStandaloneModule(schema, { formats, format: 'cjs', formatMode: 'inject' });
+// later, in the process that loads it:
+const compiled = require('./compiled.js');
+compiled.setFormats({ 'zip-tr': (s) => /^[0-9]{5}$/.test(s) });
+```
+
 ### Validator.fromStandalone(module, schema, options?)
 
 Low-level loader for artifacts produced by `Validator.bundleStandalone()` and
