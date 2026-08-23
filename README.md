@@ -169,6 +169,9 @@ v.isValidJSON('{"name": "Mert", "email": "mert@example.com"}'); // true
 // Buffer input (zero-copy, raw NAPI)
 v.isValid(Buffer.from('{"name": "Mert", "email": "mert@example.com"}'));
 
+// Which engine answers this schema: 'codegen', 'closure', 'native' or 'interpreter'
+v.engine(); // 'codegen'
+
 // Parallel batch - multi-core, NDJSON, 13.4M items/sec
 const ndjson = Buffer.from(lines.join('\n'));
 v.isValidParallel(ndjson);  // bool[]
@@ -399,6 +402,12 @@ const { toStandaloneModule } = require('ata-validator/build');
 
 fs.writeFileSync('./user.validator.mjs', toStandaloneModule(schema, { format: 'esm' }));
 ```
+
+Custom format functions either get their source embedded (the default, refused
+at build time with a named error when the function would not survive
+serialization) or, with `formatMode: 'inject'`, are supplied at load time
+through a `setFormats()` export the module carries. `docs/API.md` has the
+details.
 
 **Fastify startup, 10 route schemas, from a cold process to the first validated request:
 ajv 19.6 ms, ata 3.1 ms, no build step required.** ata registers in 1.1 ms of that and
