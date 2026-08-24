@@ -7,7 +7,7 @@ are inferred from plain JSON Schema, with no builder DSL. The native C++ engine
 (simdjson) is optional and only powers the buffer and batch paths; core
 `validate()` runs on pure JS and works in the browser.
 
-This document describes the architecture as of 0.20.0.
+This document describes the architecture as of 1.7.2.
 
 ## Design principles
 
@@ -15,7 +15,11 @@ This document describes the architecture as of 0.20.0.
   requires the native addon. Native accelerates buffer/NDJSON workloads only.
 - **Compile, do not interpret (where it pays).** Hot schemas are turned into
   specialized JavaScript functions. A small interpreter (tier 0) covers trivial
-  schemas without paying codegen cost.
+  schemas without paying codegen cost, and the schemas the code generator
+  declines are compiled into a closure tree rather than walked.
+- **Declining to compile must never mean accepting.** A code generation path
+  that cannot represent a shape hands the schema to an engine that can. An
+  empty emitted program is a bug, not a valid schema.
 - **Plain JSON Schema is the source of truth.** Types, runtime validation, and
   AOT output all derive from the same plain schema literal.
 - **Zero-eval, shippable output.** The AOT path emits static modules with no
@@ -38,6 +42,8 @@ flowchart TD
   subgraph Strategies["Execution strategies"]
     T0[tier0.js: fast-path interpreter]
     CG[js-compiler.js: JS codegen]
+    INT[interpreter.js: schema walker]
+    PC[plan-compiler.js: closure tree]
     NAT[Native C++ + simdjson]
   end
 
@@ -52,6 +58,9 @@ flowchart TD
   NORM --> CLS
   CLS --> T0
   CLS --> CG
+  CG -. declines .-> INT
+  INT --> PC
+  PC --> RT
   CG --> RT
   CG --> AOT
   CG --> STD
@@ -95,7 +104,7 @@ flowchart TD
   M -->|isValid Buffer / countValid / isValidParallel| NAT["Native C++ + simdjson"]
   NAT -.->|addon missing| THROW["throws: use validate / isValidObject"]
 
-  M -->|$dynamicRef without codegen| NATI["Native interpretive fallback"]
+  M -->|codegen declined the schema| INT["interpreter.js<br/>compiled to a closure tree"]
 ```
 
 - **Tier 0** (`lib/tier0.js`): a small interpreter for trivial shapes, built
@@ -108,9 +117,28 @@ flowchart TD
   - `lib/branch-collapse.js` folds redundant conditionals; `lib/safe-regex.js`
     routes `pattern`/`patternProperties`/`propertyNames` and built-in formats
     through a linear-time engine (ReDoS-safe).
+- **Interpreted engine** (`lib/interpreter.js`): the answer for every schema the
+  code generator declines, and the reference implementation the other engines
+  are diffed against. It plans each schema node once (`Plan`), then walks it.
+  `unevaluatedProperties`/`unevaluatedItems`, `$id`/`$anchor`/`$dynamicAnchor`
+  scoping and cross-document `$ref` live here.
+- **Closure-tree compiler** (`lib/plan-compiler.js`): compiles those plans into
+  a tree of specialized closures. No source generation and no `new Function`,
+  so it runs under a strict CSP and on the edge, but every keyword branch is
+  decided once at compile time and every child call is a direct call, which is
+  the code generator's advantage without the codegen. What the walker decides
+  per call from the schema path is decided here once: the base URI, the dynamic
+  scope for `$dynamicRef`, whether anyone reads a node's annotations, and
+  whether the schema can recurse at all (an acyclic schema drops the cycle
+  guard). Each node compiles to a pair: a collecting function whose error
+  output is byte-for-byte the walker's, and a verdict function that builds no
+  paths and no error objects and returns on the first failure.
+  `tests/test_plan_compiler.js` diffs the two over the official suite and is
+  part of `npm test`.
 - **Native C++** (`src/ata.cpp`, `binding/ata_napi.cpp`, `deps/simdjson`): powers
-  `isValid(Buffer)`, `countValid`, `isValidParallel`, `validateAndParse`, and the
-  interpretive fallback for cases JS codegen does not cover (e.g. `$dynamicRef`).
+  `isValid(Buffer)`, `countValid`, `isValidParallel` and `validateAndParse`.
+  `lib/buffer-gate.js` routes the shapes the native walker gets wrong back
+  through `validate()`.
   Loaded via `lib/native-load.js`, which resolves the per-platform
   `@ata-validator/native-*` optional package (falling back to a local dev build);
   absent native, the buffer/batch methods throw and everything else keeps working
@@ -211,6 +239,9 @@ runs the JS path.
 | `lib/draft7.js` | Draft-07 normalization and OpenAPI `nullable` handling. |
 | `lib/shape-classifier.js` | Classifies a schema to pick the execution strategy. |
 | `lib/tier0.js` | Fast-path interpreter for trivial schemas. |
+| `lib/interpreter.js` | Schema walker: the engine for everything codegen declines, and the reference the others are diffed against. |
+| `lib/plan-compiler.js` | Compiles interpreter plans into a closure tree, no `eval`, verdict and collecting variants. |
+| `lib/buffer-gate.js` | Routes buffer-API shapes the native walker gets wrong back through `validate()`. |
 | `lib/branch-collapse.js` | Codegen optimization: collapse redundant branches. |
 | `lib/safe-regex.js` | Linear-time, ReDoS-safe regex and built-in formats. |
 | `lib/ts-gen.js` | Emits `.d.ts` source text for AOT outputs. |

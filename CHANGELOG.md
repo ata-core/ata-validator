@@ -2,6 +2,19 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.7.2 - 2026-08-24
+
+### Fixed
+
+- A draft-07 document passed through the `schemas` option was rejected with "Schema in schemas option must have $id" whenever it carried `$ref` next to `$id`. Draft-07 ignores every keyword sitting beside `$ref`, so normalization drops them and `$id` goes with them, which is the right reading for evaluation: the reference resolves against the URI the document was retrieved from, not the `$id` it declares. It is the wrong reading for registration, where `$id` is the only name the caller gave the document. The identity is now read from what the caller passed when normalization has dropped it, so such a document registers under its `$id` in the array form and is addressable by both its retrieval URI and its `$id` in the map form. A document that declares no `$id` at all is still refused, and a fragment-only `$id` is still an anchor rather than a document name. This is what made all 23 remote-reference cases of the draft-07 suite error out in the Bowtie compliance report; they now answer, and answer correctly.
+
+### Changed
+
+- The closure-tree compiler now covers every schema the interpreted engine accepts. It previously declined `unevaluatedProperties`/`unevaluatedItems` and `$dynamicRef` in any schema with more than one resource, which left 192 of the 987 suite schemas walking the generic evaluator; that count is now zero. Annotations flow through the compiled tree: the compiler decides at compile time which nodes anyone reads annotations from, and those nodes carry a record that in-place children write into directly, with a failed child rolled back by truncating the record rather than by allocating a fresh one per child. `$dynamicRef` resolves against the dynamic scope computed at compile time, so multi-resource schemas no longer search it per call. A schema whose compiled graph has no cycle drops the recursion guard and the `(schema, data)` stack entirely. An unresolvable `$ref` compiles into the same runtime rejection the evaluator produces instead of declining the schema.
+- Measured on the official suite with prebuilt validators, three runs each on the same machine: draft 2020-12 went from 94 ns to 77-80 ns per case overall, and the cases that route to the interpreted engine from about 240 ns to about 125 ns when they accept and 235 ns to 160 ns when they reject. Draft 7 went from 59 ns to 49 ns overall. The metaschema-validation case, the worst outlier in the suite, went from 5.5 µs to about 1.4 µs.
+- `uniqueItems` on arrays whose item type is not known ahead of time no longer builds a canonicalizing closure and a `Set` on every call. The helpers are hoisted once per compiled function; arrays of twelve items or fewer compare pairwise with a structural equality that ignores key order and allocates nothing, and longer arrays keep the `Set`, using canonical strings only once an object actually appears. Over the draft 7 suite the `uniqueItems` cases went from 125 ns to 24 ns each.
+- `ARCHITECTURE.md` documents the interpreted engine and the closure-tree compiler, and no longer claims `$dynamicRef` falls back to the native engine, which stopped being true in 1.7.1.
+
 ## 1.7.1 - 2026-08-23
 
 ### Added

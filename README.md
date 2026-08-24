@@ -64,9 +64,10 @@ passes, and a rejection costs more than a verdict: ata builds an error carrying 
 offending value, a documentation link and a suggestion. On a five-field object schema a
 passing payload costs about 17 ns and a rejected one about 155 ns. `abortEarly: true` or
 `isValidObject()` skips that work when only the verdict matters. Schemas ata declines to
-compile, mostly cross-document `$ref`, `$dynamicRef` and `unevaluated*`, run on the
-interpreted engine: about 343 ns for a passing payload on a six-field object schema, eight
-times the compiled path, measured warm on the same machine.
+compile, mostly cross-document `$ref`, `$dynamicRef` and the harder `unevaluated*` shapes,
+run on the interpreted engine. That engine compiles each schema into a tree of closures, so
+on a six-field object schema a passing payload costs about 136 ns against 8 ns for the same
+shape on the compiled path, both measured warm in one run on the same machine.
 
 ## Error messages
 

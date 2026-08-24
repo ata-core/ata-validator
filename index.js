@@ -468,6 +468,23 @@ function _normalizeCallerSchema(s, inheritDraft7) {
   return JSON.stringify(copy) === str ? s : copy
 }
 
+// The identity a document is registered under. Draft-07 ignores every
+// keyword sitting next to `$ref`, so normalization drops them, `$id` among
+// them: that is the right reading for evaluation, where the reference
+// resolves against the retrieval URI rather than the declared `$id`. It is
+// the wrong reading for registration, since `$id` is how the caller names
+// the document. So the identity is read from the normalized copy first and
+// from what the caller passed second. A bare-fragment `$id` is a draft-07
+// anchor rather than a document identity, and normalization has already
+// turned it into `$anchor`, so it is not used here.
+function declaredId(original, normalized) {
+  const n = normalized && typeof normalized === 'object' ? normalized.$id : undefined
+  if (typeof n === 'string' && n !== '') return n
+  const o = original && typeof original === 'object' ? original.$id : undefined
+  if (typeof o === 'string' && o !== '' && o[0] !== '#') return o
+  return undefined
+}
+
 // `inheritDraft7` is true when the root schema is draft-07: a retrieved
 // document that declares no dialect is read under the root's draft.
 function buildSchemaMap(schemas, inheritDraft7) {
@@ -476,7 +493,7 @@ function buildSchemaMap(schemas, inheritDraft7) {
   if (Array.isArray(schemas)) {
     for (const s of schemas) {
       const normalized = _normalizeCallerSchema(s, inheritDraft7)
-      const id = normalized.$id
+      const id = declaredId(s, normalized)
       if (!id) throw new Error('Schema in schemas option must have $id')
       map.set(id, normalized)
     }
@@ -487,7 +504,8 @@ function buildSchemaMap(schemas, inheritDraft7) {
       // under and by the $id it declares. Registering only the $id makes
       // references to the retrieval URI unresolvable.
       map.set(key, normalized)
-      if (normalized.$id && normalized.$id !== key) map.set(normalized.$id, normalized)
+      const id = declaredId(s, normalized)
+      if (id && id !== key) map.set(id, normalized)
     }
   }
   return map

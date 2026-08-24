@@ -58,4 +58,45 @@ check('2020-12 keeps applying $ref siblings', () => {
   assert.strictEqual(v.validate([1, 2]).valid, false)
 })
 
+// Draft-07 drops the keywords sitting next to `$ref`, `$id` with them, so a
+// retrieved document written that way used to lose the only name the registry
+// could address it by. The array form of `schemas` then rejected it outright,
+// which is what made every remote-reference case of the draft-07 suite error
+// out under Bowtie.
+check('a draft-07 document with $ref beside $id registers under that $id', () => {
+  const doc = {
+    $schema: D7,
+    $id: 'http://localhost:1234/urn-ref-string.json',
+    definitions: { bar: { type: 'string' } },
+    $ref: '#/definitions/bar',
+  }
+  // Array form: the document names itself.
+  const byArray = new Validator({ $schema: D7, $ref: 'http://localhost:1234/urn-ref-string.json' }, { schemas: [doc] })
+  assert.strictEqual(byArray.validate('x').valid, true)
+  assert.strictEqual(byArray.validate(1).valid, false)
+  // Map form: addressable both by the retrieval URI and by the declared $id.
+  const byMap = new Validator(
+    { $schema: D7, $ref: 'http://localhost:1234/urn-ref-string.json' },
+    { schemas: { 'http://other.example/retrieved.json': doc } },
+  )
+  assert.strictEqual(byMap.validate('x').valid, true)
+  assert.strictEqual(byMap.validate(1).valid, false)
+})
+
+check('a document with no $id at all is still refused by the array form', () => {
+  assert.throws(
+    () => new Validator({ type: 'object' }, { schemas: [{ $schema: D7, type: 'string' }] }),
+    /must have \$id/,
+  )
+})
+
+check('a fragment-only $id is an anchor, not a document identity', () => {
+  // Normalization turns `$id: '#foo'` into `$anchor`, so there is no document
+  // name to register and the array form still refuses it.
+  assert.throws(
+    () => new Validator({ type: 'object' }, { schemas: [{ $schema: D7, $id: '#foo', type: 'string' }] }),
+    /must have \$id/,
+  )
+})
+
 console.log(`\n${passed} passed`)
