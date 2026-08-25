@@ -14,7 +14,7 @@ npm install --save-dev ata-validator
 npx ata build 'schemas/*.json' --out-dir src/generated
 ```
 
-The `ata-validator` package itself is pure JavaScript. The native accelerator (simdjson parsing, parallel NDJSON, buffer APIs) ships as per-platform optional packages that npm installs automatically where they fit, the same pattern Vite uses for esbuild. For a guaranteed zero-binary install:
+The `ata-validator` package itself is pure JavaScript. The native accelerator (simdjson parsing, parallel NDJSON, buffer APIs) ships as per-platform optional packages that npm installs automatically where they fit, the same pattern Vite uses for esbuild. Seven targets are built: macOS on arm64 and x64, Linux on x64 and arm64 against both glibc and musl, and Windows on x64. A platform without a prebuild still installs and validates, on the pure-JS engine. For a guaranteed zero-binary install:
 
 ```bash
 npm install ata-validator --omit=optional
@@ -25,6 +25,18 @@ or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; 
 Those four now agree with `validate()` on every case of the official suite, 3359 across three dialects. The native walker behind them does not handle every shape (`contains`, `unevaluatedProperties`, `patternProperties`, tuple `items`, cross-document `$ref`, a few formats), so for schemas using one of those the buffer APIs parse the bytes and answer through `validate()`; the list is in `lib/buffer-gate.js`. Typical request schemas stay on the zero-copy path. `npm test` holds the disagreement count at zero.
 
 Where `new Function` is refused altogether, on Cloudflare Workers, Deno Deploy or under a strict Content-Security-Policy, ata drops to the interpreted engine and scores the same 1298 of 1299 with code generation blocked. No flags, and on Workers no `nodejs_compat` either. See [docs/edge-runtimes.md](docs/edge-runtimes.md).
+
+Node has a switch for exactly that environment, so this takes thirty seconds to check for yourself, on ata or on whatever you use today:
+
+```bash
+node --disallow-code-generation-from-strings -e "
+  const { Validator } = require('ata-validator')
+  const v = new Validator({ type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] })
+  console.log(v.validate({ id: 1 }).valid, v.validate({ id: 'x' }).valid)
+"
+```
+
+A validator that reaches its speed by generating source and calling `new Function` cannot run under that flag at all, which is the same reason it cannot run on a Worker. That is a deliberate trade rather than an oversight, and it is worth knowing which side of it your validator is on before you deploy to an edge runtime.
 
 In your code:
 
