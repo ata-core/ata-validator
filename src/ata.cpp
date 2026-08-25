@@ -2420,8 +2420,21 @@ static bool near_page_boundary(const char* buf, size_t len) {
           + REQUIRED_PADDING >= static_cast<uintptr_t>(get_page_size()));
 }
 
-// Zero-copy validate with free padding (Lemire's trick).
-// Almost never allocates — only if buffer is near a page boundary.
+// Free padding (Lemire's trick): tell simdjson it may read past the end of the
+// document, because a buffer that does not finish near a page boundary has
+// readable bytes after it and simdjson only uses them as padding.
+//
+// It is sound only for a buffer this library owns. For one handed in by a
+// caller those bytes belong to somebody else: the read does not fault, which
+// is the point of the page check, but it is still a read past the end of the
+// caller's allocation. AddressSanitizer reports it, so anyone who fuzzes or
+// sanitizes an application built on ata sees a heap-buffer-overflow inside
+// simdjson and has no way to tell it is deliberate. `validate()` used this on
+// the caller's own buffer, which is how the fuzz targets in fuzz/ found it.
+//
+// Use this only where the padding genuinely exists. Where it does not,
+// `padded_copy` below costs one memcpy, which is small next to parsing the
+// document that follows it.
 static simdjson::padded_string_view get_free_padded_view(
     const char* data, size_t length, simdjson::padded_string& fallback) {
   if (near_page_boundary(data, length)) {
@@ -2431,6 +2444,17 @@ static simdjson::padded_string_view get_free_padded_view(
   }
   // Common: free padding available, zero-copy
   return simdjson::padded_string_view(data, length, length + REQUIRED_PADDING);
+}
+
+// A view over a padded copy of the caller's document, reusing one buffer per
+// thread so a steady stream of documents allocates nothing after the first.
+static simdjson::padded_string_view padded_copy(const char* data, size_t length) {
+  thread_local std::string tl_owned;
+  const size_t needed = length + REQUIRED_PADDING;
+  if (tl_owned.size() < needed) tl_owned.resize(needed);
+  std::memcpy(tl_owned.data(), data, length);
+  std::memset(tl_owned.data() + length, 0, REQUIRED_PADDING);
+  return simdjson::padded_string_view(tl_owned.data(), length, needed);
 }
 
 // Recognize common digit-only regex patterns: ^[0-9]+$, ^[0-9]{N}$, ^[0-9]{N,M}$
@@ -3039,9 +3063,9 @@ validation_result validate(const schema_ref& schema, std::string_view json,
     return {false, {{error_code::invalid_schema, "", "schema not compiled"}}};
   }
 
-  // Free padding trick: avoid padded_string copy when possible
-  simdjson::padded_string fallback;
-  auto psv = get_free_padded_view(json.data(), json.size(), fallback);
+  // The document belongs to the caller, so it is copied into a padded buffer
+  // rather than read past. See get_free_padded_view for why.
+  auto psv = padded_copy(json.data(), json.size());
 
   // Ultra-fast path: On Demand (no DOM materialization)
   static constexpr size_t OD_THRESHOLD = 32;
@@ -3056,8 +3080,9 @@ validation_result validate(const schema_ref& schema, std::string_view json,
         }
       }
     }
-    // Need fresh view for DOM parse (On Demand consumed it)
-    psv = get_free_padded_view(json.data(), json.size(), fallback);
+    // Need fresh view for DOM parse (On Demand consumed it). The copy is
+    // already padded and still holds this document, so re-wrap it.
+    psv = simdjson::padded_string_view(psv.data(), psv.length(), psv.length() + REQUIRED_PADDING);
   }
 
   auto& dom_p = tl_dom_parser();
