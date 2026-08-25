@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # The official JSON Schema Test Suite is a submodule and it drifts. A stale
+  # pin once hid a real bug here for five months, so let a PR arrive weekly
+  # rather than relying on somebody remembering to look.
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "test"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
