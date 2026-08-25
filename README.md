@@ -561,6 +561,17 @@ npm test
 npm run test:suite
 ```
 
+## Project
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) explains how to build the project and what a
+  pull request needs before it can be merged.
+- [GOVERNANCE.md](GOVERNANCE.md) says who decides what, which changes the project
+  will not accept and why, how releases are cut, and how someone becomes a
+  maintainer. It also states the bus factor plainly: there is one maintainer.
+- [SECURITY.md](SECURITY.md) is where vulnerabilities go. Not the issue tracker.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) applies everywhere the project is
+  discussed.
+
 ## License
 
 MIT

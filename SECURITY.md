@@ -27,8 +27,9 @@ Security issues we care about:
 
 | Version | Supported |
 |---------|-----------|
-| 0.4.x | Yes |
-| < 0.4 | No |
+| 1.7.x | Yes |
+| 1.0 to 1.6 | Fixes for critical issues only |
+| < 1.0 | No |
 
 ## RE2 and ReDoS
 
