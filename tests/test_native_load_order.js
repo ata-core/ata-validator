@@ -16,8 +16,11 @@ assert.strictEqual(nativePackageName('linux', 'x64', false), '@ata-validator/nat
 assert.strictEqual(nativePackageName('linux', 'x64', true), '@ata-validator/native-linux-x64-musl');
 assert.strictEqual(nativePackageName('linux', 'arm64', false), '@ata-validator/native-linux-arm64-gnu');
 assert.strictEqual(nativePackageName('linux', 'arm64', true), '@ata-validator/native-linux-arm64-musl');
+assert.strictEqual(nativePackageName('darwin', 'x64', false), '@ata-validator/native-darwin-x64');
 assert.strictEqual(nativePackageName('freebsd', 'x64', false), null);
-assert.strictEqual(nativePackageName('darwin', 'x64', false), null);
+// A platform ata builds for, on an architecture it does not.
+assert.strictEqual(nativePackageName('darwin', 'ia32', false), null);
+assert.strictEqual(nativePackageName('win32', 'arm64', false), null);
 
 // ATA_NO_NATIVE forces the pure-JS engine even where a dev build exists.
 const child = spawnSync(process.execPath, ['-e', `

@@ -19,6 +19,12 @@ jobs:
           - os: macos-latest
             arch: arm64
             target: darwin-arm64
+          # Intel macOS. The x64 runners were unavailable for a stretch, which
+          # is why darwin-x64 was dropped in 0.13.4; `macos-15-intel` brought
+          # them back.
+          - os: macos-15-intel
+            arch: x64
+            target: darwin-x64
           - os: windows-latest
             arch: x64
             target: win32-x64
@@ -178,7 +184,7 @@ jobs:
               (cd "$dir" && npm publish --access public)
             fi
           done
-          for t in darwin-arm64 linux-x64-gnu linux-arm64-gnu linux-x64-musl linux-arm64-musl win32-x64; do
+          for t in darwin-arm64 darwin-x64 linux-x64-gnu linux-arm64-gnu linux-x64-musl linux-arm64-musl win32-x64; do
             for i in $(seq 1 30); do
               npm view "@ata-validator/native-$t@$VERSION" version > /dev/null 2>&1 && break
               [ "$i" = "30" ] && { echo "native-$t@$VERSION not visible after 5 minutes"; exit 1; }

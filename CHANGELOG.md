@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.7.3 - 2026-08-26
+
+### Added
+
+- A prebuilt native engine for Intel macOS again, `@ata-validator/native-darwin-x64`. The target was dropped in 0.13.4 because GitHub's x64 macOS runners had stopped being reliably available; `macos-15-intel` brought them back, so the matrix is now seven targets: darwin arm64 and x64, linux x64 and arm64 on both glibc and musl, and win32 x64. Intel Macs went to the pure-JS engine in the meantime, which validates identically but leaves the buffer APIs unavailable, so this only changes speed and reach, not answers.
+
 ## 1.7.2 - 2026-08-24
 
 ### Fixed
