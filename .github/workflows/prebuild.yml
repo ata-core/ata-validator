@@ -88,7 +88,7 @@ jobs:
         run: node scripts/make-native-package.js --binary build/Release/ata.node --target ${{ matrix.target }} --out native-packages
 
       - name: Upload native package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: native-pkg-${{ matrix.target }}
           path: native-packages/
@@ -141,7 +141,7 @@ jobs:
         run: node scripts/make-native-package.js --binary build/Release/ata.node --target ${{ matrix.target }} --out native-packages
 
       - name: Upload native package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: native-pkg-${{ matrix.target }}
           path: native-packages/
