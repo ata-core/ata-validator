@@ -108,7 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
         if: matrix.arch == 'arm64'
 
       - name: Build in Alpine container
