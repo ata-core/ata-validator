@@ -6,12 +6,12 @@ it. It describes the project as it actually is today, not as it might be later.
 
 ## The people
 
-ata-validator has been built by, in order of first contribution:
+ata-validator has been built by:
 
-- [@mertcanaltin](https://github.com/mertcanaltin)
-- [@SukeshP1995](https://github.com/SukeshP1995)
 - [@lemire](https://github.com/lemire), whose work on replacing string
   comparisons with integer masks set the approach the hot paths still follow
+- [@mertcanaltin](https://github.com/mertcanaltin)
+- [@SukeshP1995](https://github.com/SukeshP1995)
 - [@armagandalkiran](https://github.com/armagandalkiran)
 - [@pnodet](https://github.com/pnodet)
 
