@@ -567,7 +567,8 @@ npm run test:suite
   pull request needs before it can be merged.
 - [GOVERNANCE.md](GOVERNANCE.md) says who decides what, which changes the project
   will not accept and why, how releases are cut, and how someone becomes a
-  maintainer. It also states the bus factor plainly: there is one maintainer.
+  maintainer. It states the bus factor plainly rather than leaving you to find
+  it out.
 - [SECURITY.md](SECURITY.md) is where vulnerabilities go. Not the issue tracker.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) applies everywhere the project is
   discussed.
@@ -576,7 +577,12 @@ npm run test:suite
 
 MIT
 
-## Authors
+## Contributors
 
-[Mert Can Altin](https://github.com/mertcanaltin)
-[Daniel Lemire](https://github.com/lemire)
+[@mertcanaltin](https://github.com/mertcanaltin) &middot;
+[@SukeshP1995](https://github.com/SukeshP1995) &middot;
+[@lemire](https://github.com/lemire) &middot;
+[@armagandalkiran](https://github.com/armagandalkiran) &middot;
+[@pnodet](https://github.com/pnodet)
+
+Missing from this list after landing a patch? Send a pull request.
