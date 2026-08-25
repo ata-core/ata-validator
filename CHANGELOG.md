@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- Rejecting a document through the buffer APIs no longer costs more than accepting one. The On-Demand plan answers first, and a `false` from it used to be ambiguous: it could mean the document failed a constraint, or that the plan could not decide. The caller had to assume the second, so it re-created the padded view, parsed the whole document again into a DOM, tried the generated plan, and then walked the tree. A rejected document was therefore parsed twice and walked up to three times. The plan now reports whether it stopped because the document failed a constraint or because it could not be read, and only the second falls through. simdjson's `INCORRECT_TYPE` is a constraint failure rather than a read failure, which is the distinction that makes this work: a property holding a string where the schema wants an integer surfaces as a read error from `get<int64>`, not as a type mismatch. On a 62 KB array of a thousand objects with one bad element: 316 µs to 11 µs when the bad element is first, 315 µs to 40 µs when it is last, and rejecting is now never dearer than accepting. `tests/test_buffer_path_parity.js` holds the buffer path to the same answers as `validate()` across all 3359 suite cases, and still reports zero disagreements.
+
 ## 1.7.3 - 2026-08-26
 
 ### Added

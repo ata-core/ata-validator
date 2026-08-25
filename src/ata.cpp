@@ -2696,14 +2696,20 @@ static inline uint64_t utf8_length_fast(std::string_view s) {
 // `pre_type` is an optional caller-supplied type hint; when set, the value.type().get
 // simdjson call is skipped (saves ~3-5 ns per recursion). Used by fast_kind::OBJECT
 // / ARRAY dispatch where the type is already established at compile time.
+// `io_err`, when given, is set whenever this returns false because the document
+// could not be read rather than because it failed a constraint. Without that
+// distinction a false is ambiguous and the caller has to re-parse and re-walk
+// the document to find out which it was, which made rejecting a document cost
+// several times more than accepting one.
 static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
-                         std::optional<simdjson::ondemand::json_type> pre_type = std::nullopt) {
+                         std::optional<simdjson::ondemand::json_type> pre_type = std::nullopt,
+                         bool* io_err = nullptr) {
   using sjt = simdjson::ondemand::json_type;
   sjt st;
   if (pre_type) {
     st = *pre_type;
   } else {
-    if (value.type().get(st) != SUCCESS) return false;
+    { auto _e = value.type().get(st); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
   }
 
   // Type check using simdjson type directly
@@ -2772,7 +2778,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
   }
   case sjt::string: {
     std::string_view sv;
-    if (value.get(sv) != SUCCESS) return false;
+    { auto _e = value.get(sv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
     if (plan.min_length || plan.max_length) {
       uint64_t len = utf8_length_fast(sv);
       if (plan.min_length && len < *plan.min_length) return false;
@@ -2812,7 +2818,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
     if (!plan.object) break;
     auto& op = *plan.object;
     simdjson::ondemand::object obj;
-    if (value.get(obj) != SUCCESS) return false;
+    { auto _e = value.get(obj); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
 
     uint64_t required_found = 0;
     uint64_t prop_count = 0;
@@ -2836,7 +2842,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
             switch (e.fk) {
               case od_plan::fast_kind::INTEGER: {
                 int64_t iv;
-                if (field.value().get(iv) != SUCCESS) return false;
+                { auto _e = field.value().get(iv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
                 auto& sub = *e.sub;
                 uint8_t f = sub.num_flags;
                 double v = static_cast<double>(iv);
@@ -2858,7 +2864,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
               }
               case od_plan::fast_kind::STRING: {
                 std::string_view sv;
-                if (field.value().get(sv) != SUCCESS) return false;
+                { auto _e = field.value().get(sv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
                 auto& sub = *e.sub;
                 if (sub.min_length || sub.max_length) {
                   uint64_t len = utf8_length_fast(sv);
@@ -2896,7 +2902,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
               }
               case od_plan::fast_kind::BOOLEAN: {
                 bool bv;
-                if (field.value().get(bv) != SUCCESS) return false;
+                { auto _e = field.value().get(bv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
                 if (e.sub->enum_check) {
                   if (bv ? !e.sub->enum_check->has_true : !e.sub->enum_check->has_false) return false;
                 }
@@ -2904,23 +2910,23 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
               }
               case od_plan::fast_kind::OBJECT: {
                 simdjson::ondemand::value fv;
-                if (field.value().get(fv) != SUCCESS) return false;
+                { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
                 if (!od_exec_plan(*e.sub, fv,
-                                  simdjson::ondemand::json_type::object)) return false;
+                                  simdjson::ondemand::json_type::object, io_err)) return false;
                 break;
               }
               case od_plan::fast_kind::ARRAY: {
                 simdjson::ondemand::value fv;
-                if (field.value().get(fv) != SUCCESS) return false;
+                { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
                 if (!od_exec_plan(*e.sub, fv,
-                                  simdjson::ondemand::json_type::array)) return false;
+                                  simdjson::ondemand::json_type::array, io_err)) return false;
                 break;
               }
               case od_plan::fast_kind::OTHER:
               default: {
                 simdjson::ondemand::value fv;
-                if (field.value().get(fv) != SUCCESS) return false;
-                if (!od_exec_plan(*e.sub, fv)) return false;
+                { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+                if (!od_exec_plan(*e.sub, fv, std::nullopt, io_err)) return false;
               }
             }
           }
@@ -2942,8 +2948,8 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
                   required_found |= (1ULL << e.required_idx);
                 if (e.sub) {
                   simdjson::ondemand::value fv;
-                  if (field.value().get(fv) != SUCCESS) return false;
-                  if (!od_exec_plan(*e.sub, fv)) return false;
+                  { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+                  if (!od_exec_plan(*e.sub, fv, std::nullopt, io_err)) return false;
                 }
                 matched = true;
                 break;
@@ -2966,13 +2972,13 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
     if (!plan.array) break;
     auto& ap = *plan.array;
     simdjson::ondemand::array arr;
-    if (value.get(arr) != SUCCESS) return false;
+    { auto _e = value.get(arr); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
 
     uint64_t count = 0;
     for (auto elem : arr) {
       simdjson::ondemand::value v;
-      if (elem.get(v) != SUCCESS) return false;
-      if (ap.items && !od_exec_plan(*ap.items, v)) return false;
+      { auto _e = elem.get(v); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+      if (ap.items && !od_exec_plan(*ap.items, v, std::nullopt, io_err)) return false;
       count++;
     }
     if (ap.min_items && count < *ap.min_items) return false;
@@ -2982,7 +2988,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
   case sjt::boolean: {
     if (plan.enum_check) {
       bool b;
-      if (value.get(b) != SUCCESS) return false;
+      { auto _e = value.get(b); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
       if (b ? !plan.enum_check->has_true : !plan.enum_check->has_false) return false;
     }
     break;
@@ -3117,9 +3123,17 @@ bool is_valid_prepadded(const schema_ref& schema, const char* data, size_t lengt
     if (!od_result.error()) {
       simdjson::ondemand::value root_val;
       if (od_result.get_value().get(root_val) == SUCCESS) {
-        if (od_exec_plan(*schema.impl->od, root_val)) {
+        bool od_err = false;
+        if (od_exec_plan(*schema.impl->od, root_val, std::nullopt, &od_err)) {
           return true;
         }
+        // A plan built with `supported` covers the whole schema, so a failure
+        // it reached on its own is the answer. Only fall through when the
+        // document could not be read, where the false means "did not get far
+        // enough to tell". Without this a rejected document was parsed twice
+        // and walked again by the DOM walker, which cost several times more
+        // than accepting the same document.
+        if (!od_err) return false;
       }
     }
     psv = get_free_padded_view(data, length, fallback);
