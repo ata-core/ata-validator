@@ -1426,6 +1426,11 @@ class Validator {
                       schemaFile: self._source ? self._source.path : undefined,
                     }))
                   : raw;
+                // Correlation is published, never applied. Both halves of a
+                // typo pair stay in the array; `related` only says they are
+                // one mistake, so a wrong pairing costs a sentence rather
+                // than a hidden violation.
+                if (enrich && cached.length > 1) attachRelated(cached);
               }
               return cached;
             },
@@ -1466,6 +1471,7 @@ class Validator {
                 schemaPositions: this._schemaPositions,
                 schemaFile: this._source ? this._source.path : undefined,
               }));
+              if (enriched.length > 1) attachRelated(enriched);
               if (positions) this._posCache.reset();
               this._lastRawInput = null;
               return { valid: false, errors: enriched };
@@ -1482,6 +1488,7 @@ class Validator {
               }
               this._posCache.reset();
             }
+            if (result.errors.length > 1) attachRelated(result.errors);
           }
           this._lastRawInput = null;
           return result;
@@ -1945,6 +1952,19 @@ function _walkPointer (root, pointer) {
 // inflate the gzipped bundle beyond the size budget). Consumers who want
 // suggestions pass the error array through this helper after validation.
 // AOT errors don't carry `received`, so we re-derive it from `data` here.
+function attachRelated (errors) {
+  const { correlateTypos } = require('./lib/correlate');
+  const pairs = correlateTypos(errors);
+  if (pairs.size === 0) return errors;
+  for (const [from, to] of pairs) {
+    const e = errors[from];
+    if (!e) continue;
+    if (e.related) { if (!e.related.includes(to)) e.related.push(to); }
+    else e.related = [to];
+  }
+  return errors;
+}
+
 function attachSuggestions (errors, data) {
   if (!errors) return errors;
   for (const e of errors) {
