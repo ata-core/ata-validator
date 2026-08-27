@@ -134,6 +134,63 @@ registered schemas cost 2.4 ms to construct before a single document was validat
 Cold start is the thing ata sells on edge runtimes, so that number mattered more than
 the attention it had had. It is now 0.26 ms. Item 2 is what is left.
 
+## 3a. The error path is four times slower than ajv's
+
+The largest gap to other implementations is not in deciding whether a document is
+valid. It is in saying why it is not.
+
+Same schemas, same instances, all three libraries configured alike: format as an
+annotation, no defaults, errors collected, no short circuit. Only the cases all three
+compile and agree on. Draft 2020-12, 314 schemas, 1031 instances of which 467 are
+invalid:
+
+| | verdict only | errors read on every failure |
+|---|---|---|
+| ata | 0.128 ms | 0.740 ms |
+| ajv | 0.191 ms | 0.170 ms |
+| @exodus/schemasafe | 0.211 ms | 0.267 ms |
+
+Reading `.errors` turns a 1.5x lead into a 4.3x deficit. Draft 7 is the same shape,
+4.9x.
+
+The lead in the first column is not a faster engine so much as a lazier one: ata does
+not build error objects until they are read, and roughly half the suite's instances
+are invalid, so the other two are doing work in that column that ata defers. Any
+comparison which quotes one of these columns should say which.
+
+Broken down over the invalid instances alone, against ajv with `allErrors`:
+
+| | | |
+|---|---|---|
+| ajv, allErrors | 0.177 ms | 1.00x |
+| ata, rich errors, the default | 0.752 ms | 4.24x |
+| ata, `richErrors: false` | 0.542 ms | 3.05x |
+| ata, `abortEarly: true` | 0.258 ms | 1.45x |
+| ata, verdict only | 0.051 ms | 0.29x |
+
+Rich enrichment, the code and documentation link and suggestion, is about a third of
+it. The rest is the mechanism: a result object and a closure per failing validation,
+then a pass that ranks and sorts, then a pass that maps every raw error into a new
+enriched one. ajv writes into an array it already has.
+
+### What one round of optimization bought, and what it did not
+
+A CPU profile put `schemaOrderRank` at 8.5% of the error path. It split the schema
+path with two regular expressions per segment and then called
+`Object.keys(node).indexOf(seg)` at every level, for every error of every failing
+document, although the answer depends only on the schema and the path, neither of
+which changes. Caching the rank per path, indexing the keys once per node, and
+skipping the escape handling when a segment contains no tilde took that function from
+8.5% to 1.4%.
+
+The whole error path got 3.5% faster. Median of eleven interleaved runs.
+
+That is the honest shape of this problem. There is no hot spot to remove. The cost is
+spread across the garbage collector at 15%, the generated code, the enrichment, and
+the per-failure result machinery, and closing a four-fold gap means redesigning that
+pipeline rather than finding another `schemaOrderRank`. Worth knowing before anyone
+promises it cheaply.
+
 ## 4. The serialized schema is scanned seven times
 
 At compile time `this._schemaStr.includes(...)` runs seven times over the whole

@@ -373,12 +373,64 @@ function resolveSchemaByPath(rootSchema, schemaPath) {
 // order AJV emits and what schema authors read top to bottom. Segments that
 // cannot be resolved (cross-schema refs, normalized keys) end the walk; the
 // stable sort then keeps such errors in engine emission order.
+// The rank of a `schemaPath` under a given root is fixed: the schema does not
+// change between validations, so neither does the answer. It was recomputed for
+// every error of every failing document, and computing it is not cheap. Two
+// caches, both keyed on things that do not change:
+//
+//   rootSchema -> schemaPath -> rank, so a path is walked once ever
+//   node       -> key -> its index, so the walk stops calling Object.keys and
+//                        scanning the result for a string
+//
+// A failing route sees the same handful of schemaPaths over and over, which is
+// what makes the first one worth having.
+const _rankCache = new WeakMap();
+const _keyIndexCache = new WeakMap();
+
+function keyIndex(node, seg) {
+  let index = _keyIndexCache.get(node);
+  if (index === undefined) {
+    index = new Map();
+    const keys = Object.keys(node);
+    for (let i = 0; i < keys.length; i++) index.set(keys[i], i);
+    _keyIndexCache.set(node, index);
+  }
+  const at = index.get(seg);
+  return at === undefined ? -1 : at;
+}
+
+// `~1` and `~0` are the only escapes a JSON pointer has, and almost no schema
+// key contains a tilde. Looking for one is far cheaper than two regex passes
+// over every segment of every path.
+function unescapePointerSegment(seg) {
+  return seg.indexOf('~') < 0 ? seg : seg.replace(/~1/g, '/').replace(/~0/g, '~');
+}
+
 function schemaOrderRank(rootSchema, schemaPath) {
   if (!schemaPath || typeof schemaPath !== 'string' || !schemaPath.startsWith('#')) return null;
-  const parts = schemaPath.slice(1).split('/').filter(Boolean).map((s) => s.replace(/~1/g, '/').replace(/~0/g, '~'));
+  if (rootSchema === null || typeof rootSchema !== 'object') return null;
+
+  let byPath = _rankCache.get(rootSchema);
+  if (byPath === undefined) { byPath = new Map(); _rankCache.set(rootSchema, byPath); }
+  const hit = byPath.get(schemaPath);
+  if (hit !== undefined) return hit;
+
+  const rank = _computeRank(rootSchema, schemaPath);
+  byPath.set(schemaPath, rank);
+  return rank;
+}
+
+function _computeRank(rootSchema, schemaPath) {
   const rank = [];
   let node = rootSchema;
-  for (const seg of parts) {
+  let start = 1;
+  while (start <= schemaPath.length) {
+    let end = schemaPath.indexOf('/', start);
+    if (end < 0) end = schemaPath.length;
+    if (end === start) { start = end + 1; continue; }   // what filter(Boolean) dropped
+    const seg = unescapePointerSegment(schemaPath.slice(start, end));
+    start = end + 1;
+
     if (node == null || typeof node !== 'object') break;
     if (Array.isArray(node)) {
       const idx = Number(seg);
@@ -386,7 +438,7 @@ function schemaOrderRank(rootSchema, schemaPath) {
       rank.push(idx);
       node = node[idx];
     } else {
-      const idx = Object.keys(node).indexOf(seg);
+      const idx = keyIndex(node, seg);
       if (idx < 0) break;
       rank.push(idx);
       node = node[seg];
