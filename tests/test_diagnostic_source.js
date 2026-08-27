@@ -26,6 +26,8 @@ const schema = { type: 'object', required: ['name'], properties: { name: { type:
   const json = '{\n  "x": 1\n}';
   const errs = v.validateJSON(json).errors;
   assert.strictEqual(errs[KEY].text, json, 'payload carries the original text');
+  assert.deepStrictEqual(errs[KEY].data, { x: 1 }, 'and still carries the parsed data');
+  assert.ok(errs[KEY].schema, 'and the schema');
   console.log('ok: text path carries its text');
 }
 

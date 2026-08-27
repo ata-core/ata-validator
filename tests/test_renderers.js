@@ -13,8 +13,10 @@ const noColor = { color: 'never', cwd: '/nowhere' };
 {
   const out = renderCompact(fix.threeErrors, noColor);
   const expected = [
-    'schemas/user.json:5:7 - error ATA3001: body.email value does not match format "email" (got "not-an-email", missing \'@\' and domain part)',
+    // Diagnostics are ordered by document position, so name (line 4) now
+    // precedes email (line 5) regardless of the order the array arrived in.
     'schemas/user.json:4:7 - error ATA2001: body.name string shorter than minLength (got "M")',
+    'schemas/user.json:5:7 - error ATA3001: body.email value does not match format "email" (got "not-an-email", missing \'@\' and domain part)',
     'schemas/user.json:6:7 - error ATA2003: body.age number below minimum (got -3)',
     '',
     'Found 3 errors in input.',
@@ -48,7 +50,8 @@ const noColor = { color: 'never', cwd: '/nowhere' };
   assert.ok(out.includes('error[ATA3001]: value does not match format "email"'));
   assert.ok(out.includes('--> schemas/user.json:5:7'));
   assert.ok(out.includes('"email": { "type": "string", "format": "email" }'));
-  assert.ok(out.includes('--> input, byte 23'));
+  assert.ok(out.includes('--> input:1:24  (body.email)'), 'data location is line:col plus the dotted path');
+  assert.ok(out.includes('^^^^^^^^^^^^^^  found "not-an-email"'), 'caret spans the token and states what was found');
   assert.ok(out.includes('"not-an-email"'));
   assert.ok(out.includes("help: missing '@' and domain part"));
   assert.ok(out.includes('note: see https://ata-validator.com/e/ATA3001'));

@@ -1470,15 +1470,20 @@ class Validator {
           if (result && !result.valid && result.errors && result.errors.length) {
             // If errors came from the inner path that already ran through the
             // wrapped this.validate (codegen jsonValidateFn -> validate path),
-            // they may already be enriched. Detect by presence of `code`.
+            // they may already be enriched. Detect by presence of `docUrl`:
+            // only enrich() sets it. `code` is not a safe signal because
+            // branch-collapse attaches codes to raw errors, and detecting on
+            // it left every collapsed oneOf/anyOf error unenriched on the
+            // text path.
             const first = result.errors[0];
-            if (!first || !first.code) {
+            // Re-parse the input once so the enrich pass can pluck `received`
+            // and feed the suggestion engine (required-typo, format hints,
+            // coercion nudges all need the live value tree), and so the
+            // diagnostic payload carries the data on both paths below.
+            let parsedData;
+            try { parsedData = JSON.parse(jsonStr); } catch { parsedData = undefined; }
+            if (!first || !first.docUrl) {
               const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
-              // Re-parse the input once so the enrich pass can pluck `received`
-              // and feed the suggestion engine (required-typo, format hints,
-              // coercion nudges all need the live value tree).
-              let parsedData;
-              try { parsedData = JSON.parse(jsonStr); } catch { parsedData = undefined; }
               const enriched = result.errors.map((e) => enrich(e, {
                 data: parsedData,
                 positions,
@@ -1511,6 +1516,7 @@ class Validator {
             }
             if (result.errors.length > 1) attachRelated(result.errors);
             attachDiagnosticSource(result.errors, {
+              data: parsedData,
               text: jsonStr,
               schema: this._schemaObj,
               mutatesInput: this._mutatesInput === true,
@@ -1987,8 +1993,17 @@ const DIAGNOSTIC_SOURCE = Symbol.for('ata.diagnosticSource');
 function attachDiagnosticSource (errors, payload) {
   if (!Array.isArray(errors) || !Object.isExtensible(errors)) return errors;
   try {
+    // validateJSON's already-enriched path runs after the validate() wrapper
+    // has attached a payload carrying the parsed data. Merge rather than
+    // replace, so the text arrives without the data going missing.
+    const prev = errors[DIAGNOSTIC_SOURCE];
+    let value = payload;
+    if (prev) {
+      value = Object.assign({}, prev);
+      for (const k of Object.keys(payload)) if (payload[k] !== undefined) value[k] = payload[k];
+    }
     Object.defineProperty(errors, DIAGNOSTIC_SOURCE, {
-      value: payload, enumerable: false, configurable: true, writable: true,
+      value, enumerable: false, configurable: true, writable: true,
     });
   } catch {
     // Nothing to do. The renderer degrades to pointer-only output.
