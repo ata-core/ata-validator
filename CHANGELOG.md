@@ -10,7 +10,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
   The walk descends through every object-valued key rather than the subschema keywords the normalizers recurse through, so it is a superset of what they visit: it can report work where there is none, costing one clone, and cannot miss work there is. Across the 2344 schemas in the official suite it reports work on 335 where normalization changes 334. `tests/test_schema_scan.js` asserts that direction over the whole suite, and asserts the check is load-bearing by breaking the scan deliberately and confirming the broken one is caught.
 
-  The answer is remembered against the schema object, the way whole compiled validators already are. Without that, a server building one validator per route over a shared registry rescans that registry once per route: fifty routes over twenty shared schemas boots in 0.111 ms rather than 20.66 ms, a difference of 186x.
+  The answer is remembered against the schema object, the way whole compiled validators already are, and so is the schema map built from a registry. Both were being redone once per validator, so a server building one validator per route over a shared registry paid for that registry once per route. Fifty routes over twenty shared schemas boots in 0.046 ms rather than 20.66 ms. Validators share the map, and anything that writes to one, which is `addSchema()` and the meta-schema registration during compilation, takes a private copy first.
 
   Nothing about what any schema validates to changes. The comparison that decided the old answer is still there behind the walk, so a schema the walk sends down the slow path gets exactly the result it got before.
 

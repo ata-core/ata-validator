@@ -162,4 +162,44 @@ check('the answer is remembered against the schema object', () => {
   for (const v of validators) assert.strictEqual(v.validate({}).valid, true)
 })
 
+check('validators sharing a registry do not share what they add to it', () => {
+  // The schema map is cached against the registry object and handed to every
+  // validator built from it, so a write has to take a private copy first.
+  // Without that, addSchema() on one route would silently register the schema
+  // for every other route, and for routes built later.
+  const shared = [{ $id: 'urn:shared:base', type: 'object' }]
+  const first = new Validator({ type: 'object' }, { schemas: shared })
+  const second = new Validator({ type: 'object' }, { schemas: shared })
+
+  first.addSchema({ $id: 'urn:private', type: 'string' })
+
+  assert.ok(first._schemaMap.has('urn:private'), 'the one that added it sees it')
+  assert.ok(!second._schemaMap.has('urn:private'), 'a sibling does not')
+
+  const third = new Validator({ type: 'object' }, { schemas: shared })
+  assert.ok(!third._schemaMap.has('urn:private'), 'nor does one built afterwards')
+
+  for (const v of [first, second, third]) {
+    assert.ok(v._schemaMap.has('urn:shared:base'), 'the shared entry survives')
+  }
+})
+
+check('registering the meta-schemas does not leak into siblings either', () => {
+  // The other writer: a schema which references json-schema.org has the
+  // vendored meta-schemas added to its map during compilation.
+  const shared = [{ $id: 'urn:shared:base2', type: 'object' }]
+  const refsMeta = new Validator(
+    { $ref: 'https://json-schema.org/draft/2020-12/schema' },
+    { schemas: shared },
+  )
+  const plain = new Validator({ type: 'object' }, { schemas: shared })
+
+  refsMeta.validate({})
+  plain.validate({})
+
+  const META = 'https://json-schema.org/draft/2020-12/schema'
+  assert.ok(refsMeta._schemaMap.has(META), 'the one that needed them has them')
+  assert.ok(!plain._schemaMap.has(META), 'the one that did not, does not')
+})
+
 console.log(`\n${passed} passed`)

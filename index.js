@@ -498,8 +498,33 @@ function declaredId(original, normalized) {
 
 // `inheritDraft7` is true when the root schema is draft-07: a retrieved
 // document that declares no dialect is read under the root's draft.
+// The map is derived entirely from what the caller passed, so the same
+// `schemas` gives the same map. A server building one validator per route over
+// a shared registry rebuilt it once per route, normalizing and re-reading the
+// `$id` of every registered schema each time. Keyed by the registry object,
+// and by the draft it is read under, since that changes what normalization
+// does to a document which declares no dialect of its own.
+//
+// Validators share the returned map, so anything that mutates one calls
+// `_ownSchemaMap()` first. There are two such places: registering the vendored
+// meta-schemas during compilation, and `addSchema()`.
+const _schemaMapCache = new WeakMap()
+
 function buildSchemaMap(schemas, inheritDraft7) {
   if (!schemas) return null
+  const byDraft = _schemaMapCache.get(schemas)
+  if (byDraft) {
+    const hit = byDraft[inheritDraft7 ? 1 : 0]
+    if (hit) return hit
+  }
+  const map = _buildSchemaMap(schemas, inheritDraft7)
+  const slot = byDraft || [null, null]
+  slot[inheritDraft7 ? 1 : 0] = map
+  if (!byDraft) _schemaMapCache.set(schemas, slot)
+  return map
+}
+
+function _buildSchemaMap(schemas, inheritDraft7) {
   const map = new Map()
   if (Array.isArray(schemas)) {
     for (const s of schemas) {
@@ -658,7 +683,9 @@ class Validator {
     // Built here rather than below because `$vocabulary` is resolved against
     // it, and that resolution waits until compilation so a meta-schema
     // registered by addSchema() still counts.
-    const schemaMap = buildSchemaMap(options.schemas, rootIsDraft7) || new Map();
+    const shared = buildSchemaMap(options.schemas, rootIsDraft7);
+    const schemaMap = shared || new Map();
+    this._schemaMapShared = shared !== null;
     this._schemaIsCallers = schemaObj === schema;
     this._vocabulariesApplied = false;
 
@@ -834,6 +861,7 @@ class Validator {
     // reference pay for the lookup.
     if (this._schemaStr.includes('json-schema.org/draft')) {
       const { METASCHEMAS } = require('./lib/metaschemas');
+      this._ownSchemaMap();
       for (const [id, meta] of METASCHEMAS) {
         const bare = id.replace(/#$/, '');
         for (const key of [id, bare, bare + '#', bare.replace(/^https:/, 'http:'), bare.replace(/^http:/, 'https:')]) {
@@ -1542,7 +1570,16 @@ class Validator {
     const rootIsDraft7 = !!(root && typeof root === 'object' && typeof root.$schema === 'string' &&
       (root.$schema === 'http://json-schema.org/draft-07/schema#' || root.$schema === 'http://json-schema.org/draft-07/schema'))
     const normalized = _normalizeCallerSchema(schema, rootIsDraft7)
+    this._ownSchemaMap()
     this._schemaMap.set(normalized.$id, normalized)
+  }
+
+  // buildSchemaMap hands the same map to every validator built from the same
+  // registry. Take a private copy before writing to it.
+  _ownSchemaMap() {
+    if (!this._schemaMapShared) return
+    this._schemaMap = new Map(this._schemaMap)
+    this._schemaMapShared = false
   }
 
   _ensureCodegen() {

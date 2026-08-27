@@ -53,13 +53,23 @@ validator per route over a shared registry hands the same registry objects to ev
 one of them, so without the cache fifty routes over twenty shared schemas scanned
 those twenty a thousand times:
 
-| | before | after | |
-|---|---|---|---|
-| 50 routes, 20-schema shared registry, boot | 20.66 ms | 0.111 ms | 186x |
+The same argument then applies one level up, to the map itself. `buildSchemaMap`
+derives entirely from what the caller passed, and was rebuilt per validator:
+normalizing and re-reading the `$id` of every registered schema, once per route. A
+CPU profile of the boot after the scan landed put it at 22% of the remaining time,
+with the garbage collector at another 24%, most of it the discarded maps. It is now
+keyed by the registry object too, and the validators share one map, with a private
+copy taken by anything that writes to it.
 
-Median of seven interleaved runs. The benchmark asserts that all fifty validators
-still accept and reject correctly before it times anything, since a boot that
-produces nothing would be very fast.
+| | boot |
+|---|---|
+| before | 20.66 ms |
+| with the scan | 0.111 ms |
+| with the map cached as well | 0.046 ms |
+
+449x in total, median of interleaved runs. The benchmark asserts that all fifty
+validators still accept and reject correctly before it times anything, since a boot
+that produced nothing would be very fast indeed.
 
 The scan walks every object-valued key rather than the list of subschema keywords the
 normalizers recurse through, so it is a superset of what they visit. It can report
