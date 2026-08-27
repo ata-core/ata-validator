@@ -36,11 +36,7 @@ const REMOTES_DIR = path.join(__dirname, "suite/remotes");
 // so a new failure is a hard error while a known one does not turn the run red,
 // and so fixing one shows up as a line to delete rather than a silent pass.
 const KNOWN_FAILURES = {
-  "draft2020-12": new Set([
-    // $vocabulary is not implemented: a custom meta-schema that drops the
-    // validation vocabulary still has its validation keywords applied.
-    "vocabulary.json :: schema that uses custom metaschema with with no validation vocabulary :: no validation: invalid number, but it still validates",
-  ]),
+  "draft2020-12": new Set([]),
   draft7: new Set([
   ]),
   v1: new Set([]),

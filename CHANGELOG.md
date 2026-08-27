@@ -2,6 +2,16 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.8.0 - 2026-08-27
+
+### Added
+
+- `$vocabulary` is honoured when a schema names a custom meta-schema in `$schema`. A dialect is a set of vocabularies and a vocabulary is a set of keywords, so a keyword whose vocabulary the meta-schema does not declare is not part of that dialect at all: it is an unknown keyword, and an unknown keyword is ignored. A schema written against a meta-schema which declares only the core and applicator vocabularies now has its `minimum`, `type` and the rest of the validation keywords ignored, while `properties` and the other applicators still apply. The keywords belonging to each vocabulary are read from the vendored meta-schemas rather than from a list kept by hand, so they come from the specification. Removing the keyword before compilation means every engine agrees without any of them knowing what a vocabulary is.
+
+  This closes the last case ata missed. Draft 2020-12 goes from 1298 to **1299 of 1299**, with draft 7 at 927 of 927 and the v1 dialect at 1133 of 1133, the same with code generation blocked. `tests/run_suite.js` has no known failures left.
+
+  One thing ata still does not do: refuse a schema whose meta-schema requires, with `true`, a vocabulary ata does not recognise. The specification says an implementation must refuse there. Turning what has always been silently accepted into a hard failure is a separate decision, so such a schema is left exactly as it was, evaluated with every keyword applied.
+
 ## 1.7.4 - 2026-08-26
 
 ### Fixed

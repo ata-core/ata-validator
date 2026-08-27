@@ -10,6 +10,7 @@ const {
   compileToJSCombined,
 } = require("./lib/js-compiler");
 const { normalizeDraft7, normalizeNullable, stripFormatAssertions } = require("./lib/draft7");
+const { enabledKeywords, stripDisabledKeywords } = require("./lib/vocabularies");
 const { isV1Dialect } = require("./lib/dialect");
 const { classify } = require("./lib/shape-classifier");
 const { buildTier0Plan, tier0Validate } = require("./lib/tier0");
@@ -511,6 +512,29 @@ function buildSchemaMap(schemas, inheritDraft7) {
   return map
 }
 
+// A schema which names a custom meta-schema in `$schema` is written against
+// whatever dialect that meta-schema declares. A keyword from a vocabulary the
+// dialect does not have is not part of the dialect, so it is an unknown
+// keyword and does not apply. Removing it here means every engine sees the
+// same schema and none of them needs to know about vocabularies.
+//
+// Only the root is consulted. A subschema naming its own `$schema` is its own
+// resource under its own dialect, and the walk stops there rather than
+// applying this dialect's answer to it.
+function _applyVocabularies(schemaObj, original, schemaMap) {
+  if (!schemaObj || typeof schemaObj !== 'object') return schemaObj
+  const declared = schemaObj.$schema
+  if (typeof declared !== 'string') return schemaObj
+  const enabled = enabledKeywords(schemaMap.get(declared))
+  if (!enabled) return schemaObj
+  // `original` is the caller's own object when it reached here unchanged, and
+  // that one is never mutated.
+  const copy = schemaObj === original
+    ? _deepCloneWithSymbols(schemaObj)
+    : schemaObj
+  return stripDisabledKeywords(copy, enabled)
+}
+
 // Compile-cache key for a root schema plus its external schemas. Must include
 // the external schema CONTENT, not just their $ids: two validators can share a
 // root schema string and the same $id while pointing that $id at different
@@ -621,6 +645,13 @@ class Validator {
       );
     }
 
+    // Built here rather than below because `$vocabulary` is resolved against
+    // it, and that resolution waits until compilation so a meta-schema
+    // registered by addSchema() still counts.
+    const schemaMap = buildSchemaMap(options.schemas, rootIsDraft7) || new Map();
+    this._schemaIsCallers = schemaObj === schema;
+    this._vocabulariesApplied = false;
+
     this._schemaStr = null; // lazy: computed on first use
     this._schemaObj = schemaObj;
     this._options = options;
@@ -634,7 +665,7 @@ class Validator {
     this._applyDefaults = null;
 
     // Schema map for cross-schema $ref resolution
-    this._schemaMap = buildSchemaMap(options.schemas, rootIsDraft7) || new Map();
+    this._schemaMap = schemaMap;
 
     // User-supplied format checkers: { formatName: (value) => boolean }.
     // Looked up at runtime when a schema references a format the built-in
@@ -758,8 +789,27 @@ class Validator {
     }
   }
 
+  // `$vocabulary` says which keywords the dialect has, and answering needs the
+  // meta-schema, which addSchema() may only have registered just now. Run once,
+  // before anything reads the schema, and before `_schemaStr` is computed from
+  // it. After this addSchema() is refused, so the answer cannot go stale.
+  _ensureVocabularies() {
+    if (this._vocabulariesApplied) return;
+    this._vocabulariesApplied = true;
+    const stripped = _applyVocabularies(
+      this._schemaObj,
+      this._schemaIsCallers ? this._schemaObj : null,
+      this._schemaMap,
+    );
+    if (stripped !== this._schemaObj) {
+      this._schemaObj = stripped;
+      this._schemaStr = null;
+    }
+  }
+
   _ensureCompiled() {
     if (this._initialized) return;
+    this._ensureVocabularies();
     this._initialized = true;
 
     const schemaObj = this._schemaObj;
@@ -1487,6 +1537,7 @@ class Validator {
 
   _ensureCodegen() {
     if (this._jsFn) return;
+    this._ensureVocabularies();
     if (typeof process !== 'undefined' && process.env && process.env.ATA_FORCE_NAPI) return;
     if (!this._schemaStr) this._schemaStr = JSON.stringify(this._schemaObj);
     const sm = this._schemaMap.size > 0 ? this._schemaMap : null;

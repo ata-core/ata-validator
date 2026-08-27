@@ -79,7 +79,7 @@ const registry = {}
 // interpreted path is not meaningfully worse, so a drop in either engine fails
 // rather than being absorbed silently.
 const FLOOR = {
-  'draft2020-12': { total: 1299, minPass: 1298 },
+  'draft2020-12': { total: 1299, minPass: 1299 },
   draft7: { total: 927, minPass: 927 },
   v1: { total: 1133, minPass: 1133 },
 }
