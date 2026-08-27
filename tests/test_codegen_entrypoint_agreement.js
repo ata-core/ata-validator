@@ -94,6 +94,26 @@ const ENTRY_POINTS = [
       return r && typeof r === 'object' && typeof r.valid === 'boolean' ? r.valid : null
     },
   },
+  {
+    // Not an entry point of its own but a fifth program: the boolean's source
+    // with its top-level returns rewritten. It is what Validator installs as
+    // validate() for most schemas, so it is the program most users actually
+    // run, and it went unguarded for five months while the four above were
+    // compared. A rewrite that reaches into a nested closure changes that
+    // closure's result type and the verdict with it.
+    name: 'hybrid (rewritten compileToJSCodegen)',
+    build: (schema, map) => {
+      const bool = compileToJSCodegen(schema, map)
+      if (typeof bool !== 'function' || typeof bool._hybridFactory !== 'function') return null
+      const errFn = compileToJSCodegenWithErrors(schema, map)
+      if (typeof errFn !== 'function') return null
+      return bool._hybridFactory(VALID_RESULT, (d) => errFn(d, true))
+    },
+    verdict: (fn, data) => {
+      const r = fn(data)
+      return r && typeof r === 'object' && typeof r.valid === 'boolean' ? r.valid : null
+    },
+  },
 ]
 
 const remotes = loadRemotes()

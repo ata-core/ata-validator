@@ -4,6 +4,14 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## 1.8.1 - 2026-08-27
 
+### Fixed
+
+- A `pattern` of the form `^[class]+$`, `^[class]{m,n}$` or `^[class]{n}$` with n above 16 could be violated without `validate()` saying so. The boolean program compiles those patterns to an inline character loop wrapped in an arrow function, and the rewrite that turns the boolean program into the error-reporting one replaced the `return false` and `return true` inside that arrow with `return E(d)` and `return R`. Both are objects, so the arrow started returning a truthy value on mismatch, the enclosing `!(cond && obj)` went false, and the error program accepted what the boolean program had rejected.
+
+  What that looked like from outside depended on the path. Without preprocessing, `validate()` still rejected, because the boolean verdict runs first, but the error it produced was a generic `schema validation failed` with no keyword, no `params.pattern` and no path. With preprocessing, which means any schema carrying a `default` or a validator built with `coerceTypes` or `removeAdditional`, the error program is installed as `validate()` directly and the result was `valid: true`. `Validator.bundleStandalone` and `bundleCompact` embed the same program and had the same silent accept. `ata compile` output is built from the boolean program and was not affected. The rewrite has been wrong since 0.6.0; the official suite never exercised these pattern shapes, so nothing caught it.
+
+  The rewrite now leaves the body of an arrow function alone, the same way it already left `function` bodies alone. `tests/test_hybrid_agreement.js` compares the rewritten program with the boolean it came from on every affected shape, at the root, in a property, in array items, through `bundleStandalone` and through a compiled module, and checks the two preprocessing cases directly. `tests/test_codegen_entrypoint_agreement.js` now compares the rewritten program as a fifth participant across the whole official suite. `tests/test_ajv_errors.js`, which had been failing on exactly this for as long as the bug existed, is now part of `npm test`.
+
 ### Changed
 
 - Constructing a validator no longer clones and serializes every schema to find out whether it needed normalizing. It did that on the root and on each registered schema: serialize, deep clone, normalize the clone, serialize again, compare. For a schema with no `nullable` field and no draft-07 keyword the answer is always no, and the work was thrown away. Every question the normalizers ask is whether some key appears anywhere in the tree, so one walk answers all of them, and the clone now happens only for schemas that need it. No registry and ten fields goes from 18.5 to 4.6 µs; fifty registered schemas of fifty fields, which is a small server's worth, from 2570 to 260 µs.
