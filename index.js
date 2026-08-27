@@ -992,6 +992,13 @@ class Validator {
               };
     }
     this._applyDefaults = preprocess;
+    // Whether validate() can change the caller's object before the verdict.
+    // This is a capability, not an option: `useDefaults` is on by default, but
+    // buildDefaultsApplier returns null when the schema declares no defaults,
+    // so a plain schema is genuinely non-mutating. The renderers refuse to
+    // synthesize a frame when this is true, because a frame built from mutated
+    // data would show the reader a value they never sent.
+    this._mutatesInput = !!(preprocess || options.coerceTypes || options.removeAdditional);
     this._preprocess = preprocess;
 
     // Detect if schema is "selective" -- doesn't recurse into arrays/deep objects.
@@ -1431,6 +1438,13 @@ class Validator {
                 // one mistake, so a wrong pairing costs a sentence rather
                 // than a hidden violation.
                 if (enrich && cached.length > 1) attachRelated(cached);
+                attachDiagnosticSource(cached, {
+                  data,
+                  text: self._lastRawInput != null ? self._lastRawInput : undefined,
+                  positions,
+                  schema: self._schemaObj,
+                  mutatesInput: self._mutatesInput === true,
+                });
               }
               return cached;
             },
@@ -1472,6 +1486,13 @@ class Validator {
                 schemaFile: this._source ? this._source.path : undefined,
               }));
               if (enriched.length > 1) attachRelated(enriched);
+              attachDiagnosticSource(enriched, {
+                data: parsedData,
+                text: jsonStr,
+                positions,
+                schema: this._schemaObj,
+                mutatesInput: this._mutatesInput === true,
+              });
               if (positions) this._posCache.reset();
               this._lastRawInput = null;
               return { valid: false, errors: enriched };
@@ -1489,6 +1510,11 @@ class Validator {
               this._posCache.reset();
             }
             if (result.errors.length > 1) attachRelated(result.errors);
+            attachDiagnosticSource(result.errors, {
+              text: jsonStr,
+              schema: this._schemaObj,
+              mutatesInput: this._mutatesInput === true,
+            });
           }
           this._lastRawInput = null;
           return result;
@@ -1952,6 +1978,24 @@ function _walkPointer (root, pointer) {
 // inflate the gzipped bundle beyond the size budget). Consumers who want
 // suggestions pass the error array through this helper after validation.
 // AOT errors don't carry `received`, so we re-derive it from `data` here.
+const DIAGNOSTIC_SOURCE = Symbol.for('ata.diagnosticSource');
+
+// The payload rides on the array, never on the error objects, and is not
+// enumerable. JSON.stringify, Object.keys, length and deep equality against a
+// fixture are all unchanged. Frozen arrays are left alone: a validator that
+// throws from its own error path is worse than a missing frame.
+function attachDiagnosticSource (errors, payload) {
+  if (!Array.isArray(errors) || !Object.isExtensible(errors)) return errors;
+  try {
+    Object.defineProperty(errors, DIAGNOSTIC_SOURCE, {
+      value: payload, enumerable: false, configurable: true, writable: true,
+    });
+  } catch {
+    // Nothing to do. The renderer degrades to pointer-only output.
+  }
+  return errors;
+}
+
 function attachRelated (errors) {
   const { correlateTypos } = require('./lib/correlate');
   const pairs = correlateTypos(errors);
@@ -1981,6 +2025,9 @@ function attachSuggestions (errors, data) {
     const s = suggestFor(probe, data);
     if (s) e.suggestion = s;
   }
+  // AOT modules import nothing, so this is their only route to a frame. The
+  // caller holds the original object and ran no preprocessing through here.
+  attachDiagnosticSource(errors, { data, mutatesInput: false });
   return errors;
 }
 

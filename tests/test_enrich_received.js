@@ -69,17 +69,28 @@ assert.ok(!('suggestion' in noSuggestion), 'no suggestion means no key, not an u
 // The reference is a JSON.stringify of the raw error. Walking the pointer with
 // a regex split per segment put enrichment at about 2.5x that reference;
 // resolving it without the intermediate allocations lands well under it.
+//
+// The `detail` field adds a measured 14 ns per error (117 to 131 ns on the
+// machine that set this number; `rank` adds 2, the anchor lookup 4), which
+// took the typical ratio from 1.4x to 1.65x. The ceiling is 2.0x so that the
+// headroom above the typical figure is what it was before, and each side is
+// the best of three samples so a busy CI runner does not trip it on noise.
 function timed (fn) {
-  for (let i = 0; i < 200000; i++) fn();
-  const t0 = process.hrtime.bigint();
-  for (let i = 0; i < 200000; i++) fn();
-  return Number(process.hrtime.bigint() - t0) / 200000;
+  let best = Infinity;
+  for (let s = 0; s < 3; s++) {
+    for (let i = 0; i < 200000; i++) fn();
+    const t0 = process.hrtime.bigint();
+    for (let i = 0; i < 200000; i++) fn();
+    const ns = Number(process.hrtime.bigint() - t0) / 200000;
+    if (ns < best) best = ns;
+  }
+  return best;
 }
 const payload = { id: 7, email: 'a@b.com', age: 'thirty', tags: ['x', 'y'], address: { city: 'Istanbul', zip: '34000' } };
 const err = typeErr('/age');
 const reference = timed(() => JSON.stringify(err));
 const cost = timed(() => enrich(err, { data: payload }));
 const ratio = cost / reference;
-assert.ok(ratio < 1.8, `enrich costs ${cost.toFixed(0)} ns, ${ratio.toFixed(2)}x a JSON.stringify of the same error; expected under 1.8x`);
+assert.ok(ratio < 2.0, `enrich costs ${cost.toFixed(0)} ns, ${ratio.toFixed(2)}x a JSON.stringify of the same error; expected under 2.0x`);
 
 console.log(`ok: received resolution rules, enrich at ${cost.toFixed(0)} ns (${ratio.toFixed(2)}x reference)`);

@@ -43,6 +43,16 @@ const outFile2 = path.join(outDir, 'user.validator.min.mjs');
     const emailErr = r.errors.find(e => e.code === 'ATA3001');
     assert.ok(emailErr.suggestion, 'attachSuggestions should populate suggestion on AOT errors');
 
+    // attachSuggestions is also the AOT route to source frames. It must make
+    // the payload reachable without changing anything a consumer can observe
+    // on the array.
+    const before = JSON.stringify(r.errors);
+    const lenBefore = r.errors.length;
+    assert.ok(r.errors[Symbol.for('ata.diagnosticSource')], 'attachSuggestions must attach the diagnostic source');
+    assert.strictEqual(JSON.stringify(r.errors), before, 'attachSuggestions must not change serialized output');
+    assert.strictEqual(r.errors.length, lenBefore, 'attachSuggestions must not change array length');
+    console.log('ok: AOT errors can reach a diagnostic source');
+
     console.log('ok: AOT --source compiled validator carries code/docUrl/schemaSource');
 
     // Now compile with --no-source and assert schemaSource is absent
