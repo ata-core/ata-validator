@@ -35,6 +35,7 @@ new Validator(false).isValidObject(anything); // false
 |--------|------|---------|-------------|
 | `coerceTypes` | boolean | false | Convert types in-place. `"42"` becomes `42` for integer fields. |
 | `removeAdditional` | boolean | false | Remove properties not defined in schema. |
+| `useDefaults` | boolean | true | Fill in `default` values on absent properties, in place, before validating. Set `false` to leave the input untouched. |
 
 ### v.validate(data)
 
@@ -68,6 +69,40 @@ const result = v.validate({ name: 'Mert', age: 26 });
 - `unique_items_violation` - duplicate items in array
 - `additional_property` - property not defined in schema
 - `min_items_violation` / `max_items_violation` - array length out of range
+
+**Additional fields under `richErrors` (the default):**
+
+- `detail` - the observation, for example `expected integer, found string`. `message` keeps its existing wording, so `detail` is opt-in.
+- `related` - indices of other errors in the same array that are part of the same mistake. A key typed `nmae` where `name` was required produces two errors that point at each other. Nothing is removed; the array length is unchanged.
+- `anchor` - `{ line, col, length }` of the failing value, plus `keyLine`, `keyCol`, `keyLength` when the error names a property. Present only on the text path (`validateJSON`), where positions exist.
+- `rank` - ordering hint, lower first: 0 key shape, 1 type, 2 value content, 3 composition.
+
+Under `richErrors: false` none of these appear and the error shape is exactly the v0.14 one.
+
+### Rendering errors
+
+`renderPretty(errors, opts)` and `renderCompact(errors, opts)` turn an error array into text for a person. Both go through the same diagnostic layer: every diagnostic names its location, states what was found rather than only the rule, and a key typed `nmae` where `name` was required renders as one diagnostic instead of two. The array is not changed by rendering; the footer says `8 schema violations, shown as 7 diagnostics` when a pair was collapsed, so the count never drifts from `errors.length`.
+
+```javascript
+const { Validator, renderPretty } = require('ata-validator');
+const v = new Validator(schema);
+
+// Text input: frames come from the text you passed, with real line numbers.
+const r = v.validateJSON(jsonText);
+if (!r.valid) console.error(renderPretty(r.errors));
+
+// Object input: pass the object to get frames. They are reconstructed by
+// re-serializing the value, and the output says so, because the line
+// numbers refer to that reconstruction and not to any file of yours.
+const r2 = v.validate(obj);
+if (!r2.valid) console.error(renderPretty(r2.errors, { data: obj }));
+```
+
+`validate(data)` attaches nothing to the array for the renderer, on purpose: it is the library hot path and a consumer that never renders should not pay for it. Without `data`, object-input diagnostics still carry the path and the value, just no frame.
+
+No frame is reconstructed when `coerceTypes`, `removeAdditional`, or a schema with `default` values is in play: those change the object before validation, so a frame built from it would show a value you did not send. The output says which option is responsible.
+
+`opts`: `color` (`'auto'` | `'always'` | `'never'`), `context` (a label for the footer), `maxErrors` (pretty only, default 20, `0` for all), `cwd` (trims schema file paths), `data` (as above).
 
 ### v.isValidObject(data)
 

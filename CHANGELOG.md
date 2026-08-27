@@ -2,6 +2,17 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Errors
+
+- Rendered diagnostics now say where the problem is. Every `renderPretty` and `renderCompact` block carries the JSON path, and a source frame with a caret on the failing token when one can be built faithfully: from the text on the `validateJSON` path, or from the object when the renderer is handed `{ data }`. Object-input frames are reconstructed by re-serializing the value and the output says so once, because the line numbers refer to that reconstruction. No frame is reconstructed under `coerceTypes`, `removeAdditional` or a schema with `default` values, since the object in hand is not what the caller sent; the output names the option instead.
+- Headlines state the observation rather than the rule: `expected integer, found string` in place of `must be integer`. Two `additionalProperties` violations no longer render as identical blocks; the property name is in the headline. A composition failure with a `const` discriminator names it, `no variant matches kind "circle"`, anchors inside the closest branch, and its branch notes read `minimum: expected ≥0, found -1`.
+- A property typed `nmae` where `name` was required renders as one diagnostic with `did you mean "name"?` instead of two. The correlation requires that no other missing or extra key in the same object is equally close; on a tie nothing is merged. Both errors stay in the array and point at each other through the new `related` field, and the footer reads `8 schema violations in input, shown as 7 diagnostics` so the count never drifts from `errors.length`.
+- Diagnostics are ordered by document position, with cause before effect only as a tie-break within one container. Carets are clamped to the line they sit under; a root-level error used to draw one the width of the whole document.
+- Under `richErrors` (the default) errors gain `detail`, `related`, `anchor` and `rank`. Existing fields, array order and array length are unchanged; `richErrors: false` still returns the v0.14 shape. `useDefaults`, on by default, is now documented.
+- Measured on a ten-case corpus scored on four questions per diagnostic (says where, states what was found, distinguishable from its neighbours, offers a way forward): 3 of 60 before, 58 of 58 after, and `tests/test_diagnostics_score.js` holds the floor at 95%. Cost on the reject path when `.errors` is read, master against this change on the same machine: a one-error document 330 to 395 ns, a seven-error document with a typo pair 2.45 to 2.95 µs. `validate().valid` is unchanged at 5 ns. Fastify's own suite through fastify-ata stays at 178 of 184.
+
 ## 1.8.2 - 2026-08-28
 
 ### Fixed
