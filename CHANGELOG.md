@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.8.1 - 2026-08-27
+
+### Changed
+
+- Constructing a validator no longer clones and serializes every schema to find out whether it needed normalizing. It did that on the root and on each registered schema: serialize, deep clone, normalize the clone, serialize again, compare. For a schema with no `nullable` field and no draft-07 keyword the answer is always no, and the work was thrown away. Every question the normalizers ask is whether some key appears anywhere in the tree, so one walk answers all of them, and the clone now happens only for schemas that need it. No registry and ten fields goes from 18.5 to 4.6 µs; fifty registered schemas of fifty fields, which is a small server's worth, from 2570 to 260 µs.
+
+  The walk descends through every object-valued key rather than the subschema keywords the normalizers recurse through, so it is a superset of what they visit: it can report work where there is none, costing one clone, and cannot miss work there is. Across the 2344 schemas in the official suite it reports work on 335 where normalization changes 334. `tests/test_schema_scan.js` asserts that direction over the whole suite, and asserts the check is load-bearing by breaking the scan deliberately and confirming the broken one is caught.
+
+  The answer is remembered against the schema object, the way whole compiled validators already are. Without that, a server building one validator per route over a shared registry rescans that registry once per route: fifty routes over twenty shared schemas boots in 0.111 ms rather than 20.66 ms, a difference of 186x.
+
+  Nothing about what any schema validates to changes. The comparison that decided the old answer is still there behind the walk, so a schema the walk sends down the slow path gets exactly the result it got before.
+
 ## 1.8.0 - 2026-08-27
 
 ### Added

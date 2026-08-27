@@ -11,6 +11,7 @@ const {
 } = require("./lib/js-compiler");
 const { normalizeDraft7, normalizeNullable, stripFormatAssertions } = require("./lib/draft7");
 const { enabledKeywords, stripDisabledKeywords } = require("./lib/vocabularies");
+const { needsNormalization } = require("./lib/schema-scan");
 const { isV1Dialect } = require("./lib/dialect");
 const { classify } = require("./lib/shape-classifier");
 const { buildTier0Plan, tier0Validate } = require("./lib/tier0");
@@ -460,11 +461,20 @@ function _normalizeCallerSchema(s, inheritDraft7) {
   const needsDraft7 = declares
     ? (s.$schema === 'http://json-schema.org/draft-07/schema#' || s.$schema === 'http://json-schema.org/draft-07/schema')
     : !!inheritDraft7
+  // One walk answers whether there is anything to do. Almost always there is
+  // not, and then the serialize, clone, normalize, serialize, compare below is
+  // work spent to find that out. The walk over-reports rather than under, so a
+  // schema it clears is one no normalizer would have touched;
+  // `tests/test_schema_scan.js` holds that direction against the whole suite.
+  if (!needsNormalization(s, needsDraft7)) return s
+
   const str = JSON.stringify(s)
   const copy = _deepCloneWithSymbols(s)
   if (needsDraft7) normalizeDraft7(copy, true)
   normalizeNullable(copy)
   // Return original when normalization produced no change, copy otherwise.
+  // Kept even though the walk has already said there is work, so that a walk
+  // which over-reports still returns exactly what it returned before.
   // Change-detection uses JSON content only; symbols do not affect it.
   return JSON.stringify(copy) === str ? s : copy
 }

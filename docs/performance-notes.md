@@ -12,10 +12,10 @@ Ordered by how much is being spent, not by how interesting the fix is.
 
 ---
 
-## 1. Half of construction goes to proving nothing needed changing
+## 1. Half of construction went to proving nothing needed changing (fixed)
 
-`_normalizeCallerSchema` runs on the root schema and on every registered schema. It
-does the same three things every time, whatever the schema looks like:
+`_normalizeCallerSchema` ran on the root schema and on every registered schema,
+and did the same three things every time, whatever the schema looked like:
 
 ```js
 const str = JSON.stringify(s)          // serialize
@@ -26,27 +26,79 @@ return JSON.stringify(copy) === str ? s : copy   // serialize again to compare
 ```
 
 Two full serializations and a deep clone, to decide whether anything changed. For a
-modern 2020-12 schema with no `nullable` and no draft-07 keyword, the answer is
-always no, and all of it is thrown away.
+modern 2020-12 schema with no `nullable` and no draft-07 keyword the answer is always
+no, and all of it was thrown away.
 
-With a 132 KB registry of 50 schemas at 50 fields each:
+Every question the normalizers ask is of the form "does this key appear anywhere in
+the tree", and one traversal answers all of them at once. `lib/schema-scan.js` walks
+the schema once and returns a bitmask; `needsNormalization` reads it and the clone
+happens only for the schemas that need it.
+
+| shape | before | after | |
+|---|---|---|---|
+| no registry, 10 fields | 18.5 µs | 4.6 µs | 4.0x |
+| no registry, 50 fields | 66.9 µs | 11.9 µs | 5.6x |
+| no registry, 200 fields | 236.0 µs | 40.2 µs | 5.9x |
+| 10 registered, 10 fields | 122.6 µs | 11.7 µs | 10.5x |
+| 10 registered, 50 fields | 551.5 µs | 60.4 µs | 9.1x |
+| 50 registered, 50 fields | 2570 µs | 260 µs | 9.9x |
+
+The win is larger with a registry because every registered schema paid the same
+price. A server registering fifty schemas starts in a quarter of a millisecond
+instead of two and a half.
+
+The answer is also remembered against the schema object, which is what
+`_identityCache` already does for whole compiled validators. A server building one
+validator per route over a shared registry hands the same registry objects to every
+one of them, so without the cache fifty routes over twenty shared schemas scanned
+those twenty a thousand times:
+
+| | before | after | |
+|---|---|---|---|
+| 50 routes, 20-schema shared registry, boot | 20.66 ms | 0.111 ms | 186x |
+
+Median of seven interleaved runs. The benchmark asserts that all fifty validators
+still accept and reject correctly before it times anything, since a boot that
+produces nothing would be very fast.
+
+The scan walks every object-valued key rather than the list of subschema keywords the
+normalizers recurse through, so it is a superset of what they visit. It can report
+work where there is none, which costs one clone, and cannot miss work there is, which
+would hand an un-normalized schema to the engines and be silently wrong.
+`tests/test_schema_scan.js` asserts that direction over all 2344 schemas in the
+suite, and asserts the property has teeth by breaking the scan on purpose and
+checking that the broken one is caught.
+
+Across the suite the scan reports work on 335 schemas where normalization changes
+334. One unnecessary clone in 2344.
+
+### What the measurement got wrong first
+
+The saving predicted here was about 660 µs, from timing a clone and two
+serializations in isolation. The real saving is 2310 µs. The gap is item 2a: the
+clone is much dearer than the proxy used to estimate it.
+
+## 2a. The clone itself is 4.7x dearer than it needs to be
+
+`_deepCloneWithSymbols` builds each object with `Object.create(null)`, then
+`Object.defineProperty` for every key, then `Object.setPrototypeOf` back. On the same
+132 KB registry:
 
 | | |
 |---|---|
-| `new Validator(schema, { schemas })` | 2518 µs |
-| the clone plus two serializations, across the registry | 662 µs |
-| one structural walk that answers the same question | 139 µs |
+| `_deepCloneWithSymbols` as written | 1190 µs |
+| the same clone with plain assignment | 251 µs |
 
-So roughly a quarter of construction is this, and it is about five times dearer than
-it needs to be. A single walk looking for `nullable` or a draft-07-only keyword tells
-you whether to bother, and the clone then happens only for the schemas that need it.
+The null prototype looks deliberate: it is what stops a schema with a `__proto__` key
+from reaching a setter during the copy. That is worth keeping. The
+`Object.defineProperty` per key on top of it may be redundant, since an object with a
+null prototype has no inherited setter for assignment to reach, but this is
+prototype-pollution-adjacent code and the reasoning has to be checked rather than
+assumed.
 
-The walk timed above is a rough one written for the measurement, not a proposed
-implementation. It has to agree exactly with what `normalizeDraft7` and
-`normalizeNullable` actually touch, or it will skip a schema that needed work, which
-is the silent-acceptance failure this codebase cares most about. That agreement is
-the whole difficulty, and a differential test over the suite has to come before the
-optimization, not after it.
+Item 1 took this off the path for almost every schema. It is still on the path for
+the schemas that genuinely need normalizing, for `assertFormat: false`, and for the
+vocabulary pass.
 
 ## 2. The registry is serialized again for the cache key
 
@@ -67,20 +119,10 @@ too, so the string is produced once and reused.
 
 ## 3. Construction cost, for reference
 
-Linear in the schema, and roughly the product with the registry:
-
-| fields | registered schemas | construction |
-|---|---|---|
-| 10 | 0 | 19 µs |
-| 50 | 0 | 61 µs |
-| 200 | 0 | 210 µs |
-| 10 | 10 | 112 µs |
-| 10 | 50 | 506 µs |
-| 50 | 50 | 2427 µs |
-
-2.4 ms before a single document is validated. That is a cold-start number, and cold
-start is the thing ata sells on edge runtimes, so it is worth more attention than it
-has had. Items 1 and 2 are most of the addressable part.
+The figures in item 1 are this table. Before the scan, a validator with fifty
+registered schemas cost 2.4 ms to construct before a single document was validated.
+Cold start is the thing ata sells on edge runtimes, so that number mattered more than
+the attention it had had. It is now 0.26 ms. Item 2 is what is left.
 
 ## 4. The serialized schema is scanned seven times
 
@@ -191,12 +233,10 @@ rediscovered as bugs:
 
 ## What is worth doing
 
-Item 1 first, and behind a differential test. It is the largest measured waste, the
-fix is contained, and the risk sits in one place: a pre-check that disagrees with the
-normalizers would skip a schema that needed work. That is the failure this codebase
-treats as the worst kind, so the test comes before the optimization.
+Items 1 and 6 are done.
 
-Item 6 is done.
+Item 2a next, if the prototype reasoning holds up. It is a contained change with a
+measured 4.7x on a path that item 1 made rare but did not remove.
 
 Item 5 is the most interesting and the least ready. There is no proposal worth trying
 until someone can explain why both columns degrade past 256 validators, and the last
