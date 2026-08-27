@@ -1438,13 +1438,11 @@ class Validator {
                 // one mistake, so a wrong pairing costs a sentence rather
                 // than a hidden violation.
                 if (enrich && cached.length > 1) attachRelated(cached);
-                attachDiagnosticSource(cached, {
-                  data,
-                  text: self._lastRawInput != null ? self._lastRawInput : undefined,
-                  positions,
-                  schema: self._schemaObj,
-                  mutatesInput: self._mutatesInput === true,
-                });
+                // No diagnostic payload here. validate(data) is the library
+                // hot path, and attaching one cost about 100 ns per rejection
+                // for a consumer that never renders. The text path attaches
+                // it below, and a renderer given `{ data }` builds frames for
+                // object input on request.
               }
               return cached;
             },
@@ -1984,37 +1982,17 @@ function _walkPointer (root, pointer) {
 // inflate the gzipped bundle beyond the size budget). Consumers who want
 // suggestions pass the error array through this helper after validation.
 // AOT errors don't carry `received`, so we re-derive it from `data` here.
-const DIAGNOSTIC_SOURCE = Symbol.for('ata.diagnosticSource');
+const { setDiagnosticSource } = require('./lib/diagnostic-source');
+const attachDiagnosticSource = setDiagnosticSource;
 
-// The payload rides on the array, never on the error objects, and is not
-// enumerable. JSON.stringify, Object.keys, length and deep equality against a
-// fixture are all unchanged. Frozen arrays are left alone: a validator that
-// throws from its own error path is worse than a missing frame.
-function attachDiagnosticSource (errors, payload) {
-  if (!Array.isArray(errors) || !Object.isExtensible(errors)) return errors;
-  try {
-    // validateJSON's already-enriched path runs after the validate() wrapper
-    // has attached a payload carrying the parsed data. Merge rather than
-    // replace, so the text arrives without the data going missing.
-    const prev = errors[DIAGNOSTIC_SOURCE];
-    let value = payload;
-    if (prev) {
-      value = Object.assign({}, prev);
-      for (const k of Object.keys(payload)) if (payload[k] !== undefined) value[k] = payload[k];
-    }
-    Object.defineProperty(errors, DIAGNOSTIC_SOURCE, {
-      value, enumerable: false, configurable: true, writable: true,
-    });
-  } catch {
-    // Nothing to do. The renderer degrades to pointer-only output.
-  }
-  return errors;
-}
-
+// Resolved once. A require() inside the function was re-resolving the path
+// on every rejection, which the profile showed as internalModuleStat at the
+// top of the reject path, above the correlation it was loading.
+let _correlateTypos = null;
 function attachRelated (errors) {
-  const { correlateTypos } = require('./lib/correlate');
-  const pairs = correlateTypos(errors);
-  if (pairs.size === 0) return errors;
+  if (_correlateTypos === null) _correlateTypos = require('./lib/correlate').correlateTypos;
+  const pairs = _correlateTypos(errors);
+  if (pairs === null) return errors;
   for (const [from, to] of pairs) {
     const e = errors[from];
     if (!e) continue;

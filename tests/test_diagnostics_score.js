@@ -45,7 +45,9 @@ for (const c of CASES) {
     const v = new Validator(c.schema, { allErrors: true });
     const r = mode === 'json' ? v.validateJSON(c.json) : v.validate(c.data);
     if (r.valid) throw new Error(`corpus case ${c.name} (${mode}) unexpectedly validated`);
-    const out = renderPretty(r.errors, { color: 'never' });
+    // Object input carries no payload; frames are requested by handing the
+    // renderer the data, which is the documented way.
+    const out = renderPretty(r.errors, mode === 'json' ? { color: 'never' } : { color: 'never', data: c.data });
     const blocks = blocksOf(out);
     if (blocks.length === 0) throw new Error(`corpus case ${c.name} (${mode}) rendered no diagnostic blocks`);
     for (const b of blocks) {

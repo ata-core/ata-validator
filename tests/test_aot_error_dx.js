@@ -48,7 +48,7 @@ const outFile2 = path.join(outDir, 'user.validator.min.mjs');
     // on the array.
     const before = JSON.stringify(r.errors);
     const lenBefore = r.errors.length;
-    assert.ok(r.errors[Symbol.for('ata.diagnosticSource')], 'attachSuggestions must attach the diagnostic source');
+    assert.ok(require('../lib/diagnostic-source').getDiagnosticSource(r.errors), 'attachSuggestions must record the diagnostic source');
     assert.strictEqual(JSON.stringify(r.errors), before, 'attachSuggestions must not change serialized output');
     assert.strictEqual(r.errors.length, lenBefore, 'attachSuggestions must not change array length');
     console.log('ok: AOT errors can reach a diagnostic source');

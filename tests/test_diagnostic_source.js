@@ -3,19 +3,31 @@
 const assert = require('node:assert');
 const { Validator, attachSuggestions } = require('..');
 
-const KEY = Symbol.for('ata.diagnosticSource');
+const { getDiagnosticSource } = require('../lib/diagnostic-source');
 const schema = { type: 'object', required: ['name'], properties: { name: { type: 'string' } } };
 
-// The symbol rides on the array and is invisible to every observation a
-// downstream consumer can make.
+// validate(data) is the library hot path and attaches nothing: a consumer
+// that never renders must not pay for a payload. Measured at about 100 ns
+// per rejection before this was decided.
 {
   const v = new Validator(schema, { allErrors: true });
   const errs = v.validate({}).errors;
-  const src = errs[KEY];
+  assert.strictEqual(getDiagnosticSource(errs), null, 'object path carries no payload');
+  assert.strictEqual(errs.length, 1, 'and the array is as it was');
+  console.log('ok: object path attaches nothing');
+}
+
+// The text path does attach one, and it is invisible to every observation a
+// downstream consumer can make.
+{
+  const v = new Validator(schema, { allErrors: true });
+  const errs = v.validateJSON('{}').errors;
+  const src = getDiagnosticSource(errs);
   assert.ok(src, 'source payload attached');
   assert.deepStrictEqual(src.data, {}, 'payload carries the data');
-  assert.strictEqual(Object.keys(errs).length, errs.length, 'symbol is not an own enumerable key');
-  assert.ok(!JSON.stringify(errs).includes('diagnosticSource'), 'symbol does not serialize');
+  assert.strictEqual(Object.keys(errs).length, errs.length, 'nothing added to the array');
+  assert.ok(!Object.getOwnPropertyDescriptor(errs, Symbol.for('ata.diagnosticSource')).enumerable, 'the carrier is not enumerable');
+  assert.ok(!JSON.stringify(errs).includes('diagnosticSource'), 'nothing serializes');
   assert.strictEqual(errs.length, 1, 'length unchanged');
   console.log('ok: symbol attached invisibly');
 }
@@ -25,9 +37,9 @@ const schema = { type: 'object', required: ['name'], properties: { name: { type:
   const v = new Validator(schema, { allErrors: true });
   const json = '{\n  "x": 1\n}';
   const errs = v.validateJSON(json).errors;
-  assert.strictEqual(errs[KEY].text, json, 'payload carries the original text');
-  assert.deepStrictEqual(errs[KEY].data, { x: 1 }, 'and still carries the parsed data');
-  assert.ok(errs[KEY].schema, 'and the schema');
+  assert.strictEqual(getDiagnosticSource(errs).text, json, 'payload carries the original text');
+  assert.deepStrictEqual(getDiagnosticSource(errs).data, { x: 1 }, 'and still carries the parsed data');
+  assert.ok(getDiagnosticSource(errs).schema, 'and the schema');
   console.log('ok: text path carries its text');
 }
 
@@ -36,9 +48,9 @@ const schema = { type: 'object', required: ['name'], properties: { name: { type:
 // validator compiles, which is lazy, so it is read after the first call.
 {
   const v = new Validator(schema, { allErrors: true });
-  const r = v.validate({});
+  const r = v.validateJSON('{}');
   assert.strictEqual(v._mutatesInput, false, 'plain schema does not mutate input');
-  assert.strictEqual(r.errors[KEY].mutatesInput, false);
+  assert.strictEqual(getDiagnosticSource(r.errors).mutatesInput, false);
   console.log('ok: non-mutating schema is marked safe');
 }
 
@@ -49,10 +61,10 @@ const schema = { type: 'object', required: ['name'], properties: { name: { type:
   const withDefault = { type: 'object', properties: { a: { type: 'string', default: 'INJ' }, b: { type: 'integer' } } };
   const v = new Validator(withDefault, { allErrors: true });
   const d = { b: 'nope' };
-  const r = v.validate(d);
+  v.validate(d);
   assert.strictEqual(v._mutatesInput, true, 'a default makes the validator mutating');
-  assert.strictEqual(r.errors[KEY].mutatesInput, true);
   assert.strictEqual(d.a, 'INJ', 'and it really did mutate');
+  assert.strictEqual(getDiagnosticSource(v.validateJSON('{"b":"nope"}').errors).mutatesInput, true, 'and the text path says so');
   console.log('ok: defaults mark the validator mutating');
 }
 
@@ -69,8 +81,8 @@ const schema = { type: 'object', required: ['name'], properties: { name: { type:
 {
   const errs = [{ code: 'ATA1001', keyword: 'type', path: '/a', instancePath: '/a', params: { type: 'string' }, message: 'must be string' }];
   attachSuggestions(errs, { a: 1 });
-  assert.ok(errs[KEY], 'attachSuggestions attaches the payload');
-  assert.deepStrictEqual(errs[KEY].data, { a: 1 });
+  assert.ok(getDiagnosticSource(errs), 'attachSuggestions attaches the payload');
+  assert.deepStrictEqual(getDiagnosticSource(errs).data, { a: 1 });
   console.log('ok: AOT bridge attaches the payload');
 }
 

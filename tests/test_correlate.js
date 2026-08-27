@@ -1,7 +1,9 @@
 'use strict';
 
 const assert = require('node:assert');
-const { correlateTypos } = require('../lib/correlate');
+const { correlateTypos: raw } = require('../lib/correlate');
+// null means no pairs; normalise so the assertions below can ask for size.
+const correlateTypos = (e) => raw(e) || new Map();
 
 function req (path, missing) {
   return { keyword: 'required', path, instancePath: path, params: { missingProperty: missing } };
