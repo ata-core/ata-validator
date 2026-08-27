@@ -68,8 +68,7 @@ function err (o) {
   const errors = [err({ path: '/tags/0', instancePath: '/tags/0', received: '1', params: { type: 'string' } })];
   const d = toDiagnostics(errors, { data: { tags: [1, 'ok'] } });
   assert.ok(d[0].frame, 'frame synthesized');
-  assert.strictEqual(d[0].frame.synthesized, true, 'and marked as synthesized');
-  assert.ok(d[0].notes.some((n) => /reconstructed/.test(n)), 'and says so');
+  assert.strictEqual(d[0].frame.synthesized, true, 'and marked as synthesized, for the renderer to say once');
   console.log('ok: frame synthesized from data');
 }
 
