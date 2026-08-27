@@ -2,7 +2,7 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## 1.8.1 - 2026-08-27
+## 1.8.2 - 2026-08-28
 
 ### Fixed
 
@@ -11,6 +11,12 @@ All notable changes to ata-validator are documented here. The format follows [Ke
   What that looked like from outside depended on the path. Without preprocessing, `validate()` still rejected, because the boolean verdict runs first, but the error it produced was a generic `schema validation failed` with no keyword, no `params.pattern` and no path. With preprocessing, which means any schema carrying a `default` or a validator built with `coerceTypes` or `removeAdditional`, the error program is installed as `validate()` directly and the result was `valid: true`. `Validator.bundleStandalone` and `bundleCompact` embed the same program and had the same silent accept. `ata compile` output is built from the boolean program and was not affected. The rewrite has been wrong since 0.6.0; the official suite never exercised these pattern shapes, so nothing caught it.
 
   The rewrite now leaves the body of an arrow function alone, the same way it already left `function` bodies alone. `tests/test_hybrid_agreement.js` compares the rewritten program with the boolean it came from on every affected shape, at the root, in a property, in array items, through `bundleStandalone` and through a compiled module, and checks the two preprocessing cases directly. `tests/test_codegen_entrypoint_agreement.js` now compares the rewritten program as a fifth participant across the whole official suite. `tests/test_ajv_errors.js`, which had been failing on exactly this for as long as the bug existed, is now part of `npm test`.
+
+### Changed
+
+- Ranking an error into schema declaration order no longer re-derives the rank on every error of every failing document. It was splitting the schema path with two regular expressions per segment and then scanning `Object.keys(node)` at each level, which was 8.5% of the error path in a profile, for an answer that depends only on the schema and the path. The rank is now cached per path under its root, each node's keys are indexed once, and escape handling is skipped for segments with no tilde. That function drops from 8.5% to 1.4% of the error path, and the error path as a whole gets 3.5% faster, median of eleven interleaved runs. `docs/performance-notes.md` records the larger gap this was measured against; it is not closed by this change.
+
+## 1.8.1 - 2026-08-27
 
 ### Changed
 
