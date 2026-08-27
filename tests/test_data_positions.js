@@ -26,3 +26,25 @@ const m3 = buildDataPositionMap(buf);
 assert.strictEqual(m3['/email'].byteOffset, map['/email'].byteOffset);
 
 console.log('ok: data-positions unit tests');
+
+// Key spans: an object member records where its key token sits, so an error
+// naming a property can point at the property instead of at its container.
+{
+  const text = '{\n  "alpha": 1,\n  "beta": [10, 20]\n}';
+  const map = buildDataPositionMap(text);
+
+  assert.strictEqual(map['/alpha'].keyLine, 2, 'alpha key on line 2');
+  assert.strictEqual(map['/alpha'].keyCol, 3, 'alpha key starts at col 3');
+  assert.strictEqual(map['/alpha'].keyLength, 7, 'alpha key token is 7 chars including quotes');
+  assert.strictEqual(text.slice(map['/alpha'].keyOffset, map['/alpha'].keyOffset + map['/alpha'].keyLength), '"alpha"');
+
+  assert.strictEqual(map['/beta'].keyLine, 3, 'beta key on line 3');
+  assert.strictEqual(text.slice(map['/beta'].keyOffset, map['/beta'].keyOffset + map['/beta'].keyLength), '"beta"');
+
+  // Array elements have no key of their own.
+  assert.strictEqual(map['/beta/0'].keyOffset, undefined, 'array element has no key span');
+  // Neither does the root.
+  assert.strictEqual(map[''].keyOffset, undefined, 'root has no key span');
+
+  console.log('ok: key spans recorded for object members');
+}
