@@ -524,7 +524,7 @@ Running the whole Draft 2020-12 suite with nothing excluded, `format` and `defau
 Areas that remain deliberate scope decisions for 1.x:
 
 - **Remote `$ref` over the network** is not fetched. Register cross-schema refs explicitly with `schemas: [...]` or `addSchema()`.
-- **`$vocabulary`** is honoured for evaluation: a keyword whose vocabulary the meta-schema does not declare is not part of the dialect, so it is treated as unknown and does not apply. What ata does not do is refuse a schema whose meta-schema requires a vocabulary ata does not recognise, which the specification says an implementation must do. That schema is evaluated with every keyword applied, as it was before.
+- **`$vocabulary`** is honoured for the document which names the meta-schema: a keyword whose vocabulary that meta-schema does not declare is not part of the dialect, so it is treated as unknown and does not apply. Two things it does not do. It does not refuse a schema whose meta-schema requires a vocabulary ata does not recognise, which the specification says an implementation must do; that schema is evaluated with every keyword applied, as before. And a separate document reached through `$ref` keeps its own keywords rather than inheriting the referring dialect, so register it with its own `$schema` if it should follow one.
 - **`contentEncoding` / `contentMediaType` / `contentSchema`** are annotation-only, as the spec permits, and are not validated.
 - **`minLength`/`maxLength`** count UTF-16 code units, not grapheme clusters.
 - **Infinite-loop detection** relies on a recursion depth guard that cuts off circular `$ref` chains.

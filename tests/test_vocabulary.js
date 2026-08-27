@@ -138,6 +138,37 @@ check('a subschema naming its own $schema keeps its own dialect', () => {
   assert.strictEqual(v.validate({ n: 20 }).valid, true)
 })
 
+check('a referenced document keeps its own keywords', () => {
+  // Stated in the README rather than fixed. Only the document which names the
+  // meta-schema is filtered; a separate one reached by $ref is not assumed to
+  // be under the same dialect just because it declares no $schema of its own.
+  const other = { $id: 'http://example.com/other', minimum: 10 }
+  const v = new Validator(
+    { $schema: NO_VALIDATION.$id, $ref: other.$id },
+    { schemas: [NO_VALIDATION, other] },
+  )
+  assert.strictEqual(v.validate(1).valid, false)
+})
+
+check('the format-assertion vocabulary is recognised', () => {
+  // It has no vendored meta-schema, being an alternative to format-annotation
+  // rather than part of the standard dialect, so it is the one keyword set
+  // named in the source. If it were missed, a meta-schema asking for format
+  // assertion would be unknown and nothing would be filtered at all.
+  const meta = {
+    $id: 'http://example.com/meta/fa',
+    $vocabulary: {
+      'https://json-schema.org/draft/2020-12/vocab/core': true,
+      'https://json-schema.org/draft/2020-12/vocab/applicator': true,
+      'https://json-schema.org/draft/2020-12/vocab/format-assertion': true,
+    },
+  }
+  const enabled = enabledKeywords(meta)
+  assert.ok(enabled, 'not an unknown vocabulary')
+  assert.ok(enabled.has('format'))
+  assert.ok(!enabled.has('minimum'), 'validation is still absent')
+})
+
 check('a meta-schema registered by addSchema() counts too', () => {
   // addSchema() is legal right up until compilation, so the answer cannot be
   // worked out in the constructor.

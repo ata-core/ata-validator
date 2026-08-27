@@ -10,7 +10,11 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
   This closes the last case ata missed. Draft 2020-12 goes from 1298 to **1299 of 1299**, with draft 7 at 927 of 927 and the v1 dialect at 1133 of 1133, the same with code generation blocked. `tests/run_suite.js` has no known failures left.
 
-  One thing ata still does not do: refuse a schema whose meta-schema requires, with `true`, a vocabulary ata does not recognise. The specification says an implementation must refuse there. Turning what has always been silently accepted into a hard failure is a separate decision, so such a schema is left exactly as it was, evaluated with every keyword applied.
+  Two things it does not do. It does not refuse a schema whose meta-schema requires, with `true`, a vocabulary ata does not recognise; the specification says an implementation must refuse there, and turning what has always been silently accepted into a hard failure is a separate decision, so such a schema is evaluated as before with every keyword applied. And a separate document reached through `$ref` keeps its own keywords rather than inheriting the referring dialect, so a document which should follow one needs to say so with its own `$schema`.
+
+### Fixed
+
+- `bundleStandalone` and `bundleCompact` built the error-reporting function from the schema the caller passed rather than the one the validator compiled. Anything which prepares a schema therefore reached the boolean path and not the error path: with `assertFormat: false` the bundle reported a `format` error the caller had turned off, and only once some other keyword failed first, since the error function runs only after the boolean one says no. `toStandalone` already read the compiled schema; these two now do as well.
 
 ## 1.7.4 - 2026-08-26
 

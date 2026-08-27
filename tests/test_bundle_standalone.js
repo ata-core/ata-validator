@@ -19,6 +19,34 @@ function loadBundle(src) {
 console.log('\nata bundleStandalone tests\n');
 
 const cases = [
+  ['bundleStandalone: the error path sees the schema the validator compiled', () => {
+    // The boolean function comes from the validator, which compiles a prepared
+    // schema. The error function used to be compiled from the caller's
+    // original, so anything that prepared the schema applied to one path and
+    // not the other. With assertFormat: false the bundle reported a `format`
+    // error the caller had turned off, and only when some other keyword failed
+    // first, which is what made it quiet.
+    const schema = {
+      type: 'object',
+      additionalProperties: false,
+      properties: { e: { type: 'string', format: 'email' } },
+      required: ['e'],
+    };
+    const opts = { assertFormat: false };
+    const instance = { e: 'not-an-email', extra: 1 };
+
+    const expected = new Validator(schema, opts).validate(instance)
+      .errors.map((e) => e.keyword).sort();
+
+    for (const build of ['bundleStandalone', 'bundleCompact']) {
+      const validators = loadBundle(Validator[build]([schema], opts));
+      const got = validators[0](instance).errors.map((e) => e.keyword).sort();
+      assert(
+        JSON.stringify(got) === JSON.stringify(expected),
+        `${build} reported ${JSON.stringify(got)}, runtime reported ${JSON.stringify(expected)}`,
+      );
+    }
+  }],
   ['bundleStandalone: hoisted anyOf branch helpers are emitted', () => {
     // Issue #24: bundle output referenced `_af1_b0` without its definition
     // because the codegen preamble (where hoisted anyOf/oneOf branch fns
