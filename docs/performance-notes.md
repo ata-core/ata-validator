@@ -308,3 +308,36 @@ measured 4.7x on a path that item 1 made rare but did not remove.
 Item 5 is the most interesting and the least ready. There is no proposal worth trying
 until someone can explain why both columns degrade past 256 validators, and the last
 attempt in that area was reverted after being measured.
+
+## 5. The verdict path: where the time is and what moved it
+
+Measured 2026-08-28 on the official suite run as a benchmark, one prebuilt
+validator per group, one pass over every instance, warm medians
+(`benchmark/verdict-bench.md` has every figure and the commands). `validate().valid`
+on master 1.9.0: 60 ns on 2020-12 against 78 for the next validator and 136 for
+the one after; 43 on draft7 against 55 and 74.
+
+The interpreter carried 22 percent of the cases and 41 percent of the time. The
+same schemas measured alone cost 7 to 36 ns; in the suite loop they averaged 190.
+The difference is not per-node work. The closure tree shares one body of closure
+code across every validator, so every call site inside it sees hundreds of
+targets and misses its inline cache; generated code does not, because each
+validator owns its own. So the lever was to put fewer schemas on the closure
+tree, not to make it do less.
+
+The code generator now takes boolean subschemas in every position, recursive
+`#/$defs/` references as named functions, and `additionalProperties` as a schema
+under composition and `patternProperties`. Every group that moved got faster,
+31 of 31 on 2020-12 and 28 of 28 on draft7, summed per-group time down 70
+percent. Suite-wide, interleaved against master in one process, the figure did
+not move outside the measurement's own noise of about 8 percent, because the
+groups that moved were cheap ones and the loop's per-call overhead dominates.
+
+Two things were measured and dropped. Length-bucketed key comparison for
+`additionalProperties: false`: V8 interns property names, so the existing chain
+of `!==` is already a pointer compare. The `(schema, data)` cycle guard on `$ref`
+steps: a 2.3x figure came from timing a cold build before a warm one; interleaved
+it was 151 against 160 ns, no change.
+
+`date` and `ipv4` format checks read the string once: 45.7 to 14.2 ns and 54.5 to
+27.1 ns. `uuid` measured 57.3 against 59.4 and kept its regular expression.
