@@ -81,4 +81,16 @@ checkShape('draft-7 additionalItems: false', { $schema: 'http://json-schema.org/
   [['a', 'b'], false],
 ]);
 
+checkShape('properties with a false member', { type: 'object', properties: { x: false, y: true, z: { type: 'number' } } }, [
+  [{}, true],
+  [{ y: 1 }, true],
+  [{ x: 1 }, false],
+  [{ z: 'no' }, false],
+]);
+checkShape('properties false without type', { properties: { x: false } }, [
+  [{ x: null }, false],
+  [{ y: 1 }, true],
+  ['not an object', true],
+]);
+
 module.exports = { checkShape };
