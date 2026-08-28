@@ -131,4 +131,17 @@ checkShape('if: false selects else', { if: false, then: false, else: { type: 'nu
 // the empty one included; a non-array is untouched by it and not: false passes.
 checkShape('not: false and contains: false', { not: false, contains: false }, [[[], false], [[1], false], ['x', true]]);
 
+const tree = { $defs: { node: { type: 'object', required: ['v'], properties: { v: { type: 'number' }, kids: { type: 'array', items: { $ref: '#/$defs/node' } } } } }, $ref: '#/$defs/node' };
+checkShape('self-recursive $defs', tree, [
+  [{ v: 1 }, true],
+  [{ v: 1, kids: [{ v: 2, kids: [{ v: 3 }] }] }, true],
+  [{ v: 1, kids: [{ v: 'x' }] }, false],
+  [{ v: 1, kids: [{ v: 2, kids: [{}] }] }, false],
+]);
+const pair = { $defs: { a: { type: 'object', properties: { b: { $ref: '#/$defs/b' } } }, b: { type: 'array', items: { $ref: '#/$defs/a' } } }, $ref: '#/$defs/a' };
+checkShape('two defs referring to each other', pair, [
+  [{ b: [{ b: [] }] }, true],
+  [{ b: [1] }, false],
+]);
+
 module.exports = { checkShape };
