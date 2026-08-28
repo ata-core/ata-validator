@@ -23,7 +23,12 @@ function errorKeys (errors) {
   return (comp.length ? comp : keys).sort();
 }
 
-function checkShape (name, schema, cases) {
+// opts.compareErrors: false skips the error comparison for shapes where the
+// two engines report the same verdict with different, pre-existing error
+// shapes: the interpreter applies additionalProperties: false as a false
+// schema at the key (`not@/key`), codegen reports `additionalProperties` at
+// the object the way the default error shape does.
+function checkShape (name, schema, cases, opts) {
   // The Validator normalizes draft-7 spellings (tuple items, additionalItems)
   // before any engine sees the schema; the generators and the interpreter are
   // called directly here, so do the same on a copy.
@@ -46,7 +51,7 @@ function checkShape (name, schema, cases) {
     assert.strictEqual(errFn(data, true).valid, expected, `${name}: errors verdict on ${JSON.stringify(data)}`);
     if (comb) assert.strictEqual(comb(data).valid, expected, `${name}: combined verdict on ${JSON.stringify(data)}`);
     if (hybrid) assert.strictEqual(hybrid(data).valid, expected, `${name}: hybrid verdict on ${JSON.stringify(data)}`);
-    if (!expected) {
+    if (!expected && !(opts && opts.compareErrors === false)) {
       assert.deepStrictEqual(errorKeys(errFn(data, true).errors), errorKeys(ref.errors), `${name}: error keywords and paths on ${JSON.stringify(data)}`);
       if (comb) assert.deepStrictEqual(errorKeys(comb(data).errors), errorKeys(ref.errors), `${name}: combined error keywords and paths on ${JSON.stringify(data)}`);
     }
@@ -142,6 +147,38 @@ const pair = { $defs: { a: { type: 'object', properties: { b: { $ref: '#/$defs/b
 checkShape('two defs referring to each other', pair, [
   [{ b: [{ b: [] }] }, true],
   [{ b: [1] }, false],
+]);
+
+checkShape('additionalProperties schema with allOf', { allOf: [{ properties: { foo: {} } }], additionalProperties: { type: 'boolean' } }, [
+  [{ foo: 1 }, false],
+  [{ bar: true }, true],
+  [{ bar: 1 }, false],
+  [{}, true],
+]);
+checkShape('additionalProperties schema with patternProperties', { properties: { a: {} }, patternProperties: { '^x': { type: 'number' } }, additionalProperties: { type: 'string' } }, [
+  [{ a: 1, x1: 2, other: 's' }, true],
+  [{ other: 1 }, false],
+  [{ x1: 's' }, false],
+]);
+
+// Two patterns with additionalProperties: false. A key matching only the
+// second pattern must not be rejected by the first pattern's miss; this was
+// a wrong reject in the unified key loop before the loop was rewritten.
+checkShape('two patternProperties with additionalProperties: false', { properties: { a: {} }, patternProperties: { '^x': { type: 'number' }, '^y': { type: 'string' } }, additionalProperties: false }, [
+  [{ y1: 's' }, true],
+  [{ x1: 1, y1: 's', a: null }, true],
+  [{ y1: 1 }, false],
+  [{ z: 1 }, false],
+], { compareErrors: false });
+// The suite's own interaction case: a declared key that also matches a
+// pattern is validated by the pattern too.
+checkShape('declared key also matched by a pattern', { properties: { foo: { type: 'array', maxItems: 3 }, bar: { type: 'array' } }, patternProperties: { 'f.o': { minItems: 2 } }, additionalProperties: { type: 'integer' } }, [
+  [{ foo: [] }, false],
+  [{ foo: [1, 2] }, true],
+  [{ foo: [1, 2, 3, 4] }, false],
+  [{ bar: [] }, true],
+  [{ quux: 3 }, true],
+  [{ quux: 'x' }, false],
 ]);
 
 module.exports = { checkShape };
