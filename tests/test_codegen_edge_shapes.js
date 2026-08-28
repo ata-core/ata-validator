@@ -93,4 +93,24 @@ checkShape('properties false without type', { properties: { x: false } }, [
   ['not an object', true],
 ]);
 
+checkShape('patternProperties with boolean values', { patternProperties: { '^f': true, '^b': false } }, [
+  [{ foo: 1 }, true],
+  [{ bar: 1 }, false],
+  [{ zap: 1 }, true],
+]);
+checkShape('dependentSchemas with boolean values', { dependentSchemas: { foo: true, bar: false } }, [
+  [{ foo: 1 }, true],
+  [{ bar: 1 }, false],
+  [{}, true],
+]);
+checkShape('propertyNames: false', { propertyNames: false }, [
+  [{}, true],
+  [{ a: 1 }, false],
+  [[], true],
+]);
+checkShape('propertyNames: true', { propertyNames: true, maxProperties: 1 }, [
+  [{ a: 1 }, true],
+  [{ a: 1, b: 2 }, false],
+]);
+
 module.exports = { checkShape };
