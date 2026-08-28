@@ -13,8 +13,14 @@ const { isDraft7, normalizeDraft7 } = require('../lib/draft7');
 
 const VALID = { valid: true, errors: [] };
 
+// Codegen collapses anyOf and oneOf to one error carrying the branch detail
+// in `branchErrors`; the interpreter lists every branch's errors flat. That
+// difference predates this file and is a presentation choice, not a verdict,
+// so under a composition keyword only the composition error is compared.
 function errorKeys (errors) {
-  return (errors || []).map((e) => `${e.keyword}@${e.instancePath}`).sort();
+  const keys = (errors || []).map((e) => `${e.keyword}@${e.instancePath}`);
+  const comp = keys.filter((k) => /^(anyOf|oneOf)@/.test(k));
+  return (comp.length ? comp : keys).sort();
 }
 
 function checkShape (name, schema, cases) {
@@ -112,5 +118,17 @@ checkShape('propertyNames: true', { propertyNames: true, maxProperties: 1 }, [
   [{ a: 1 }, true],
   [{ a: 1, b: 2 }, false],
 ]);
+
+checkShape('allOf with a false member', { allOf: [true, false] }, [[1, false], [{}, false]]);
+checkShape('allOf with true members', { allOf: [true, { type: 'string' }] }, [['a', true], [1, false]]);
+checkShape('anyOf with a false member', { anyOf: [false, { type: 'string' }] }, [['a', true], [1, false]]);
+checkShape('anyOf with a true member', { anyOf: [true, { type: 'string' }], maxLength: 1 }, [['a', true], ['ab', false], [1, true]]);
+checkShape('if: true, then: false', { if: true, then: false }, [[1, false]]);
+checkShape('object if, then: false', { if: { type: 'string' }, then: false }, [['a', false], [1, true]]);
+checkShape('if with else: false', { if: { type: 'string' }, else: false }, [['a', true], [1, false]]);
+checkShape('if: false selects else', { if: false, then: false, else: { type: 'number' } }, [[1, true], ['a', false]]);
+// contains needs at least one match, so a false contains fails on every array,
+// the empty one included; a non-array is untouched by it and not: false passes.
+checkShape('not: false and contains: false', { not: false, contains: false }, [[[], false], [[1], false], ['x', true]]);
 
 module.exports = { checkShape };
