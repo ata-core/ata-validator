@@ -9,6 +9,7 @@ const assert = require('node:assert');
 const { Validator } = require('..');
 const { compileToJSCodegen, compileToJSCodegenWithErrors, compileToJSCombined } = require('../lib/js-compiler');
 const { createInterpreter } = require('../lib/interpreter');
+const { isDraft7, normalizeDraft7 } = require('../lib/draft7');
 
 const VALID = { valid: true, errors: [] };
 
@@ -17,6 +18,10 @@ function errorKeys (errors) {
 }
 
 function checkShape (name, schema, cases) {
+  // The Validator normalizes draft-7 spellings (tuple items, additionalItems)
+  // before any engine sees the schema; the generators and the interpreter are
+  // called directly here, so do the same on a copy.
+  if (isDraft7(schema)) schema = normalizeDraft7(JSON.parse(JSON.stringify(schema)));
   const bool = compileToJSCodegen(schema, null, undefined);
   assert.ok(typeof bool === 'function', `${name}: compileToJSCodegen must take this shape`);
   const errFn = compileToJSCodegenWithErrors(schema, null, undefined);
@@ -52,6 +57,28 @@ function checkShape (name, schema, cases) {
 checkShape('oneOf with boolean members', { oneOf: [true, { type: 'string' }] }, [
   ['x', false],
   [1, true],
+]);
+
+// items: false rejects any element past the prefix; items: true constrains nothing.
+checkShape('items: false with prefixItems', { type: 'array', prefixItems: [{ type: 'string' }], items: false }, [
+  [['a'], true],
+  [['a', 1], false],
+  [[], true],
+  [[1], false],
+]);
+checkShape('items: false alone', { items: false }, [
+  [[], true],
+  [[1], false],
+  ['not an array', true],
+]);
+checkShape('items: true with a length bound', { type: 'array', items: true, maxItems: 2 }, [
+  [[1, 'x'], true],
+  [[1, 2, 3], false],
+]);
+// Draft 7 spells the same thing with additionalItems; lib/draft7.js maps it.
+checkShape('draft-7 additionalItems: false', { $schema: 'http://json-schema.org/draft-07/schema#', items: [{ type: 'string' }], additionalItems: false }, [
+  [['a'], true],
+  [['a', 'b'], false],
 ]);
 
 module.exports = { checkShape };
