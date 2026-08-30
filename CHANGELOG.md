@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Performance
+
+- The code generator takes shapes it used to decline for no correctness reason: boolean subschemas in `items`, `properties`, `patternProperties`, `dependentSchemas`, `propertyNames`, `allOf`, `anyOf`, `not`, `contains` and `if`/`then`/`else`, recursive `#/$defs/` references as named functions, and `additionalProperties` as a schema alongside composition or `patternProperties`. Each lands in all three generators and the closure path, held to the interpreter by `tests/test_codegen_edge_shapes.js` and the entry-point agreement test over the whole official suite. Every suite group that moved off the interpreter got faster, 31 of 31 on draft 2020-12 and 28 of 28 on draft 7, summed per-group time down 70 percent. The suite-wide figure, measured interleaved against the previous release in one process, did not move outside that measurement's noise; `benchmark/verdict-bench.md` has the numbers and says why.
+- `date` and `ipv4` format checks read the string once with no regular expression and no allocation: 45.7 to 14.2 ns and 54.5 to 27.1 ns on a valid value, interleaved medians. Fuzzed against the previous forms with 0 mismatches; `tests/test_formats_single_pass.js` keeps it that way.
+
+### Fixed
+
+- A key matched only by the second of two `patternProperties` entries, alongside `additionalProperties: false`, was rejected: the generated key loop returned at the first pattern that missed. Found while rewriting that loop; covered by the edge-shape test.
+- A declared property that also matched a `patternProperties` entry skipped the pattern's schema in the generated code when `additionalProperties` was a schema. The suite's own interaction case caught it the moment the shape was allowed to compile.
+
 ## 1.9.0 - 2026-08-28
 
 ### Errors
