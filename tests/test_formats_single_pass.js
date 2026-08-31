@@ -122,4 +122,88 @@ for (const [value, expected] of DATE_TIME_PICKED) {
   console.log('ok: date-time single-pass agrees with RFC 3339');
 }
 
+
+// ipv6 is checked against Node's own validator, which is an implementation
+// nobody here wrote. It differs on one point by design: it accepts a zone
+// identifier ("fe80::1%eth0"), which RFC 4291 addresses do not carry and the
+// official suite refuses, so those strings are compared against the suite's
+// answer instead.
+{
+  const net = require('net');
+  const oracle = (v) => (v.indexOf('%') !== -1 ? false : net.isIPv6(v));
+
+  const PICKED_V6 = [
+    '::1', '::', '2001:db8::1', '1:2:3:4:5:6:7:8', '::ffff:192.168.1.1',
+    '1:2:3:4:5:6:1.2.3.4', '::1.2.3.4', 'abcd::', '1::',
+    // Refused: a group over four digits, two runs of "::", a short address
+    // with no "::", a broken IPv4 tail, a trailing single colon
+    '12345::1', '1::2::3', '1:2:3:4:5:6:7', '::ffff:1.2.3.4.5', '::1:',
+    ':', ':::', '', 'not:an:ip', '1:2:3:4:5:6:7:8:9',
+  ];
+  for (const v of PICKED_V6) {
+    assert.strictEqual(F.ipv6(v), oracle(v), `ipv6 picked: ${JSON.stringify(v)}`);
+  }
+  assert.strictEqual(F.ipv6('fe80::1%eth0'), false, 'a zone id is not part of the address');
+
+  // The suite's own corpus, which is where the disagreement between the two
+  // engines showed up: one accepted an IPv4 tail and the other did not.
+  const suite = require('./suite/tests/draft2020-12/optional/format/ipv6.json');
+  for (const group of suite) {
+    for (const t of group.tests) {
+      if (typeof t.data !== 'string') continue;
+      assert.strictEqual(F.ipv6(t.data), t.valid, `ipv6 suite: ${JSON.stringify(t.data)} (${t.description})`);
+    }
+  }
+
+  const alphabet = '0123456789abcdefABCDEF:.%xg';
+  let n = 0;
+  for (let i = 0; i < 300000; i++) {
+    const len = 1 + Math.floor(rnd() * 24);
+    let v = '';
+    for (let j = 0; j < len; j++) v += alphabet[Math.floor(rnd() * alphabet.length)];
+    if (F.ipv6(v) !== oracle(v)) {
+      n++;
+      if (n < 4) console.log(`  mismatch ipv6: ${JSON.stringify(v)} new=${F.ipv6(v)} node=${oracle(v)}`);
+    }
+  }
+  assert.strictEqual(n, 0, `ipv6: ${n} fuzz mismatches against net.isIPv6`);
+
+  const fn = new Function('v', F.ipv6Source('v', true) + ';return true');
+  for (const v of PICKED_V6) assert.strictEqual(fn(v), F.ipv6(v), `ipv6 source form: ${JSON.stringify(v)}`);
+  console.log('ok: ipv6 single-pass agrees with net.isIPv6');
+}
+
+// hostname keeps the answers of the expression it replaces, exactly.
+{
+  const oldHostname = (v) => v.length > 0 && v.length <= 253 &&
+    /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(v);
+
+  const PICKED_HOST = [
+    'example.com', 'sub.example.com', 'a', 'a-b.c-d.e', 'xn--hello-txk',
+    '-leading.com', 'trailing-.com', 'double..dot', '.leading.dot', 'trailing.dot.',
+    'a'.repeat(63), 'a'.repeat(64), 'a'.repeat(63) + '.com', 'a'.repeat(300),
+    'UPPER.Case', 'has_underscore.com', 'has space.com', '', 'a..b',
+  ];
+  for (const v of PICKED_HOST) {
+    assert.strictEqual(F.hostname(v), oldHostname(v), `hostname picked: ${JSON.stringify(v)}`);
+  }
+
+  const alphabet = 'abzAZ09-._';
+  let n = 0;
+  for (let i = 0; i < 300000; i++) {
+    const len = 1 + Math.floor(rnd() * 14);
+    let v = '';
+    for (let j = 0; j < len; j++) v += alphabet[Math.floor(rnd() * alphabet.length)];
+    if (F.hostname(v) !== oldHostname(v)) {
+      n++;
+      if (n < 4) console.log(`  mismatch hostname: ${JSON.stringify(v)} new=${F.hostname(v)} old=${oldHostname(v)}`);
+    }
+  }
+  assert.strictEqual(n, 0, `hostname: ${n} fuzz mismatches`);
+
+  const fn = new Function('v', F.hostnameSource('v', true) + ';return true');
+  for (const v of PICKED_HOST) assert.strictEqual(fn(v), F.hostname(v), `hostname source form: ${JSON.stringify(v)}`);
+  console.log('ok: hostname single-pass agrees with the regular expression');
+}
+
 console.log('ok: formats single pass');
