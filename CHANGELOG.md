@@ -6,6 +6,9 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Fixed
 
+- The native engine's error codes no longer reach callers untranslated. A type failure answered by the addon came back as `code: 3` with no `keyword` and a `docUrl` pointing at a page that does not exist, while the same failure from the JavaScript engines came back as `ATA1001`; both now report the documented code, keyword and link. `tests/test_native_error_codes.js` holds the table against the enum in `include/ata.h`, so the two cannot drift apart silently.
+- The error generator declined self-referencing schemas by emitting nothing for the reference, which accepted whatever that reference guarded: `{ properties: { foo: { $ref: "#" } }, additionalProperties: false }` accepted `{ foo: { bar: false } }` on that path. It now declines the schema outright and the validator falls back to an engine that answers it correctly. The entry-point agreement test covers the shape.
+
 - Data that points back at itself no longer exhausts the stack. A document with a cycle, which JSON text cannot express but an in-memory object graph can, threw `RangeError: Maximum call stack size exceeded` on the compiled path while the interpreted engine settled on an answer, so the two engines disagreed. Both now follow the same rule: a value already being checked against a schema is a fixed point and counts as satisfied, and a cycle no longer hides a real violation elsewhere in the document. Validation runs a fast pass that only counts depth and a guarded pass that runs when that depth is exceeded, so ordinary documents pay one integer operation per recursive call. Measured interleaved on a self-referencing schema: a four-node document 22.2 to 30.6 ns, a 200-node document 2077 to 1178 ns, non-recursive schemas unchanged at 3.8 ns. `tests/test_cyclic_input.js` holds all three engines to the same answers.
 
 ### Performance
