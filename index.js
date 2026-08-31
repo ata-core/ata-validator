@@ -15,6 +15,7 @@ const { needsNormalization } = require("./lib/schema-scan");
 const { isV1Dialect } = require("./lib/dialect");
 const { classify } = require("./lib/shape-classifier");
 const { buildTier0Plan, tier0Validate } = require("./lib/tier0");
+const { createCache: _createPosCache } = require("./lib/data-position-cache");
 
 // Extract default values from a schema tree. Returns a function that applies
 // defaults to an object in-place (mutates), or null if no defaults exist.
@@ -788,89 +789,15 @@ class Validator {
     // Per-validate data position cache. Populated by validateJSON before
     // dispatching to inner validate(); consulted by the rich-error wrap
     // to attach dataFrame entries to each enriched error.
-    this._posCache = require('./lib/data-position-cache').createCache();
+    this._posCache = null; // created by _pos() on first use, only the JSON text path needs it
     this._lastRawInput = null;
 
-    // Lazy stubs: trigger compilation on first call, then re-dispatch
-    this.validate = (data) => {
-      this._ensureCompiled();
-      return this.validate(data);
-    };
-    this.isValidObject = (data) => {
-      // Lazy: classify + build tier 0 plan on first call, not in constructor.
-      const _tier = classify(this._schemaObj);
-      if (_tier.tier === 0) {
-        const _plan = buildTier0Plan(this._schemaObj);
-        let _n = 0;
-        this.isValidObject = (d) => {
-          const r = tier0Validate(_plan, d);
-          if (++_n === 2) {
-            try { this._ensureCodegen(); } catch {}
-          }
-          return r;
-        };
-      } else {
-        this._ensureCodegen();
-        // Codegen can bail on shapes it cannot represent; the full compile
-        // binds the native path or the unsupported thrower instead of
-        // leaving this stub to re-dispatch to itself.
-        if (!this._jsFn) this._ensureCompiled();
-      }
-      return this.isValidObject(data);
-    };
-    this.validateJSON = (jsonStr) => {
-      this._ensureCompiled();
-      return this.validateJSON(jsonStr);
-    };
-    this.isValidJSON = (jsonStr) => {
-      this._ensureCompiled();
-      return this.isValidJSON(jsonStr);
-    };
-    this.validateAndParse = (jsonStr) => {
-      if (!native) throw new Error('Native addon required for validateAndParse()');
-      this._ensureCompiled();
-      return this.validateAndParse(jsonStr);
-    };
-    this.isValid = (buf) => {
-      if (!native) throw new Error('Native addon required for isValid() — use validate() or isValidObject() instead');
-      this._ensureCompiled();
-      return this.isValid(buf);
-    };
-    this.countValid = (ndjsonBuf) => {
-      if (!native) throw new Error('Native addon required for countValid()');
-      this._ensureCompiled();
-      return this.countValid(ndjsonBuf);
-    };
-    this.batchIsValid = (buffers) => {
-      if (!native) throw new Error('Native addon required for batchIsValid()');
-      this._ensureCompiled();
-      return this.batchIsValid(buffers);
-    };
+    // Public methods start as memoized accessors on the prototype; nothing is
+    // allocated per instance until one is first read. See _defineLazyMethod
+    // below the class.
 
-    // ~standard uses self.validate() -- works with lazy because it goes through
-    // the instance property which gets swapped after compilation
-    const self = this;
-    Object.defineProperty(this, "~standard", {
-      value: Object.freeze({
-        version: 1,
-        vendor: "ata-validator",
-        validate(value) {
-          const result = self.validate(value);
-          if (result.valid) {
-            return { value };
-          }
-          return {
-            issues: result.errors.map((err) => ({
-              message: err.message,
-              path: parsePointerPath(err.instancePath),
-            })),
-          };
-        },
-      }),
-      writable: false,
-      enumerable: false,
-      configurable: false,
-    });
+    // "~standard" (Standard Schema V1) is a lazy prototype accessor too;
+    // see below the class. Consumers only pay for it if they read it.
 
     // Populate identity cache so repeated `new Validator(sameSchema)` short-circuits.
     if (!opts && typeof schema === "object" && schema !== null) {
@@ -882,6 +809,10 @@ class Validator {
   // meta-schema, which addSchema() may only have registered just now. Run once,
   // before anything reads the schema, and before `_schemaStr` is computed from
   // it. After this addSchema() is refused, so the answer cannot go stale.
+  _pos() {
+    return this._posCache || (this._posCache = _createPosCache());
+  }
+
   _ensureVocabularies() {
     if (this._vocabulariesApplied) return;
     this._vocabulariesApplied = true;
@@ -1416,7 +1347,7 @@ class Validator {
         if (result && result.valid === false && result !== ABORT_EARLY_RESULT) {
           // Positions come from the raw input when validateJSON set one;
           // resolved eagerly since the cache is reset per call.
-          const positions = (enrich && self._lastRawInput != null) ? self._posCache.get(self._lastRawInput) : null;
+          const positions = (enrich && self._lastRawInput != null) ? self._pos().get(self._lastRawInput) : null;
           if (positions) self._posCache.reset();
           let cached = null;
           return {
@@ -1481,7 +1412,7 @@ class Validator {
             let parsedData;
             try { parsedData = JSON.parse(jsonStr); } catch { parsedData = undefined; }
             if (!first || !first.docUrl) {
-              const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
+              const positions = (this._lastRawInput != null) ? this._pos().get(this._lastRawInput) : null;
               const enriched = result.errors.map((e) => enrich(e, {
                 data: parsedData,
                 positions,
@@ -1501,7 +1432,7 @@ class Validator {
               return { valid: false, errors: enriched };
             }
             // Already-enriched path: still attach dataFrame if missing.
-            const positions = (this._lastRawInput != null) ? this._posCache.get(this._lastRawInput) : null;
+            const positions = (this._lastRawInput != null) ? this._pos().get(this._lastRawInput) : null;
             if (positions) {
               for (const e of result.errors) {
                 if (e && !e.dataFrame) {
@@ -2031,6 +1962,114 @@ function attachSuggestions (errors, data) {
 function defineSchema (schema) {
   return schema;
 }
+
+// Public methods start as memoized accessors on the prototype. A fresh
+// Validator allocates none of them; the first read of a method builds the
+// bound closure, stores it on the instance as an ordinary writable property
+// and returns it. The setter keeps the compile step's plain assignments
+// (`this.validate = fn`) working before the getter has ever run. Detached
+// use (`const f = v.validate`) keeps working because the closure binds the
+// instance.
+// Standard Schema V1. Built on first read, then pinned to the instance with
+// the same descriptor the constructor used to install eagerly.
+Object.defineProperty(Validator.prototype, "~standard", {
+  configurable: true,
+  get() {
+    const self = this;
+    const std = Object.freeze({
+      version: 1,
+      vendor: "ata-validator",
+      validate(value) {
+        const result = self.validate(value);
+        if (result.valid) {
+          return { value };
+        }
+        return {
+          issues: result.errors.map((err) => ({
+            message: err.message,
+            path: parsePointerPath(err.instancePath),
+          })),
+        };
+      },
+    });
+    Object.defineProperty(this, "~standard", {
+      value: std,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    });
+    return std;
+  },
+});
+
+function _defineLazyMethod(name, maker) {
+  Object.defineProperty(Validator.prototype, name, {
+    configurable: true,
+    get() {
+      const fn = maker(this);
+      Object.defineProperty(this, name, { value: fn, writable: true, configurable: true, enumerable: true });
+      return fn;
+    },
+    set(fn) {
+      Object.defineProperty(this, name, { value: fn, writable: true, configurable: true, enumerable: true });
+    },
+  });
+}
+
+_defineLazyMethod('validate', (self) => (data) => {
+  self._ensureCompiled();
+  return self.validate(data);
+});
+_defineLazyMethod('isValidObject', (self) => (data) => {
+  // Lazy: classify + build tier 0 plan on first call, not in constructor.
+  const _tier = classify(self._schemaObj);
+  if (_tier.tier === 0) {
+    const _plan = buildTier0Plan(self._schemaObj);
+    let _n = 0;
+    self.isValidObject = (d) => {
+      const r = tier0Validate(_plan, d);
+      if (++_n === 2) {
+        try { self._ensureCodegen(); } catch {}
+      }
+      return r;
+    };
+  } else {
+    self._ensureCodegen();
+    // Codegen can bail on shapes it cannot represent; the full compile
+    // binds the native path or the unsupported thrower instead of
+    // leaving this stub to re-dispatch to itself.
+    if (!self._jsFn) self._ensureCompiled();
+  }
+  return self.isValidObject(data);
+});
+_defineLazyMethod('validateJSON', (self) => (jsonStr) => {
+  self._ensureCompiled();
+  return self.validateJSON(jsonStr);
+});
+_defineLazyMethod('isValidJSON', (self) => (jsonStr) => {
+  self._ensureCompiled();
+  return self.isValidJSON(jsonStr);
+});
+_defineLazyMethod('validateAndParse', (self) => (jsonStr) => {
+  if (!native) throw new Error('Native addon required for validateAndParse()');
+  self._ensureCompiled();
+  return self.validateAndParse(jsonStr);
+});
+_defineLazyMethod('isValid', (self) => (buf) => {
+  if (!native) throw new Error('Native addon required for isValid() — use validate() or isValidObject() instead');
+  self._ensureCompiled();
+  return self.isValid(buf);
+});
+_defineLazyMethod('countValid', (self) => (ndjsonBuf) => {
+  if (!native) throw new Error('Native addon required for countValid()');
+  self._ensureCompiled();
+  return self.countValid(ndjsonBuf);
+});
+_defineLazyMethod('batchIsValid', (self) => (buffers) => {
+  if (!native) throw new Error('Native addon required for batchIsValid()');
+  self._ensureCompiled();
+  return self.batchIsValid(buffers);
+});
 
 module.exports = {
   Validator,

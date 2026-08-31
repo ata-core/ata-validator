@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Performance
+
+- A constructed Validator is roughly three times smaller on the heap until it is used. The public methods and the Standard Schema entry moved from per-instance closures built in the constructor to memoized prototype accessors, and the JSON position cache is only allocated when the JSON text path first needs it. Measured per instance on a 10-key object schema, double-gc deltas over 2000 instances: 1.61 KB to 0.43 KB with a shared schema object, 2.33 KB to 1.12 KB when each instance owns its schema, 3.93 KB to 3.30 KB once compiled and used. Construction alone went from 1504 to 855 ns; construction plus first validate pays about 0.9 microseconds more, once, because the compile step's method assignments now go through a defining setter. The hot validate() path is unchanged, measured interleaved. Detached method references (`const f = v.validate`) still work; `tests/test_lazy_instance.js` pins the shape.
+
 ## 1.10.0 - 2026-08-30
 
 ### Performance
