@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Fixed
+
+- Data that points back at itself no longer exhausts the stack. A document with a cycle, which JSON text cannot express but an in-memory object graph can, threw `RangeError: Maximum call stack size exceeded` on the compiled path while the interpreted engine settled on an answer, so the two engines disagreed. Both now follow the same rule: a value already being checked against a schema is a fixed point and counts as satisfied, and a cycle no longer hides a real violation elsewhere in the document. Validation runs a fast pass that only counts depth and a guarded pass that runs when that depth is exceeded, so ordinary documents pay one integer operation per recursive call. Measured interleaved on a self-referencing schema: a four-node document 22.2 to 30.6 ns, a 200-node document 2077 to 1178 ns, non-recursive schemas unchanged at 3.8 ns. `tests/test_cyclic_input.js` holds all three engines to the same answers.
+
 ### Performance
 
 - A constructed Validator is roughly three times smaller on the heap until it is used. The public methods and the Standard Schema entry moved from per-instance closures built in the constructor to memoized prototype accessors, and the JSON position cache is only allocated when the JSON text path first needs it. Measured per instance on a 10-key object schema, double-gc deltas over 2000 instances: 1.61 KB to 0.43 KB with a shared schema object, 2.33 KB to 1.12 KB when each instance owns its schema, 3.93 KB to 3.30 KB once compiled and used. Construction alone went from 1504 to 855 ns; construction plus first validate pays about 0.9 microseconds more, once, because the compile step's method assignments now go through a defining setter. The hot validate() path is unchanged, measured interleaved. Detached method references (`const f = v.validate`) still work; `tests/test_lazy_instance.js` pins the shape.
