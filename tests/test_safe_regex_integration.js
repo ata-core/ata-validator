@@ -16,9 +16,21 @@ function load (code) { const m = { exports: {} }; new Function('module', 'export
 // linear one, paired with an input that never matches (forces the worst case).
 const EVIL = '^(a+)+$'
 const EVIL_INPUT = 'a'.repeat(40) + '!'
-const BUDGET_MS = 50
+// The gate separates linear from catastrophic, not fast from slow. A
+// backtracking engine on this input runs for minutes; a linear one answers in
+// microseconds. The budget sits far above the second and far below the first,
+// because a shared CI machine can stall a millisecond-scale measurement for
+// tens of milliseconds and that is not the thing under test.
+const BUDGET_MS = 500
 
-function timed (fn) { const t0 = Date.now(); const out = fn(); return { out, ms: Date.now() - t0 } }
+// The first call compiles the schema and the pattern and runs unoptimized, so
+// it is made once and discarded; what is measured is the matching itself.
+function timed (fn) {
+  fn()
+  const t0 = Date.now()
+  const out = fn()
+  return { out, ms: Date.now() - t0 }
+}
 
 console.log('\nReDoS-safe regex integration\n')
 
