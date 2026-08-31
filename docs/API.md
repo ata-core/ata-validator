@@ -106,7 +106,11 @@ No frame is reconstructed when `coerceTypes`, `removeAdditional`, or a schema wi
 
 ### v.isValidObject(data)
 
-Boolean-only check. Fastest path, no error details, no defaults/coercion.
+Boolean-only check: the answer `validate()` would give, without building the
+error list. Configured preprocessing still runs, so a validator with
+`coerceTypes`, `removeAdditional` or a schema `default` rewrites the input here
+exactly as it does in `validate()`, and the two never disagree. Without those
+options nothing is touched and this is the fastest call in the API.
 
 ```javascript
 v.isValidObject({ name: 'Mert', age: 26 }); // true
