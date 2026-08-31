@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- The ReDoS integration test measured the first call, which includes compiling the schema and the pattern, against a 50 ms budget. On a loaded CI machine that reads as a failure without anything being wrong: the gate exists to separate linear matching from catastrophic backtracking, which differ by minutes, not by milliseconds. It now warms up first and allows 500 ms.
+
 ## 1.11.0 - 2026-08-31
 
 ### Fixed
