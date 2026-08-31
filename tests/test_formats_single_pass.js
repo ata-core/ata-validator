@@ -206,4 +206,37 @@ for (const [value, expected] of DATE_TIME_PICKED) {
   console.log('ok: hostname single-pass agrees with the regular expression');
 }
 
+
+// uri keeps the answers of the two expressions it replaces: a scheme read from
+// the front, then one scan for characters a URI cannot hold.
+{
+  const oldUri = (v) => /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(v) && !/[\s\u0000-\u001f\u007f]/.test(v);
+
+  const PICKED_URI = [
+    'https://example.com', 'urn:isbn:0451450523', 'a:', 'ab+c-d.e:x', 'A:',
+    '1abc:x', 'no-colon', '://x', 'http://a b', 'x:\u0001', '', '/path/to',
+    'mailto:someone@example.com', 'HTTP://EXAMPLE.COM',
+  ];
+  for (const v of PICKED_URI) {
+    assert.strictEqual(F.uri(v), oldUri(v), `uri picked: ${JSON.stringify(v)}`);
+  }
+
+  const alphabet = 'abzAZ09+-.:/?#%_ \t\u0001\u007f\u00e9';
+  let n = 0;
+  for (let i = 0; i < 300000; i++) {
+    const len = 1 + Math.floor(rnd() * 14);
+    let v = '';
+    for (let j = 0; j < len; j++) v += alphabet[Math.floor(rnd() * alphabet.length)];
+    if (F.uri(v) !== oldUri(v)) {
+      n++;
+      if (n < 4) console.log(`  mismatch uri: ${JSON.stringify(v)} new=${F.uri(v)} old=${oldUri(v)}`);
+    }
+  }
+  assert.strictEqual(n, 0, `uri: ${n} fuzz mismatches`);
+
+  const fn = new Function('v', F.uriSource('v', true) + ';return true');
+  for (const v of PICKED_URI) assert.strictEqual(fn(v), F.uri(v), `uri source form: ${JSON.stringify(v)}`);
+  console.log('ok: uri single-pass agrees with the regular expressions');
+}
+
 console.log('ok: formats single pass');

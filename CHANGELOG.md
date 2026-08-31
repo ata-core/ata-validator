@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Performance
+
+- `uri` reads the scheme from the front and scans the rest once instead of running two regular expressions: 39.3 to 32.8 ns, interleaved medians. Same answers, fuzzed over 300k strings with 0 mismatches. `uri-reference` keeps its expression, which has to match all of Unicode whitespace rather than the ASCII range.
+
 ### Fixed
 
 - The ReDoS integration test measured the first call, which includes compiling the schema and the pattern, against a 50 ms budget. On a loaded CI machine that reads as a failure without anything being wrong: the gate exists to separate linear matching from catastrophic backtracking, which differ by minutes, not by milliseconds. It now warms up first and allows 500 ms.
