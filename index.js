@@ -809,6 +809,18 @@ class Validator {
   // meta-schema, which addSchema() may only have registered just now. Run once,
   // before anything reads the schema, and before `_schemaStr` is computed from
   // it. After this addSchema() is refused, so the answer cannot go stale.
+  // Whether validation is preceded by a pass that rewrites the input:
+  // coercion, removal of undeclared keys, or filling in defaults. The verdict
+  // methods have to take the same path when it is, so the quick bindings that
+  // answer from the compiled function alone are not used for these validators.
+  _needsPreprocess() {
+    const o = this._options;
+    if (o.coerceTypes || o.removeAdditional) return true;
+    if (o.useDefaults === false) return false;
+    if (!this._schemaStr) this._schemaStr = JSON.stringify(this._schemaObj);
+    return this._schemaStr.includes('"default"');
+  }
+
   _pos() {
     return this._posCache || (this._posCache = _createPosCache());
   }
@@ -1111,14 +1123,26 @@ class Validator {
           return result;
         };
       }
-      this.isValidObject = jsFn;
+      // The verdict methods answer validate()'s question without building the
+      // error list, so they run the same preprocess pass. Skipping it made the
+      // two disagree on input that coercion or a default would have fixed.
+      this.isValidObject = preprocess
+        ? (data) => { preprocess(data); return jsFn(data) }
+        : jsFn;
       const hybridFn = jsFn._hybridFactory
         ? jsFn._hybridFactory(VALID_RESULT, errFn)
         : null;
-      const jsonValidateFn = safeCombinedFn
+      const jsonValidateInner = safeCombinedFn
         || hybridFn
         || ((obj) => (jsFn(obj) ? VALID_RESULT : errFn(obj)));
-      this.validateJSON = useSimdjsonForLarge && native
+      // Parsed text takes the same preprocess pass as a parsed object, so
+      // validate(obj) and validateJSON(text) answer the same for the same
+      // document. Without it, coercion, removal and defaults applied on one
+      // path and not the other.
+      const jsonValidateFn = preprocess
+        ? (obj) => { preprocess(obj); return jsonValidateInner(obj) }
+        : jsonValidateInner;
+      this.validateJSON = useSimdjsonForLarge && native && !preprocess
         ? (jsonStr) => {
             if (jsonStr.length >= SIMDJSON_THRESHOLD) {
               this._ensureNative();
@@ -1145,7 +1169,22 @@ class Validator {
             this._ensureNative();
             return this._compiled.validateJSON(jsonStr);
           };
-      this.isValidJSON = useSimdjsonForLarge && native
+      // The addon validates the bytes as they are, which is the wrong answer
+      // when the schema asks for coercion, removal or defaults: those change
+      // what counts as valid. With a preprocess pass configured the text is
+      // parsed and run through the same path validate() takes.
+      const verdictFromText = (jsonStr) => {
+        let parsed;
+        try {
+          parsed = JSON.parse(jsonStr);
+        } catch (e) {
+          if (!(e instanceof SyntaxError)) throw e;
+          return false;
+        }
+        if (preprocess) preprocess(parsed);
+        return jsFn(parsed);
+      };
+      this.isValidJSON = useSimdjsonForLarge && native && !preprocess
         ? (jsonStr) => {
             if (jsonStr.length >= SIMDJSON_THRESHOLD) {
               this._ensureNative();
@@ -1154,21 +1193,9 @@ class Validator {
                 Buffer.from(jsonStr),
               );
             }
-            try {
-              return jsFn(JSON.parse(jsonStr));
-            } catch (e) {
-              if (!(e instanceof SyntaxError)) throw e;
-              return false;
-            }
+            return verdictFromText(jsonStr);
           }
-        : (jsonStr) => {
-            try {
-              return jsFn(JSON.parse(jsonStr));
-            } catch (e) {
-              if (!(e instanceof SyntaxError)) throw e;
-              return false;
-            }
-          };
+        : verdictFromText;
       // validateAndParse: parse the JSON, then validate. Pure JS (JSON.parse +
       // validate) so it works with or without the native addon and in browsers.
       {
@@ -1604,6 +1631,13 @@ class Validator {
 
   _ensureCodegen() {
     if (this._jsFn) return;
+    // A validator that rewrites its input cannot use the binding below: that
+    // one answers from the compiled function alone and would skip the rewrite,
+    // so isValidObject() and validate() would disagree.
+    if (this._needsPreprocess()) {
+      this._ensureCompiled();
+      return;
+    }
     this._ensureVocabularies();
     if (typeof process !== 'undefined' && process.env && process.env.ATA_FORCE_NAPI) return;
     if (!this._schemaStr) this._schemaStr = JSON.stringify(this._schemaObj);
@@ -2021,6 +2055,12 @@ _defineLazyMethod('validate', (self) => (data) => {
   return self.validate(data);
 });
 _defineLazyMethod('isValidObject', (self) => (data) => {
+  // A validator that rewrites its input goes through the full compile, which
+  // binds a verdict method that runs the rewrite first.
+  if (self._needsPreprocess()) {
+    self._ensureCompiled();
+    return self.isValidObject(data);
+  }
   // Lazy: classify + build tier 0 plan on first call, not in constructor.
   const _tier = classify(self._schemaObj);
   if (_tier.tier === 0) {
