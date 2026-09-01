@@ -130,7 +130,7 @@
   },
   "devDependencies": {
     "@sinclair/typebox": "^0.34.49",
-    "@types/node": "^25.8.0",
+    "@types/node": "^26.4.0",
     "cmake-js": "^8.0.0",
     "esbuild": "^0.28.0",
     "jsonc-parser": "^3.3.1",
