@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.12.1 - 2026-09-06
+
+### Fixed
+
+- One format violation reports one error. The error path turns each failing statement of a format check into an error push, and it kept going after pushing, so a single bad value collected one identical error per statement it failed: twelve for `date-time` on a short string, five for `time`, two for `uuid` and `hostname`. The check now leaves the format block on the first failure. Verdicts are unchanged; only the duplicate copies of the same error are gone. `tests/test_format_single_error.js` holds every built-in format to exactly one error across 25 invalid values.
+
 ## 1.12.0 - 2026-09-06
 
 ### Performance
