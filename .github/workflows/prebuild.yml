@@ -3,6 +3,10 @@ name: Prebuild & Publish
 on:
   release:
     types: [published]
+  # Manual runs republish the version in package.json on the chosen ref. The
+  # publish job skips anything already on the registry, so a re-run after a
+  # partial failure is safe.
+  workflow_dispatch:
 
 jobs:
   prebuild:
@@ -94,29 +98,30 @@ jobs:
           path: native-packages/
 
   prebuild-musl:
-    runs-on: ubuntu-latest
+    # Both targets build natively: amd64 on the standard runner, arm64 on the
+    # arm64 runner the gnu prebuild already uses. The arm64 build ran under
+    # QEMU before, and the emulator began dying with SIGILL (exit 132) at the
+    # same apk step on every attempt of the 1.12.0 release, six of six, so it
+    # stopped being a retry problem and the emulator went away instead.
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: x64
+          - os: ubuntu-latest
             platform: linux/amd64
             target: linux-x64-musl
-          - arch: arm64
+          - os: ubuntu-24.04-arm
             platform: linux/arm64
             target: linux-arm64-musl
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-qemu-action@v3
-        if: matrix.arch == 'arm64'
-
       - name: Build in Alpine container
-        # QEMU-emulated arm64 builds crash sporadically with SIGILL (exit 132)
-        # right after container start; a fresh attempt succeeds. Retry up to 3x.
-        # SIGILL can land mid-install and leave node_modules half written, which
-        # made the next attempt fail on ENOTEMPTY instead of retrying cleanly,
-        # so each attempt starts from an empty tree.
+        # The retry loop predates the native runners and stays as a cheap
+        # guard. SIGILL could land mid-install and leave node_modules half
+        # written, which made the next attempt fail on ENOTEMPTY instead of
+        # retrying cleanly, so each attempt starts from an empty tree.
         run: |
           for attempt in 1 2 3; do
             docker run --rm --platform ${{ matrix.platform }} \
