@@ -2,13 +2,23 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.12.0 - 2026-09-06
 
 ### Performance
 
-- `uri` reads the scheme from the front and scans the rest once instead of running two regular expressions: 39.3 to 32.8 ns, interleaved medians. Same answers, fuzzed over 300k strings with 0 mismatches. `uri-reference` keeps its expression, which has to match all of Unicode whitespace rather than the ASCII range.
+- `date-time` stopped asking every character where it sits. The scan tested each of nineteen positions against the separator indices before checking the digit; the separators are now read directly by index and each digit becomes its value in the same read that validates it, so the field numbers cost nothing extra. 40.8 to 19.5 ns on a valid value, medians across separate processes. Same answers as before on every month, day and clock boundary and under 150k random mutations.
+
+- `uuid` reads the four hyphens by index and the 32 hex digits in five runs with fixed bounds, instead of a case-insensitive regular expression. A digit is one unsigned compare and a letter one more after folding case with a single OR. 48.4 to 35.1 ns; 300k mutated and random strings against the old expression with 0 mismatches.
+
+- `time` reads fixed positions the same way instead of running a regular expression: 15.6 to 12.1 ns, and 200k mutations against the old pattern with 0 mismatches.
+
+- `uri` reads the scheme from the front and scans the rest once instead of running two regular expressions: 39.3 to 32.8 ns, interleaved medians. The remaining scan then became two tiers, because the measured answer was not the expected one: a hand-written character loop beat the old `\s` expression in isolation but lost to the engine's scanner inside a compiled validator, since `\s` is what forced the Unicode machinery in. The first tier asks whether anything sits outside printable ASCII, a one-byte class the engine scans at its own speed and no ordinary URI ever trips; only a string that trips it pays for the loop that knows the exact reserved set. On a nested schema carrying six URLs, 215.5 to 189.4 ns per document, medians across separate processes. `uri-reference` shares the same scan. Fuzzed over every code point in the BMP in three positions, 0 mismatches.
+
+- The Standard Schema bridge stopped paying for enrichment it throws away. An issue carries a message and a path and nothing else, but `~standard.validate` read the rich error list, which builds suggestions, ranks and source frames per error. It now takes the raw, schema-ordered list through the same build the rich path uses, and `parsePointerPath` walks the pointer in one pass instead of split, filter, map and a regex per segment. A 16-error rejection went from 17.6 to 4.3 microseconds; messages and order are unchanged, and `tests/test_standard_schema.js` holds issues to exact parity with `validate().errors`. Schemas using `errorMessage` keep their custom messages.
 
 ### Fixed
+
+- The compiled engine refused a lowercase zone letter in `time` that the interpreter accepted: `00:00:00z` answered differently depending on which engine ran the schema, and `date-time` took either case in both. One implementation now answers for every engine, and it takes both cases, per RFC 3339.
 
 - The ReDoS integration test measured the first call, which includes compiling the schema and the pattern, against a 50 ms budget. On a loaded CI machine that reads as a failure without anything being wrong: the gate exists to separate linear matching from catastrophic backtracking, which differ by minutes, not by milliseconds. It now warms up first and allows 500 ms.
 
