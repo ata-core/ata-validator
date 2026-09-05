@@ -326,14 +326,21 @@ const ABORT_EARLY_RESULT = Object.freeze({
 // the eager shape. Note for tests: deepStrictEqual against a plain object
 // compares prototypes; read `.errors` and compare that.
 class LazyRejection {
-  constructor(build, data) {
+  constructor(build, data, buildRaw) {
     this.valid = false;
     this._build = build;
     this._data = data;
     this._errors = null;
+    this._buildRaw = buildRaw;
   }
   toJSON() {
     return { valid: false, errors: this.errors };
+  }
+  // Raw shape for consumers that carry only message and path, such as the
+  // Standard Schema bridge: schema order, no enrichment. Reading `errors`
+  // afterwards still enriches through its own build.
+  _ataRaw() {
+    return this._buildRaw ? this._buildRaw(this._data) : this.errors;
   }
 }
 Object.defineProperty(LazyRejection.prototype, 'errors', {
@@ -463,18 +470,30 @@ function sortErrorsBySchemaOrder(rootSchema, errors) {
 
 function parsePointerPath(path) {
   if (!path) return [];
-  return path
-    .split("/")
-    .filter(Boolean)
-    .map((seg) => {
-      const decoded = seg.replace(/~1/g, "/").replace(/~0/g, "~");
-      // Per Standard Schema V1: array indices should be emitted as numbers,
-      // object keys as strings. Treat all-digit segments as numeric indices.
-      if (/^(0|[1-9][0-9]*)$/.test(decoded)) {
-        return { key: Number(decoded) };
+  // One pass, no intermediate arrays. Per Standard Schema V1 an array index
+  // is emitted as a number and an object key as a string; a segment is an
+  // index when it is all digits with no leading zero.
+  const out = [];
+  const n = path.length;
+  let start = 1;
+  for (let i = 1; i <= n; i++) {
+    if (i !== n && path.charCodeAt(i) !== 47) continue;
+    if (i > start) {
+      let seg = path.slice(start, i);
+      if (seg.indexOf('~') >= 0) seg = seg.replace(/~1/g, '/').replace(/~0/g, '~');
+      const c0 = seg.charCodeAt(0);
+      let numeric = c0 >= 48 && c0 <= 57 && (seg.length === 1 || c0 !== 48);
+      if (numeric) {
+        for (let k = 1; k < seg.length; k++) {
+          const c = seg.charCodeAt(k);
+          if (c < 48 || c > 57) { numeric = false; break; }
+        }
       }
-      return { key: decoded };
-    });
+      out.push({ key: numeric ? Number(seg) : seg });
+    }
+    start = i + 1;
+  }
+  return out;
 }
 
 function createPaddedBuffer(jsonStr) {
@@ -1379,6 +1398,14 @@ class Validator {
           let cached = null;
           return {
             valid: false,
+            // Raw shape for consumers that carry only message and path, such
+            // as the Standard Schema bridge: schema order, no enrichment.
+            // Reading `errors` afterwards still enriches from the same build.
+            _ataRaw() {
+              let raw = result.errors || [];
+              if (raw.length > 1) raw = sortErrorsBySchemaOrder(root, raw);
+              return raw;
+            },
             get errors() {
               if (cached === null) {
                 let raw = result.errors || [];
@@ -1550,17 +1577,24 @@ class Validator {
       const _full = this.validate;
       const _fast = this._fastVerdict;
       const EMPTY_ERRORS = Object.freeze([]);
+      const _verdictFallback = [{ keyword: 'validation', instancePath: '', schemaPath: '#', params: {}, message: 'schema validation failed' }];
       const _buildErrors = (data) => {
         const r = _full(data);
         return (r && r.valid === false && r.errors && r.errors.length)
           ? r.errors
           // The data changed between the verdict and this read; keep the
           // verdict and say so rather than inventing a specific error.
-          : [{ keyword: 'validation', instancePath: '', schemaPath: '#', params: {}, message: 'schema validation failed' }];
+          : _verdictFallback;
+      };
+      const _buildRawErrors = (data) => {
+        const r = _full(data);
+        if (!r || r.valid !== false) return _verdictFallback;
+        const raw = typeof r._ataRaw === 'function' ? r._ataRaw() : r.errors;
+        return raw && raw.length ? raw : _verdictFallback;
       };
       this.validate = (data) => {
         if (_fast(data)) return { valid: true, data, errors: EMPTY_ERRORS };
-        return new LazyRejection(_buildErrors, data);
+        return new LazyRejection(_buildErrors, data, _buildRawErrors);
       };
     }
 
@@ -2018,12 +2052,24 @@ Object.defineProperty(Validator.prototype, "~standard", {
         if (result.valid) {
           return { value };
         }
-        return {
-          issues: result.errors.map((err) => ({
-            message: err.message,
-            path: parsePointerPath(err.instancePath),
-          })),
-        };
+        // An issue carries a message and a path and nothing else, so the
+        // suggestion and source-frame work the rich error path does would be
+        // thrown away here. Take the raw, schema-ordered list when the result
+        // offers one; fall back to the public list otherwise.
+        const raw = typeof result._ataRaw === 'function' ? result._ataRaw() : result.errors;
+        const issues = new Array(raw.length);
+        for (let i = 0; i < raw.length; i++) {
+          const err = raw[i];
+          const path = err.instancePath != null ? err.instancePath : (err.path || '');
+          let message = err.message;
+          if (!message) {
+            // The native engine reports numeric codes without a message; the
+            // enrich pass knows how to word those. Rare, so required lazily.
+            message = require('./lib/enrich-error').enrich(err, {}).message;
+          }
+          issues[i] = { message, path: parsePointerPath(path) };
+        }
+        return { issues };
       },
     });
     Object.defineProperty(this, "~standard", {

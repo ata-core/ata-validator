@@ -58,6 +58,31 @@ if (r3.issues && r3.issues.length > 0 && r3.issues[0].path) {
   assert(true, "path keys (skipped)");
 }
 
+// Issues come from the raw error path: same count and order as
+// validate().errors, message and path agreeing entry by entry. Guards the
+// _ataRaw shortcut against drifting from the public error list.
+{
+  const v6 = new Validator({
+    type: "object",
+    properties: {
+      name: { type: "string", minLength: 2 },
+      count: { type: "integer", minimum: 1 },
+      tags: { type: "array", items: { type: "string" } },
+    },
+    required: ["name", "count"],
+  });
+  const bad = { name: "x", count: 0, tags: ["ok", 7] };
+  const errors = v6.validate(bad).errors;
+  const issues = v6["~standard"].validate(bad).issues;
+  assert(issues.length === errors.length, "raw parity: same number of issues as errors");
+  for (let i = 0; i < errors.length; i++) {
+    assert(issues[i].message === errors[i].message, "raw parity: message " + i);
+    const joined = "/" + issues[i].path.map((p) => p.key).join("/");
+    const want = errors[i].instancePath === "" ? "/" : errors[i].instancePath;
+    assert(joined === want, "raw parity: path " + i);
+  }
+}
+
 // Boolean schema false
 const v3 = new Validator(false);
 const r4 = v3["~standard"].validate("anything");
