@@ -18,7 +18,7 @@ jobs:
       # `npm test` runs the official suite with code generation blocked
       # (tests/test_no_eval.js), so this job needs the submodule the same way
       # test-suite does.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -77,7 +77,7 @@ jobs:
   test-cpp:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install RE2
         run: sudo apt-get update && sudo apt-get install -y libre2-dev libabsl-dev
@@ -94,7 +94,7 @@ jobs:
   test-suite:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -117,7 +117,7 @@ jobs:
   test-ts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
