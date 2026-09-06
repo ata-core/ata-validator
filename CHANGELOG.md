@@ -2,6 +2,16 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.13.0 - 2026-09-06
+
+### Changed
+
+- The default browser bundle stops carrying the AOT emitters. `lib/aot.js` has promised a browser stub via the package.json `browser` field since the fs-free build, but the mapping was never actually in the field, so every browser bundle shipped the emitters and the embedded safe-regex engine source they pull in, along with the native walker's routing table that only matters when the native addon loads. Both now map to stubs. Emitting validators in a browser still works, through the new `ata-validator/aot` entry, and the `Validator.bundle*` statics in a browser bundle throw a message that points there; `Validator.loadBundle` keeps working in the default bundle, since loading a bundle somebody already built is a runtime act. Measured with the schema-benchmarks rolldown pipeline: minified and gzipped 73,491 to 64,812 bytes, 11.8 percent smaller. The browser-imports guard now bans a token from each excluded file so the mapping cannot regress silently.
+
+### Added
+
+- `ata-validator/aot`: the standalone emitters (`toStandalone`, `toStandaloneModule`, `bundle`, `bundleStandalone`, `bundleCompact`, `loadBundle`) as an explicit, typed import. In Node it is the same module the statics use; in a browser it is the way to opt back into emission without paying for it on pages that never emit.
+
 ## 1.12.1 - 2026-09-06
 
 ### Fixed
