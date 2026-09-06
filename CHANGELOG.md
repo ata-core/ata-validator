@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.13.1 - 2026-09-06
+
+### Fixed
+
+- The native engine stops printing to stderr for patterns outside RE2's subset. A pattern with lookahead or a backreference is an expected input, not a fault: construction is probed, and the JavaScript engines answer for the pattern instead. RE2 logged every such probe to stderr anyway, so a schema carrying zod's email pattern printed two C++ error lines on compile while validating correctly. RE2 is now constructed with logging off; verdicts are unchanged.
+
 ## 1.13.0 - 2026-09-06
 
 ### Changed
