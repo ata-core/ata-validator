@@ -20,6 +20,11 @@
       "import": "./compat.mjs",
       "require": "./compat.js"
     },
+    "./aot": {
+      "types": "./aot.d.ts",
+      "import": "./aot.mjs",
+      "require": "./aot.js"
+    },
     "./build": {
       "types": "./build.d.ts",
       "import": "./build.mjs",
@@ -37,7 +42,9 @@
     "ata": "bin/ata.js"
   },
   "browser": {
-    "./lib/native-load.js": "./lib/native-load.browser.js"
+    "./lib/native-load.js": "./lib/native-load.browser.js",
+    "./lib/aot.js": "./lib/aot.browser.js",
+    "./lib/buffer-gate.js": "./lib/buffer-gate.browser.js"
   },
   "scripts": {
     "prepublishOnly": "node scripts/regen-safe-regex-source.js && node tests/test_pack_purity.js && ATA_ALLOW_DOC_PLACEHOLDERS=1 node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js && node tests/test_safe_regex_source_sync.js && node tests/test_version_sync.js",
@@ -96,6 +103,9 @@
     "index.mjs",
     "index.browser.mjs",
     "index.d.ts",
+    "aot.js",
+    "aot.mjs",
+    "aot.d.ts",
     "lib/",
     "compat.js",
     "compat.mjs",

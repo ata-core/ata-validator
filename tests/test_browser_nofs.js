@@ -10,17 +10,22 @@ const Module = require("module");
 const path = require("path");
 
 const browserEntry = path.join(__dirname, "..", "index.browser.mjs");
+const aotEntry = path.join(__dirname, "..", "aot.mjs");
 
 const result = esbuild.buildSync({
   stdin: {
     contents: `
       import { Validator, toTypeScript } from ${JSON.stringify(browserEntry)}
+      import { bundleStandalone } from ${JSON.stringify(aotEntry)}
       const schema = { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] }
       const v = new Validator(schema)
+      let stubMessage = ''
+      try { Validator.bundleStandalone([schema]) } catch (e) { stubMessage = e.message }
       globalThis.__ATA_RESULT = {
         valid: v.validate({ id: 1 }).valid,
         invalid: v.validate({}).valid,
-        hasCode: !!Validator.bundleStandalone([schema]),
+        hasCode: !!bundleStandalone(Validator, [schema]),
+        stubMessage,
         tsOK: toTypeScript(schema, { name: 'X' }).includes('interface X'),
       }
     `,
@@ -63,7 +68,8 @@ try {
 const r = globalThis.__ATA_RESULT;
 check(r && r.valid === true, "validates a valid object without fs");
 check(r && r.invalid === false, "rejects an invalid object without fs");
-check(r && r.hasCode === true, "bundleStandalone (no pattern) works without fs");
+check(r && r.hasCode === true, "ata-validator/aot bundleStandalone works without fs");
+check(r && /ata-validator\/aot/.test(r.stubMessage), "default-entry emitter statics point at the aot entry");
 check(r && r.tsOK === true, "toTypeScript works without fs");
 
 console.log(`\n${failed === 0 ? "ok" : "FAILED"}: ata bundles for the browser and runs without fs`);

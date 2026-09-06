@@ -23,6 +23,17 @@ const bannedTokens = [
   '__dirname',
 ];
 
+// Build tooling that the `browser` field swaps for stubs. Each token is an
+// identifier or string that exists only in the real module, never in its
+// stub, so its appearance in a browser bundle means the mapping regressed.
+// `lib/aot.js` drags the embedded safe-regex engine source with it, which is
+// why the browser bundle cares.
+const browserOnlyBannedTokens = [
+  'getSafeRegexEmbed',   // lib/aot.js
+  'Pike VM',             // lib/safe-regex-source.js (inside the source string)
+  'DIVERGENT_FORMATS',   // lib/buffer-gate.js
+];
+
 function bundle(entry) {
   const result = esbuild.buildSync({
     entryPoints: [entry],
@@ -58,7 +69,7 @@ const check = (cond, msg) => {
 
 function assertClean(label, entry) {
   const code = stripComments(bundle(entry));
-  for (const token of bannedTokens) {
+  for (const token of [...bannedTokens, ...browserOnlyBannedTokens]) {
     check(
       !code.includes(token),
       `${label}: bundle contains no \`${token}\``,

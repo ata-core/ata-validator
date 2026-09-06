@@ -1602,7 +1602,7 @@ class Validator {
     // validate() on shapes listed in lib/buffer-gate.js. For those schemas
     // every buffer entry point goes through validate() instead.
     if (native) {
-      const { bufferNeedsSlowPath, installSlowBufferApis } = require('./lib/buffer-gate');
+      const { bufferNeedsSlowPath, installSlowBufferApis } = require('./lib/buffer-gate.js');
       if (bufferNeedsSlowPath(schemaObj, this._schemaMap)) installSlowBufferApis(this);
     }
 
@@ -1925,19 +1925,19 @@ function version() {
 // generated module shapes; browser bundles get `lib/aot.browser.js` (a stub
 // that throws) via the package.json `browser` field.
 Validator.bundle = function (schemas, opts) {
-  return require('./lib/aot').bundle(Validator, schemas, opts);
+  return require('./lib/aot.js').bundle(Validator, schemas, opts);
 };
 
 Validator.bundleStandalone = function (schemas, opts) {
-  return require('./lib/aot').bundleStandalone(Validator, schemas, opts);
+  return require('./lib/aot.js').bundleStandalone(Validator, schemas, opts);
 };
 
 Validator.bundleCompact = function (schemas, opts) {
-  return require('./lib/aot').bundleCompact(Validator, schemas, opts);
+  return require('./lib/aot.js').bundleCompact(Validator, schemas, opts);
 };
 
 Validator.loadBundle = function (mods, schemas, opts) {
-  return require('./lib/aot').loadBundle(Validator, mods, schemas, opts);
+  return require('./lib/aot.js').loadBundle(Validator, mods, schemas, opts);
 };
 
 const parseJSON = native ? native.parseJSON : JSON.parse;
