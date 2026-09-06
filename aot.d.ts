@@ -20,18 +20,18 @@ export function toStandalone(validator: Validator<unknown>): string | null;
 export function toStandaloneModule(validator: Validator<unknown>, opts?: StandaloneOptions): string;
 
 /** Emit a module of per-schema compiled validators that `loadBundle` consumes. */
-export function bundle(V: ValidatorClass, schemas: Array<JSONSchema | boolean>, opts?: StandaloneOptions): string;
+export function bundle(V: ValidatorClass, schemas: ReadonlyArray<JSONSchema | boolean | object>, opts?: StandaloneOptions): string;
 
 /** Emit one self-contained module for many schemas, zero runtime dependency. */
-export function bundleStandalone(V: ValidatorClass, schemas: Array<JSONSchema | boolean>, opts?: StandaloneOptions): string;
+export function bundleStandalone(V: ValidatorClass, schemas: ReadonlyArray<JSONSchema | boolean | object>, opts?: StandaloneOptions): string;
 
 /** Like bundleStandalone with shared helpers deduplicated across schemas. */
-export function bundleCompact(V: ValidatorClass, schemas: Array<JSONSchema | boolean>, opts?: StandaloneOptions): string;
+export function bundleCompact(V: ValidatorClass, schemas: ReadonlyArray<JSONSchema | boolean | object>, opts?: StandaloneOptions): string;
 
 /** Turn the modules a bundle produced back into Validator instances. */
 export function loadBundle(
   V: ValidatorClass,
   mods: Array<unknown>,
-  schemas: Array<JSONSchema | boolean>,
+  schemas: ReadonlyArray<JSONSchema | boolean | object>,
   opts?: object,
 ): Array<Validator<unknown>>;
