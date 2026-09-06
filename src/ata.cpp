@@ -2182,7 +2182,7 @@ static void cg_compile(const schema_node* n, cg::plan& p,
 // --- Codegen executor ---
 
 static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
-                     dom::element value) {
+                     dom::element value, bool* undecidable = nullptr) {
   auto t = value.type();
   bool t_numeric = (t == et::INT64 || t == et::UINT64 || t == et::DOUBLE);
   double t_dval = t_numeric ? to_double(value) : 0.0;
@@ -2216,7 +2216,7 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::CHECK_MIN_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s<c.a)return false;} break;
     case cg::op::CHECK_MAX_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s>c.a)return false;} break;
     case cg::op::CHECK_UNIQUE_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);std::set<std::string> seen;for(auto x:a)if(!seen.insert(canonical_json(x)).second)return false;} break;
-    case cg::op::ARRAY_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);for(auto x:a)if(!cg_exec(p,p.subs[c.a],x))return false;} break;
+    case cg::op::ARRAY_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);for(auto x:a)if(!cg_exec(p,p.subs[c.a],x,undecidable))return false;} break;
     case cg::op::CHECK_REQUIRED: if(t==et::OBJECT){dom::object o;value.get(o);dom::element d;if(o[p.strings[c.a]].get(d)!=SUCCESS)return false;} break;
     case cg::op::CHECK_MIN_PROPS: if(t==et::OBJECT){dom::object o;value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n<c.a)return false;} break;
     case cg::op::CHECK_MAX_PROPS: if(t==et::OBJECT){dom::object o;value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n>c.a)return false;} break;
@@ -2232,7 +2232,7 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
       }
       for(auto [key,val]:o){
         bool matched=false;
-        for(auto& pp:props){if(key==pp.nm){if(!cg_exec(p,p.subs[pp.si],val))return false;matched=true;break;}}
+        for(auto& pp:props){if(key==pp.nm){if(!cg_exec(p,p.subs[pp.si],val,undecidable))return false;matched=true;break;}}
         if(!matched&&no_add)return false;
       }
       i=j; break;
@@ -2252,7 +2252,9 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
       if(!f)return false; break;
     }
     case cg::op::CHECK_CONST: if(canonical_json(value)!=p.strings[c.a])return false; break;
-    case cg::op::COMPOSITION: return false; // fallback to tree walker
+    case cg::op::COMPOSITION:
+      if (undecidable) *undecidable = true;
+      return false; // fallback to tree walker
     }
   }
   return true;
@@ -3186,9 +3188,17 @@ bool is_valid_prepadded(const schema_ref& schema, const char* data, size_t lengt
   // this reason; returning it directly here rejected valid documents whenever
   // the schema used one of those keywords.
   if (!schema.impl->gen_plan.code.empty()) {
-    if (cg_exec(schema.impl->gen_plan, schema.impl->gen_plan.code, result.value_unsafe())) {
+    bool undecidable = false;
+    if (cg_exec(schema.impl->gen_plan, schema.impl->gen_plan.code, result.value_unsafe(),
+                &undecidable)) {
       return true;
     }
+    // Every check the plan compiles mirrors the tree walker exactly (same
+    // element_type_mask, canonical_json, utf8_length, RE2 handle and format
+    // table), so a false that never touched a COMPOSITION opcode is the tree
+    // walker's answer too. Without this the whole DOM was walked a second
+    // time on every rejection, costing about twice an acceptance.
+    if (!undecidable) return false;
   }
 
   // validate_fast was a second, simpler walker, and it disagreed with the one
