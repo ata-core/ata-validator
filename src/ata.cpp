@@ -15,6 +15,19 @@
 #include <cstring>
 #ifndef ATA_NO_RE2
 #include <re2/re2.h>
+
+// RE2 logs every unparseable pattern to stderr by default. A pattern outside
+// RE2's subset (lookahead, backreferences) is an expected input here, not a
+// fault: construction is probed, ok() is checked, and the JavaScript engines
+// answer for the pattern instead. Handled cases should not print.
+static const re2::RE2::Options& ata_quiet_re2_options() {
+  static const re2::RE2::Options opts = [] {
+    re2::RE2::Options o;
+    o.set_log_errors(false);
+    return o;
+  }();
+  return opts;
+}
 #endif
 #include <set>
 #include <unordered_map>
@@ -638,7 +651,7 @@ static schema_node_ptr compile_node(dom::element el,
       ctx.compile_error = "pattern keyword requires RE2 support (built with ATA_NO_RE2)";
       return node;
 #else
-      auto re = std::make_shared<re2::RE2>(node->pattern.value());
+      auto re = std::make_shared<re2::RE2>(node->pattern.value(), ata_quiet_re2_options());
       if (re->ok()) {
         node->compiled_pattern = std::move(re);
       }
@@ -768,7 +781,7 @@ static schema_node_ptr compile_node(dom::element el,
       schema_node::pattern_prop pp;
       pp.pattern = std::string(key);
       pp.schema = compile_node(val, ctx);
-      auto re = std::make_shared<re2::RE2>(pp.pattern);
+      auto re = std::make_shared<re2::RE2>(pp.pattern, ata_quiet_re2_options());
       if (re->ok()) {
         pp.compiled = std::move(re);
       }
