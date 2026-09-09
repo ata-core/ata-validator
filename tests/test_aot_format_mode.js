@@ -34,7 +34,7 @@ check('inject: module exports setFormats and throws by name before it is called'
 
 check('inject: esm output exports setFormats', () => {
   const src = toStandaloneModule(schema, { formats, format: 'esm', formatMode: 'inject' })
-  assert.ok(/export \{ validate, isValid, setFormats \}/.test(src))
+  assert.ok(/export \{ validate, isValid, setFormats(, _ataParse as parse)? \}/.test(src))
 })
 
 check('inject: bundleStandalone and bundleCompact share one registry', () => {
