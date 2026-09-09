@@ -6,6 +6,11 @@ export interface StandaloneOptions {
   format?: 'esm' | 'cjs';
   /** Use stub error functions for the smallest output. Default: false. */
   abortEarly?: boolean;
+  /**
+   * Also export `parse(data)`: validate, then return a copy of the input
+   * holding only the properties the schema declares. Default: false.
+   */
+  parse?: boolean;
   [key: string]: unknown;
 }
 

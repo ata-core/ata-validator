@@ -97,6 +97,14 @@ export interface ToStandaloneModuleOptions {
   formats?: Record<string, (value: string) => boolean>;
   /** See {@link BundleStandaloneOptions.formatMode}. */
   formatMode?: 'embed' | 'inject';
+  /**
+   * Also export `parse(data)`: validate, then return a copy of the input
+   * holding only the properties the schema declares. Off by default because
+   * it adds to the emitted module's size. Emitted only where the copy is
+   * provably exact; a schema using `$ref`, a composition, `patternProperties`,
+   * an `additionalProperties` schema or an array of objects gets no `parse`.
+   */
+  parse?: boolean;
 }
 
 /** Bundle multiple schemas into one self-contained module (no ata-validator runtime). */
@@ -105,5 +113,6 @@ export function bundleStandalone(schemas: unknown[], options?: BundleStandaloneO
 /** Like {@link bundleStandalone} but deduplicates shared bodies for smaller output. */
 export function bundleCompact(schemas: unknown[], options?: BundleStandaloneOptions): string;
 
-/** Emit a self-contained `validate`/`isValid` module string for a single schema. */
+/** Emit a self-contained `validate`/`isValid` module string for a single
+ * schema, plus `parse` when {@link ToStandaloneModuleOptions.parse} is set. */
 export function toStandaloneModule(schema: unknown, options?: ToStandaloneModuleOptions): string | null;
