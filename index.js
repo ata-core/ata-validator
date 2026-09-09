@@ -216,6 +216,31 @@ function collectRemovals(schema, actions, path) {
   }
 }
 
+// Emit the in-place strip for one schema node and everything under its
+// `properties`. Scope matches collectRemovals(): object properties only, so
+// the two paths keep the same answer.
+function emitRemovals(node, access, lines, depth, seen) {
+  if (!node || typeof node !== 'object' || !node.properties) return;
+  if (seen.has(node)) return;
+  seen.add(node);
+  const keys = Object.keys(node.properties);
+  if (node.additionalProperties === false && keys.length > 0) {
+    const kv = '_k' + depth;
+    const checks = keys.map((k) => `${kv}!==${JSON.stringify(k)}`).join('&&');
+    const guard = depth === 0
+      ? ''
+      : `if(${access}!==null&&typeof ${access}==='object'&&!Array.isArray(${access}))`;
+    lines.push(`${guard}for(var ${kv} in ${access})if(${checks})delete ${access}[${kv}]`);
+  }
+  for (const key of keys) {
+    const prop = node.properties[key];
+    if (prop && typeof prop === 'object' && prop.properties) {
+      emitRemovals(prop, `${access}[${JSON.stringify(key)}]`, lines, depth + 1, seen);
+    }
+  }
+  seen.delete(node);
+}
+
 // Generate a fast preprocess function via codegen instead of closure arrays
 function buildPreprocessCodegen(schema, options) {
   if (typeof schema !== 'object' || schema === null || !schema.properties) return null;
@@ -223,10 +248,14 @@ function buildPreprocessCodegen(schema, options) {
   const props = schema.properties;
   const keys = Object.keys(props);
 
-  // removeAdditional: inline key check
-  if (options.removeAdditional && schema.additionalProperties === false) {
-    const checks = keys.map(k => `_k!==${JSON.stringify(k)}`).join('&&');
-    lines.push(`for(var _k in d)if(${checks})delete d[_k]`);
+  // removeAdditional: strip unknown keys at every level the schema describes,
+  // not just the top one. The closure path below (collectRemovals) always
+  // recursed; this one did not, so the same schema and the same document got
+  // opposite verdicts depending on whether the runtime allowed code
+  // generation, and the codegen answer was the one that disagreed with both
+  // the interpreter and the default validator this aims to match.
+  if (options.removeAdditional) {
+    emitRemovals(schema, 'd', lines, 0, new Set());
   }
 
   // coerceTypes: inline per property
