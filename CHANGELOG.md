@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- `engine: 'interpreter'`, a per-validator setting that keeps a schema off code generation: no `new Function`, no shared compile cache; the eval-free interpreted engine answers `validate()`, `isValidObject()` and `validateJSON()`. The default is the right trade for a schema the application wrote. A schema that arrives at runtime from a plugin or a tenant is input, and until now the only way to validate against one without executing source derived from it was the process-wide `ATA_FORCE_NAPI` switch. `engine()` reports `'interpreter'` for such a validator; any value other than `'auto'` or `'interpreter'` throws, so a misspelling cannot fall through to the generator. `tests/test_engine_option.js` holds the verdicts equal across engines and proves, with `Function` guarded, that the interpreter validator never builds a function from source while the default one does.
+
 ## 1.13.1 - 2026-09-06
 
 ### Fixed

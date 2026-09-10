@@ -357,6 +357,17 @@ export interface ValidatorOptions {
    * v0.14 error shape.
    */
   richErrors?: boolean;
+  /**
+   * Which engine may answer this validator. 'auto' (default) picks the fastest
+   * engine that handles the schema, generated JavaScript for most schemas.
+   * 'interpreter' keeps the schema off code generation entirely: no
+   * `new Function`, no shared compile cache; the eval-free interpreted engine
+   * answers `validate()`, `isValidObject()` and `validateJSON()`. For a schema
+   * that arrives from outside the trust boundary. The verdict is the same on
+   * every engine; the cost is not. The buffer APIs (`isValid`, `countValid`,
+   * `batchIsValid`) are native-only and unaffected.
+   */
+  engine?: 'auto' | 'interpreter';
 }
 
 export interface BundleStandaloneOptions extends ValidatorOptions {
@@ -405,7 +416,7 @@ export interface Validator<T = unknown> {
    * Which engine answers `validate()` for this schema: 'codegen' (generated
    * JS), 'closure' (the closure compiler) or 'interpreter'; 'native' is
    * reserved. The verdict is the same on every engine; the cost is not.
-   * A diagnostic, not a configuration.
+   * A diagnostic; the `engine` option is the setting.
    */
   engine(): 'codegen' | 'closure' | 'native' | 'interpreter';
 
