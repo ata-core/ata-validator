@@ -351,10 +351,13 @@ const v = new Validator(schema, {
   removeAdditional: true,  // strip properties not in schema
   schemas: [otherSchema],  // cross-schema $ref registry
   abortEarly: true,        // skip detailed error collection on failure (~4x faster on invalid data)
+  engine: 'interpreter',   // eval-free interpreted engine only: for a schema from outside the trust boundary
 });
 ```
 
 `abortEarly` returns a shared `{ valid: false, errors: [{ message: 'validation failed' }] }` on failure instead of running the detailed error collector. Useful when the caller only needs a pass/fail decision (Fastify route guards, high-throughput gatekeepers, request rejection at the edge).
+
+`engine: 'interpreter'` keeps one validator off code generation: no `new Function`, no shared compile cache, the interpreted engine answers every call. The default turns a schema into JavaScript source, which is the right trade for a schema you wrote; a schema that arrives at runtime from a plugin or a tenant is input, and this option validates against it without ever executing anything derived from it. Same verdict, higher per-call cost; `ATA_FORCE_NAPI=1` does the same for a whole process.
 
 ### Build-time compile (`ata compile`)
 
