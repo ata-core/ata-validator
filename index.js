@@ -39,7 +39,7 @@ function collectDefaults(schema, actions, path) {
       const defaultVal = prop.default;
       if (!path) {
         actions.push((data) => {
-          if (typeof data === "object" && data !== null && !(key in data)) {
+          if (typeof data === "object" && data !== null && !Object.hasOwn(data, key)) {
             data[key] =
               typeof defaultVal === "object" && defaultVal !== null
                 ? JSON.parse(JSON.stringify(defaultVal))
@@ -57,7 +57,7 @@ function collectDefaults(schema, actions, path) {
           if (
             typeof target === "object" &&
             target !== null &&
-            !(key in target)
+            !Object.hasOwn(target, key)
           ) {
             target[key] =
               typeof defaultVal === "object" && defaultVal !== null
@@ -289,7 +289,7 @@ function buildPreprocessCodegen(schema, options) {
       if (prop && typeof prop === 'object' && prop.default !== undefined) {
         const k = JSON.stringify(key);
         const def = JSON.stringify(prop.default);
-        lines.push(`if(!(${k} in d))d[${k}]=${def}`);
+        lines.push(`if(!Object.hasOwn(d,${k}))d[${k}]=${def}`);
       }
     }
   }

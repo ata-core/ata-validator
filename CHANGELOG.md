@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- A default fills a property the instance does not carry, and both engines asked `key in data` to find out, which also answers for what the instance inherits: a property named `constructor` never received its default, and one named `__proto__` sent its nested defaults to `Object.prototype`, since the interpreter's applier walked `data.__proto__` as the parent. Both now ask `Object.hasOwn`. `tests/test_defaults_own_keys.js` holds it for either engine. Reported and fixed by @d4tocchini in #43.
+
 ## 1.27.0 - 2026-09-17
 
 ### Added
