@@ -335,12 +335,34 @@ Hand-written parsers, no regex:
 | Format | Example |
 |--------|---------|
 | `email` | `user@example.com` |
+| `idn-email` | `ä@öffentlich.de` |
 | `date` | `2026-03-28` |
 | `date-time` | `2026-03-28T12:00:00Z` |
-| `time` | `12:00:00` |
+| `time` | `12:00:00Z` |
+| `duration` | `P4DT12H30M5S` |
 | `uri` | `https://example.com` |
 | `uri-reference` | `/path/to/resource` |
+| `uri-template` | `https://example.com/{id}` |
+| `iri` | `https://example.com/ünïcode` |
+| `iri-reference` | `/ünïcode` |
 | `ipv4` | `192.168.1.1` |
 | `ipv6` | `::1` |
 | `uuid` | `550e8400-e29b-41d4-a716-446655440000` |
 | `hostname` | `example.com` |
+| `json-pointer` | `/foo/bar` |
+| `relative-json-pointer` | `1/foo` |
+| `regex` | `^[a-z]+$` |
+
+`time` and `date-time` require the offset RFC 3339 asks for, so `12:00:00`
+without one is not a time, and they accept second 60 only where it is the leap
+second, 23:59:60 in UTC.
+
+**Not asserted:** `idn-hostname` and the internationalised half of `hostname`.
+Deciding whether an `xn--` label is a valid internationalised name means
+carrying the IDNA2008 tables: Unicode categories, script data, and the
+contextual and bidi rules. That is tens of kilobytes in a library whose
+compiled output is about one kilobyte per schema, and a partial version would
+turn valid names away. Anything listed as a format ata does not assert is
+treated as an annotation and passes, which is what the specification says an
+unknown format does. A schema that needs those names can supply its own check
+through the `formats` option.

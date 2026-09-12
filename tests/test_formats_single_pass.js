@@ -50,10 +50,19 @@ function referenceDateTime (s) {
   const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
   const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
   if (day < 1 || day > days) return false;
-  if (+m[4] > 23 || +m[5] > 59 || +m[6] > 59) return false;
+  const hh = +m[4], mi = +m[5], sec = +m[6];
+  if (hh > 23 || mi > 59 || sec > 60) return false;
   const off = m[8];
-  if (off === 'Z' || off === 'z') return true;
-  return +off.slice(1, 3) <= 23 && +off.slice(4, 6) <= 59;
+  let offMin = 0;
+  if (off !== 'Z' && off !== 'z') {
+    const oh = +off.slice(1, 3), om = +off.slice(4, 6);
+    if (oh > 23 || om > 59) return false;
+    offMin = (off[0] === '+' ? 1 : -1) * (oh * 60 + om);
+  }
+  // RFC 3339 keeps second 60 for the leap second, which is 23:59:60 in UTC
+  // whichever offset the string is written in.
+  if (sec === 60) return ((hh * 60 + mi - offMin) % 1440 + 1440) % 1440 === 1439;
+  return true;
 }
 
 const DATE_TIME_PICKED = [
@@ -64,6 +73,11 @@ const DATE_TIME_PICKED = [
   ['2026-08-31T12:00:00-05:30', true],
   ['2024-02-29T00:00:00Z', true],
   ['2000-02-29T00:00:00Z', true],
+  // The leap second, which the shape-only reference used to refuse
+  ['1998-12-31T23:59:60Z', true],
+  ['1998-12-31T15:59:60.123-08:00', true],
+  ['2026-12-31T12:00:60Z', false],
+  ['2026-12-31T23:59:61Z', false],
   // Accepted before, because Date.parse rolls these over rather than refusing
   ['2026-02-29T00:00:00Z', false],
   ['1900-02-29T00:00:00Z', false],
@@ -73,7 +87,7 @@ const DATE_TIME_PICKED = [
   ['2026-13-01T00:00:00Z', false],
   ['2026-00-10T00:00:00Z', false],
   ['2026-12-31T23:60:00Z', false],
-  ['2026-12-31T23:59:60Z', false],
+  ['2026-12-31T23:59:60Z', true],
   ['2026-08-31T12:00:00+24:00', false],
   ['2026-08-31T12:00:00+02:60', false],
   ['2026-08-31T12:00:00', false],
@@ -207,10 +221,39 @@ for (const [value, expected] of DATE_TIME_PICKED) {
 }
 
 
-// uri keeps the answers of the two expressions it replaces: a scheme read from
-// the front, then one scan for characters a URI cannot hold.
+// uri reads a scheme from the front and then scans once for the characters a
+// URI may hold. The reference spells out RFC 3986: the unreserved set, the
+// delimiters, and "%" only when two hex digits follow. The expression this
+// replaced looked for whitespace and control characters alone, so it called a
+// backslash, a quote, an angle bracket and a lone percent sign valid.
 {
-  const oldUri = (v) => /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(v) && !/[\s\u0000-\u001f\u007f]/.test(v);
+  const oldUri = (v) => {
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(v)) return false;
+    const rest = v.slice(v.indexOf(':') + 1);
+    if (!/^(?:[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=]|%[0-9A-Fa-f]{2})*$/.test(rest)) return false;
+    // authority: a bracketed host must close, a port is digits, and an
+    // unbracketed host may hold at most one colon
+    const m = /^\/\/([^/?#]*)/.exec(rest);
+    if (m) {
+      const auth = m[1];
+      const at = auth.lastIndexOf('@');
+      if (at !== -1 && /[[\]]/.test(auth.slice(0, at))) return false;
+      const hp = at === -1 ? auth : auth.slice(at + 1);
+      if (hp.startsWith('[')) {
+        const close = hp.indexOf(']');
+        if (close === -1) return false;
+        const tail = hp.slice(close + 1);
+        if (tail !== '' && !/^:[0-9]*$/.test(tail)) return false;
+      } else {
+        const first = hp.indexOf(':');
+        if (first !== -1) {
+          if (hp.indexOf(':', first + 1) !== -1) return false;
+          if (!/^[0-9]*$/.test(hp.slice(first + 1))) return false;
+        }
+      }
+    }
+    return true;
+  };
 
   const PICKED_URI = [
     'https://example.com', 'urn:isbn:0451450523', 'a:', 'ab+c-d.e:x', 'A:',
@@ -221,7 +264,7 @@ for (const [value, expected] of DATE_TIME_PICKED) {
     assert.strictEqual(F.uri(v), oldUri(v), `uri picked: ${JSON.stringify(v)}`);
   }
 
-  const alphabet = 'abzAZ09+-.:/?#%_ \t\u0001\u007f\u00e9';
+  const alphabet = 'abzAZ09+-.:/?#%_ \t\u0001\u007f\u00e9\\"<>^`{|}[]@';
   let n = 0;
   for (let i = 0; i < 300000; i++) {
     const len = 1 + Math.floor(rnd() * 14);

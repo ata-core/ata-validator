@@ -20,6 +20,7 @@ const FORMATS = [
   // codegen path silently ignored them while the interpreter enforced them.
   // Anything either engine claims to check belongs in this list.
   'json-pointer', 'relative-json-pointer', 'uri-template', 'regex',
+  'iri', 'iri-reference', 'idn-email',
 ]
 
 // Mix of valid values, boundary values, and near-misses that have historically
