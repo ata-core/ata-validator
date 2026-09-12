@@ -425,6 +425,63 @@ function resolveSchemaByPath(rootSchema, schemaPath) {
 const _rankCache = new WeakMap();
 const { rankFor: schemaOrderRank, ordinalFor: schemaOrdinal } = require('./lib/schema-order');
 
+// The rejection the rich-errors wrapper returns. `errors` is built on first
+// read and cached; `_ataRaw()` is the raw, schema-ordered list for consumers
+// that carry only message and path, such as the Standard Schema bridge.
+// Prototype accessors, not per-instance ones: see LazyRejection.
+class RichRejection {
+  constructor(result, data, positions, self, root, enrich) {
+    this.valid = false;
+    this._result = result;
+    this._data = data;
+    this._positions = positions;
+    this._self = self;
+    this._root = root;
+    this._enrich = enrich;
+    this._cached = null;
+  }
+  toJSON() {
+    return { valid: false, errors: this.errors };
+  }
+  _ataRaw() {
+    let raw = this._result.errors || [];
+    if (raw.length > 1) raw = sortErrorsBySchemaOrder(this._root, raw);
+    return raw;
+  }
+}
+Object.defineProperty(RichRejection.prototype, 'errors', {
+  enumerable: true,
+  configurable: true,
+  get() {
+    if (this._cached === null) {
+      const self = this._self;
+      const enrich = this._enrich;
+      let raw = this._result.errors || [];
+      if (raw.length > 1) raw = sortErrorsBySchemaOrder(this._root, raw);
+      const cached = (enrich && raw.length)
+        ? raw.map((e) => enrich(e, {
+            data: this._data,
+            positions: this._positions,
+            schemaPositions: self._schemaPositions,
+            schemaFile: self._source ? self._source.path : undefined,
+          }))
+        // The v0.14 shape is a fixed key set; the ordering key the
+        // generated code carries is dropped from it here.
+        : raw.map(stripOrdinal);
+      // Correlation is published, never applied. Both halves of a typo pair
+      // stay in the array; `related` only says they are one mistake, so a
+      // wrong pairing costs a sentence rather than a hidden violation.
+      if (enrich && cached.length > 1) attachRelated(cached);
+      // No diagnostic payload here. validate(data) is the library hot path,
+      // and attaching one cost about 100 ns per rejection for a consumer
+      // that never renders. The text path attaches it, and a renderer given
+      // `{ data }` builds frames for object input on request.
+      this._cached = cached;
+    }
+    return this._cached;
+  },
+});
+
 // A raw error without the `_o` ordering key, for the legacy error shape.
 function stripOrdinal(e) {
   if (e === null || typeof e !== 'object' || e._o === undefined) return e;
@@ -454,11 +511,17 @@ function sortErrorsBySchemaOrder(rootSchema, errors) {
     prev = o;
   }
   if (sorted) return errors;
-  const idx = new Array(n);
-  for (let i = 0; i < n; i++) idx[i] = i;
-  idx.sort((a, b) => keys[a] - keys[b] || a - b);
-  const out = new Array(n);
-  for (let i = 0; i < n; i++) out[i] = errors[idx[i]];
+  // Error lists are short. A stable insertion sort over the integer keys
+  // moves the errors in tandem with no comparator calls and no index array.
+  const out = errors.slice();
+  for (let i = 1; i < n; i++) {
+    const k = keys[i];
+    const e = out[i];
+    let j = i - 1;
+    while (j >= 0 && keys[j] > k) { keys[j + 1] = keys[j]; out[j + 1] = out[j]; j--; }
+    keys[j + 1] = k;
+    out[j + 1] = e;
+  }
   return out;
 }
 
@@ -785,6 +848,7 @@ class Validator {
     this._schemaStr = null; // lazy: computed on first use
     this._schemaObj = schemaObj;
     this._options = options;
+    this._noOpts = !opts;
     this._initialized = false;
     this._nativeReady = false;
     this._compiled = null;
@@ -1422,45 +1486,11 @@ class Validator {
           // resolved eagerly since the cache is reset per call.
           const positions = (enrich && self._lastRawInput != null) ? self._pos().get(self._lastRawInput) : null;
           if (positions) self._posCache.reset();
-          let cached = null;
-          return {
-            valid: false,
-            // Raw shape for consumers that carry only message and path, such
-            // as the Standard Schema bridge: schema order, no enrichment.
-            // Reading `errors` afterwards still enriches from the same build.
-            _ataRaw() {
-              let raw = result.errors || [];
-              if (raw.length > 1) raw = sortErrorsBySchemaOrder(root, raw);
-              return raw;
-            },
-            get errors() {
-              if (cached === null) {
-                let raw = result.errors || [];
-                if (raw.length > 1) raw = sortErrorsBySchemaOrder(root, raw);
-                cached = (enrich && raw.length)
-                  ? raw.map((e) => enrich(e, {
-                      data,
-                      positions,
-                      schemaPositions: self._schemaPositions,
-                      schemaFile: self._source ? self._source.path : undefined,
-                    }))
-                  // The v0.14 shape is a fixed key set; the ordering key the
-                  // generated code carries is dropped from it here.
-                  : raw.map(stripOrdinal);
-                // Correlation is published, never applied. Both halves of a
-                // typo pair stay in the array; `related` only says they are
-                // one mistake, so a wrong pairing costs a sentence rather
-                // than a hidden violation.
-                if (enrich && cached.length > 1) attachRelated(cached);
-                // No diagnostic payload here. validate(data) is the library
-                // hot path, and attaching one cost about 100 ns per rejection
-                // for a consumer that never renders. The text path attaches
-                // it below, and a renderer given `{ data }` builds frames for
-                // object input on request.
-              }
-              return cached;
-            },
-          };
+          // One instance of a class with prototype accessors. An object
+          // literal with a getter here cost a closure plus an accessor
+          // definition on every rejection, several hundred nanoseconds
+          // before any error was read.
+          return new RichRejection(result, data, positions, self, root, enrich);
         }
         return result;
       };
@@ -1496,7 +1526,10 @@ class Validator {
             try { parsedData = JSON.parse(jsonStr); } catch { parsedData = undefined; }
             if (!first || !first.docUrl) {
               const positions = (this._lastRawInput != null) ? this._pos().get(this._lastRawInput) : null;
-              const enriched = result.errors.map((e) => enrich(e, {
+              // Declaration order, as validate() applies it; the text path
+              // used to enrich in emission order.
+              const ordered = result.errors.length > 1 ? sortErrorsBySchemaOrder(this._schemaObj, result.errors) : result.errors;
+              const enriched = ordered.map((e) => enrich(e, {
                 data: parsedData,
                 positions,
                 schemaPositions: this._schemaPositions,
@@ -1635,8 +1668,12 @@ class Validator {
       if (bufferNeedsSlowPath(schemaObj, this._schemaMap, this._keywords)) installSlowBufferApis(this);
     }
 
-    // Save to identity cache for ultra-fast reuse with same schema object
-    if (this._schemaObj && typeof this._schemaObj === 'object') {
+    // Save to identity cache for ultra-fast reuse with same schema object.
+    // Only an instance built without options may answer a later
+    // `new Validator(schema)`: one built with options (richErrors: false,
+    // coerceTypes, formats, ...) would hand its options to a caller that
+    // asked for none.
+    if (this._noOpts && this._schemaObj && typeof this._schemaObj === 'object') {
       _identityCache.set(this._schemaObj, this);
     }
   }

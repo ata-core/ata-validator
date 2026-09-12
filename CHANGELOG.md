@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.17.1 - 2026-09-13
+
+### Changed
+
+- The rejection object behind a failing `validate()` is an instance of a class with prototype accessors rather than an object literal that defined a getter and a closure on every rejection. Same shape, same laziness, same caching; `JSON.stringify` still sees the errors.
+- Declaration-order sorting of short error lists is a stable in-place insertion sort over the integer keys, with no comparator and no index array. Measured on the raw error list of the schema-benchmarks product schema, 15 errors: 1.49 to 1.10 µs; through the Standard Schema bridge 2.02 to 1.63 µs. Since 1.16.2 that row has gone from 3.30 to 1.63 µs on the same machine, and in the schema-benchmarks harness itself standard invalid went from 3.57 to 1.44 µs (60 percent less), every other row within noise.
+
+### Fixed
+
+- `validateJSON()` reports errors in schema declaration order, as `validate()` does. The text path enriched errors in emission order, so the first error could differ between the two entry points for the same document.
+- An instance built with options no longer answers a later `new Validator(sameSchema)` without options. The identity cache was seeded by every instance, so a validator created with `richErrors: false` or `coerceTypes` could be handed back to a caller that asked for the defaults.
+
 ## 1.17.0 - 2026-09-13
 
 ### Changed
