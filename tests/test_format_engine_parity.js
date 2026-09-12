@@ -16,6 +16,10 @@ const { createInterpreter } = require('../lib/interpreter.js')
 const FORMATS = [
   'email', 'date', 'date-time', 'time', 'duration', 'uuid',
   'uri', 'uri-reference', 'ipv4', 'ipv6', 'hostname',
+  // These four were implemented on one engine and not the other, so the
+  // codegen path silently ignored them while the interpreter enforced them.
+  // Anything either engine claims to check belongs in this list.
+  'json-pointer', 'relative-json-pointer', 'uri-template', 'regex',
 ]
 
 // Mix of valid values, boundary values, and near-misses that have historically
