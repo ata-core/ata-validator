@@ -501,7 +501,9 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 | Framework | Pattern | Recipe |
 |---|---|---|
 | Fastify | dedicated plugin | [`fastify-ata`](https://github.com/ata-core/fastify-ata) |
-| Vite (build-time compile) | dedicated plugin | [`ata-vite`](https://github.com/ata-core/ata-vite) |
+| Vite, Webpack, Rollup, Rolldown, esbuild, Rspack (build-time compile) | dedicated plugin | [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata) |
+| Vite (build-time compile) | dedicated plugin | [`ata-vite`](https://github.com/ata-core/ata-vite), the Vite entry of the plugin above |
+| Next.js (build-time compile) | webpack entry of the plugin above | `@ata-project/unplugin/webpack` in `next.config.js` |
 | Hono | async middleware | [docs/integrations/hono.md](docs/integrations/hono.md) |
 | Elysia | direct handler check | [docs/integrations/elysia.md](docs/integrations/elysia.md) |
 | tRPC | Standard Schema V1 input | [docs/integrations/trpc.md](docs/integrations/trpc.md) |
