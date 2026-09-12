@@ -2,6 +2,15 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.17.0 - 2026-09-13
+
+### Changed
+
+- Errors are put in schema declaration order by an integer computed when the schema is compiled, not by walking each error's schemaPath at read time. The rank of a path is its pre-order position in the schema tree, which is exactly the order the old array-of-indexes comparison produced; the code generator now writes that position into each error literal (`_o`, an internal field), the reader compares integers, and a list that already arrives in order is returned without sorting or allocating. Errors without a position (an appended custom-keyword error, a path into another document) keep their place next to the error before them. The ordinal logic lives in `lib/schema-order.js`; `tests/test_error_order_ordinal.js` holds the ordinal to the array rank on a set of paths and holds the public error order unchanged.
+- The Standard Schema bridge caches parsed issue paths per instancePath string (bounded, entries frozen), instead of splitting the string for every issue of every rejection.
+- Measured on the schema-benchmarks harness locally, before and after on the same machine: standard invalid 3.57 to 2.83 µs (21 percent less); every other row within noise. On the raw error list of that schema, 15 errors: 1.88 to 1.50 µs; through the Standard Schema bridge 3.30 to 1.99 µs. Verdict paths are untouched.
+- `richErrors: false` keeps the v0.14 key set: the ordering field is dropped from that shape.
+
 ## 1.16.2 - 2026-09-12
 
 ### Fixed

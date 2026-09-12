@@ -423,83 +423,64 @@ function resolveSchemaByPath(rootSchema, schemaPath) {
 // A failing route sees the same handful of schemaPaths over and over, which is
 // what makes the first one worth having.
 const _rankCache = new WeakMap();
-const _keyIndexCache = new WeakMap();
+const { rankFor: schemaOrderRank, ordinalFor: schemaOrdinal } = require('./lib/schema-order');
 
-function keyIndex(node, seg) {
-  let index = _keyIndexCache.get(node);
-  if (index === undefined) {
-    index = new Map();
-    const keys = Object.keys(node);
-    for (let i = 0; i < keys.length; i++) index.set(keys[i], i);
-    _keyIndexCache.set(node, index);
-  }
-  const at = index.get(seg);
-  return at === undefined ? -1 : at;
+// A raw error without the `_o` ordering key, for the legacy error shape.
+function stripOrdinal(e) {
+  if (e === null || typeof e !== 'object' || e._o === undefined) return e;
+  const out = {};
+  for (const k in e) if (k !== '_o') out[k] = e[k];
+  return out;
 }
 
-// `~1` and `~0` are the only escapes a JSON pointer has, and almost no schema
-// key contains a tilde. Looking for one is far cheaper than two regex passes
-// over every segment of every path.
-function unescapePointerSegment(seg) {
-  return seg.indexOf('~') < 0 ? seg : seg.replace(/~1/g, '/').replace(/~0/g, '~');
-}
-
-function schemaOrderRank(rootSchema, schemaPath) {
-  if (!schemaPath || typeof schemaPath !== 'string' || !schemaPath.startsWith('#')) return null;
-  if (rootSchema === null || typeof rootSchema !== 'object') return null;
-
-  let byPath = _rankCache.get(rootSchema);
-  if (byPath === undefined) { byPath = new Map(); _rankCache.set(rootSchema, byPath); }
-  const hit = byPath.get(schemaPath);
-  if (hit !== undefined) return hit;
-
-  const rank = _computeRank(rootSchema, schemaPath);
-  byPath.set(schemaPath, rank);
-  return rank;
-}
-
-function _computeRank(rootSchema, schemaPath) {
-  const rank = [];
-  let node = rootSchema;
-  let start = 1;
-  while (start <= schemaPath.length) {
-    let end = schemaPath.indexOf('/', start);
-    if (end < 0) end = schemaPath.length;
-    if (end === start) { start = end + 1; continue; }   // what filter(Boolean) dropped
-    const seg = unescapePointerSegment(schemaPath.slice(start, end));
-    start = end + 1;
-
-    if (node == null || typeof node !== 'object') break;
-    if (Array.isArray(node)) {
-      const idx = Number(seg);
-      if (!Number.isInteger(idx) || idx < 0 || idx >= node.length) break;
-      rank.push(idx);
-      node = node[idx];
-    } else {
-      const idx = keyIndex(node, seg);
-      if (idx < 0) break;
-      rank.push(idx);
-      node = node[seg];
-    }
-  }
-  return rank;
-}
-
+// Errors in schema declaration order. Each error's key is its schemaPath's
+// pre-order ordinal in the root schema: written into the literal by the code
+// generator (`_o`), looked up once per path otherwise. Most rejections come
+// out already ordered, and those return without sorting or allocating.
 function sortErrorsBySchemaOrder(rootSchema, errors) {
-  const ranked = errors.map((e, i) => ({ e, i, rank: schemaOrderRank(rootSchema, e.schemaPath) }));
-  ranked.sort((a, b) => {
-    if (!a.rank || !b.rank) return a.i - b.i;
-    const n = Math.min(a.rank.length, b.rank.length);
-    for (let k = 0; k < n; k++) {
-      if (a.rank[k] !== b.rank[k]) return a.rank[k] - b.rank[k];
-    }
-    return a.i - b.i;
-  });
-  return ranked.map((r) => r.e);
+  const n = errors.length;
+  const keys = new Array(n);
+  let sorted = true;
+  let prev = -1;
+  for (let i = 0; i < n; i++) {
+    const e = errors[i];
+    let o = typeof e._o === 'number' ? e._o : schemaOrdinal(rootSchema, e.schemaPath);
+    // An error with no place in this document (an appended custom-keyword
+    // error, a path into another schema) stays next to the error before it,
+    // which is where the rank comparison left it too.
+    if (o === null) o = prev < 0 ? 0 : prev;
+    keys[i] = o;
+    if (o < prev) sorted = false;
+    prev = o;
+  }
+  if (sorted) return errors;
+  const idx = new Array(n);
+  for (let i = 0; i < n; i++) idx[i] = i;
+  idx.sort((a, b) => keys[a] - keys[b] || a - b);
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) out[i] = errors[idx[i]];
+  return out;
 }
 
+
+// Paths repeat across rejections of the same shape, so the parsed segment
+// list is cached per path string. Entries are frozen: the same array is
+// handed to every issue that names the path. The cache is bounded so a
+// stream of array indexes cannot grow it without limit.
+const _pathCache = new Map();
+const PATH_CACHE_MAX = 4096;
 function parsePointerPath(path) {
-  if (!path) return [];
+  if (!path) return EMPTY_PATH;
+  const hit = _pathCache.get(path);
+  if (hit !== undefined) return hit;
+  const segs = Object.freeze(parsePointerPathUncached(path));
+  if (_pathCache.size >= PATH_CACHE_MAX) _pathCache.clear();
+  _pathCache.set(path, segs);
+  return segs;
+}
+const EMPTY_PATH = Object.freeze([]);
+
+function parsePointerPathUncached(path) {
   // One pass, no intermediate arrays. Per Standard Schema V1 an array index
   // is emitted as a number and an object key as a string; a segment is an
   // index when it is all digits with no leading zero.
@@ -1463,7 +1444,9 @@ class Validator {
                       schemaPositions: self._schemaPositions,
                       schemaFile: self._source ? self._source.path : undefined,
                     }))
-                  : raw;
+                  // The v0.14 shape is a fixed key set; the ordering key the
+                  // generated code carries is dropped from it here.
+                  : raw.map(stripOrdinal);
                 // Correlation is published, never applied. Both halves of a
                 // typo pair stay in the array; `related` only says they are
                 // one mistake, so a wrong pairing costs a sentence rather
