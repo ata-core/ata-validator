@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.16.2 - 2026-09-12
+
+### Fixed
+
+- A schema with `unevaluatedProperties` or `unevaluatedItems` reported every failure as one placeholder error, `{ code: 'unevaluated', message: 'unevaluated property or item' }`, with no `keyword` and no `instancePath`. The generated code answers the verdict for these schemas but the error generator declines them, and the error path then fell into a stub instead of the interpreted engine, which reports them correctly. A wrong type, a missing required property, a bad format or an enum miss under a root `unevaluatedProperties: false` all came back as that one line, so anything mapping errors by keyword and path saw nothing useful. Failing data is now re-validated by the interpreted engine on that path, as it already was without the native addon for other declined shapes. Verdicts were never affected. Found by a user comparing error output on a generated config schema. `tests/test_unevaluated_error_path.js` holds the generated-code path to the interpreter's errors on five shapes, in all three engine modes.
+
 ## 1.16.1 - 2026-09-12
 
 ### Fixed

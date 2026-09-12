@@ -1057,12 +1057,14 @@ class Validator {
           }]
         };
       };
+      // The error generator declines unevaluated*; the interpreted engine
+      // reports those schemas correctly, so failing data is re-validated
+      // there. This used to be a placeholder error with no keyword and no
+      // path, which hid whatever had actually failed.
       const errFn =
         safeErrFn ||
-        (hasUnevaluated
-          ? (d) => ({ valid: jsFn(d), errors: jsFn(d) ? [] : [{ code: 'unevaluated', path: '', message: 'unevaluated property or item' }] })
-          : !native
-            ? jsOnlyFallback
+        (hasUnevaluated || !native
+          ? jsOnlyFallback
             : hasDynRef
               ? (d) => {
                   this._ensureNative();
