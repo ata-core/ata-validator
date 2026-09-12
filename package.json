@@ -140,7 +140,7 @@
   },
   "devDependencies": {
     "@sinclair/typebox": "^0.34.49",
-    "@types/node": "^25.8.0",
+    "@types/node": "^26.5.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "cmake-js": "^8.0.0",
