@@ -135,6 +135,16 @@ flowchart TD
   paths and no error objects and returns on the first failure.
   `tests/test_plan_compiler.js` diffs the two over the official suite and is
   part of `npm test`.
+- **Custom keywords** (`lib/keywords.js`): `new Validator(schema, { keywords })`
+  registers `validate`, `compile` or `macro` definitions. A schema that uses
+  one is routed to the interpreted engine before any of the paths above are
+  tried (the code generator, the tier-0 plan and the compile cache are all
+  bypassed, and `lib/buffer-gate.js` sends the buffer APIs through
+  `validate()`), because none of those engines know the keyword and each would
+  accept what the interpreter rejects. The plan records the custom checks per
+  node; `macro` output is applied in place like an `allOf` branch and adds the
+  keyword's own error when it fails. The AOT emitters refuse such schemas: a
+  standalone module cannot carry a function.
 - **Native C++** (`src/ata.cpp`, `binding/ata_napi.cpp`, `deps/simdjson`): powers
   `isValid(Buffer)`, `countValid`, `isValidParallel` and `validateAndParse`.
   `lib/buffer-gate.js` routes the shapes the native walker gets wrong back
@@ -242,6 +252,8 @@ runs the JS path.
 | `lib/interpreter.js` | Schema walker: the engine for everything codegen declines, and the reference the others are diffed against. |
 | `lib/plan-compiler.js` | Compiles interpreter plans into a closure tree, no `eval`, verdict and collecting variants. |
 | `lib/buffer-gate.js` | Routes buffer-API shapes the native walker gets wrong back through `validate()`. |
+| `lib/keywords.js` | Custom keyword definitions: normalization and the schema scan that routes a schema to the interpreter. |
+| `lib/compat-errors.js` | Shapes `validate()` errors the way the reference class reports them for `ata-validator/compat`: evaluation order, branch and wrapper errors, the `allErrors: false` group. |
 | `lib/branch-collapse.js` | Codegen optimization: collapse redundant branches. |
 | `lib/safe-regex.js` | Linear-time, ReDoS-safe regex and built-in formats. |
 | `lib/ts-gen.js` | Emits `.d.ts` source text for AOT outputs. |

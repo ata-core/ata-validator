@@ -89,7 +89,11 @@ const validate = ajv.compile(schema)
 if (validate(data)) { ... } else { console.log(validate.errors) }
 ```
 
-`ata-validator/compat` implements the ajv surface area used in most production code (compile, addSchema, getSchema, validate). Error shapes match ajv's format (`keyword`, `instancePath`, `schemaPath`, `params`, `message`).
+`ata-validator/compat` implements the class surface production code calls: `compile`, `compileAsync`, `validate`, `addSchema`, `getSchema`, `removeSchema`, `validateSchema`, `addFormat`, `addKeyword` (the `validate`, `compile` and `macro` forms), `addVocabulary`, `errorsText`, and the constructor options `allErrors`, `coerceTypes`, `useDefaults`, `removeAdditional`, `verbose`, `validateFormats`, `validateSchema`, `formats`, `keywords` and `schemas`. A schema that names no `$schema` is read as draft-07, as the default class does.
+
+Errors come back in the shape and the order the reference reports them: `keyword`, `instancePath`, `schemaPath`, `params`, `message`, the failing branches before an `anyOf` or `oneOf`, each bad name before its `propertyNames`, and with `allErrors` off, the first failing keyword's group only. `tests/test_ajv_parity.js` runs a corpus of real call shapes through both implementations and compares verdicts, error sets, messages, coerced data and `errorsText()` output.
+
+Three things are refused rather than accepted quietly: `$data: true` throws at construction, a keyword defined only through `code` throws at `addKeyword`, and `addFormats()` from the formats plugin throws with a note that its formats are built in. Strict-mode options (`strict`, `strictTypes`, ...) are accepted and ignored: an unknown keyword is an annotation.
 
 ## Common patterns
 
@@ -298,9 +302,10 @@ Pure warm-path validation is essentially tied with ajv. The measurable wins for 
 
 Things that work slightly differently or are not yet supported:
 
-- **Custom keywords**: ata does not have a custom-keyword plugin API. If your ajv code registers custom keywords, keep those validations in application code for now.
-- **Custom formats**: the built-in format set is `email`, `date`, `date-time`, `time`, `uri`, `uri-reference`, `ipv4`, `ipv6`, `uuid`, `hostname`. Custom formats via `ajv-formats` are not supported.
-- **`$data` references**: not supported.
+- **Custom keywords**: `new Validator(schema, { keywords })` on the runtime API, `addKeyword` on the shim. The `validate`, `compile` and `macro` forms are supported; `code` (a code generator hook) is not, and a schema that uses a custom keyword runs on the interpreted engine and cannot be compiled ahead of time. See [custom-keywords.md](custom-keywords.md).
+- **Custom formats**: `formats: { name: fn }` on the runtime API, `addFormat` on the shim (a function, a RegExp, a pattern string or `{ validate }`). The formats plugin is not needed and its `addFormats()` throws; the formats it carries are built in.
+- **`$data` references**: not supported. The shim throws at construction.
+- **Error order under `allErrors: true`**: after a `type` failure the reference keeps evaluating the node's other keywords and reports those too; ata stops at the type error. The shim does not add the extra errors.
 - **`uniqueItems` with objects**: supported, uses `JSON.stringify` for content comparison.
 - **`unevaluatedProperties` / `unevaluatedItems`**: supported for the common cases (properties-only, allOf, anyOf with bitmask tracking). A few spec edge cases are flagged in the test suite output.
 

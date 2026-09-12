@@ -36,6 +36,11 @@ new Validator(false).isValidObject(anything); // false
 | `coerceTypes` | boolean | false | Convert types in-place. `"42"` becomes `42` for integer fields. |
 | `removeAdditional` | boolean | false | Remove properties not defined in schema. |
 | `useDefaults` | boolean | true | Fill in `default` values on absent properties, in place, before validating. Set `false` to leave the input untouched. |
+| `assertFormat` | boolean | true | Assert `format`. Set `false` to treat it as an annotation. |
+| `formats` | object | none | Custom format checkers, `{ name: (value) => boolean }`. See Supported Formats below. |
+| `keywords` | object | none | Custom keywords, `{ name: definition }`. A schema that uses one runs on the interpreted engine. See [custom-keywords.md](custom-keywords.md). |
+| `schemas` | object or array | none | Documents that `$ref` can reach, keyed by URI, or an array of documents with `$id`. |
+| `verbose` | boolean | false | Put `parentSchema` on every error. |
 
 ### v.validate(data)
 

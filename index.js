@@ -3,6 +3,7 @@
 // Loading is delegated to lib/native-load.js so this file stays free of
 // platform probing and `path` (the browser entry must not pull those in).
 const native = require("./lib/native-load")();
+const { normalizeKeywords, schemaUsesKeywords } = require('./lib/keywords');
 const {
   compileToJS,
   compileToJSCodegen,
@@ -790,6 +791,16 @@ class Validator {
     this._schemaIsCallers = schemaObj === schema;
     this._vocabulariesApplied = false;
 
+    // Custom keywords, normalized once. `_usesKeywords` is what routes the
+    // schema to the interpreted engine and keeps it out of the shared
+    // compile cache; a schema that registers keywords but uses none of them
+    // takes the ordinary path.
+    this._keywords = normalizeKeywords(options.keywords);
+    this._usesKeywords = false;
+    if (this._keywords !== null && schemaUsesKeywords(schemaObj, this._keywords)) {
+      this._usesKeywords = true;
+    }
+
     this._schemaStr = null; // lazy: computed on first use
     this._schemaObj = schemaObj;
     this._options = options;
@@ -918,7 +929,7 @@ class Validator {
     const mapKey = compileCacheKey(this._schemaStr, this._schemaMap);
     // Custom formats are JS functions: bypass the compile cache since they can
     // differ between validators that share the same schema string.
-    const cached = this._userFormats ? null : _compileCache.get(mapKey);
+    const cached = (this._userFormats || this._usesKeywords) ? null : _compileCache.get(mapKey);
     let jsFn, jsCombinedFn, jsErrFn, _isCodegen = false;
     var _forceNapi = typeof process !== 'undefined' && process.env && process.env.ATA_FORCE_NAPI;
     // v1 removes the bookending requirement for $dynamicRef. Only the
@@ -936,7 +947,7 @@ class Validator {
     // survives the block and would quietly handle schemas it gets wrong; the
     // interpreted engine is both eval-free and more correct, so go straight
     // there.
-    if (this._v1Dynamic || !codegenAvailable()) {
+    if (this._v1Dynamic || this._usesKeywords || !codegenAvailable()) {
       jsFn = null; jsCombinedFn = null; jsErrFn = null;
     } else if (cached && !_forceNapi) {
       jsFn = cached.jsFn;
@@ -1030,6 +1041,7 @@ class Validator {
             schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
             formats: this._userFormats,
             v1: isV1Dialect(schemaObj),
+            keywords: this._keywords,
           });
         }
         const r = _interp.validate(d);
@@ -1117,6 +1129,7 @@ class Validator {
             schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
             formats: this._userFormats,
             v1: isV1Dialect(schemaObj),
+            keywords: this._keywords,
           });
         }
         const interp = _interp;
@@ -1323,6 +1336,7 @@ class Validator {
           schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
           formats: this._userFormats,
           v1: isV1Dialect(schemaObj),
+          keywords: this._keywords,
         });
         this._engine = 'interpreter';
         _validate = (data) => interp.validate(data);
@@ -1385,6 +1399,7 @@ class Validator {
         schemaMap: this._schemaMap.size > 0 ? this._schemaMap : null,
         formats: this._userFormats,
         v1: isV1Dialect(schemaObj),
+        keywords: this._keywords,
       });
       this._engine = 'interpreter';
       if (!preprocess) this._fastVerdict = (d) => interp.isValid(d);
@@ -1632,7 +1647,7 @@ class Validator {
     // every buffer entry point goes through validate() instead.
     if (native) {
       const { bufferNeedsSlowPath, installSlowBufferApis } = require('./lib/buffer-gate.js');
-      if (bufferNeedsSlowPath(schemaObj, this._schemaMap)) installSlowBufferApis(this);
+      if (bufferNeedsSlowPath(schemaObj, this._schemaMap, this._keywords)) installSlowBufferApis(this);
     }
 
     // Save to identity cache for ultra-fast reuse with same schema object
@@ -1697,7 +1712,7 @@ class Validator {
     // A validator that rewrites its input cannot use the binding below: that
     // one answers from the compiled function alone and would skip the rewrite,
     // so isValidObject() and validate() would disagree.
-    if (this._needsPreprocess()) {
+    if (this._needsPreprocess() || this._usesKeywords) {
       this._ensureCompiled();
       return;
     }
@@ -1708,7 +1723,7 @@ class Validator {
     const mapKey = compileCacheKey(this._schemaStr, this._schemaMap);
     // Custom formats are JS functions: skip the shared cache so different
     // validators with the same schema string but different formats don't collide.
-    const cached = this._userFormats ? null : _compileCache.get(mapKey);
+    const cached = (this._userFormats || this._usesKeywords) ? null : _compileCache.get(mapKey);
     if (cached && cached.jsFn) {
       this._jsFn = cached.jsFn;
       this.isValidObject = cached.jsFn;
@@ -2131,8 +2146,11 @@ _defineLazyMethod('validate', (self) => (data) => {
 });
 _defineLazyMethod('isValidObject', (self) => (data) => {
   // A validator that rewrites its input goes through the full compile, which
-  // binds a verdict method that runs the rewrite first.
-  if (self._needsPreprocess()) {
+  // binds a verdict method that runs the rewrite first. So does one whose
+  // schema uses a custom keyword: neither the tier-0 plan nor the code
+  // generator knows the keyword, and either would accept what validate()
+  // rejects.
+  if (self._needsPreprocess() || self._usesKeywords) {
     self._ensureCompiled();
     return self.isValidObject(data);
   }

@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.16.0 - unreleased
+
+### Added
+
+- Custom keywords. `new Validator(schema, { keywords: { name: definition } })` registers keywords with a `validate(value, data, parentSchema)` function, a `compile(value, parentSchema)` factory, or a `macro(value, parentSchema)` that returns a schema applied in place. A definition can name the JSON Schema `type` it applies to. A schema that uses a registered keyword runs on the interpreted engine, so `anyOf`, `not`, `$ref` and the other applicators keep their meaning around the custom check; the compiled engines, the tier-0 plan and the native walker are all routed away from such schemas, and `bundleStandalone` refuses them instead of emitting a module that would ignore the keyword. Verdict paths (`isValidObject`, `isValidJSON`) agree with `validate()`. A keyword definition with none of the three forms throws, so a `code`-only definition is never accepted quietly.
+- `ata-validator/compat` covers the reference class's surface: `compileAsync`, `removeSchema` (by key, by object, by RegExp, or everything), `validateSchema` against the vendored meta-schemas, `addFormat` in its four forms, `addKeyword` in the `validate`, `compile` and `macro` forms plus the bare-name form, `addVocabulary`, `getKeyword`, `removeKeyword`, `errorsText`, `addMetaSchema`, `ajv.errors` and `ajv.opts`; and the constructor options `allErrors`, `useDefaults` (off by default, as in the reference), `coerceTypes`, `removeAdditional`, `verbose`, `validateFormats`, `validateSchema`, `formats`, `keywords` and `schemas`. `compile` throws `schema is invalid: ...` on a schema the meta-schema rejects, and caches by schema object. A schema with no `$schema` is read as draft-07, which is what `require('ajv')` does.
+- The shim reports errors in the reference's shape and order: keywords sorted the way the reference evaluates them rather than in declaration order, the failing branches before an `anyOf` or `oneOf`, each bad property name with its own errors and a `propertyNames` error, items before `contains` and an `if` error after a failed `then`/`else` under `allErrors`, draft-07 `dependencies` named as such, and with `allErrors` off the first failing keyword's whole group. `tests/test_ajv_parity.js` runs 32 scenarios of real consumer call shapes through both implementations and compares the results field by field; the reference is a devDependency and never ships.
+
+### Changed
+
+- `ata-validator/compat` refuses what it cannot honour instead of accepting it: `$data: true` throws at construction, a `code`-only keyword throws at `addKeyword`, and the reference's formats plugin throws with a note that its formats are built in.
+
 ## 1.13.1 - 2026-09-06
 
 ### Fixed

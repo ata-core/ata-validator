@@ -148,7 +148,7 @@ const v = new Validator(schema)
 const result = v.validate(data)
 ```
 
-The runtime API is unchanged from previous releases. AJV-shim users continue importing from `ata-validator/compat`.
+The runtime API is unchanged from previous releases. Code written against the default validator's class keeps working through `ata-validator/compat`, which covers `compile`, `addSchema`, `addFormat`, `addKeyword`, `errorsText` and the rest of that surface, and reports errors in the same shape and order. See [docs/migration-from-ajv.md](docs/migration-from-ajv.md).
 
 ## Usage
 
@@ -470,6 +470,29 @@ auto schema = ata::compile(R"({
 auto result = ata::validate(schema, R"({"name": "Mert"})");
 // result.valid == true
 ```
+
+### Custom keywords
+
+Register keywords the schema vocabulary does not have with the `keywords` option. A definition is a `validate` function, a `compile` factory, or a `macro` that returns a schema, with an optional `type` that limits which values it sees.
+
+```javascript
+const v = new Validator(
+  { properties: { title: { type: 'string', maxWords: 5 } } },
+  {
+    keywords: {
+      maxWords: {
+        type: 'string',
+        compile: (n) => (s) => s.split(/\s+/).length <= n,
+      },
+    },
+  },
+)
+
+v.validate({ title: 'one two three four five six' })
+// { valid: false, errors: [{ keyword: 'maxWords', instancePath: '/title', ... }] }
+```
+
+A schema that uses a custom keyword runs on the interpreted engine, where `anyOf`, `not` and `$ref` keep their meaning around the custom check, and it cannot be compiled ahead of time, since a standalone module imports nothing and cannot carry the function. `bundleStandalone` refuses such schemas rather than emitting a module that would ignore the keyword. See [docs/custom-keywords.md](docs/custom-keywords.md).
 
 ## Framework integrations
 

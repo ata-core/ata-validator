@@ -314,6 +314,26 @@ export type ValidateAndParseResult<T = unknown> =
   | { valid: true;  value: T;       errors: ValidationError[] }
   | { valid: false; value: unknown; errors: ValidationError[] };
 
+export type KeywordValidate = (schemaValue: unknown, data: unknown, parentSchema: object) => boolean;
+
+export interface KeywordDefinition {
+  /** JSON Schema type name(s) the keyword applies to. Other types pass. */
+  type?: string | string[];
+  /**
+   * Called per value with the keyword's value in the schema, the data, and
+   * the schema object that carries the keyword. May leave error objects on
+   * itself (`fn.errors`) to replace the default error.
+   */
+  validate?: KeywordValidate;
+  /** Called once per schema node; the returned function runs per value. */
+  compile?: (schemaValue: unknown, parentSchema: object) => (data: unknown) => boolean;
+  /**
+   * Returns a schema that is applied in place. Its errors carry the keyword's
+   * path, and the keyword reports an error of its own when it fails.
+   */
+  macro?: (schemaValue: unknown, parentSchema: object) => JSONSchema | boolean;
+}
+
 export interface ValidatorOptions {
   coerceTypes?: boolean;
   removeAdditional?: boolean;
@@ -336,6 +356,12 @@ export interface ValidatorOptions {
    * the schema. Values are functions that return true when the input is valid.
    */
   formats?: Record<string, FormatChecker>;
+  /**
+   * Custom keywords, keyed by name. A schema that uses one runs on the
+   * interpreted engine and cannot be compiled ahead of time. See
+   * docs/custom-keywords.md.
+   */
+  keywords?: Record<string, KeywordDefinition | KeywordValidate>;
   /**
    * When true, validation errors include `parentSchema` (the schema object
    * that produced the error). Matches ajv's `verbose: true`.
