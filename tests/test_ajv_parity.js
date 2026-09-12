@@ -348,6 +348,23 @@ parity('addFormat as RegExp, string, function and object', (Klass) => {
   return { ok, no, keys: errorKeys(v.errors), messages: errorMessages(v.errors) };
 });
 
+parity('a custom format next to an anyOf sibling reports the format error', (Klass) => {
+  const out = {};
+  for (const allErrors of [true, false]) {
+    const ajv = new Klass({ allErrors });
+    ajv.addFormat('slug', /^[a-z-]+$/);
+    const v = ajv.compile({
+      type: 'object',
+      properties: { s: { type: 'string', format: 'slug' }, n: { anyOf: [{ type: 'string' }, { type: 'null' }] } },
+      required: ['s'],
+    });
+    out['bad' + allErrors] = v({ s: 'A', n: null });
+    out['keys' + allErrors] = errorKeys(v.errors);
+    out['ok' + allErrors] = v({ s: 'ok', n: null });
+  }
+  return out;
+});
+
 parity('formats option at construction', (Klass) => {
   const ajv = new Klass({ formats: { slug: /^[a-z-]+$/ } });
   const v = ajv.compile({ type: 'string', format: 'slug' });

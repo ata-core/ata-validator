@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.16.1 - 2026-09-12
+
+### Fixed
+
+- A custom format (`formats: { name: fn }`, or `addFormat` on the compat class) next to a shape the combined code generator declines, such as an `anyOf` sibling, threw `_uf_<name> is not defined` on the first invalid document instead of reporting the format error. The error-path code generator emitted the call to the format checker without binding it; it now takes the checkers as bound parameters like the other two entry points. Verdicts were never affected, only the error path, and only on that combination. Present since custom formats were added; caught by the 1.16.0 clean-install check. `tests/test_user_format_error_path.js` covers it.
+
 ## 1.16.0 - 2026-09-12
 
 ### Added
