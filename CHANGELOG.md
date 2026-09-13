@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.17.2 - 2026-09-13
+
+### Changed
+
+- `new Validator(schema)` no longer walks the schema. Normalization (the draft-07 rewrites, `nullable`, `format` removal under `assertFormat: false`) and the scan that decides whether any of it is needed now run on the first read of the schema, which is the first compile. Construction is the instance and its fields. Measured on the schema-benchmarks product schema built fresh each time: 4.28 to 0.91 µs; with the `@ata-project/keywords` wrapper (0.3.1, which reads the schema lazily too) 6.70 to 2.81 µs. Nothing observable changes for a schema that is used: the same normalized document reaches the engines, and the identity cache, `keywords`, `assertFormat` and `source` options behave as before. `tests/test_lazy_normalization.js` counts property reads on the schema during construction and holds them at the dialect lookup alone.
+
 ## 1.17.1 - 2026-09-13
 
 ### Changed

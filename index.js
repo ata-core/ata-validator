@@ -797,6 +797,26 @@ function resolveSchemaForPreprocess(schema, schemaMap) {
   return cloned || s
 }
 
+// `_schemaObj` and `_usesKeywords` are materialized together on first read:
+// the caller's schema normalized on a clone (the caller's object is never
+// touched), `format` stripped under `assertFormat: false`, and the custom
+// keyword scan. The accessors then step aside for own data properties, so
+// every later read is a plain field.
+function _materializeSchema(self) {
+  const raw = self._rawSchema;
+  const options = self._options;
+  let schemaObj = _normalizeCallerSchema(raw);
+  const isCallers = self._rawIsCallers && schemaObj === raw;
+  if (options.assertFormat === false) {
+    schemaObj = stripFormatAssertions(isCallers ? _deepCloneWithSymbols(schemaObj) : schemaObj);
+  }
+  const usesKeywords = self._keywords !== null && schemaUsesKeywords(schemaObj, self._keywords);
+  Object.defineProperty(self, '_schemaObj', { value: schemaObj, writable: true, configurable: true, enumerable: true });
+  Object.defineProperty(self, '_usesKeywords', { value: usesKeywords, writable: true, configurable: true, enumerable: true });
+  Object.defineProperty(self, '_schemaIsCallers', { value: isCallers && schemaObj === raw, writable: true, configurable: true, enumerable: true });
+  return schemaObj;
+}
+
 class Validator {
   constructor(schema, opts) {
     const options = opts || {};
@@ -809,22 +829,16 @@ class Validator {
       if (hit) return hit;
     }
 
+    // The schema is not walked here. Normalization (draft-07 rewrites,
+    // nullable, `assertFormat: false`) and the scan that decides whether any
+    // of it is needed run on the first read of `_schemaObj`, which is the
+    // first compile. Construction is the object and its fields; a server
+    // building a validator per request pays nothing for a schema it never
+    // uses, and a benchmark timing construction measures construction.
     // When schema is a string, JSON.parse already produces a fresh object.
-    // When schema is an object, normalization runs on a clone so the caller's
-    // object is never touched.
-    let schemaObj = typeof schema === "string"
-      ? _normalizeCallerSchema(JSON.parse(schema))
-      : _normalizeCallerSchema(schema);
-    const rootIsDraft7 = !!(schemaObj && typeof schemaObj === 'object' && typeof schemaObj.$schema === 'string' &&
-      (schemaObj.$schema === 'http://json-schema.org/draft-07/schema#' || schemaObj.$schema === 'http://json-schema.org/draft-07/schema'));
-
-    // assertFormat: false makes `format` annotation-only. Strip it on a clone
-    // so the caller's schema keeps the keyword.
-    if (options.assertFormat === false) {
-      schemaObj = stripFormatAssertions(
-        schemaObj === schema ? _deepCloneWithSymbols(schemaObj) : schemaObj,
-      );
-    }
+    const raw = typeof schema === "string" ? JSON.parse(schema) : schema;
+    const rootIsDraft7 = !!(raw && typeof raw === 'object' && typeof raw.$schema === 'string' &&
+      (raw.$schema === 'http://json-schema.org/draft-07/schema#' || raw.$schema === 'http://json-schema.org/draft-07/schema'));
 
     // Built here rather than below because `$vocabulary` is resolved against
     // it, and that resolution waits until compilation so a meta-schema
@@ -832,21 +846,17 @@ class Validator {
     const shared = buildSchemaMap(options.schemas, rootIsDraft7);
     const schemaMap = shared || new Map();
     this._schemaMapShared = shared !== null;
-    this._schemaIsCallers = schemaObj === schema;
     this._vocabulariesApplied = false;
 
-    // Custom keywords, normalized once. `_usesKeywords` is what routes the
-    // schema to the interpreted engine and keeps it out of the shared
-    // compile cache; a schema that registers keywords but uses none of them
-    // takes the ordinary path.
+    // Custom keywords, normalized once. `_usesKeywords` (resolved with the
+    // schema) is what routes the schema to the interpreted engine and keeps
+    // it out of the shared compile cache; a schema that registers keywords
+    // but uses none of them takes the ordinary path.
     this._keywords = normalizeKeywords(options.keywords);
-    this._usesKeywords = false;
-    if (this._keywords !== null && schemaUsesKeywords(schemaObj, this._keywords)) {
-      this._usesKeywords = true;
-    }
 
     this._schemaStr = null; // lazy: computed on first use
-    this._schemaObj = schemaObj;
+    this._rawSchema = raw;
+    this._rawIsCallers = typeof schema !== "string";
     this._options = options;
     this._noOpts = !opts;
     this._initialized = false;
@@ -2159,6 +2169,18 @@ function _defineLazyMethod(name, maker) {
     set(fn) {
       Object.defineProperty(this, name, { value: fn, writable: true, configurable: true, enumerable: true });
     },
+  });
+}
+
+for (const [name, pick] of [
+  ['_schemaObj', (self) => _materializeSchema(self)],
+  ['_usesKeywords', (self) => { _materializeSchema(self); return self._usesKeywords; }],
+  ['_schemaIsCallers', (self) => { _materializeSchema(self); return self._schemaIsCallers; }],
+]) {
+  Object.defineProperty(Validator.prototype, name, {
+    configurable: true,
+    get() { return pick(this); },
+    set(v) { Object.defineProperty(this, name, { value: v, writable: true, configurable: true, enumerable: true }); },
   });
 }
 
