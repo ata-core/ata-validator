@@ -43,7 +43,7 @@ const ok = (name, cond) => { assert.strictEqual(cond, true, name); checks++ }
       kind: { const: 'invoice' },
     },
   })
-  for (const needle of ['^INV-[0-9]{6}$', 'date-time', 'a multiple of 0.01', 'at least 0',
+  for (const needle of ['^INV-[0-9]{6}$', 'date-time', 'rounded to 2 decimal places', 'at least 0',
     '1 to 120 characters', '1 to 5 items', 'all items different', 'exactly "invoice"']) {
     ok(`states ${needle}`, text.includes(needle))
   }
@@ -75,7 +75,14 @@ const ok = (name, cond) => { assert.strictEqual(cond, true, name); checks++ }
     $defs: { money: { type: 'number', multipleOf: 0.01 } },
     type: 'object', required: ['paid'], properties: { paid: { $ref: '#/$defs/money' } },
   })
-  ok('a local $ref is resolved', /paid: number, a multiple of 0.01/.test(ref))
+  ok('a local $ref is resolved', /paid: number, rounded to 2 decimal places/.test(ref))
+
+  // Measured: "a multiple of 0.01" is not acted on reliably, "rounded to 2
+  // decimal places" is, and that phrase was most of the gap against a careful
+  // description written by a person. A step that is not a power of ten has no
+  // better phrasing, so it keeps the literal one.
+  ok('a non-decimal step keeps the literal wording',
+    /a multiple of 0.25/.test(describeSchema({ type: 'number', multipleOf: 0.25 })))
 
   const union = describeSchema({ type: 'object', properties: { v: { anyOf: [{ type: 'string' }, { type: 'number' }] } } })
   ok('alternatives are spelled out', /one of the following shapes/.test(union) && /option 1/.test(union) && /option 2/.test(union))
