@@ -51,9 +51,25 @@ if (isValid(req.body)) {
 
 The `.compiled.mjs` modules are self-contained: zero runtime dependency on ata-validator, fully tree-shakeable, with TypeScript types emitted alongside.
 
+## Measured by others
+
+Two public harnesses run ata without ata's involvement. Quote these before anything in this
+file.
+
+- [schemabenchmarks.dev](https://schemabenchmarks.dev), a benchmark of runtime validation
+  libraries maintained outside this project. On its validation page, valid data, the run of
+  2026-09-13 against ata 1.14.1 puts ata first at 603 ns, with the next entry at 1.77 times
+  that. The same site puts ata last on the download page, at 64.9 KB gzipped, because the entry
+  it bundles is the runtime compiler; the module `ata build` emits for that schema is 3.9 KB
+  minified and gzipped, and a compiled entry for the harness is in preparation.
+- [Bowtie](https://bowtie.report/), the cross-implementation JSON Schema test harness. ata's
+  harness runs Draft 2020-12 and draft 7 there; on the harness at ata 1.16.1 the official suite
+  passes with nothing failed, errored or skipped under Bowtie's own runner. The v1 dialect is
+  declared in a pending harness change that waits for a Bowtie release.
+
 ## Why AOT
 
-| Dimension | Schema | ata-AOT | AJV-runtime | Difference |
+| Dimension | Schema | ata-AOT | runtime validator | Difference |
 |---|---|---|---|---|
 | Bundle (gzipped) | simple | 1.0 KB | 52.7 KB | 50.5x smaller |
 | Bundle (gzipped) | complex | 4.8 KB | 52.7 KB | 11.0x smaller |
@@ -62,8 +78,8 @@ The `.compiled.mjs` modules are self-contained: zero runtime dependency on ata-v
 | Throughput (1M ops) | simple | 258 Mops/s | 102 Mops/s | 2.5x faster |
 | Compile time | simple | 8 µs | 1.61 ms | 191x faster |
 
-Reproduce on your machine with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple
-M4 Pro, Node 25.2.1, 2026-08-13. Across three runs throughput moved between 258 and 278
+The runtime column is the default validator most frameworks ship. Reproduce on your machine
+with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-08-13. Across three runs throughput moved between 258 and 278
 Mops/s and the compile ratio between 150x and 199x, so treat the last two rows as an order
 of magnitude rather than a constant.
 
