@@ -2048,6 +2048,7 @@ function compile(schema, opts) {
 const { toTypeScript } = require("./lib/ts-gen");
 const { renderPretty } = require("./lib/render-pretty");
 const { renderCompact } = require("./lib/render-compact");
+const { toOutput } = require("./lib/output-format");
 const { renderJSON } = require("./lib/render-json");
 const { suggestFor } = require("./lib/suggestions");
 const { reprValue } = require("./lib/enrich-error");
@@ -2272,6 +2273,7 @@ module.exports = {
   defineSchema,
   renderPretty,
   renderCompact,
+  toOutput,
   renderJSON,
   attachSuggestions, // internal: used by the renderers; not public API
 };

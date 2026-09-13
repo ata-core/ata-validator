@@ -211,6 +211,25 @@ flowchart LR
   R --> JSON["render-json.js"]
 ```
 
+### Specification output format
+
+Errors come back in ata's own shape, which is what consumers and the compat
+entry expect. The specification also defines an output format of its own, with
+`keywordLocation`, `absoluteKeywordLocation` and `instanceLocation`, and the
+official suite carries tests for it under `tests/suite/output-tests/`, separate
+from the validation tests. `toOutput(validator, data, { format })` produces it.
+
+`flag` and `basic` are implemented, for draft 2019-09 and 2020-12.
+`detailed` and `verbose` are not: they need the applicator tree including the
+subschemas that passed, which no engine keeps. The v1 `list` format is not
+implemented; it is still changing and v1's own output schema does not define it
+yet. `tests/test_output_format.js` runs what exists.
+
+This is the part of the specification that says how a validator explains
+itself, and almost nothing tests it. The first case in the 2020-12 set is a
+property key `~a/b` that has to be reported as `/~0a~1b`, which is a bug this
+repo had and fixed by hand; the suite had a test for it the whole time.
+
 ### Holding the engines together
 
 Several engines answer the same question, so the thing that has to be tested is
