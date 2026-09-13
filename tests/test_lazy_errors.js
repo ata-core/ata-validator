@@ -38,7 +38,11 @@ check('interpreter-routed schemas are lazy too', () => {
   const v = new Validator({ type: 'object', patternProperties: { '^x-': { type: 'string' } }, additionalProperties: false })
   const r = v.validate({ 'x-a': 1, other: 2 })
   assert.strictEqual(r.valid, false)
-  assert.deepStrictEqual(r.errors.map((e) => e.code).sort(), ['ATA1001', 'ATA4005'])
+  // ATA7002 (additionalProperties), not ATA4005 (`not`): the interpreter used
+  // to report `additionalProperties: false` as a plain false subschema, which
+  // dropped the keyword and the rejected property name that every consumer
+  // reads. It reports the same thing the generated code does now.
+  assert.deepStrictEqual(r.errors.map((e) => e.code).sort(), ['ATA1001', 'ATA7002'])
 })
 
 check('errorMessage overrides still apply', () => {

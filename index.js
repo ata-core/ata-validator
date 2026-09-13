@@ -1461,9 +1461,18 @@ class Validator {
       });
       this._engine = 'interpreter';
       if (!preprocess) this._fastVerdict = (d) => interp.isValid(d);
-      const run = preprocess
-        ? (data) => { preprocess(data); return interp.validate(data); }
-        : (data) => interp.validate(data);
+      // abortEarly is a documented contract, not a property of whichever engine
+      // answered: it promises the frozen ATA9000 stub instead of a detailed
+      // error, so code that branches on it has to behave the same with and
+      // without code generation. Taking the verdict path here also skips
+      // building the errors the caller said it did not want.
+      const run = options.abortEarly
+        ? (preprocess
+            ? (data) => { preprocess(data); return interp.isValid(data) ? VALID_RESULT : ABORT_EARLY_RESULT; }
+            : (data) => (interp.isValid(data) ? VALID_RESULT : ABORT_EARLY_RESULT))
+        : (preprocess
+            ? (data) => { preprocess(data); return interp.validate(data); }
+            : (data) => interp.validate(data));
       this.validate = run;
       this.isValidObject = this._fastVerdict
         ? this._fastVerdict

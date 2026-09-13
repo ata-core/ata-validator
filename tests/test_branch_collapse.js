@@ -95,7 +95,10 @@ const allofStrict = require('./fixtures/error-dx/composition/allof-strict.json')
   assert.strictEqual(r.valid, false);
   const e = r.errors.find(e => e.code === 'ATA4002');
   assert.ok(e, 'expected ATA4002 multi-match oneOf');
-  assert.strictEqual(e.params.matched, 2);
+  // params.passingSchemas lists the branches that matched, the way the
+  // interpreter and the reference implementation report it. It replaced
+  // {matched, total}, which said how many without saying which.
+  assert.deepStrictEqual(e.params.passingSchemas, [1, 2]); // card and paypal, not wire
 }
 
 // anyOf with neither matching -> ATA4003

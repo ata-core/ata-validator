@@ -211,6 +211,33 @@ flowchart LR
   R --> JSON["render-json.js"]
 ```
 
+### Holding the engines together
+
+Several engines answer the same question, so the thing that has to be tested is
+that they answer it the same way. Two differentials do that, each running the
+whole corpus twice in separate processes, once with `new Function` blocked,
+because which engine answers is a property of the realm and not something a
+single process can switch:
+
+| Test | Compares |
+| --- | --- |
+| `tests/test_engine_differential.js` | verdicts, including values JSON cannot carry and the options matrix |
+| `tests/test_error_shape_differential.js` | the errors themselves: keyword, instancePath, schemaPath, params |
+
+The second exists because a wrong error is invisible to the first: both engines
+reject, the verdict matches, and only the report differs. That gap held a
+property key whose `/` was never escaped into a JSON Pointer, an
+`additionalProperties: false` that came back as `not` on one engine, and an
+`abortEarly` that returned real errors where the documented contract promises a
+stub. `tests/test_plan_compiler.js` covers a third pair, the interpreter's fast
+plan against its generic evaluator, over the whole suite.
+
+Together with `tests/test_ajv_parity.js`, which pins the compat entry to the
+reference implementation, this reaches an environment the reference cannot: the
+reference needs code generation to compile at all, so it can never be consulted
+under a strict CSP. Codegen matches the reference, the interpreter matches
+codegen, so the interpreter matches the reference by transitivity.
+
 ## TypeScript type system
 
 Two distinct, independent paths produce TypeScript types. Do not confuse them.
