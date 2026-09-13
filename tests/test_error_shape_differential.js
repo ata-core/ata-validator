@@ -162,32 +162,18 @@ if (compiled.length !== interpreted.length) {
   process.exit(1)
 }
 
-// Two differences are known, understood, and not fixed here. They are allowed
-// by a predicate narrow enough that a new bug cannot hide behind one, and each
-// is a tracked piece of work rather than an accepted difference.
-//
-// 1. Branch collapse. The generated code folds a failing anyOf/oneOf into one
-//    error naming the closest variant; the interpreter lists the branch errors.
-//    That is a feature the interpreter does not implement yet, not a wrong
-//    answer, and the verdict is identical either way.
-//
-// 2. $ref schema pointers. For `{$defs:{n:...}, $ref:'#/$defs/n'}` the
-//    generated code reports schemaPath `#/type` and the interpreter reports
-//    `#/$ref/type`. Both are wrong: the reference implementation reports
-//    `#/$defs/n/type`, the place the keyword actually lives. Fixing it means
-//    threading the resolved pointer through $ref expansion in both engines,
-//    which is the part of this codebase that has broken most often, so it gets
-//    its own change and its own verification rather than riding along here.
-//    The allowance is tight: it applies only when the schema uses $ref and the
-//    two engines agree on everything except schemaPath.
-const stripSchemaPath = (sig) => sig.replace(/#[^?\s]*/g, '#')
+// One difference is known, understood, and not a wrong answer: the generated
+// code folds a failing anyOf/oneOf into a single error naming the closest
+// variant, and the interpreter lists the branch errors instead. Branch
+// collapse is a feature the interpreter does not implement yet; the verdict is
+// identical either way. It is allowed by a predicate narrow enough that a new
+// bug cannot hide behind it.
 const hasKey = (node, key) => JSON.stringify(node).includes('"' + key + '"')
 
 function knownGap (schema, a, b) {
   if ((hasKey(schema, 'anyOf') || hasKey(schema, 'oneOf')) &&
       /^(anyOf|oneOf)@/.test(a) && /^(anyOf|oneOf)@/.test(b) &&
       a.includes('closest')) return 'branch collapse'
-  if (hasKey(schema, '$ref') && stripSchemaPath(a) === stripSchemaPath(b)) return '$ref schema pointer'
   return null
 }
 
