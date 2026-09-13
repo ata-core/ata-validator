@@ -162,30 +162,12 @@ if (compiled.length !== interpreted.length) {
   process.exit(1)
 }
 
-// One difference is known, understood, and not a wrong answer: the generated
-// code folds a failing anyOf/oneOf into a single error naming the closest
-// variant, and the interpreter lists the branch errors instead. Branch
-// collapse is a feature the interpreter does not implement yet; the verdict is
-// identical either way. It is allowed by a predicate narrow enough that a new
-// bug cannot hide behind it.
-const hasKey = (node, key) => JSON.stringify(node).includes('"' + key + '"')
-
-function knownGap (schema, a, b) {
-  if ((hasKey(schema, 'anyOf') || hasKey(schema, 'oneOf')) &&
-      /^(anyOf|oneOf)@/.test(a) && /^(anyOf|oneOf)@/.test(b) &&
-      a.includes('closest')) return 'branch collapse'
-  return null
-}
-
 const splits = []
-const known = new Map()
 for (let i = 0; i < compiled.length; i++) {
   if (compiled[i] === interpreted[i]) continue
   const [s, o, d] = compiled[i].split('|')
   const a = compiled[i].split('|').slice(3).join('|')
   const b = interpreted[i].split('|').slice(3).join('|')
-  const gap = knownGap(SCHEMAS[+s], a, b)
-  if (gap) { known.set(gap, (known.get(gap) || 0) + 1); continue }
   splits.push({ schema: SCHEMAS[+s], options: OPTIONS[+o], doc: DOCS[+d], compiled: a, interpreted: b })
 }
 
@@ -203,8 +185,5 @@ if (splits.length) {
   process.exit(1)
 }
 
-const gapNote = known.size
-  ? ' (' + [...known].map(([k, n]) => `${n} known ${k}`).join(', ') + ')'
-  : ''
-console.log(`error shape differential: ${compiled.length} cases, both engines report the same errors${gapNote}`)
+console.log(`error shape differential: ${compiled.length} cases, both engines report the same errors`)
 }
