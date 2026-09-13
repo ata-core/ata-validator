@@ -2049,6 +2049,7 @@ const { toTypeScript } = require("./lib/ts-gen");
 const { renderPretty } = require("./lib/render-pretty");
 const { renderCompact } = require("./lib/render-compact");
 const { toOutput } = require("./lib/output-format");
+const { toRetryMessage } = require("./lib/retry-message");
 const { renderJSON } = require("./lib/render-json");
 const { suggestFor } = require("./lib/suggestions");
 const { reprValue } = require("./lib/enrich-error");
@@ -2279,6 +2280,7 @@ module.exports = {
   renderPretty,
   renderCompact,
   toOutput,
+  toRetryMessage,
   renderJSON,
   attachSuggestions, // internal: used by the renderers; not public API
 };
