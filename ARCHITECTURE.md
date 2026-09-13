@@ -182,6 +182,17 @@ The same codegen backs three in-process emitters on `Validator`:
 | `Validator.bundleStandalone()` | Multiple schemas, one zero-dep module. |
 | `Validator.bundleCompact()` | Bundle with shared template de-duplication. |
 
+All of them build from the compiled schema alone, so they must refuse any
+validator that enforces more than its schema carries. Two things do that, and
+each is declared rather than guessed at: the constructor's `keywords` option
+sets `_usesKeywords`, and a wrapper that replaces an instance's entry points,
+such as `withKeywords()` from `@ata-project/keywords`, sets `_externalChecks`.
+Core cannot detect the second on its own, because it installs its own entry
+points as own properties on the instance and so cannot read "something replaced
+these" as a signal. A wrapper that does not declare itself gets a module that
+silently drops its checks, which is why the flag is part of the contract rather
+than an implementation detail.
+
 ## Error enrichment pipeline
 
 Raw codegen errors are enriched into compiler-grade diagnostics, then rendered.
