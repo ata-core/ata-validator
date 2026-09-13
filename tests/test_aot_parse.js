@@ -63,6 +63,33 @@ const compile = (schema) => {
   check('returns a different object', out !== input && out.nested !== input.nested)
 }
 
+// 1b. arrays of objects are rebuilt element by element
+{
+  const m = compile({
+    type: 'object',
+    properties: {
+      tags: { type: 'array', items: { type: 'string' } },
+      images: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { id: { type: 'number' }, url: { type: 'string' } },
+          required: ['id', 'url'],
+        },
+      },
+    },
+    required: ['tags', 'images'],
+  })
+  check('parse is emitted for an array of objects', m && typeof m.parse === 'function')
+  const input = { tags: ['a'], images: [{ id: 1, url: 'u', sneaky: true }], extra: 2 }
+  const before = JSON.stringify(input)
+  const out = m.parse(input)
+  check('strips inside the array', JSON.stringify(out) === JSON.stringify({ tags: ['a'], images: [{ id: 1, url: 'u' }] }))
+  check('array elements are new objects', out.images[0] !== input.images[0])
+  check('array-of-objects input untouched', JSON.stringify(input) === before)
+  check('an empty array survives', JSON.stringify(m.parse({ tags: [], images: [] })) === JSON.stringify({ tags: [], images: [] }))
+}
+
 // 2. optional properties appear only when the input had them
 {
   const m = compile({
