@@ -169,10 +169,13 @@ function structuredCloneSafe (v) {
     (k, x) => (x === '__nonfinite__' ? NaN : x))
 }
 
+// Written without process.exit(): the payload is large enough that exiting
+// here truncates a pipe that has not drained, and the run then reports fewer
+// cases than the other one. That is exactly how it failed in CI, where the
+// machine is slower and the pipe drains later, while it always passed locally.
 if (process.argv.includes('--emit')) {
   emit()
-  process.exit(0)
-}
+} else {
 
 // ---------------------------------------------------------------------------
 // driver
@@ -230,3 +233,4 @@ if (disagreements.length) {
 }
 
 console.log(`engine differential: ${compiled.length} cases, the compiled and interpreted engines agree on all of them`)
+}

@@ -2222,7 +2222,12 @@ _defineLazyMethod('isValidObject', (self) => (data) => {
       return r;
     };
   } else {
-    self._ensureCodegen();
+    // `new Function` is a property of the realm, not of the schema: under a
+    // strict CSP or `--disallow-code-generation-from-strings` this throws
+    // rather than declining, and the EvalError reached the caller of a verdict
+    // method. The full compile can answer without code generation, so fall
+    // through to it. The tier-0 branch above already guarded its own call.
+    try { self._ensureCodegen(); } catch { /* no codegen in this realm */ }
     // Codegen can bail on shapes it cannot represent; the full compile
     // binds the native path or the unsupported thrower instead of
     // leaving this stub to re-dispatch to itself.
