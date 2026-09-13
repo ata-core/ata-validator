@@ -10,7 +10,7 @@ const {
   compileToJSCodegenWithErrors,
   compileToJSCombined,
 } = require("./lib/js-compiler");
-const { normalizeDraft7, normalizeNullable, stripFormatAssertions } = require("./lib/draft7");
+const { normalizeDraft7, normalizeNullable, normalizeExclusiveBounds, stripFormatAssertions } = require("./lib/draft7");
 const { enabledKeywords, stripDisabledKeywords } = require("./lib/vocabularies");
 const { needsNormalization } = require("./lib/schema-scan");
 const { isV1Dialect } = require("./lib/dialect");
@@ -618,6 +618,7 @@ function _normalizeCallerSchema(s, inheritDraft7) {
   const copy = _deepCloneWithSymbols(s)
   if (needsDraft7) normalizeDraft7(copy, true)
   normalizeNullable(copy)
+  normalizeExclusiveBounds(copy)
   // Return original when normalization produced no change, copy otherwise.
   // Kept even though the walk has already said there is work, so that a walk
   // which over-reports still returns exactly what it returned before.
