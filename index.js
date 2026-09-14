@@ -1009,7 +1009,12 @@ class Validator {
     // there.
     if (this._v1Dynamic || this._usesKeywords || !codegenAvailable()) {
       jsFn = null; jsCombinedFn = null; jsErrFn = null;
-    } else if (cached && !_forceNapi) {
+    // `full` separates an entry that holds every compiled function from one
+    // the verdict-only fast path seeded, where `combined` and `errFn` are null
+    // because nothing has tried to build them yet. Both halves of that
+    // distinction are null, and reading the second as the first costs this
+    // schema its generated error function for the life of the process.
+    } else if (cached && cached.full && !_forceNapi) {
       jsFn = cached.jsFn;
       jsCombinedFn = cached.combined;
       jsErrFn = cached.errFn;
@@ -1023,13 +1028,13 @@ class Validator {
       _isCodegen = !!_cgFn;
       this._engine = _cgFn ? 'codegen' : jsFn ? 'closure' : null;
       if (!uf) {
-        _compileCache.set(mapKey, { jsFn, combined: jsCombinedFn, errFn: jsErrFn, isCodegen: _isCodegen });
+        _compileCache.set(mapKey, { jsFn, combined: jsCombinedFn, errFn: jsErrFn, isCodegen: _isCodegen, full: true });
       }
     } else {
       jsFn = null; jsCombinedFn = null; jsErrFn = null;
     }
     this._jsFn = jsFn;
-    if (this._engine === undefined) this._engine = cached ? (cached.isCodegen ? 'codegen' : jsFn ? 'closure' : null) : null;
+    if (this._engine === undefined) this._engine = (cached && cached.full) ? (cached.isCodegen ? 'codegen' : jsFn ? 'closure' : null) : null;
 
     // Data mutators -- try codegen first (12x faster), fallback to closure arrays.
     // Follow cross-refs so coercion/defaults/removeAdditional see the referenced
@@ -1781,9 +1786,11 @@ class Validator {
     this._jsFn = jsFn;
     if (jsFn) {
       this.isValidObject = jsFn;
-      // seed cache with codegen, combined/errFn filled later by _ensureCompiled
+      // A partial entry: the verdict function is real, the other two are not
+      // built yet rather than declined. `full: false` says so, so the next
+      // caller that needs errors compiles them instead of inheriting nulls.
       if (!uf) {
-        if (!cached) _compileCache.set(mapKey, { jsFn, combined: null, errFn: null });
+        if (!cached) _compileCache.set(mapKey, { jsFn, combined: null, errFn: null, full: false });
         else cached.jsFn = jsFn;
       }
     }

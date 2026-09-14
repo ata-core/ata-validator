@@ -4,6 +4,12 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Fixed
+
+- A schema validated once with `isValidObject()` lost its generated error function for the rest of the process. The verdict-only fast path compiles that one function and seeds the shared compile cache with the other two set to null, meaning "not built yet"; the full compile read those nulls as "the compiler declined this schema" and never tried again, so errors fell back to the interpreted engine or the addon. Every server hits that order, because most documents are valid. Cache entries now record whether they are complete. Verdicts and error content were never affected, and `tests/test_compile_cache_order.js` runs both orders in separate processes and holds the engine and the error list equal.
+  - Measured on a five-field schema with an enum and a format, after validating one valid document: `validate(bad).errors` 3.89 µs to 0.66 µs, the Standard Schema path 3.52 µs to 0.07 µs. With no addon installed at all (`ATA_NO_NATIVE=1`), where the fallback was the interpreter rather than the addon, 1.05 µs to 0.66 µs and 0.42 µs to 0.07 µs.
+  - `engine()` reported `closure` for a schema that compiles, once a valid document had been validated first. It now reports `codegen` in either order.
+
 ### Changed
 
 - Enriching a rejection no longer reads more of the document than the diagnostic it produces. `received` describes the offending value in at most 60 characters, and it used to find out whether a value fitted by serialising it whole, so a `required` error on a large payload cost a `JSON.stringify` of that payload, once per error. Sizing is now bounded by those 60 characters and stops as soon as they are spent. Enriching one error on a document holding a thousand rows: 61.5 µs to 160 ns, and flat in the size of the document rather than linear. On the schema-benchmarks product schema, where `validate()` reports 16 errors, reading `.errors` went from 9.84 to 5.10 µs (48 percent less) on the same machine, separate processes. Verdict paths, `isValidObject()` and the Standard Schema bridge are unchanged.
