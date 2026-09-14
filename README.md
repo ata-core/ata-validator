@@ -374,7 +374,7 @@ const v = new Validator(schema, {
 
 ### Build-time compile (`ata compile`)
 
-The `ata` CLI turns a JSON Schema file into a self-contained JavaScript module. No runtime dependency on `ata-validator`, so only the generated validator ships to the browser. Typical output is ~1 KB gzipped compared to ~65 KB for the full runtime bundled for the browser.
+The `ata` CLI turns a JSON Schema file into a self-contained JavaScript module. No runtime dependency on `ata-validator`, so only the generated validator ships to the browser. Typical output is about 2 KB gzipped for a ten-field schema, against 74 KB for the runtime bundled for the browser.
 
 ```bash
 npx ata compile schemas/user.json -o src/generated/user.validator.mjs
@@ -404,7 +404,7 @@ CLI options:
 | `-o, --output <file>` | `<schema>.validator.mjs` | Output path |
 | `-f, --format <fmt>` | `esm` | `esm` or `cjs` |
 | `--name <TypeName>` | from filename | Root type name in the `.d.ts` |
-| `--abort-early` | off | Generate the stub-error variant (~0.5 KB gzipped) |
+| `--abort-early` | off | Generate the stub-error variant, about a third of the source |
 | `--no-types` | off | Skip the `.d.mts` / `.d.cts` output |
 
 For a project with many schemas, `ata build <glob>` compiles them all in one command:
@@ -415,13 +415,19 @@ npx ata build 'schemas/*.json' --out-dir build/validators --check
 
 Run with `--watch` during development for incremental rebuilds.
 
-Typical bundle sizes (10-field user schema, gzipped):
+Bundle sizes for a 10-field user schema, minified and gzipped, measured with
+`bun build --minify --target=browser`:
 
-| Variant | Size | Notes |
+| What the app imports | Size | Notes |
 |---|---|---|
-| `ata-validator` runtime | ~27 KB | Full compiler + all keywords |
-| `ata compile` (standard) | **~1.1 KB** | Validator + detailed error collector |
-| `ata compile --abort-early` | **~0.5 KB** | Validator + stub errors only |
+| `Validator` from `ata-validator` | 74.1 KB | The compiler ships with it, because a runtime schema can use any keyword |
+| `isValid` from the compiled module | **1.9 KB** | Nothing else is reachable, so the error collector is dropped |
+| `validate` from the compiled module | **3.6 KB** | Adds the detailed error collector |
+
+`--abort-early` makes the generated source about three times smaller, and after
+bundling it makes no difference: importing only `isValid` already leaves the error
+collector unreachable, and a bundler drops it. Use the flag to cut the file on disk,
+not to cut what ships.
 
 Programmatic API if you prefer to script it:
 
