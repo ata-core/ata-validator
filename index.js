@@ -458,13 +458,17 @@ Object.defineProperty(RichRejection.prototype, 'errors', {
       const enrich = this._enrich;
       let raw = this._result.errors || [];
       if (raw.length > 1) raw = sortErrorsBySchemaOrder(this._root, raw);
-      const cached = (enrich && raw.length)
-        ? raw.map((e) => enrich(e, {
+      // One options object for the whole list, not one per error.
+      const opts = enrich && raw.length
+        ? {
             data: this._data,
             positions: this._positions,
             schemaPositions: self._schemaPositions,
             schemaFile: self._source ? self._source.path : undefined,
-          }))
+          }
+        : null;
+      const cached = opts
+        ? raw.map((e) => enrich(e, opts))
         // The v0.14 shape is a fixed key set; the ordering key the
         // generated code carries is dropped from it here.
         : raw.map(stripOrdinal);
@@ -1549,12 +1553,13 @@ class Validator {
               // Declaration order, as validate() applies it; the text path
               // used to enrich in emission order.
               const ordered = result.errors.length > 1 ? sortErrorsBySchemaOrder(this._schemaObj, result.errors) : result.errors;
-              const enriched = ordered.map((e) => enrich(e, {
+              const enrichOpts = {
                 data: parsedData,
                 positions,
                 schemaPositions: this._schemaPositions,
                 schemaFile: this._source ? this._source.path : undefined,
-              }));
+              };
+              const enriched = ordered.map((e) => enrich(e, enrichOpts));
               if (enriched.length > 1) attachRelated(enriched);
               attachDiagnosticSource(enriched, {
                 data: parsedData,

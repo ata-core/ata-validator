@@ -2,6 +2,17 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- Enriching a rejection no longer reads more of the document than the diagnostic it produces. `received` describes the offending value in at most 60 characters, and it used to find out whether a value fitted by serialising it whole, so a `required` error on a large payload cost a `JSON.stringify` of that payload, once per error. Sizing is now bounded by those 60 characters and stops as soon as they are spent. Enriching one error on a document holding a thousand rows: 61.5 µs to 160 ns, and flat in the size of the document rather than linear. On the schema-benchmarks product schema, where `validate()` reports 16 errors, reading `.errors` went from 9.84 to 5.10 µs (48 percent less) on the same machine, separate processes. Verdict paths, `isValidObject()` and the Standard Schema bridge are unchanged.
+- An object too large to show reports its shape rather than its serialised size: `[object, 5 keys]` where it used to say `[object, ~0.1KB]`. This is the only change to error output; every value that printed its body before prints the same body now, including nested objects, arrays and values with their own `toJSON`.
+- The error's value is resolved from its pointer once and handed to both the `received` repr and the suggestion sources. `lib/suggestions.js` had a second pointer walk that split the string and mapped over the segments; both paths now use `resolvePointer` in `lib/pointer.js`.
+- A `required` typo hint is offered on containers of up to 64 keys. Past that the nearest key stops being evidence of a typo, which is the cap `suggestEnumTypo` already applied to its candidate list, and the scan is a distance computation per key.
+- `levenshtein` reads characters by code and swaps its two rows through a temporary. The destructured swap it used built an array per row. About 9 percent faster on the key pairs the suggestion sources compare.
+- `tests/test_enrich_received.js` holds enrichment to within 4x across a hundredfold increase in document volume. Before this change the same measurement was 122x.
+
 ## 1.17.2 - 2026-09-13
 
 ### Changed

@@ -54,9 +54,31 @@ const long = 'x'.repeat(200);
 const reprLong = receivedFor('/s', { s: long });
 assert.ok(reprLong.length < 70, 'long string is truncated');
 assert.ok(reprLong.endsWith('..."'), 'truncation is marked');
+// An object too big to show is summarised by its shape, the way an array is.
+// Counting keys is O(1) where measuring the serialised size was O(the whole
+// subtree), and a `required` error on a large document paid that per error.
 const bigObj = {};
 for (let i = 0; i < 50; i++) bigObj['k' + i] = i;
-assert.ok(/^\[object, ~[\d.]+KB\]$/.test(receivedFor('/o', { o: bigObj })), 'large object reports size');
+assert.strictEqual(receivedFor('/o', { o: bigObj }), '[object, 50 keys]');
+assert.strictEqual(receivedFor('/o', { o: { a: 1 } }), '{"a":1}');
+assert.strictEqual(receivedFor('/o', { o: {} }), '{}');
+
+// Anything that fitted inline before still fits: a nested object, and a value
+// that serialises through its own toJSON.
+assert.strictEqual(receivedFor('/o', { o: { nested: { a: 1 } } }), '{"nested":{"a":1}}');
+assert.strictEqual(receivedFor('/d', { d: new Date(0) }), '"1970-01-01T00:00:00.000Z"');
+assert.strictEqual(receivedFor('/o', { o: { a: [1, 2, 3] } }), '{"a":[1,2,3]}');
+assert.strictEqual(receivedFor('/o', { o: { 'a"b': 1 } }), '{"a\\"b":1}');
+assert.strictEqual(receivedFor('/o', { o: { u: undefined, a: 1 } }), '{"a":1}');
+
+// The string form matches JSON.stringify wherever a fast path is taken, so a
+// quote, a backslash, a control character or an astral pair reads the same as
+// it always did.
+for (const s of ['plain', '', 'a"b', 'a\\b', 'a\nb', 'tab\there', 'ünïcøde', '😀', '\u2028', 'x'.repeat(58), 'x'.repeat(59)]) {
+  const expected = JSON.stringify(s);
+  assert.strictEqual(receivedFor('/s', { s }), expected.length > 60 ? expected.slice(0, 57) + '..."' : expected,
+    `string repr for ${JSON.stringify(s)}`);
+}
 
 // Suggestions still fire off the extracted value.
 const coerce = enrich(typeErr('/age'), { data: { age: '30' } });
@@ -93,4 +115,22 @@ const cost = timed(() => enrich(err, { data: payload }));
 const ratio = cost / reference;
 assert.ok(ratio < 2.0, `enrich costs ${cost.toFixed(0)} ns, ${ratio.toFixed(2)}x a JSON.stringify of the same error; expected under 2.0x`);
 
-console.log(`ok: received resolution rules, enrich at ${cost.toFixed(0)} ns (${ratio.toFixed(2)}x reference)`);
+// Enrichment must not scale with the volume of the document. `received` used
+// to serialise the whole container to decide it was too big to show, so a
+// `required` error on a large payload cost a JSON.stringify of that payload,
+// once per error. Sizing is bounded by the 60 characters a repr can hold, so
+// the two documents below cost the same to enrich although one carries a
+// hundred times the data. Width is a separate matter and still costs a key
+// enumeration, which no summary of an object can avoid.
+const shallowDoc = { rows: [] };
+const deepDoc = { rows: [] };
+for (let i = 0; i < 10; i++) shallowDoc.rows.push({ id: i, name: 'row ' + i, email: `u${i}@example.com` });
+for (let i = 0; i < 1000; i++) deepDoc.rows.push({ id: i, name: 'row ' + i, email: `u${i}@example.com` });
+const rootErr = { keyword: 'required', instancePath: '', schemaPath: '#/required', params: { missingProperty: 'tenant' }, message: 'must have required property tenant' };
+assert.strictEqual(enrich(rootErr, { data: deepDoc }).received, '[object, 1 key]');
+const smallCost = timed(() => enrich(rootErr, { data: shallowDoc }));
+const largeCost = timed(() => enrich(rootErr, { data: deepDoc }));
+const growth = largeCost / smallCost;
+assert.ok(growth < 4, `enriching a document holding 1000 rows costs ${largeCost.toFixed(0)} ns against ${smallCost.toFixed(0)} ns for one holding 10, ${growth.toFixed(1)}x; enrichment is reading the whole document again`);
+
+console.log(`ok: received resolution rules, enrich at ${cost.toFixed(0)} ns (${ratio.toFixed(2)}x reference), flat in document size (${growth.toFixed(2)}x over 100x the keys)`);
