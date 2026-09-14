@@ -2,7 +2,7 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.22.0 - 2026-09-14
 
 ### Fixed
 
@@ -11,6 +11,8 @@ All notable changes to ata-validator are documented here. The format follows [Ke
   - `engine()` reported `closure` for a schema that compiles, once a valid document had been validated first. It now reports `codegen` in either order.
 
 ### Changed
+
+- The official test suite submodule moved 60 commits forward, to 2026-09-13. All three dialects stay at zero regressions and the case counts rose: Draft 2020-12 1299 to 1301, draft 7 927 to 929, the v1 dialect 1133 to 1135, identical with code generation blocked. The buffer path agrees with `validate()` on all 3365 of them. Every figure in the README, the docs and the contributor notes was remeasured and updated together, and the floors in `tests/test_no_eval.js` were raised so the new cases cannot be lost silently.
 
 - `uri` is one walk over the string instead of three, and reads its character classes out of tables instead of comparison chains. It was the most expensive thing an ordinary document carried: on a schema with five formats over a 1.6 KB payload, format assertion was 94 percent of the validation cost and `uri` was most of that, while the structural check of the whole nested document was 43 ns. The authority's landmarks, the last `@`, the colons after it and whether a bracket came before it, are now recorded during the character scan rather than by cutting the authority out with `slice` and asking the copy for `lastIndexOf` and two regular expressions.
   - `format: uri` on one string, through a compiled validator: 92 to 42 ns. The same product schema's document: 697 to 423 ns. End to end, where `JSON.parse` is the other 75 percent: 2.98 to 2.69 µs.

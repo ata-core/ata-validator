@@ -149,8 +149,8 @@ happens to allow. `tests/test_no_eval.js` blocks `eval` and `new Function`
 before ata is loaded and runs the entire official test suite through it. It runs
 as part of `npm test`, and the run fails if the result drops.
 
-With code generation blocked, ata passes **1299 of 1299** cases on Draft 2020-12,
-**927 of 927** on Draft 7 and **1133 of 1133** on the v1 dialect, the same figures
+With code generation blocked, ata passes **1301 of 1301** cases on Draft 2020-12,
+**929 of 929** on Draft 7 and **1135 of 1135** on the v1 dialect, the same figures
 the compiled path scores.
 
 ## What needs the native addon
