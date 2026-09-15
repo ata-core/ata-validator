@@ -177,12 +177,30 @@ reads what arrived.
 Being a second JSON reader is the risk. Three rules contain it:
 
 - **Decline by default.** `compileScanner` returns null for any schema outside
-  a supported core (`type`, `properties`, `required`, `additionalProperties`,
-  `items`, the length, size and range keywords, `pattern`, `format`, `const`,
-  `enum`). `$ref`, the combinators, `if`/`then`/`else`, `contains`,
-  `unevaluated*` and the dependency keywords all decline, and so does anything
-  unrecognised. A compiled scanner also returns BAIL at runtime for a document
-  shape it cannot answer. Either way the caller parses, as before.
+  a supported core: `type`, `properties`, `required`, `additionalProperties`,
+  `items`, `prefixItems`, the length, size and range keywords, `pattern`,
+  `format`, `const`, `enum`, plus `$ref` and `allOf` as described below. What
+  needs backtracking or annotations declines, which is `anyOf`, `oneOf`, `not`,
+  `if`/`then`/`else`, `contains`, `patternProperties`, `propertyNames`,
+  `unevaluated*` and the dependency keywords, and so does anything
+  unrecognised. `compileScanner(schema, {onDecline})` reports the reason, so
+  what to widen next is measured rather than guessed. A compiled scanner also
+  returns BAIL at runtime for a document shape it cannot answer. Either way the
+  caller parses, as before.
+- **A reference is inlined, narrowly.** Only a fragment pointer into the
+  document being compiled. A reference carrying any sibling that bears on the
+  verdict declines, because draft 7 lets `$ref` override its siblings and
+  2020-12 applies both, and reading it under one rule while compiling under the
+  other is how this goes wrong quietly. So does one that re-enters a reference
+  already being expanded, and any `$id` or `$anchor` below the root, which is
+  base-URI resolution the scanner does not implement.
+- **An intersection becomes one schema before anything is emitted.** The
+  subtle keyword there is `additionalProperties`: a branch applies its own to
+  the names its own `properties` does not list, which is not the set the merged
+  `properties` does not list. Taking the union of the properties and keeping
+  one `additionalProperties` accepts documents every branch rejects, so a name
+  in the merged set takes, from every branch, either that branch's subschema
+  for it or that branch's `additionalProperties`.
 - **Whatever needs the value gets the value.** `format`, `pattern`, `const` and
   `enum` are answered by the same compiled check `validate()` runs, over that
   one materialised scalar. A string carrying escapes is decoded by `JSON.parse`

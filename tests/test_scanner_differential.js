@@ -202,6 +202,33 @@ const GEN_SCHEMAS = [
   { type: 'object', properties: { name: { type: 'string' }, next: { $ref: '#' } }, additionalProperties: false },
   // names a JSON pointer has to unescape
   { type: 'object', properties: { a: { $ref: '#/$defs/a~1b' } }, $defs: { 'a/b': { type: 'string' } } },
+  // allOf. The first is the shape a union of properties gets wrong: `b` is
+  // additional to the first branch, so {"b":1} must be rejected.
+  { allOf: [{ type: 'object', properties: { a: { type: 'integer' } }, additionalProperties: false }, { type: 'object', properties: { b: { type: 'string' } } }] },
+  { allOf: [{ type: 'object', properties: { a: { type: 'integer' } } }, { type: 'object', properties: { a: { minimum: 3 } } }] },
+  { type: 'object', allOf: [{ $ref: '#/$defs/base' }, { properties: { name: { type: 'string', minLength: 2 } }, required: ['name'] }], $defs: { base: { type: 'object', properties: { id: { type: 'integer', minimum: 1 } }, required: ['id'] } } },
+  { allOf: [{ type: 'integer', minimum: 0, maximum: 100 }, { type: 'integer', minimum: 10, maximum: 50 }] },
+  { allOf: [{ type: 'number' }, { type: 'integer' }] },
+  { allOf: [{ type: 'string' }, { type: 'integer' }] },
+  { allOf: [{ minLength: 1 }, { maxLength: 4 }] },
+  { allOf: [{ type: 'array', items: { type: 'integer' } }, { type: 'array', items: { minimum: 0 } }, { minItems: 1, maxItems: 3 }] },
+  { allOf: [{ type: 'object', required: ['a'] }, { type: 'object', required: ['b'] }] },
+  // nested: a branch that is itself an intersection
+  { allOf: [{ allOf: [{ type: 'object', properties: { id: { type: 'integer' } } }] }, { required: ['id'] }] },
+  // both branches constrain additional names, with different schemas
+  { allOf: [{ type: 'object', properties: { a: {} }, additionalProperties: { type: 'string' } }, { type: 'object', properties: { b: {} }, additionalProperties: { maxLength: 3 } }] },
+  { allOf: [{ type: 'object' }, false] },
+  // tuples
+  { type: 'array', prefixItems: [{ type: 'integer' }, { type: 'string' }] },
+  { type: 'array', prefixItems: [{ type: 'integer' }], items: false },
+  { type: 'array', prefixItems: [{ type: 'integer' }], items: { type: 'string' }, minItems: 1, maxItems: 3 },
+  { prefixItems: [{ type: 'object', properties: { a: { type: 'string' } } }, { type: 'array' }] },
+  { allOf: [{ type: 'array', prefixItems: [{ type: 'integer' }] }, { type: 'array', prefixItems: [{ minimum: 2 }, { type: 'string' }] }] },
+  // const and enum over composites: the value is compared as a whole
+  { enum: [{ a: 1 }, [1, 2], 'hello', null] },
+  { const: { a: [1, { b: true }] } },
+  { type: 'object', properties: { k: { enum: [{ x: 1 }, 2] }, b: { type: 'string' } } },
+  { type: 'array', items: { enum: [[], {}, 0] } },
 ];
 
 // The realistic schemas the AOT tests use. These carry a root $id, nested
