@@ -153,6 +153,33 @@ Schemas without an `errorMessage` keyword pay nothing: the override pass is only
 
 For consumers who built log dashboards on the v0.14 error shape, `new Validator(schema, { richErrors: false })` returns the legacy shape exactly. For high-throughput paths, `abortEarly: true` continues to short-circuit; the returned error carries `code: 'ATA9000'` and no enrichment.
 
+## Which path, and where
+
+There are two ways to run ata and they suit different places. Measuring the wrong one
+is the most common way to get a misleading number out of this library.
+
+| | compiled with `ata build` | runtime `new Validator(schema)` |
+|---|---|---|
+| In a bundle, gzipped | **1.9 KB** | 75.6 KB |
+| Time to a served request | **3.5 ms** | 10.7 ms |
+| Schema known when | build time | any time |
+
+The bundle row is a ten-field user schema built with
+`bun build --minify --target=browser`. The startup row is a Hono route on Bun 1.4, best
+of seven, against 3.6 ms for the same app doing no validation at all, so the compiled
+path costs nothing measurable to start. The runtime
+figure is what it is because a schema that arrives at run time can use any keyword, so
+the whole engine has to be there. The compiled module imports nothing and contains only
+the checks your schema asks for.
+
+**On a server, use whichever fits your schemas.** 76 KB of JavaScript on a Node or Bun
+process is not a cost anyone notices, and the runtime API is the simpler thing to reach
+for. Speed is the same either way once warm.
+
+**In a browser, on an edge runtime, or anywhere cold starts are charged, compile.** This
+is where the difference is the whole story, and it is also where `new Function` is often
+blocked outright, which the compiled module does not need.
+
 ## When to use the runtime API instead
 
 `ata build` is for schemas you know at build time. If your schemas are user-supplied at runtime (form builders, no-code platforms, dynamic API ingestion), use the runtime API:
