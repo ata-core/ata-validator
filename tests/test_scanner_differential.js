@@ -189,7 +189,30 @@ const GEN_SCHEMAS = [
   { type: 'string', format: 'uuid' },
   { type: 'integer', exclusiveMinimum: 0, exclusiveMaximum: 10 },
   { type: 'number', minimum: -1.5, maximum: 1.5 },
+  // references are inlined, so the property names here are the ones the
+  // generator actually emits: a reference nobody reaches proves nothing
+  { $ref: '#/$defs/user', $defs: { user: { type: 'object', properties: { id: { type: 'integer', minimum: 1 }, name: { type: 'string', minLength: 1 } }, required: ['id'] } } },
+  { type: 'object', properties: { a: { $ref: '#/$defs/s' }, b: { $ref: '#/$defs/s' } }, $defs: { s: { type: 'string', maxLength: 5 } } },
+  { type: 'array', items: { $ref: '#/definitions/n' }, definitions: { n: { type: 'integer', minimum: 0, maximum: 9 } } },
+  // a reference through a reference, and one into a nested position
+  { $ref: '#/$defs/outer', $defs: { outer: { $ref: '#/$defs/inner' }, inner: { type: 'object', properties: { age: { type: 'integer' } }, additionalProperties: false } } },
+  { type: 'object', properties: { id: { $ref: '#/$defs/wrap/properties/id' } }, $defs: { wrap: { properties: { id: { type: 'integer', minimum: 5 } } } } },
+  // a recursive document: the scanner declines it, and the corpus is here to
+  // prove the route past a declined schema still agrees
+  { type: 'object', properties: { name: { type: 'string' }, next: { $ref: '#' } }, additionalProperties: false },
+  // names a JSON pointer has to unescape
+  { type: 'object', properties: { a: { $ref: '#/$defs/a~1b' } }, $defs: { 'a/b': { type: 'string' } } },
 ];
+
+// The realistic schemas the AOT tests use. These carry a root $id, nested
+// $defs and local references, which is the shape the suite does not have.
+const fixtureDir = path.join(__dirname, 'fixtures/aot-build');
+if (fs.existsSync(fixtureDir)) {
+  for (const name of fs.readdirSync(fixtureDir)) {
+    if (!name.endsWith('.json')) continue;
+    try { GEN_SCHEMAS.push(JSON.parse(fs.readFileSync(path.join(fixtureDir, name), 'utf8'))); } catch {}
+  }
+}
 const CORRUPT = ['', ' ', '{', '}', '[', ']', '"', ',', ':', '\\', '0', 'x', 'é'];
 for (const schema of GEN_SCHEMAS) {
   const v = prepare(schema);
@@ -218,13 +241,19 @@ for (const schema of GEN_SCHEMAS) {
 // the compiler underneath it.
 let wired = 0, wiredCases = 0;
 const wiredFailures = [];
-function checkWired(schema, text) {
+// One validator per schema, not per document: constructing one compiles the
+// schema, and doing that per comparison made this test the slowest in the run.
+function wiredValidator(schema) {
   let v;
-  try { v = new Validator(schema); } catch { return; }
-  if (typeof v.isValidJSON !== 'function') return;
+  try { v = new Validator(schema); } catch { return null; }
+  if (typeof v.isValidJSON !== 'function') return null;
   // A scanner is built only once a caller has asked often enough to earn it,
   // and this test is the caller that has to see it on the first comparison.
   if (typeof v._ensureScanner === 'function') v._ensureScanner(true);
+  return v;
+}
+function checkWired(v, text) {
+  if (!v) return;
   let ref;
   try { ref = v.validate(JSON.parse(text)).valid; } catch (e) {
     if (!(e instanceof SyntaxError)) throw e;
@@ -238,22 +267,24 @@ function checkWired(schema, text) {
   wiredCases++;
   if (v._scanner) wired++;
   if (got !== ref) {
-    wiredFailures.push(`isValidJSON says ${got}, validate says ${ref} for schema ${JSON.stringify(schema).slice(0, 90)} text ${JSON.stringify(text).slice(0, 100)}`);
+    wiredFailures.push(`isValidJSON says ${got}, validate says ${ref} for schema ${JSON.stringify(v._schemaObj || {}).slice(0, 90)} text ${JSON.stringify(text).slice(0, 100)}`);
   }
 }
 for (const schema of GEN_SCHEMAS.concat(PERMISSIVE)) {
-  for (const text of MALFORMED) checkWired(schema, text);
+  const v = wiredValidator(schema);
+  if (!v) continue;
+  for (const text of MALFORMED) checkWired(v, text);
   for (let n = 0; n < 200; n++) {
     const text = JSON.stringify(randomValue(0));
-    checkWired(schema, text);
+    checkWired(v, text);
     const pos = Math.floor(rng() * (text.length + 1));
-    checkWired(schema, text.slice(0, pos) + CORRUPT[Math.floor(rng() * CORRUPT.length)] + text.slice(pos));
+    checkWired(v, text.slice(0, pos) + CORRUPT[Math.floor(rng() * CORRUPT.length)] + text.slice(pos));
   }
   // a duplicate key is the shape the scanner bails on, and the parser takes
   // the last one; the wired route has to land on the parser's answer
-  checkWired(schema, '{"a":1,"a":"x"}');
-  checkWired(schema, '{"id":0,"id":5,"name":"ok"}');
-  checkWired(schema, '{"\\u0061":1}');
+  checkWired(v, '{"a":1,"a":"x"}');
+  checkWired(v, '{"id":0,"id":5,"name":"ok"}');
+  checkWired(v, '{"\\u0061":1}');
 }
 if (wiredFailures.length > 0) {
   console.error(`\n${wiredFailures.length} wiring disagreement(s):`);
