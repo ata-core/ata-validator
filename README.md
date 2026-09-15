@@ -97,6 +97,55 @@ run on the interpreted engine. That engine compiles each schema into a tree of c
 on a six-field object schema a passing payload costs about 136 ns against 8 ns for the same
 shape on the compiled path, both measured warm in one run on the same machine.
 
+## Schemas and models
+
+If you ask a model for structured output and validate the result, the schema is
+part of the prompt and the validation error is part of the retry. Two functions
+produce those strings.
+
+```js
+import { describeSchema, toRetryMessage, Validator } from 'ata-validator'
+
+describeSchema(schema)
+// output: object
+//   status: one of "AWAITING_CLEARANCE", "PART_SETTLED", "CLOSED_OUT"
+//   region_code: one of "R11", "R24", "R37", "R52"
+//   amount: integer, at least 1
+//   no other fields
+
+const r = new Validator(schema).validate(fromTheModel)
+if (!r.valid) toRetryMessage(r.errors)
+// /status: expected one of ["AWAITING_CLEARANCE", "PART_SETTLED", "CLOSED_OUT"], found "partial"
+// /region_code: expected one of ["R11", "R24", "R37", "R52"], found "HH"
+// /amount: expected ≥1, found 0
+// /: unknown property "extra"
+```
+
+Whether this is worth anything depends on the schema, and the measurement that
+says so is
+[public](https://github.com/mertcanaltin/retry-message-experiment), with the
+harness and the raw results.
+
+On constraints a model can work out from the document, a pattern, a date format,
+a currency in uppercase, it changes nothing: 40 of 40 documents recovered on one
+retry with the conventional error text, and 40 of 40 with the detailed one.
+
+On constraints it cannot work out, an `enum` of internal codes while the
+document says "paid in part" and "Hamburg office", the conventional text
+recovered 0 of 30 and the detailed text 30 of 30. The model does not give up
+when it is not told the values, it invents plausible ones, so no number of
+retries closes it.
+
+Stating the constraints up front does the same job earlier. Across four prompts
+on the same fixtures, first attempts that validate: nothing 0 of 30, a lean
+field list 0 of 30, a careful hand-written description 30 of 30 on the inferable
+fixture and 0 of 30 on the opaque one, and `describeSchema` 30 and 23. A person
+writing prose matches the generated description wherever prose works. It is the
+enumerated values a person leaves out.
+
+One model, Claude Haiku 4.5, one schema shape, 30 to 40 documents per arm, no
+temperature control. Read it as a finding, not a law.
+
 ## Error messages
 
 ata's error output is compiler-grade: each error carries a stable code, an inline source frame pointing at the schema file, and another pointing at the offending bytes in the request payload. Renderers ship in three styles:

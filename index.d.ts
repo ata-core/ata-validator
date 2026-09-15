@@ -72,6 +72,37 @@ export function renderPretty(errors: RichValidationError[], opts?: PrettyOptions
 export function renderCompact(errors: RichValidationError[], opts?: CompactOptions): string;
 export function renderJSON(errors: RichValidationError[], opts?: JSONRenderOptions): string;
 
+/** Options for {@link describeSchema}. */
+export interface DescribeSchemaOptions {
+  /** What to call the top level in the description. Defaults to `output`. */
+  name?: string;
+}
+
+/**
+ * The schema's constraints as prose, for the prompt that asks a model to
+ * produce a document. Values a model cannot infer, an `enum` of internal codes
+ * most of all, are the ones worth stating: measured on one fixture, naming them
+ * took first-attempt validity from 0 of 30 to 23 of 30, where a careful
+ * hand-written description scored 0 on exactly those fields.
+ * https://github.com/mertcanaltin/retry-message-experiment
+ */
+export function describeSchema(schema: object, opts?: DescribeSchemaOptions): string;
+
+/** Options for {@link toRetryMessage}. */
+export interface RetryMessageOptions {
+  /** Most errors to include. Defaults to 20, because a model does not act on a long list. */
+  limit?: number;
+}
+
+/**
+ * The errors as a string to send back to a model, naming what was expected and
+ * what arrived. On constraints a model can infer from context this changes
+ * nothing; where a constraint is an internal vocabulary it was the difference
+ * between 0 of 30 and 30 of 30 recovered on one retry.
+ * https://github.com/mertcanaltin/retry-message-experiment
+ */
+export function toRetryMessage(errors: RichValidationError[], opts?: RetryMessageOptions): string;
+
 /** A user-supplied format checker. Receives the candidate value, returns true if valid. */
 export type FormatChecker = (value: string) => boolean;
 
