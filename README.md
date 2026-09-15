@@ -1,6 +1,6 @@
 # ata-validator
 
-JSON Schema validation with first-class TypeScript and zero runtime cost. AOT compile your schemas to per-schema ESM modules with no validator dependency. `Validator<T>` composes with TypeBox, Zod-from-JSON-Schema, Valibot, or hand-written types. Runtime API available for dynamic schemas. Draft 2020-12, draft 7 and the [JSON Schema v1 dialect](#dialects).
+JSON Schema validation that compiles for speed and still runs where code generation is blocked. The compiled and interpreted engines answer identically, at 100% of the official suite in both modes, across Draft 2020-12, draft 7 and the [JSON Schema v1 dialect](#dialects). First-class TypeScript inference, and `ata build` emits a standalone module that imports nothing.
 
 [![npm](https://img.shields.io/npm/v/ata-validator)](https://www.npmjs.com/package/ata-validator)
 [![License](https://img.shields.io/npm/l/ata-validator)](LICENSE)
