@@ -154,6 +154,51 @@ flowchart TD
   absent native, the buffer/batch methods throw and everything else keeps working
   on JS.
 
+## Validating from the text: the scanner
+
+Measured end to end on a real request, `JSON.parse` is about three quarters of
+the cost and structural validation is under two percent. A caller that only
+wants a verdict pays most of its time building a document it then throws away.
+
+`lib/scan-compiler.js` generates, per schema, a function that reads the JSON
+text directly and answers from it. Nothing is materialised: object keys are
+matched against the raw span in the text, numbers are accumulated out of their
+digits, and a subtree the schema does not constrain is stepped over by
+`lib/scan-runtime.js` rather than built. A rejection can stop at the byte that
+caused it instead of parsing the rest of a document that is already refused.
+
+It is wired into `isValidJSON`, and into `validateJSON` under `abortEarly`,
+where there are no errors to produce. Paths that must report errors keep
+parsing: scanning a document that turns out to be invalid is work thrown away
+there. It is not used when a preprocess pass is configured, because coercion,
+removal and defaults rewrite the document before it is judged and the scanner
+reads what arrived.
+
+Being a second JSON reader is the risk. Three rules contain it:
+
+- **Decline by default.** `compileScanner` returns null for any schema outside
+  a supported core (`type`, `properties`, `required`, `additionalProperties`,
+  `items`, the length, size and range keywords, `pattern`, `format`, `const`,
+  `enum`). `$ref`, the combinators, `if`/`then`/`else`, `contains`,
+  `unevaluated*` and the dependency keywords all decline, and so does anything
+  unrecognised. A compiled scanner also returns BAIL at runtime for a document
+  shape it cannot answer. Either way the caller parses, as before.
+- **Whatever needs the value gets the value.** `format`, `pattern`, `const` and
+  `enum` are answered by the same compiled check `validate()` runs, over that
+  one materialised scalar. A string carrying escapes is decoded by `JSON.parse`
+  of its own span. So those rules cannot drift from the validator: they are the
+  validator.
+- **A duplicate name is the parser's to resolve.** JSON allows a name to
+  repeat and `JSON.parse` keeps the last one, so a member that fails is not
+  the end of the scan: the failure is recorded, the value is stepped over, and
+  scanning continues. A repeat of any name already seen bails. An object that
+  reaches its closing brace with a recorded failure and no repeat is invalid.
+
+`tests/test_scanner_differential.js` holds the scanner and `validate()` to the
+same verdict on the same text over the whole official suite, a malformed-JSON
+corpus, and generated documents with single-character corruptions. It counts
+disagreements, not bails, and the count must stay at zero.
+
 ## AOT build pipeline
 
 `ata build`/`ata compile` and the programmatic `build()` API compile schemas to
@@ -309,6 +354,8 @@ runs the JS path.
 | `lib/interpreter.js` | Schema walker: the engine for everything codegen declines, and the reference the others are diffed against. |
 | `lib/plan-compiler.js` | Compiles interpreter plans into a closure tree, no `eval`, verdict and collecting variants. |
 | `lib/buffer-gate.js` | Routes buffer-API shapes the native walker gets wrong back through `validate()`. |
+| `lib/scan-compiler.js` | Generates a per-schema scanner that answers the verdict from JSON text without parsing it. |
+| `lib/scan-runtime.js` | Helpers every scanner shares: the strict value skipper and span decoding. |
 | `lib/keywords.js` | Custom keyword definitions: normalization and the schema scan that routes a schema to the interpreter. |
 | `lib/compat-errors.js` | Shapes `validate()` errors the way the reference class reports them for `ata-validator/compat`: evaluation order, branch and wrapper errors, the `allErrors: false` group. |
 | `lib/branch-collapse.js` | Codegen optimization: collapse redundant branches. |
