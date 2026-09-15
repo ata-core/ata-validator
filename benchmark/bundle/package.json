@@ -1,0 +1,18 @@
+{
+  "name": "ata-bundle-bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen": "node gen.mjs",
+    "build": "for a in none zod valibot typebox ata ata-aot; do bun build src/app-$a.ts --minify --target=bun --outfile=out/$a.js; done",
+    "verify": "bun run verify.ts",
+    "startup": "./measure.sh"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.52",
+    "ata-validator": "^1.22.0",
+    "hono": "^4.13.7",
+    "valibot": "^1.5.0",
+    "zod": "^4.6.5"
+  }
+}
