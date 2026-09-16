@@ -161,7 +161,13 @@ function cmdCompile(args) {
     process.exit(1);
   }
   const input = args._[0];
-  const format = args.opts.format || 'esm';
+  // With no --format, the output filename already says what the caller wants:
+  // -o validator.cjs used to emit an ES module into a .cjs file, which Node
+  // then refused to load.
+  const extFormat = args.opts.output && /\.cjs$/.test(args.opts.output) ? 'cjs'
+    : args.opts.output && /\.mjs$/.test(args.opts.output) ? 'esm'
+    : null;
+  const format = args.opts.format || extFormat || 'esm';
   if (format !== 'esm' && format !== 'cjs') {
     process.stderr.write(`error: --format must be esm or cjs (got "${format}")\n`);
     process.exit(1);

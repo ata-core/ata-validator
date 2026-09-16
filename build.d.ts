@@ -89,6 +89,18 @@ export interface BundleStandaloneOptions {
 }
 
 export interface ToStandaloneModuleOptions {
+  /**
+   * Run the authoring-time schema checks before emitting: unknown keywords
+   * (with a spelling suggestion), inert keywords, unsatisfiable required
+   * names, unresolvable local $refs. Throws with every finding.
+   */
+  strictSchema?: boolean;
+  /**
+   * Called when the module ships degraded: error detail was requested but the
+   * error generator declined this schema, so failures report the single
+   * ATA9000 abort-early error while the verdict stays exact.
+   */
+  onWarning?: (message: string) => void;
   format?: 'cjs' | 'esm';
   abortEarly?: boolean;
   source?: boolean;

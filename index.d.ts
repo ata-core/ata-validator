@@ -395,9 +395,20 @@ export interface ValidatorOptions {
   keywords?: Record<string, KeywordDefinition | KeywordValidate>;
   /**
    * When true, validation errors include `parentSchema` (the schema object
-   * that produced the error). Matches ajv's `verbose: true`.
+   * that produced the error), `schema` (the failing keyword's own value) and
+   * `data` (the value the error points at). Matches ajv's `verbose: true`.
    */
   verbose?: boolean;
+  /**
+   * Authoring-time schema checks, run at construction on the schema as
+   * written: unknown keywords (with a spelling suggestion), keywords the
+   * node's own `type` makes inert, `required` names nothing can satisfy, and
+   * local `$ref`s that do not resolve. `true` throws with every finding;
+   * `'log'` warns through `logger` (or the console) and continues.
+   */
+  strictSchema?: boolean | 'log';
+  /** Receives `strictSchema: 'log'` warnings; `false` silences them. */
+  logger?: { warn(...args: unknown[]): void } | false;
   /**
    * When true, validate() returns a shared frozen result on the first failure
    * instead of collecting full error details. Smaller hot-path allocation.
