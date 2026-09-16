@@ -209,6 +209,10 @@ ata errors follow the ajv schema, so error handling code usually needs no change
 
 Messages match ajv's wording for the common keywords. If your tests snapshot messages, run them against ata to catch any string-level differences.
 
+`params` carries the same names, so code that branches on them keeps working: `missingProperty` for `required`, `additionalProperty` for `additionalProperties`, `unevaluatedProperty` for `unevaluatedProperties`, `limit` for the bounds and for `unevaluatedItems`.
+
+Under `verbose: true` an error also carries `parentSchema`, `schema` and `data`, the same three the default class attaches: the schema object owning the failing keyword, that keyword's own value, and the value the error points at. Without the option none of the three is present, so a consumer that tests `'data' in err` can tell the two modes apart.
+
 ## Error UX
 
 ata's errors are a superset of the ajv shape. Existing shim consumers (`ata-validator/compat`) continue to see `instancePath`, `schemaPath`, `keyword`, `message`, `params` unchanged.
@@ -307,7 +311,7 @@ Things that work slightly differently or are not yet supported:
 - **`$data` references**: not supported. The shim throws at construction.
 - **Error order under `allErrors: true`**: after a `type` failure the reference keeps evaluating the node's other keywords and reports those too; ata stops at the type error. The shim does not add the extra errors.
 - **`uniqueItems` with objects**: supported, uses `JSON.stringify` for content comparison.
-- **`unevaluatedProperties` / `unevaluatedItems`**: supported for the common cases (properties-only, allOf, anyOf with bitmask tracking). A few spec edge cases are flagged in the test suite output.
+- **`unevaluatedProperties` / `unevaluatedItems`**: supported, with no known spec gaps: all three dialects run clean, Draft 2020-12 1301 of 1301, draft 7 929 of 929, the v1 dialect 1135 of 1135. The verdict is generated code; errors for a schema using these keywords come from the interpreted engine, which is the one thing to know if you measure the rejection path on such a schema.
 
 If you rely on any of the unsupported items, file an issue at [github.com/ata-core/ata-validator](https://github.com/ata-core/ata-validator/issues) with a minimal schema.
 

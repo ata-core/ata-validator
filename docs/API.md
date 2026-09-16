@@ -40,7 +40,7 @@ new Validator(false).isValidObject(anything); // false
 | `formats` | object | none | Custom format checkers, `{ name: (value) => boolean }`. See Supported Formats below. |
 | `keywords` | object | none | Custom keywords, `{ name: definition }`. A schema that uses one runs on the interpreted engine. See [custom-keywords.md](custom-keywords.md). |
 | `schemas` | object or array | none | Documents that `$ref` can reach, keyed by URI, or an array of documents with `$id`. |
-| `verbose` | boolean | false | Put `parentSchema` on every error. |
+| `verbose` | boolean | false | Put `parentSchema`, `schema` and `data` on every error: the schema object that owns the failing keyword, that keyword's own value, and the value the error points at. Off by default, and the default error shape does not carry the three keys at all. |
 
 ### v.validate(data)
 

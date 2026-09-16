@@ -334,10 +334,32 @@ not move outside the measurement's own noise of about 8 percent, because the
 groups that moved were cheap ones and the loop's per-call overhead dominates.
 
 Two things were measured and dropped. Length-bucketed key comparison for
-`additionalProperties: false`: V8 interns property names, so the existing chain
-of `!==` is already a pointer compare. The `(schema, data)` cycle guard on `$ref`
+`additionalProperties: false`: V8 interns property names, so each `!==` in the
+chain is already a pointer compare. The `(schema, data)` cycle guard on `$ref`
 steps: a 2.3x figure came from timing a cold build before a warm one; interleaved
 it was 151 against 160 ns, no change.
+
+The first of those two was right about the cost of one comparison and wrong
+about the total, which took a year and an outside bug report to notice. A chain
+of `n` comparisons runs per key of the document, so the work is quadratic in the
+number of declared properties however cheap each compare is: a 1000-property
+schema spent 75 us on a document where the same schema without the keyword took
+3, and doubling the properties quadrupled that. Above 128 declared names the
+generated code now reads a name lookup, a null-prototype object built once per
+compiled function and read by an indexed loop over `Object.keys`. Below 128 the
+chain stays, because there the two are the same within noise and the chain
+allocates nothing.
+
+Cross-process medians, one variant per process, properties of type string: 250
+names 8.76 us against 5.49, 500 names 26.29 against 12.47. With the
+per-property work removed so the membership test is all that is measured: 1000
+names 77.3 us against 18.1, 2000 names 273.6 against 38.9. `for...in` over the
+document instead of the indexed loop allocates no key array and was still about
+a quarter slower at every size tried. The guard in
+`tests/test_additional_properties_scaling.js` is structural, asserting on the
+emitted source rather than on a wall-clock ratio: an earlier version of it
+asserted a timing bound that the quadratic shape could pass and the fix could
+fail.
 
 `date` and `ipv4` format checks read the string once: 45.7 to 14.2 ns and 54.5 to
 27.1 ns. `uuid` measured 57.3 against 59.4 and kept its regular expression.
