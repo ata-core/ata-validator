@@ -203,6 +203,15 @@ const { toStandaloneModule } = require('ata-validator/build');
 fs.writeFileSync('./compiled.mjs', toStandaloneModule(schema, { format: 'esm' }));
 ```
 
+When error detail is requested (the default) but the error generator declines
+the schema, `unevaluated*` among the shapes it declines, the module still
+ships with an exact verdict, reports every failure as the single ATA9000
+abort-early error, says so in its header comment, and reports the degradation
+through `onWarning: (message) => ...` if you pass one. `ata compile` prints
+that warning, and refuses the build under `--strict`. For detailed errors on
+such schemas, validate failing documents with the runtime `Validator`, which
+falls back to the interpreted engine.
+
 Custom formats (`formats: { name: fn }`) reach the output in one of two ways,
 chosen with `formatMode`:
 

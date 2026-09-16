@@ -218,7 +218,15 @@ function cmdCompile(args) {
     }
   }
   const schemaFile = path.relative(process.cwd(), input) || input;
-  const src = aot.toStandaloneModule(v, { format, abortEarly, source, sourceMap, schemaFile });
+  const compileWarnings = [];
+  const src = aot.toStandaloneModule(v, { format, abortEarly, source, sourceMap, schemaFile, onWarning: (w) => compileWarnings.push(w) });
+  if (compileWarnings.length > 0) {
+    if (args.opts.strict) {
+      for (const w of compileWarnings) reportCompileError(input, w);
+      process.exit(1);
+    }
+    for (const w of compileWarnings) process.stderr.write(`ata: warning: ${input}: ${w}\n`);
+  }
   if (!src) {
     reportCompileError(input, 'schema is too complex for standalone compilation');
     process.exit(1);

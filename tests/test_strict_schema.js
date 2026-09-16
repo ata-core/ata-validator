@@ -151,4 +151,25 @@ const MISTYPED = { type: 'object', properties: { a: { type: 'string', maxLenght:
   ok('ata compile --strict-schema fails the build a typo would have poisoned');
 }
 
+// --- an AOT module that cannot carry error detail says so ---------------------
+{
+  const { toStandaloneModule } = require('../build.js');
+  const degraded = { type: 'object', properties: { on: { type: 'boolean' } }, if: { required: ['on'] }, then: { required: ['why'] }, unevaluatedProperties: false };
+  const seen = [];
+  const src = toStandaloneModule(degraded, { abortEarly: false, onWarning: (w) => seen.push(w) });
+  assert.ok(typeof src === 'string' && src.length > 0, 'the module still ships');
+  assert.strictEqual(seen.length, 1, 'and the degradation is reported once');
+  assert.ok(seen[0].includes('error detail could not be generated'));
+  assert.ok(src.includes('NOTE: error detail was requested'), 'the emitted header says it too');
+  // a schema whose error path generates fine must not warn
+  const quiet = [];
+  toStandaloneModule({ type: 'object', properties: { a: { type: 'string' } }, required: ['a'] }, { abortEarly: false, onWarning: (w) => quiet.push(w) });
+  assert.strictEqual(quiet.length, 0);
+  // and asking for abortEarly on purpose is not a degradation
+  const chosen = [];
+  toStandaloneModule(degraded, { abortEarly: true, onWarning: (w) => chosen.push(w) });
+  assert.strictEqual(chosen.length, 0);
+  ok('AOT error-detail degradation is loud, and only when it is a degradation');
+}
+
 console.log(`\n${passed} passed, 0 failed`);
