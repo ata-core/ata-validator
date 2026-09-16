@@ -2,6 +2,20 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.24.0 - 2026-09-16
+
+### Added
+
+- A schema-directed scanner: `isValidJSON()` answers the verdict from the JSON text without building the document. Parsing is about three quarters of the cost of a request that only needs yes or no, and a rejection now stops at the byte that caused it. The scanner compiles per schema, on the codegen path only, after 64 calls (generating one costs about 20 µs, so a caller that checks one document never pays), and it declines anything outside its supported core: `type`, `properties`, `required`, `additionalProperties`, `items`, `prefixItems`, the length, size and range keywords, `pattern`, `format`, `const`, `enum`, local `$ref` (inlined, acyclic, no base-changing keywords below the root), `allOf` (merged, with the `additionalProperties` cross-branch rule written out in full), and `unevaluated*` where it is provably a synonym for `additionalProperties`/`items`. Whatever it cannot answer it declines at compile time or bails from at runtime, and the parse path takes over unchanged. `tests/test_scanner_differential.js` holds the scanner and `validate()` to the same verdict on the same text: 413,130 comparisons over the official suite, a malformed-JSON corpus and generated corruptions, zero disagreements, and the count must stay at zero.
+  - Cross-process medians against the same call forced through `JSON.parse`: accepted documents 1.19x to 1.43x by size; rejection at the first element 37x at 4 KB and 385x at 41 KB.
+  - Generated config schemas are first-class: up to 4096 properties per node, and past 48 names the dispatch is a rolling hash accumulated during the key scan, one lookup in a Map passed outside the source, one `startsWith` to confirm, bodies shared per distinct subschema, and an in-order fast path for machine-written JSON that resynchronises across omitted optional keys. A 26.6 KB config with 1300 declared properties: 136.7 µs by parse-and-validate, 43.8 µs by scan.
+  - `isValidJSON` also remembers the last (text, verdict) pair, since the verdict is a pure function of the text: a drift monitor re-reading an unchanged file answers in 0.44 µs by native string compare. Withheld when user formats or custom keywords are present, since user functions may not be pure.
+- Strict mode covers all four cases from issue #44: unknown keywords (with a spelling suggestion), unresolvable local `$ref`s, keywords the node's own `type` makes inert (`minimum` on a string can never fire), and `required` names nothing can satisfy (`additionalProperties: false` with the name absent from `properties`). `ata compile --strict-schema` and `build({ strictSchema: true })` run the same checks at build time and refuse to emit a module from a schema that fails them.
+
+### Fixed
+
+- An AOT module that cannot carry error detail says so. `toStandaloneModule` with error detail requested builds the error function from the error generator, which declines some schemas, `unevaluated*` among them; the runtime validator falls back to the interpreted engine there, but a standalone module has nothing to fall back to, so it shipped with an exact verdict and a single ATA9000 stub for every failure, silently. The module still ships, since the verdict is exact and validating the rare failing document with the runtime `Validator` is a legitimate pattern, but the degradation is loud in every layer: `onWarning` on the emitter, a NOTE in the module header, a `warnings` list in the `build()` report, a printed warning from `ata compile`, and a refused build under `--strict`. Found by a gateway team that lost their per-field startup errors to it.
+
 ## 1.23.0 - 2026-09-16
 
 ### Added
