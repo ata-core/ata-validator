@@ -1014,27 +1014,40 @@ class Validator {
     // because nothing has tried to build them yet. Both halves of that
     // distinction are null, and reading the second as the first costs this
     // schema its generated error function for the life of the process.
-    } else if (cached && cached.full && !_forceNapi) {
+    } else if (cached && cached.jsFn !== undefined && !_forceNapi) {
+      // `full` says the error and combined functions exist too. An entry
+      // without it still carries a verdict function worth reusing; the pair is
+      // built by _buildDeferred below if something asks for an error, and the
+      // entry is upgraded then. `undefined` in `combined`/`errFn` means not
+      // built yet; `null` means the compiler declined. Those two must never
+      // blur: reading the first as the second is the bug this cache had once
+      // already, and it silently cost schemas their generated error function.
       jsFn = cached.jsFn;
       jsCombinedFn = cached.combined;
       jsErrFn = cached.errFn;
       _isCodegen = !!cached.isCodegen;
+      this._engine = _isCodegen ? 'codegen' : jsFn ? 'closure' : null;
     } else if (!_forceNapi) {
       const uf = this._userFormats;
       const _cgFn = compileToJSCodegen(schemaObj, sm, uf);
       jsFn = _cgFn || compileToJS(schemaObj, null, sm);
-      jsCombinedFn = compileToJSCombined(schemaObj, VALID_RESULT, sm, uf);
-      jsErrFn = compileToJSCodegenWithErrors(schemaObj, sm, uf);
+      // Only the verdict is compiled here. The error and combined generators
+      // are the other two thirds of a cold first call (8.2, 10.4 and 7.8 ms on
+      // a 120-property config schema, most of it V8 compiling each generator
+      // the first time it is entered), and a caller that never reads an error
+      // never needs them. _buildDeferred compiles them on the first rejection.
+      jsCombinedFn = undefined;
+      jsErrFn = undefined;
       _isCodegen = !!_cgFn;
       this._engine = _cgFn ? 'codegen' : jsFn ? 'closure' : null;
       if (!uf) {
-        _compileCache.set(mapKey, { jsFn, combined: jsCombinedFn, errFn: jsErrFn, isCodegen: _isCodegen, full: true });
+        _compileCache.set(mapKey, { jsFn, combined: undefined, errFn: undefined, isCodegen: _isCodegen, full: false });
       }
     } else {
       jsFn = null; jsCombinedFn = null; jsErrFn = null;
     }
     this._jsFn = jsFn;
-    if (this._engine === undefined) this._engine = (cached && cached.full) ? (cached.isCodegen ? 'codegen' : jsFn ? 'closure' : null) : null;
+    if (this._engine === undefined) this._engine = null;
 
     // Data mutators -- try codegen first (12x faster), fallback to closure arrays.
     // Follow cross-refs so coercion/defaults/removeAdditional see the referenced
@@ -1080,14 +1093,26 @@ class Validator {
           )));
     const useSimdjsonForLarge = !hasArrayTraversal;
 
-    if (jsFn) {
-      let safeErrFn = null;
-      if (jsErrFn) {
-        try {
-          jsErrFn({}, true);
-          safeErrFn = (d) => jsErrFn(d, true);
-        } catch {}
+    // Builds the two generators the compile step left out, once, and upgrades
+    // the shared cache entry. `undefined` means not built yet; `null` means the
+    // compiler declined. Conflating those is what once cost every schema its
+    // generated error function for the life of the process, so they stay apart.
+    const _buildDeferred = () => {
+      if (jsCombinedFn !== undefined && jsErrFn !== undefined) return;
+      const uf2 = this._userFormats;
+      if (jsCombinedFn === undefined) jsCombinedFn = compileToJSCombined(schemaObj, VALID_RESULT, sm, uf2) || null;
+      if (jsErrFn === undefined) jsErrFn = compileToJSCodegenWithErrors(schemaObj, sm, uf2) || null;
+      if (!uf2) {
+        const entry = _compileCache.get(mapKey);
+        if (entry && entry.jsFn === jsFn) {
+          entry.combined = jsCombinedFn;
+          entry.errFn = jsErrFn;
+          entry.full = true;
+        }
       }
+    };
+
+    if (jsFn) {
       // errFn: use JS codegen if safe, else native fallback (only when native
       // is available). Environments without the native addon — Cloudflare
       // Workers, browser, Bun without N-API — get a JS-only fallback so the
@@ -1126,19 +1151,38 @@ class Validator {
       // reports those schemas correctly, so failing data is re-validated
       // there. This used to be a placeholder error with no keyword and no
       // path, which hid whatever had actually failed.
-      const errFn =
-        safeErrFn ||
-        (hasUnevaluated || !native
-          ? jsOnlyFallback
-            : hasDynRef
-              ? (d) => {
-                  this._ensureNative();
-                  return this._compiled.validateJSON(JSON.stringify(d));
-                }
-              : (d) => {
-                  this._ensureNative();
-                  return this._compiled.validate(d);
-                });
+      // Resolved on the first rejection rather than at compile time, because
+      // building the generator behind it is two thirds of what a first call
+      // costs and a caller that never reads an error never needs it. The probe
+      // moves here with it: it calls the generated function, so it cannot run
+      // before the function exists.
+      let _errOnlyImpl = null;
+      const errOnly = (d) => {
+        if (_errOnlyImpl === null) {
+          _buildDeferred();
+          let safe = null;
+          if (jsErrFn) {
+            try {
+              jsErrFn({}, true);
+              safe = (x) => jsErrFn(x, true);
+            } catch {}
+          }
+          _errOnlyImpl =
+            safe ||
+            (hasUnevaluated || !native
+              ? jsOnlyFallback
+                : hasDynRef
+                  ? (x) => {
+                      this._ensureNative();
+                      return this._compiled.validateJSON(JSON.stringify(x));
+                    }
+                  : (x) => {
+                      this._ensureNative();
+                      return this._compiled.validate(x);
+                    });
+        }
+        return _errOnlyImpl(d);
+      };
 
       // Best path: combined validator (single pass, validates + collects errors)
       // Valid data: returns VALID_RESULT, no allocation
@@ -1148,24 +1192,41 @@ class Validator {
       // Test combined at compile time -- some schemas (e.g. if/then/else)
       // produce broken combined code that crashes on certain inputs.
       // We probe with diverse data; if any throws, fall back to hybrid.
-      let safeCombinedFn = null;
-      if (jsCombinedFn) {
-        try {
-          const probe = {};
-          // Populate probe with one key per known property to trigger nested paths
-          if (schemaObj && schemaObj.properties) {
-            for (const k of Object.keys(schemaObj.properties)) probe[k] = "";
-          }
-          if (schemaObj && schemaObj.if && schemaObj.if.properties) {
-            for (const k of Object.keys(schemaObj.if.properties)) probe[k] = "";
-          }
-          jsCombinedFn(probe);
-          jsCombinedFn({});
-          jsCombinedFn(null);
-          jsCombinedFn(0);
-          safeCombinedFn = jsCombinedFn;
-        } catch {}
-      }
+      let _combinedProbed = false;
+      let _safeCombined = null;
+      const combinedIfSafe = () => {
+        if (_combinedProbed) return _safeCombined;
+        _combinedProbed = true;
+        _buildDeferred();
+        if (jsCombinedFn) {
+          try {
+            const probe = {};
+            // Populate probe with one key per known property to trigger nested paths
+            if (schemaObj && schemaObj.properties) {
+              for (const k of Object.keys(schemaObj.properties)) probe[k] = "";
+            }
+            if (schemaObj && schemaObj.if && schemaObj.if.properties) {
+              for (const k of Object.keys(schemaObj.if.properties)) probe[k] = "";
+            }
+            jsCombinedFn(probe);
+            jsCombinedFn({});
+            jsCombinedFn(null);
+            jsCombinedFn(0);
+            _safeCombined = jsCombinedFn;
+          } catch {}
+        }
+        return _safeCombined;
+      };
+
+      // What the hybrid path hands to its error slot: the combined function
+      // when it is usable, since it validates and collects in one pass, and
+      // the error generator otherwise. Same order the eager code chose, just
+      // chosen on the first rejection.
+      let _errPreferredImpl = null;
+      const errPreferCombined = (d) => {
+        if (_errPreferredImpl === null) _errPreferredImpl = combinedIfSafe() || errOnly;
+        return _errPreferredImpl(d);
+      };
 
       // The boolean engine is the verdict authority for these paths; the
       // final lazy wrapper uses it to skip error construction entirely.
@@ -1182,7 +1243,7 @@ class Validator {
           : (data) => (_fn(data) ? VALID_RESULT : ABORT_EARLY_RESULT);
       } else if (hasDynRef && _isCodegen && jsFn) {
         // $dynamicRef with JS codegen: direct path, no wrapper layers
-        const _fn = jsFn, _efn = safeErrFn || errFn, _R = VALID_RESULT;
+        const _fn = jsFn, _efn = errOnly, _R = VALID_RESULT;
         this.validate = preprocess
           ? (data) => { preprocess(data); return _fn(data) ? _R : _efn(data); }
           : (data) => _fn(data) ? _R : _efn(data);
@@ -1207,31 +1268,29 @@ class Validator {
       } else if (jsFn && jsFn._hybridFactory) {
         // Zero-wrapper: hybridFactory bakes VALID_RESULT + errFn into a single function
         // No arrow function wrapper, no ternary, one function call
-        const hybridFn = jsFn._hybridFactory(VALID_RESULT, safeCombinedFn || errFn);
+        // The factory bakes the error function in as an argument and never
+        // calls it for a document that passes, so a resolver here costs the
+        // accepted path nothing and keeps the compile off the first call.
+        const hybridFn = jsFn._hybridFactory(VALID_RESULT, errPreferCombined);
         this.validate = preprocess
           ? (data) => { preprocess(data); return hybridFn(data); }
           : hybridFn;
-      } else if (safeCombinedFn) {
-        this.validate = preprocess
-          ? (data) => { preprocess(data); return safeCombinedFn(data); }
-          : safeCombinedFn;
       } else {
-        const hybridFn = jsFn && jsFn._hybridFactory
-          ? jsFn._hybridFactory(VALID_RESULT, errFn)
-          : null;
-        this.validate = hybridFn
-          ? preprocess
+        // No hybrid factory, so the assembly needs the function itself rather
+        // than a reference it can call later: build it now.
+        const safeCombinedFn = combinedIfSafe();
+        if (safeCombinedFn) {
+          this.validate = preprocess
+            ? (data) => { preprocess(data); return safeCombinedFn(data); }
+            : safeCombinedFn;
+        } else {
+          this.validate = preprocess
             ? (data) => {
                 preprocess(data);
-                return hybridFn(data);
+                return jsFn(data) ? VALID_RESULT : errOnly(data);
               }
-            : hybridFn
-          : preprocess
-            ? (data) => {
-                preprocess(data);
-                return jsFn(data) ? VALID_RESULT : errFn(data);
-              }
-            : (data) => (jsFn(data) ? VALID_RESULT : errFn(data));
+            : (data) => (jsFn(data) ? VALID_RESULT : errOnly(data));
+        }
       }
       // Verbose mode: populate parentSchema, schema and data on each error, the
       // three fields the default error shape carries under the same option.
@@ -1274,12 +1333,15 @@ class Validator {
       this.isValidObject = preprocess
         ? (data) => { preprocess(data); return jsFn(data) }
         : jsFn;
+      // Same preference as the object path: the combined function first, since
+      // it validates and collects in one pass, and the error generator behind
+      // it. `errPreferCombined` is that order, resolved on the first rejection
+      // instead of at compile time.
       const hybridFn = jsFn._hybridFactory
-        ? jsFn._hybridFactory(VALID_RESULT, errFn)
+        ? jsFn._hybridFactory(VALID_RESULT, errPreferCombined)
         : null;
-      const jsonValidateInner = safeCombinedFn
-        || hybridFn
-        || ((obj) => (jsFn(obj) ? VALID_RESULT : errFn(obj)));
+      const jsonValidateInner = hybridFn
+        || ((obj) => (jsFn(obj) ? VALID_RESULT : errPreferCombined(obj)));
       // Parsed text takes the same preprocess pass as a parsed object, so
       // validate(obj) and validateJSON(text) answer the same for the same
       // document. Without it, coercion, removal and defaults applied on one
@@ -1799,15 +1861,20 @@ class Validator {
       return;
     }
     const uf = this._userFormats;
-    const jsFn = compileToJSCodegen(this._schemaObj, sm, uf) || compileToJS(this._schemaObj, null, sm);
+    const _cg = compileToJSCodegen(this._schemaObj, sm, uf);
+    const jsFn = _cg || compileToJS(this._schemaObj, null, sm);
     this._jsFn = jsFn;
     if (jsFn) {
       this.isValidObject = jsFn;
       // A partial entry: the verdict function is real, the other two are not
-      // built yet rather than declined. `full: false` says so, so the next
-      // caller that needs errors compiles them instead of inheriting nulls.
+      // built yet rather than declined. `undefined` is the not-built marker
+      // the full compile's _buildDeferred looks for; `null` would read as
+      // "the compiler declined" and cost the schema its error function, which
+      // is the bug this cache had once already. `isCodegen` rides along so a
+      // validator that later reuses this entry reports the same engine it
+      // would have compiled to.
       if (!uf) {
-        if (!cached) _compileCache.set(mapKey, { jsFn, combined: null, errFn: null, full: false });
+        if (!cached) _compileCache.set(mapKey, { jsFn, combined: undefined, errFn: undefined, isCodegen: !!_cg, full: false });
         else cached.jsFn = jsFn;
       }
     }
