@@ -78,10 +78,15 @@ declare namespace Ata {
     formats?: Record<string, Format>;
     keywords?: KeywordDefinition[];
     schemas?: object[] | Record<string, object>;
+    /** Enforced: unknown keywords and dangling local $refs throw at compile ('log' warns instead). */
     strict?: boolean | 'log';
+    /** Same checks as `strict`; the specific option wins over the umbrella one. */
     strictSchema?: boolean | 'log';
+    /** Accepted for API compatibility; not enforced. */
     strictTypes?: boolean | 'log';
+    /** Accepted for API compatibility; not enforced. */
     strictTuples?: boolean | 'log';
+    /** Accepted for API compatibility; not enforced. */
     strictRequired?: boolean | 'log';
     allowUnionTypes?: boolean;
     logger?: { log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void } | false;

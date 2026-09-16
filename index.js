@@ -885,6 +885,29 @@ class Validator {
     // produced the error). Matches ajv's `verbose: true` behavior.
     this._verbose = !!options.verbose;
 
+    // strictSchema: authoring-time checks, off by default. A mistyped keyword
+    // is the one schema mistake that fails open: to every dialect `maxLenght`
+    // is an annotation, so the constraint the author meant is simply absent
+    // and previously invalid data validates. `true` throws here, at
+    // construction, with every finding; `'log'` reports through
+    // `options.logger` or the console and continues. The check runs on the
+    // schema as written, before any normalization touches it.
+    if (options.strictSchema === true || options.strictSchema === 'log') {
+      const { checkSchemaStrict } = require('./lib/strict-check');
+      const problems = checkSchemaStrict(schema, { userKeywords: options.keywords || null });
+      if (problems.length > 0) {
+        const text = problems.map((x) => `strict mode: ${x.message} at ${x.path}`).join('\n');
+        if (options.strictSchema === true) {
+          throw new Error(text);
+        }
+        const logger = options.logger;
+        if (logger !== false) {
+          const warn = logger && typeof logger.warn === 'function' ? logger.warn.bind(logger) : console.warn;
+          warn(text);
+        }
+      }
+    }
+
     // richErrors: default true. Only the literal `false` opts back into the
     // v0.14 error shape (no code/expected/received/docUrl, no aliases).
     this._richErrors = options && options.richErrors === false ? false : true;

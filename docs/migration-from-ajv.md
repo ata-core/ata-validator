@@ -308,6 +308,7 @@ Things that work slightly differently or are not yet supported:
 
 - **Custom keywords**: `new Validator(schema, { keywords })` on the runtime API, `addKeyword` on the shim. The `validate`, `compile` and `macro` forms are supported; `code` (a code generator hook) is not, and a schema that uses a custom keyword runs on the interpreted engine and cannot be compiled ahead of time. See [custom-keywords.md](custom-keywords.md).
 - **Custom formats**: `formats: { name: fn }` on the runtime API, `addFormat` on the shim (a function, a RegExp, a pattern string or `{ validate }`). The formats plugin is not needed and its `addFormats()` throws; the formats it carries are built in.
+- **Strict mode**: `strict` and `strictSchema` are enforced for the two checks that fail open: an unknown keyword (`maxLenght` would otherwise compile with the constraint simply absent) and a dangling local `$ref`. The unknown-keyword error suggests the intended spelling. `strictTypes`, `strictTuples` and `strictRequired` are accepted for API compatibility and not enforced.
 - **`$data` references**: not supported. The shim throws at construction.
 - **Error order under `allErrors: true`**: after a `type` failure the reference keeps evaluating the node's other keywords and reports those too; ata stops at the type error. The shim does not add the extra errors.
 - **`uniqueItems` with objects**: supported, uses `JSON.stringify` for content comparison.

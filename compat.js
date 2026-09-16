@@ -15,8 +15,10 @@ const { resolvePointer } = require('./lib/pointer.js');
 //   - `$data` references;
 //   - keywords defined only through `code` (a code generator hook);
 //   - the reference formats plugin, whose formats are built in here.
-// Strict-mode schema checks (`strict`, `strictTypes`, ...) are accepted and
-// ignored: an unknown keyword is an annotation, as the specification says.
+// Strict-mode schema checks: `strict` and `strictSchema` are enforced for the
+// checks that fail open, an unknown keyword (`maxLenght` compiles and the
+// constraint is simply absent) and a dangling local `$ref`. `strictTypes`,
+// `strictTuples` and `strictRequired` are accepted and ignored.
 
 const { Validator } = require('./index');
 const { METASCHEMAS } = require('./lib/metaschemas');
@@ -99,6 +101,13 @@ class Ata {
       removeAdditional: !!o.removeAdditional,
       verbose: !!o.verbose,
     };
+    // `strict` and `strictSchema`: the unknown-keyword and dangling-local-$ref
+    // checks are enforced; `strictTypes`, `strictTuples` and `strictRequired`
+    // are still accepted and ignored. The specific keyword option wins over
+    // the umbrella one, which is how the reference class reads them.
+    const strictness = o.strictSchema !== undefined ? o.strictSchema : o.strict;
+    if (strictness === true || strictness === 'log') out.strictSchema = strictness;
+    if (o.logger !== undefined) out.logger = o.logger;
     if (o.validateFormats === false) out.assertFormat = false;
     const formatNames = Object.keys(this._formats);
     if (formatNames.length > 0) out.formats = { ...this._formats };
