@@ -1844,16 +1844,36 @@ class Validator {
           return self._scanner;
         };
         const byParsing = this.isValidJSON;
+        // The verdict is a pure function of the text, and the caller a
+        // gateway or a drift monitor keeps asking about is usually the same
+        // text: a config file re-read on a timer, a heartbeat body. One
+        // remembered (text, verdict) pair answers that case with a native
+        // string compare, which is a memcmp, instead of a scan. Withheld when
+        // user formats or custom keywords are present, since those are user
+        // functions and nothing guarantees they are pure.
+        const memoizable = !self._userFormats && !self._usesKeywords;
+        let _memoText = null;
+        let _memoVerdict = false;
         this.isValidJSON = (jsonStr) => {
           const scan = self._ensureScanner();
           if (scan === undefined) return byParsing(jsonStr);
           if (scan === null) { self.isValidJSON = byParsing; return byParsing(jsonStr); }
-          self.isValidJSON = (text) => {
-            if (typeof text !== 'string') return byParsing(text);
-            const r = scan(text);
-            if (r === -1) return byParsing(text);
-            return r === 1;
-          };
+          self.isValidJSON = memoizable
+            ? (text) => {
+                if (typeof text !== 'string') return byParsing(text);
+                if (text === _memoText) return _memoVerdict;
+                const r = scan(text);
+                const verdict = r === -1 ? byParsing(text) : r === 1;
+                _memoText = text;
+                _memoVerdict = verdict;
+                return verdict;
+              }
+            : (text) => {
+                if (typeof text !== 'string') return byParsing(text);
+                const r = scan(text);
+                if (r === -1) return byParsing(text);
+                return r === 1;
+              };
           return self.isValidJSON(jsonStr);
         };
         if (options.abortEarly) {
