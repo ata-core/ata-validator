@@ -159,7 +159,79 @@ const compile = (schema) => {
   check('no parse without the option', !/_ataParse/.test(plain))
 }
 
-// 7. the boolean and error entry points are unchanged by any of this
+// 7. defaults: an absent optional property takes its declared default, and
+// an object default is a fresh value on every call, never shared state
+{
+  const m = compile({
+    type: 'object',
+    properties: {
+      b: { type: 'string' },
+      rollout: { type: 'integer', minimum: 0, default: 0 },
+      opts: { type: 'object', properties: { x: { type: 'integer' } }, default: { x: 1 } },
+      limits: { type: 'object', properties: { cpu: { type: 'number', default: 1.5 }, mem: { type: 'integer' } } },
+    },
+    required: ['b'],
+  })
+  check('defaults module emitted', m && typeof m.parse === 'function')
+  const r = m.parse({ b: 'x' })
+  check('absent optional takes its default', r.rollout === 0 && r.opts.x === 1)
+  check('a present value wins over the default', m.parse({ b: 'x', rollout: 7 }).rollout === 7)
+  check('object defaults are fresh per call', m.parse({ b: 'x' }).opts !== m.parse({ b: 'x' }).opts)
+  check('nested default fills only under a present parent',
+    m.parse({ b: 'x' }).limits === undefined && m.parse({ b: 'x', limits: { mem: 2 } }).limits.cpu === 1.5)
+}
+
+// 8. the two default shapes that would diverge from the runtime decline:
+// a required property with a default (the runtime fills it before checking
+// required, a raw-input validation cannot), and a default the property's own
+// schema rejects (the runtime catches it at validation, parse would ship it)
+{
+  const rd = toStandaloneModule(
+    new Validator({ type: 'object', properties: { a: { type: 'integer', default: 3 } }, required: ['a'] }),
+    { format: 'cjs', parse: true },
+  )
+  check('required with default gets no parse', !/_ataParse/.test(rd))
+  const bad = toStandaloneModule(
+    new Validator({ type: 'object', properties: { a: { type: 'integer', default: 'nope' }, b: { type: 'string' } }, required: ['b'] }),
+    { format: 'cjs', parse: true },
+  )
+  check('an invalid default gets no parse', !/_ataParse/.test(bad))
+}
+
+// 9. in-place applicators are admitted when they only constrain: the
+// if/then/else config shape with root unevaluatedProperties: false now gets
+// a parse() that enforces the conditional and rejects undeclared keys
+{
+  const m = compile({
+    type: 'object',
+    properties: { on: { type: 'boolean' }, why: { type: 'string', minLength: 1 }, tag: { type: 'string', default: 'none' } },
+    required: ['on'],
+    if: { properties: { on: { const: true } }, required: ['on'] },
+    then: { required: ['why'] },
+    unevaluatedProperties: false,
+  })
+  check('composed config shape gets parse', m && typeof m.parse === 'function')
+  check('defaults still fill there', m.parse({ on: false }).tag === 'none')
+  let threw = false
+  try { m.parse({ on: true }) } catch { threw = true }
+  check('the then branch is enforced', threw)
+  threw = false
+  try { m.parse({ on: false, stray: 1 }) } catch { threw = true }
+  check('unevaluatedProperties: false rejects an undeclared key', threw)
+  // and the shapes that widen the key set still decline
+  const refd = toStandaloneModule(
+    new Validator({ $defs: { b: { properties: { extra: {} } } }, type: 'object', properties: { a: { type: 'integer' } }, allOf: [{ $ref: '#/$defs/b' }] }),
+    { format: 'cjs', parse: true },
+  )
+  check('a $ref in an applicator still gets no parse', !/_ataParse/.test(refd))
+  const widen = toStandaloneModule(
+    new Validator({ type: 'object', properties: { a: { type: 'integer' } }, allOf: [{ properties: { other: { type: 'string' } } }] }),
+    { format: 'cjs', parse: true },
+  )
+  check('an applicator declaring a new name still gets no parse', !/_ataParse/.test(widen))
+}
+
+// 10. the boolean and error entry points are unchanged by any of this
 {
   const m = compile({ type: 'object', properties: { a: { type: 'number' } }, required: ['a'] })
   check('isValid still works', m.isValid({ a: 1 }) === true && m.isValid({}) === false)
@@ -169,4 +241,4 @@ const compile = (schema) => {
 
 fs.rmSync(dir, { recursive: true, force: true })
 if (failed) process.exit(1)
-console.log('aot parse: strips to the declared shape, declines where it cannot prove the copy')
+console.log('aot parse: strips, defaults, composed shapes under the subset proof; declines where it cannot prove the copy')

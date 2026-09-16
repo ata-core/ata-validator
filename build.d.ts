@@ -111,10 +111,16 @@ export interface ToStandaloneModuleOptions {
   formatMode?: 'embed' | 'inject';
   /**
    * Also export `parse(data)`: validate, then return a copy of the input
-   * holding only the properties the schema declares. Off by default because
-   * it adds to the emitted module's size. Emitted only where the copy is
-   * provably exact; a schema using `$ref`, a composition, `patternProperties`,
-   * an `additionalProperties` schema or an array of objects gets no `parse`.
+   * holding only the properties the schema declares, with declared `default`
+   * values filled in for absent optional properties (object and array
+   * defaults are fresh per call). Off by default because it adds to the
+   * emitted module's size. Emitted only where the copy is provably exact:
+   * `$ref` and `patternProperties` decline; in-place applicators (`allOf`,
+   * `anyOf`, `oneOf`, `if`/`then`/`else`, and `unevaluatedProperties: false`)
+   * are admitted when every property name they mention is already declared
+   * in the node's own `properties`. A required property with a default, or
+   * a default its own schema rejects, also declines, because those are the
+   * two shapes where parse() and the runtime would disagree.
    */
   parse?: boolean;
   /**

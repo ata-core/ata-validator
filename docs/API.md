@@ -235,6 +235,22 @@ const compiled = require('./compiled.js');
 compiled.setFormats({ 'zip-tr': (s) => /^[0-9]{5}$/.test(s) });
 ```
 
+With `parse: true` the module also exports `parse(data)`: validate, throw
+on failure, and return a copy of the input holding only the properties the
+schema declares, with declared `default` values filled in for absent
+optional properties. An object or array default is a fresh value on every
+call. It is emitted only where the rebuild is provably exact. A `$ref` or
+`patternProperties` declines. In-place applicators (`allOf`, `anyOf`,
+`oneOf`, `if`/`then`/`else`, `unevaluatedProperties: false`) are admitted
+when every property name they mention is already declared in the node's own
+`properties`, so the common config shape, a conditional over declared fields
+with a closed root, gets a `parse` that enforces the conditional, rejects
+undeclared keys, and hands back the ready object. Two default shapes decline
+because they are where `parse` and the runtime would disagree: a required
+property with a default (the runtime fills it before checking `required`),
+and a default the property's own schema rejects (the runtime catches it at
+validation).
+
 With `positions: true` the module also exports `validateJSON(text)`: it
 parses the JSON text, validates, and on failure attaches a `dataFrame`
 (`byteOffset`, `length`, `line`, `col`, `text`, the same five fields the
