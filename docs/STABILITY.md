@@ -36,6 +36,16 @@ Example: the instance methods `toStandalone()`/`toStandaloneModule()` were depre
 
 ata-validator targets JSON Schema Draft 2020-12 (plus Draft 7). Against the full official suite with nothing excluded it passes 1285 of 1290 Draft 2020-12 cases (99.6%) and 911 of 922 Draft 7 cases (98.8%); `npm run test:suite` reproduces both figures and names every remaining failure. Known limitations are documented in the README's "Known limitations" section and are considered scope decisions, not bugs, for the 1.x line.
 
+## Compiled output
+
+A module emitted by `toStandaloneModule`, `bundleStandalone` or
+`bundleCompact` agrees with the runtime `Validator` of the same version on
+the verdict for every document. The emitters decline or degrade loudly
+where they cannot prove equivalence, and the differential test that holds
+both engines to the same answers runs in every CI build. A compiled module
+also exports `schemaHash` so a build can detect that its artifact no longer
+matches the schema it came from.
+
 ## Platform support
 
 Native prebuilds ship as `@ata-validator/native-*` optional packages for linux x64/arm64 (glibc and musl), macOS arm64, and windows x64. Every other platform runs the pure-JS engine. The core package contains no binaries.

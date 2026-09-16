@@ -140,6 +140,15 @@ export function bundleStandalone(schemas: unknown[], options?: BundleStandaloneO
 /** Like {@link bundleStandalone} but deduplicates shared bodies for smaller output. */
 export function bundleCompact(schemas: unknown[], options?: BundleStandaloneOptions): string;
 
+/**
+ * Stable content hash of a schema, 16 hex characters, over a canonical JSON
+ * form (keys sorted at every level). Every module from
+ * {@link toStandaloneModule} exports its own `schemaHash`; comparing that
+ * against `schemaHash(currentSchema)` tells a build the module is stale.
+ * An integrity aid, not a security boundary.
+ */
+export function schemaHash(schema: unknown): string;
+
 /** Emit a self-contained `validate`/`isValid` module string for a single
  * schema, plus `parse` when {@link ToStandaloneModuleOptions.parse} is set
  * and `validateJSON` when {@link ToStandaloneModuleOptions.positions} is. */

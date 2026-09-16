@@ -203,6 +203,16 @@ const { toStandaloneModule } = require('ata-validator/build');
 fs.writeFileSync('./compiled.mjs', toStandaloneModule(schema, { format: 'esm' }));
 ```
 
+A compiled module and the runtime `Validator` agree on the verdict for
+every document, at the same version. This is a stated contract, not an
+aspiration: the emitters build from the same compiled program the runtime
+executes, `tests/test_aot_differential.js` holds the two to the same answers
+in every CI run, and anywhere the emitters cannot prove equivalence they
+decline or degrade loudly rather than emit something that might disagree.
+Error detail carries the same guarantee wherever the module ships it; a
+module that cannot carry error detail says so (below) and still keeps the
+verdict contract.
+
 When error detail is requested (the default) but the error generator declines
 the schema (`unevaluated*` next to a `$ref` or `patternProperties` is the
 usual case; provably local `unevaluated*` compiles since 1.25.0), the module
@@ -250,6 +260,19 @@ because they are where `parse` and the runtime would disagree: a required
 property with a default (the runtime fills it before checking `required`),
 and a default the property's own schema rejects (the runtime catches it at
 validation).
+
+Every emitted module exports `schemaHash`, a 16 character content hash of
+the schema it was compiled from, over a canonical JSON form so key order
+does not matter. `schemaHash(schema)` from `ata-validator/build` computes
+the same value, so a build can detect a stale artifact by comparing the two
+instead of embedding its own fingerprint. It is an integrity aid, not a
+security boundary.
+
+```javascript
+const { schemaHash } = require('ata-validator/build');
+const mod = await import('./compiled.mjs');
+if (mod.schemaHash !== schemaHash(currentSchema)) rebuild();
+```
 
 With `positions: true` the module also exports `validateJSON(text)`: it
 parses the JSON text, validates, and on failure attaches a `dataFrame`
