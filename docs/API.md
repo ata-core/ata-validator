@@ -204,7 +204,9 @@ fs.writeFileSync('./compiled.mjs', toStandaloneModule(schema, { format: 'esm' })
 ```
 
 When error detail is requested (the default) but the error generator declines
-the schema, `unevaluated*` among the shapes it declines, the module still
+the schema (`unevaluated*` next to a `$ref` or `patternProperties` is the
+usual case; provably local `unevaluated*` compiles since 1.25.0), the module
+still
 ships with an exact verdict, reports every failure as the single ATA9000
 abort-early error, says so in its header comment, and reports the degradation
 through `onWarning: (message) => ...` if you pass one. `ata compile` prints
@@ -231,6 +233,26 @@ const src = toStandaloneModule(schema, { formats, format: 'cjs', formatMode: 'in
 // later, in the process that loads it:
 const compiled = require('./compiled.js');
 compiled.setFormats({ 'zip-tr': (s) => /^[0-9]{5}$/.test(s) });
+```
+
+With `positions: true` the module also exports `validateJSON(text)`: it
+parses the JSON text, validates, and on failure attaches a `dataFrame`
+(`byteOffset`, `length`, `line`, `col`, `text`, the same five fields the
+runtime's `validateJSON` attaches) to every error by walking the original
+text once. The mapping goes through the error's `instancePath`, so when the
+same key appears in several sections each error points at its own
+occurrence, which a string search for the first occurrence does not. A
+syntax error comes back as the single ATA9001 error with a frame on the
+document. Off by default because the embedded walker adds about 5 KB
+to the module, 1.7 KB gzipped.
+
+```javascript
+const src = toStandaloneModule(schema, { positions: true, abortEarly: false });
+// in the process that loads it:
+const { validateJSON } = await import('./compiled.mjs');
+const text = fs.readFileSync('config.json', 'utf8');
+const r = validateJSON(text);
+if (!r.valid) console.error(r.errors[0].dataFrame.line, r.errors[0].message);
 ```
 
 ### Validator.fromStandalone(module, schema, options?)

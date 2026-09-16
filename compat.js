@@ -409,6 +409,26 @@ function metaValidator(id) {
   return v;
 }
 
+// Maps each error's instancePath to its position in the JSON text the data
+// was parsed from and attaches it as `dataFrame` ({ byteOffset, length,
+// line, col, text }). One walk of the text, and correct when the same key
+// appears in several sections, which a first-occurrence string search is
+// not. Not an Ajv API: exported for callers that keep the source text
+// around and want file positions on Ajv-shaped errors.
+Ata.attachDataFrames = function attachDataFrames(errors, text) {
+  if (!errors || !errors.length || text == null) return errors;
+  const { buildDataPositionMap } = require('./lib/data-positions');
+  let map;
+  try { map = buildDataPositionMap(text); } catch { return errors; }
+  for (const e of errors) {
+    if (!e || e.dataFrame) continue;
+    const ptr = e.instancePath != null ? e.instancePath : (e.dataPath || '');
+    const p = map[ptr];
+    if (p) e.dataFrame = { byteOffset: p.byteOffset, length: p.length, line: p.line, col: p.col, text: p.text };
+  }
+  return errors;
+};
+
 module.exports = Ata;
 module.exports.default = Ata;
 module.exports.Ata = Ata;

@@ -117,6 +117,15 @@ export interface ToStandaloneModuleOptions {
    * an `additionalProperties` schema or an array of objects gets no `parse`.
    */
   parse?: boolean;
+  /**
+   * Also export `validateJSON(text)`: parse the JSON text, validate, and on
+   * failure attach a `dataFrame` ({ byteOffset, length, line, col, text })
+   * to every error by walking the original text once, so errors point at the
+   * right occurrence even when the same key appears in several sections.
+   * Off by default because the embedded position walker adds to the emitted
+   * module's size.
+   */
+  positions?: boolean;
 }
 
 /** Bundle multiple schemas into one self-contained module (no ata-validator runtime). */
@@ -126,5 +135,6 @@ export function bundleStandalone(schemas: unknown[], options?: BundleStandaloneO
 export function bundleCompact(schemas: unknown[], options?: BundleStandaloneOptions): string;
 
 /** Emit a self-contained `validate`/`isValid` module string for a single
- * schema, plus `parse` when {@link ToStandaloneModuleOptions.parse} is set. */
+ * schema, plus `parse` when {@link ToStandaloneModuleOptions.parse} is set
+ * and `validateJSON` when {@link ToStandaloneModuleOptions.positions} is. */
 export function toStandaloneModule(schema: unknown, options?: ToStandaloneModuleOptions): string | null;

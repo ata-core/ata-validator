@@ -25,6 +25,14 @@ declare class Ata {
   removeKeyword(keyword: string): this;
 
   errorsText(errors?: Ata.ErrorObject[] | null, options?: { separator?: string; dataVar?: string }): string;
+
+  /**
+   * Attach a `dataFrame` ({ byteOffset, length, line, col, text }) to each
+   * error by mapping its `instancePath` into the JSON text the data was
+   * parsed from. One walk of the text; correct when the same key appears in
+   * several sections. Not an Ajv API. Mutates and returns `errors`.
+   */
+  static attachDataFrames(errors: Ata.ErrorObject[] | null | undefined, text: string | Buffer): Ata.ErrorObject[] | null | undefined;
 }
 
 declare namespace Ata {

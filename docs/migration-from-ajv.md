@@ -181,6 +181,25 @@ v.isValidJSON(jsonStr)     // returns boolean
 
 `validateJSON` uses simdjson above 8 KB and V8's `JSON.parse` below.
 
+If you stay on the Ajv-shaped API but read your data from a file, the shim
+can put file positions on the errors after the fact. `attachDataFrames`
+walks the original text once and maps each error's `instancePath` to a
+`dataFrame` (`byteOffset`, `length`, `line`, `col`, `text`), landing on the
+right occurrence even when the same key appears in several sections. It is
+not an Ajv API; it exists because hand-written line finders based on a
+string search get repeated keys wrong.
+
+```js
+const Ajv = require('ata-validator/compat');
+const ajv = new Ajv({ allErrors: true });
+const validate = ajv.compile(schema);
+const text = fs.readFileSync('config.json', 'utf8');
+if (!validate(JSON.parse(text))) {
+  Ajv.attachDataFrames(validate.errors, text);
+  for (const e of validate.errors) console.error(`${e.dataFrame.line}:${e.dataFrame.col} ${e.message}`);
+}
+```
+
 ### Buffer input (native addon)
 
 Something ajv cannot do: validate a raw `Buffer` without materializing a JS object tree.
