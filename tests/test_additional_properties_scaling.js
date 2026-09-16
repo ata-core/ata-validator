@@ -63,6 +63,29 @@ ok('the verdict and the error are unchanged on both sides of the threshold');
   ok('the generated code uses a hoisted lookup only where it pays');
 }
 
+// --- the same disguise on unevaluatedProperties ------------------------------
+{
+  // The static unevaluatedProperties tier used a first-character switch for
+  // membership, and keys sharing a first character, ENV_0 through ENV_599
+  // here, all land in one case whose body chains every name: the same
+  // quadratic, differently dressed. Above the threshold it must use the
+  // hoisted lookup too.
+  const properties = {};
+  for (let i = 0; i < 600; i++) properties['ENV_' + i] = { type: 'string' };
+  const big = toStandaloneModule({ type: 'object', properties, unevaluatedProperties: false }, {});
+  assert.ok(/_apn\d+=Object\.create\(null\)/.test(big),
+    'a large unevaluatedProperties: false builds a name lookup');
+  const doc = {};
+  for (let i = 0; i < 600; i++) doc['ENV_' + i] = 'v';
+  const { Validator } = require('../index');
+  const v = new Validator({ type: 'object', properties, unevaluatedProperties: false });
+  assert.strictEqual(v.isValidObject(doc), true);
+  assert.strictEqual(v.isValidObject({ ...doc, surprise: 1 }), false);
+  assert.strictEqual(v.validate({ ...doc, surprise: 1 }).errors[0].params.unevaluatedProperty, 'surprise',
+    'and the error still names the key');
+  ok('unevaluatedProperties uses the hoisted lookup above the threshold');
+}
+
 // --- reported, not asserted -------------------------------------------------
 {
   const measure = (n) => {
