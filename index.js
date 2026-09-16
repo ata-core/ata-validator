@@ -1445,59 +1445,6 @@ class Validator {
       // reads what arrived. The compiler declines any schema it cannot answer
       // and a compiled scanner returns BAIL for a document shape it cannot
       // answer, and then the parse path below takes over unchanged.
-      if (!preprocess) {
-        const self = this;
-        // Generating a scanner costs about 20 microseconds, measured, and it
-        // saves from around 85 nanoseconds on a small accepted document to
-        // several microseconds on a rejected one. Building it on the first
-        // call would therefore be a straight loss for a caller that checks one
-        // document and exits, so it is built once a caller has asked often
-        // enough that it is plainly doing this in a loop. A server passes the
-        // line during warm-up and never sees it.
-        const SCAN_AFTER = 64;
-        let calls = 0;
-        // undefined: not built. null: this schema has no scanner. Passing true
-        // builds it now, which is how the differential test reaches it.
-        this._ensureScanner = (now) => {
-          if (self._scanner === undefined) {
-            if (!now && ++calls < SCAN_AFTER) return undefined;
-            const built = require('./lib/scan-compiler').compileScanner(schemaObj, { userFormats: self._userFormats });
-            self._scanner = built ? built.scan : null;
-          }
-          return self._scanner;
-        };
-        const byParsing = this.isValidJSON;
-        this.isValidJSON = (jsonStr) => {
-          const scan = self._ensureScanner();
-          if (scan === undefined) return byParsing(jsonStr);
-          if (scan === null) { self.isValidJSON = byParsing; return byParsing(jsonStr); }
-          self.isValidJSON = (text) => {
-            if (typeof text !== 'string') return byParsing(text);
-            const r = scan(text);
-            if (r === -1) return byParsing(text);
-            return r === 1;
-          };
-          return self.isValidJSON(jsonStr);
-        };
-        if (options.abortEarly) {
-          const validateByParsing = this.validateJSON;
-          this.validateJSON = (jsonStr) => {
-            const scan = self._ensureScanner();
-            if (scan === undefined) return validateByParsing(jsonStr);
-            if (scan === null) { self.validateJSON = validateByParsing; return validateByParsing(jsonStr); }
-            self.validateJSON = (text) => {
-              if (typeof text === 'string') {
-                const r = scan(text);
-                if (r === 1) return VALID_RESULT;
-                if (r === 0) return ABORT_EARLY_RESULT;
-              }
-              return validateByParsing(text);
-            };
-            return self.validateJSON(jsonStr);
-          };
-        }
-      }
-
       // validateAndParse: parse the JSON, then validate. Pure JS (JSON.parse +
       // validate) so it works with or without the native addon and in browsers.
       {
@@ -1871,6 +1818,63 @@ class Validator {
       const { bufferNeedsSlowPath, installSlowBufferApis } = require('./lib/buffer-gate.js');
       if (bufferNeedsSlowPath(schemaObj, this._schemaMap, this._keywords)) installSlowBufferApis(this);
     }
+    // Installed after the buffer gate on purpose: the gate replaces
+    // isValidJSON for schemas whose shapes the native walker gets wrong,
+    // unevaluatedProperties among them, and the scanner wiring has to wrap
+    // whatever answers last or a gated schema silently loses its scanner.
+    if (this._jsFn && !this._preprocess) {
+        const self = this;
+        // Generating a scanner costs about 20 microseconds, measured, and it
+        // saves from around 85 nanoseconds on a small accepted document to
+        // several microseconds on a rejected one. Building it on the first
+        // call would therefore be a straight loss for a caller that checks one
+        // document and exits, so it is built once a caller has asked often
+        // enough that it is plainly doing this in a loop. A server passes the
+        // line during warm-up and never sees it.
+        const SCAN_AFTER = 64;
+        let calls = 0;
+        // undefined: not built. null: this schema has no scanner. Passing true
+        // builds it now, which is how the differential test reaches it.
+        this._ensureScanner = (now) => {
+          if (self._scanner === undefined) {
+            if (!now && ++calls < SCAN_AFTER) return undefined;
+            const built = require('./lib/scan-compiler').compileScanner(schemaObj, { userFormats: self._userFormats });
+            self._scanner = built ? built.scan : null;
+          }
+          return self._scanner;
+        };
+        const byParsing = this.isValidJSON;
+        this.isValidJSON = (jsonStr) => {
+          const scan = self._ensureScanner();
+          if (scan === undefined) return byParsing(jsonStr);
+          if (scan === null) { self.isValidJSON = byParsing; return byParsing(jsonStr); }
+          self.isValidJSON = (text) => {
+            if (typeof text !== 'string') return byParsing(text);
+            const r = scan(text);
+            if (r === -1) return byParsing(text);
+            return r === 1;
+          };
+          return self.isValidJSON(jsonStr);
+        };
+        if (options.abortEarly) {
+          const validateByParsing = this.validateJSON;
+          this.validateJSON = (jsonStr) => {
+            const scan = self._ensureScanner();
+            if (scan === undefined) return validateByParsing(jsonStr);
+            if (scan === null) { self.validateJSON = validateByParsing; return validateByParsing(jsonStr); }
+            self.validateJSON = (text) => {
+              if (typeof text === 'string') {
+                const r = scan(text);
+                if (r === 1) return VALID_RESULT;
+                if (r === 0) return ABORT_EARLY_RESULT;
+              }
+              return validateByParsing(text);
+            };
+            return self.validateJSON(jsonStr);
+          };
+        }
+      }
+
 
     // Save to identity cache for ultra-fast reuse with same schema object.
     // Only an instance built without options may answer a later

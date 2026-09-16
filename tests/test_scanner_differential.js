@@ -229,6 +229,17 @@ const GEN_SCHEMAS = [
   { const: { a: [1, { b: true }] } },
   { type: 'object', properties: { k: { enum: [{ x: 1 }, 2] }, b: { type: 'string' } } },
   { type: 'array', items: { enum: [[], {}, 0] } },
+  // unevaluated*: exact synonyms for additionalProperties and items in any
+  // schema the scanner accepts, because everything that could contribute an
+  // annotation beyond properties/prefixItems is declined or resolved away
+  { type: 'object', properties: { a: { type: 'string' }, id: { type: 'integer' } }, unevaluatedProperties: false },
+  { type: 'object', properties: { a: { type: 'string' } }, unevaluatedProperties: { type: 'integer' } },
+  { type: 'object', properties: { a: { type: 'string' } }, additionalProperties: { type: 'integer' }, unevaluatedProperties: false },
+  { allOf: [{ properties: { a: { type: 'string' } } }, { properties: { b: { type: 'integer' } } }], unevaluatedProperties: false },
+  { $ref: '#/$defs/u', $defs: { u: { type: 'object', properties: { name: { type: 'string' } }, unevaluatedProperties: false } } },
+  { type: 'array', prefixItems: [{ type: 'integer' }], unevaluatedItems: false },
+  { type: 'array', prefixItems: [{ type: 'integer' }], unevaluatedItems: { type: 'string' } },
+  { type: 'array', prefixItems: [{ type: 'integer' }], items: { type: 'string' }, unevaluatedItems: false },
 ];
 
 // The realistic schemas the AOT tests use. These carry a root $id, nested
