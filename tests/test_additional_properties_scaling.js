@@ -8,11 +8,19 @@
 // environment variables and feature flags, so its property count is whatever
 // the project has.
 //
-// Two guards here. The structural one says the generated code does the right
-// thing, and holds whatever the machine is doing. The timing one says the
-// result is not quadratic, with enough room that noise cannot fail it: a
-// fourfold increase in properties must not cost more than eight times the
-// time, where the old shape cost sixteen.
+// The guard is structural: the generated code must read a hoisted lookup rather
+// than test the key against every declared name, and must build that lookup
+// outside the function that runs per call. That holds whatever the machine is
+// doing.
+//
+// There is no timing assertion. The first version of this test asserted that
+// four times the properties cost less than eight times the time, and it was
+// wrong twice over: a CI runner measured 8.3x for the fixed code, and the
+// quadratic code it was supposed to catch measured 7.7x on the machine it was
+// written on, because the comparison chain short-circuits on a match and the
+// linear part of the work dilutes the ratio. A bound that a regression can
+// pass and a fix can fail is not a guard. The numbers are still printed, since
+// they are worth reading in a CI log.
 
 const assert = require('node:assert');
 const { Validator } = require('../index');
@@ -55,7 +63,7 @@ ok('the verdict and the error are unchanged on both sides of the threshold');
   ok('the generated code uses a hoisted lookup only where it pays');
 }
 
-// --- and the result is not quadratic ----------------------------------------
+// --- reported, not asserted -------------------------------------------------
 {
   const measure = (n) => {
     const { schema, data } = build(n);
@@ -75,9 +83,6 @@ ok('the verdict and the error are unchanged on both sides of the threshold');
   const large = measure(1000);
   const ratio = large / small;
   console.log(`  250 properties ${(small / 1000).toFixed(2)} us, 1000 properties ${(large / 1000).toFixed(2)} us, ratio ${ratio.toFixed(1)}x`);
-  assert.ok(ratio < 8,
-    `four times the properties cost ${ratio.toFixed(1)}x the time; quadratic is 16x, linear is 4x`);
-  ok('four times the properties does not cost sixteen times the time');
 }
 
 console.log(`\n${passed} passed, 0 failed`);
