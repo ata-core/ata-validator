@@ -41,7 +41,7 @@ new Validator(false).isValidObject(anything); // false
 | `keywords` | object | none | Custom keywords, `{ name: definition }`. A schema that uses one runs on the interpreted engine. See [custom-keywords.md](custom-keywords.md). |
 | `schemas` | object or array | none | Documents that `$ref` can reach, keyed by URI, or an array of documents with `$id`. |
 | `verbose` | boolean | false | Put `parentSchema`, `schema` and `data` on every error: the schema object that owns the failing keyword, that keyword's own value, and the value the error points at. Off by default, and the default error shape does not carry the three keys at all. |
-| `strictSchema` | boolean \| 'log' | false | Authoring-time checks at construction: an unknown keyword (with a spelling suggestion) and a dangling local `$ref` throw, or warn under `'log'`. An unknown keyword is the one schema mistake that fails open, so this is the loud version of what silence would hide. `x-` prefixed names and keywords registered through `keywords` pass. |
+| `strictSchema` | boolean \| 'log' | false | Authoring-time checks at construction: an unknown keyword (with a spelling suggestion), a dangling local `$ref`, a keyword the node's own `type` makes inert, and a `required` name nothing can satisfy throw, or warn under `'log'`. `ata compile --strict-schema` runs the same checks at build time. An unknown keyword is the one schema mistake that fails open, so this is the loud version of what silence would hide. `x-` prefixed names and keywords registered through `keywords` pass. |
 
 ### v.validate(data)
 

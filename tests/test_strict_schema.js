@@ -103,4 +103,52 @@ const MISTYPED = { type: 'object', properties: { a: { type: 'string', maxLenght:
   ok('compat log mode uses the logger and logger:false is silent');
 }
 
+// --- the two checks that complete issue #44 ----------------------------------
+{
+  assert.throws(
+    () => new Validator({ type: 'string', minimum: 3 }, { strictSchema: true }),
+    /"minimum" has no effect here/,
+  );
+  assert.throws(
+    () => new Validator({ type: 'object', properties: { a: { type: 'string' } }, required: ['b'], additionalProperties: false }, { strictSchema: true }),
+    /nothing can satisfy this schema/,
+  );
+  // and the shapes these must NOT flag
+  new Validator({ type: ['string', 'number'], minLength: 1, minimum: 0 }, { strictSchema: true });
+  new Validator({ minimum: 3 }, { strictSchema: true });
+  new Validator({ type: 'object', properties: { a: {} }, required: ['b'] }, { strictSchema: true });
+  new Validator({ type: 'object', properties: { a: {} }, required: ['b'], additionalProperties: false, patternProperties: { '^b$': {} } }, { strictSchema: true });
+  ok('an inert keyword and an unsatisfiable required are reported, their lookalikes are not');
+}
+
+// --- the build refuses what strict mode refuses -------------------------------
+{
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { execFileSync } = require('node:child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-strict-'));
+  const bad = path.join(dir, 'bad.schema.json');
+  fs.writeFileSync(bad, JSON.stringify({ type: 'object', properties: { a: { type: 'string', maxLenght: 3 } } }));
+  const cli = path.join(__dirname, '..', 'bin', 'ata.js');
+  const out = path.join(dir, 'out.mjs');
+  // without the flag the typo compiles, which is the disease
+  execFileSync(process.execPath, [cli, 'compile', bad, '-o', out], { stdio: 'ignore' });
+  assert.ok(fs.existsSync(out));
+  fs.rmSync(out);
+  // with it the compile fails, no module is written, and the message names the fix
+  let failed = false, message = '';
+  try {
+    execFileSync(process.execPath, [cli, 'compile', bad, '--strict-schema', '-o', out], { encoding: 'utf8' });
+  } catch (e) {
+    failed = true;
+    message = String(e.stdout || '') + String(e.stderr || '');
+  }
+  assert.ok(failed, 'the compile exits non-zero');
+  assert.ok(!fs.existsSync(out), 'and writes no module');
+  assert.ok(message.includes('did you mean "maxLength"?'));
+  fs.rmSync(dir, { recursive: true, force: true });
+  ok('ata compile --strict-schema fails the build a typo would have poisoned');
+}
+
 console.log(`\n${passed} passed, 0 failed`);

@@ -38,6 +38,10 @@ Build options:
   --cache-file <path>     Cache file for incremental builds (default: cache disabled)
   --max-size <bytes>      Fail build if any compiled module exceeds this gzipped size
   --strict                Treat any AOT-incompatible schema as a build error (default: skip + warn)
+  --strict-schema         Fail the build on schema authoring mistakes: unknown
+                          keywords (with a spelling suggestion), keywords the
+                          node's type makes inert, unresolvable local $refs,
+                          and required names nothing can satisfy
   --watch                 Re-emit on schema change (Ctrl-C to exit)
   --no-types              Skip .d.mts/.d.cts emission alongside compiled modules
   --source                Embed schema source map (default in development)
@@ -80,6 +84,7 @@ function parseArgs(argv) {
     if (a === '--abort-early') { out.opts.abortEarly = true; continue; }
     if (a === '--check') { out.opts.check = true; continue; }
     if (a === '--strict') { out.opts.strict = true; continue; }
+    if (a === '--strict-schema') { out.opts.strictSchema = true; continue; }
     if (a === '--out-dir') { out.opts.outDir = argv[++i]; continue; }
     if (a === '--suffix') { out.opts.suffix = argv[++i]; continue; }
     if (a === '--cache-file') { out.opts.cacheFile = argv[++i]; continue; }
@@ -178,6 +183,19 @@ function cmdCompile(args) {
   } catch (e) {
     reportCompileError(input, `${input} is not valid JSON: ${e.message}`);
     process.exit(1);
+  }
+
+  // The build is where an authoring mistake is cheapest to stop: a typo like
+  // maxLenght compiles into a module that simply lacks the rule, and nobody
+  // revisits a compiled module. Findings fail the compile, with the path and
+  // the suggested spelling.
+  if (args.opts.strictSchema) {
+    const { checkSchemaStrict } = require('../lib/strict-check');
+    const problems = checkSchemaStrict(schema, {});
+    if (problems.length > 0) {
+      for (const x of problems) reportCompileError(input, `strict mode: ${x.message} at ${x.path}`);
+      process.exit(1);
+    }
   }
 
   const { Validator } = require('..');
