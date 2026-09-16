@@ -154,7 +154,10 @@ const MISTYPED = { type: 'object', properties: { a: { type: 'string', maxLenght:
 // --- an AOT module that cannot carry error detail says so ---------------------
 {
   const { toStandaloneModule } = require('../build.js');
-  const degraded = { type: 'object', properties: { on: { type: 'boolean' } }, if: { required: ['on'] }, then: { required: ['why'] }, unevaluatedProperties: false };
+  // unevaluated* next to a $ref is genuinely undecidable for the generator:
+  // the referenced schema's annotations cannot be proven local, so this shape
+  // stays degraded even now that provably-local unevaluated* compiles.
+  const degraded = { $defs: { base: { properties: { on: { type: 'boolean' } } } }, type: 'object', allOf: [{ $ref: '#/$defs/base' }], unevaluatedProperties: false };
   const seen = [];
   const src = toStandaloneModule(degraded, { abortEarly: false, onWarning: (w) => seen.push(w) });
   assert.ok(typeof src === 'string' && src.length > 0, 'the module still ships');

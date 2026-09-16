@@ -132,4 +132,45 @@ function ok(name) { console.log('  PASS  ' + name); passed++; }
   ok('compat reports the keyword and carries data on every error');
 }
 
+// --- provably-local unevaluated* now compiles real error code ---------------
+// The generator used to decline any schema containing unevaluated*, so error
+// detail came from interpreter re-validation and AOT modules degraded to a
+// single generic error. When every occurrence is provably local (no $ref, no
+// in-place applicator contributing names outside the node's own properties)
+// it now compiles, with the keyword's own identity.
+{
+  const { compileToJSCodegenWithErrors } = require('../lib/js-compiler');
+  const { toStandaloneModule } = require('../build.js');
+  const local = {
+    type: 'object',
+    properties: { on: { type: 'boolean' }, why: { type: 'string', minLength: 1 } },
+    if: { properties: { on: { const: true } }, required: ['on'] },
+    then: { required: ['why'] },
+    unevaluatedProperties: false,
+  };
+  assert.ok(compileToJSCodegenWithErrors(local, null, null), 'the error generator no longer declines');
+  const warned = [];
+  const src = toStandaloneModule(local, { abortEarly: false, format: 'cjs', onWarning: (w) => warned.push(w) });
+  assert.strictEqual(warned.length, 0, 'AOT no longer degrades on this shape');
+  const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-uneval-aot-'));
+  const mod = path.join(dir, 'v.cjs');
+  fs.writeFileSync(mod, src);
+  const { validate } = require(mod);
+  const errs = validate({ on: true, why: '', stray: 1 }).errors;
+  const uneval = errs.find((e) => e.keyword === 'unevaluatedProperties');
+  assert.ok(uneval, 'the standalone module names the keyword');
+  assert.strictEqual(uneval.params.unevaluatedProperty, 'stray');
+  assert.ok(errs.some((e) => e.keyword === 'minLength' && e.instancePath === '/why'), 'and still reports the nested failure');
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  const items = { type: 'array', prefixItems: [{ type: 'string' }], unevaluatedItems: false };
+  assert.ok(compileToJSCodegenWithErrors(items, null, null), 'unevaluatedItems compiles too');
+  const e2 = new Validator(items).validate(['a', 'b', 'c']).errors;
+  assert.strictEqual(e2.length, 1);
+  assert.strictEqual(e2[0].keyword, 'unevaluatedItems');
+  assert.deepStrictEqual(e2[0].params, { limit: 1 });
+  ok('provably-local unevaluated* compiles real error code, through to AOT');
+}
+
 console.log(`\n${passed} passed, 0 failed`);
