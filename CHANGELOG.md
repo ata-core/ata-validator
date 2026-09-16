@@ -2,6 +2,22 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.23.0 - 2026-09-16
+
+### Added
+
+- `strictSchema: true | 'log'`, and the compat shim's `strict`/`strictSchema` now enforce it: the authoring-time checks for the mistakes that fail open. An unknown keyword throws at construction with its path and the nearest known spelling, `strict mode: unknown keyword "maxLenght" (did you mean "maxLength"?) at #/properties/a/maxLenght`, and a local `$ref` that does not resolve in its own document throws instead of compiling a validator that rejects everything. `'log'` warns through the logger and continues. Off by default. The known-keyword list is derived from the vendored meta-schema documents rather than maintained by hand, plus the keywords ata implements beyond them; `x-` prefixed names and keywords registered through the `keywords` option pass. Property names, `enum` and `const` values, `default` and `examples` are data, not keywords, and the walk knows the difference, including the draft-07 `dependencies` form. `strictTypes`, `strictTuples` and `strictRequired` remain accepted and ignored, and `compat.d.ts` now says which is which. Reported as issue #44 by a migration that fuzzed 1,364 mutations against both validators, found zero divergence, and then shipped a typo.
+
+### Changed
+
+- The error and combined generators compile on the first rejection instead of at startup. Every schema compiled three functions eagerly: the verdict, the combined validate-and-collect form, and the error generator, which on a cold first call cost 8.2, 10.4 and 7.8 ms on a 120-property config schema, most of it V8 compiling each generator's own code the first time it is entered. A caller that never reads an error never needs the last two, and `validate()` on a passing document does not either, so they are built on the first rejection. Compile plus first verdict on that schema: 30.7 to 10.8 ms, interleaved runs of committed builds. The warm path measured the same on all ten cases checked. The shared compile cache keeps `undefined` meaning not built yet and `null` meaning the compiler declined, in both places that seed it, and `tests/test_compile_cache_order.js` caught the one seam where the two seeders disagreed during this change.
+- The static `unevaluatedProperties` tier stopped checking membership with a first-character switch. Keys sharing a first character, `ENV_0` through `ENV_999` say, all land in one case whose body chains every name, per key of the document: the `additionalProperties` quadratic in a different coat. Above 128 declared names the generated code reads the hoisted lookup that fixed the first one; below that the switch stays. A 1300-property config document with both of its objects closed: 87.7 to 24.5 µs, and the keyword now costs what `additionalProperties` costs, which is the membership test itself. Only the boolean generator has this code; the error and combined generators decline `unevaluated*` and the interpreted engine produces those errors.
+- The compat shim derives each error's pointer segments and kinds once, into a key map shared by the reference-order sort and the shaping loop. The sort comparator used to re-split and re-classify both errors' pointers on every one of its comparisons, and the loop derived the same segments again per error, with the `if` wrapper's flush doing it a third time. A seven-error rejection through `ata-validator/compat` with `allErrors`: 5.79 to 3.27 µs. The shim's own overhead over `Validator.validate` fell from 4.4 µs to 1.9. The compat surface is pinned by `test_compat`, 106 error-format cases, 36 parity cases and the error-shape differential, all green before and after.
+
+### Fixed
+
+- The API table said `verbose` attaches only `parentSchema`; it attaches `parentSchema`, `schema` and `data`, and the migration guide now lists which `params` key each keyword carries. The performance notes recorded "length-bucketed key comparison for `additionalProperties: false`" as measured and dropped on the grounds that each comparison is a pointer compare; that was right about one comparison and wrong about the total, and the note now carries the measurements that replaced it.
+
 ## 1.22.1 - 2026-09-16
 
 ### Fixed
