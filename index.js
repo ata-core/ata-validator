@@ -1233,19 +1233,36 @@ class Validator {
               }
             : (data) => (jsFn(data) ? VALID_RESULT : errFn(data));
       }
-      // Verbose mode: populate parentSchema on each error.
-      // Errors may be frozen, so clone them with the extra field.
+      // Verbose mode: populate parentSchema, schema and data on each error, the
+      // three fields the default error shape carries under the same option.
+      // `data` is the value the error points at; without it a caller has to
+      // walk the document by the instance path itself, which is what one
+      // migration ended up writing by hand. Errors may be frozen, so clone
+      // them with the extra fields.
       if (this._verbose) {
         const inner = this.validate;
         const root = this._schemaObj;
+        const { resolvePointer } = require('./lib/pointer.js');
         this.validate = (data) => {
           const result = inner(data);
           if (result && !result.valid && result.errors) {
-            const enriched = result.errors.map((err) =>
-              err && err.parentSchema === undefined
-                ? { ...err, parentSchema: resolveSchemaByPath(root, err.schemaPath) }
-                : err
-            );
+            const enriched = result.errors.map((err) => {
+              if (!err || err.parentSchema !== undefined) return err;
+              const parentSchema = resolveSchemaByPath(root, err.schemaPath);
+              // The last segment of the schema path is the keyword that
+              // failed, so its value on the parent is that keyword's schema.
+              const sp = typeof err.schemaPath === 'string' ? err.schemaPath : '';
+              const last = sp.slice(sp.lastIndexOf('/') + 1).replace(/~1/g, '/').replace(/~0/g, '~');
+              const keywordSchema = (parentSchema !== null && typeof parentSchema === 'object' && last)
+                ? parentSchema[last]
+                : undefined;
+              return {
+                ...err,
+                parentSchema,
+                schema: keywordSchema,
+                data: resolvePointer(data, err.instancePath, undefined),
+              };
+            });
             return { valid: false, errors: enriched };
           }
           return result;

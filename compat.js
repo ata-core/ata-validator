@@ -1,5 +1,7 @@
 'use strict';
 
+const { resolvePointer } = require('./lib/pointer.js');
+
 // Drop-in for the default validator's class. `const Ajv = require('ata-validator/compat')`
 // and the rest of the file stays as it was: `new Ajv(opts)`, `compile`,
 // `validate`, `addSchema`, `getSchema`, `removeSchema`, `addFormat`,
@@ -174,7 +176,16 @@ class Ata {
         validate.errors = null;
         return true;
       }
-      const errors = shaper === null ? result.errors : shaper(result.errors, data);
+      let errors = shaper === null ? result.errors : shaper(result.errors, data);
+      // Errors the shaper synthesises, the `if` wrapper among them, are built
+      // from the group rather than carried up from the validator, so verbose
+      // mode has to fill in the value they point at here or they would be the
+      // only ones missing it.
+      if (this.opts.verbose) {
+        errors = errors.map((e) => (e && !('data' in e)
+          ? { ...e, data: resolvePointer(data, e.instancePath || '', undefined) }
+          : e));
+      }
       validate.errors = shaper === null && !allErrors ? errors.slice(0, 1) : errors;
       return false;
     };
