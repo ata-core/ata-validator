@@ -2,6 +2,14 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.22.1 - 2026-09-16
+
+### Fixed
+
+- `validateJSON()` did not return on a document that ends inside an array. `validateJSON('[')` was one byte, any schema, the default configuration, and it never came back. On a rejection the error carries a caret, so a map from pointer to position is built from the raw text; its array loop asked for the next element without checking that the input had ended, `walk` returned without moving, and nothing else could close the array. `'[}'` hung the same way, because a character that begins no value leaves the position where it was. The object loop escaped only by accident: an unterminated string throws, and `lib/data-position-cache.js` catches throws. It cannot catch a loop. Both container loops now stop at the end of the input, and the array loop stops when an iteration does not advance, so a truncated document still yields a map of what was there.
+  - A regression here is an infinite loop, which an ordinary test cannot report because it never reaches a failure. `tests/test_malformed_json_termination.js` runs its corpus in a child process under a watchdog, so a hang becomes a timeout and a red test. The corpus is every prefix of ten documents plus characters inserted where they cannot begin a value: 1793 inputs, 7172 verdicts. It was confirmed to fail before this change and pass after.
+  - `tests/fuzz_positions.js` had never fed malformed text to this walker; it fuzzes schema positions with `JSON.stringify` output, which is always well formed. Nothing else changes: on the same five-field schema, `validate()` on a valid document, `validate()` on an invalid one with the errors read, and `validateJSON()` on both are all within measurement noise of 1.22.0.
+
 ## 1.22.0 - 2026-09-14
 
 ### Fixed
