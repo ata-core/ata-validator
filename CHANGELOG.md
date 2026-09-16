@@ -2,6 +2,14 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- Provably local `unevaluated*` compiles real error detail on the generated-code path, and therefore in standalone modules. When every occurrence of `unevaluatedProperties`/`unevaluatedItems` sits on a node with no `$ref` and no `patternProperties`, and every in-place applicator (`allOf`, `anyOf`, `oneOf`, `if`/`then`/`else`) contributes only property names the node's own `properties` already declares, the keyword is exactly `additionalProperties`/`items` in disguise and both the error and combined generators now emit it as such, keeping the keyword's own identity: one error per stray key with `params.unevaluatedProperty` (ATA7003), one error with `params.limit` for extra items. `toStandaloneModule` with error detail requested no longer degrades on these schemas; a config schema of the common `if/then/else` plus root `unevaluatedProperties: false` shape ships an AOT module with the same per-field errors the runtime reports. Schemas where the annotations cannot be proven local (`unevaluated*` next to a `$ref`, cousin-visible shapes) still decline, loudly, as before. Verified by the error-shape differential (2,816 cases), the engine differential (18,126 cases) and the official suite on all three dialects.
+- `toStandaloneModule(schema, { positions: true })` also exports `validateJSON(text)`: parse, validate, and on failure attach a `dataFrame` (`byteOffset`, `length`, `line`, `col`, `text`) to every error by walking the original text once. The mapping goes through `instancePath`, so a key that appears in several sections frames each error on its own occurrence, which a first-occurrence string search does not. A syntax error is the single ATA9001 error with a frame on the document. The walker is the runtime's own `buildDataPositionMap`, embedded verbatim so the two cannot drift, and it costs about 5 KB in the module (1.7 KB gzipped), which is why it is opt-in.
+- The compat shim exports `attachDataFrames(errors, text)`: the same one-pass mapping for Ajv-shaped errors, for callers that keep the source text around. Not an Ajv API; it exists because hand-written line finders based on a string search get repeated keys wrong.
+
 ## 1.24.0 - 2026-09-16
 
 ### Added
