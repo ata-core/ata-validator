@@ -60,7 +60,7 @@ file.
   libraries maintained outside this project. On its validation page, valid data, the run of
   2026-09-13 against ata 1.14.1 puts ata first at 603 ns, with the next entry at 1.77 times
   that. The same site puts ata last on the download page, at 64.9 KB gzipped, because the entry
-  it bundles is the runtime compiler; the module `ata build` emits for that schema is 3.9 KB
+  it bundles is the runtime compiler; the module `ata build` emits for that schema is 5.1 KB
   minified and gzipped, and a compiled entry for the harness is in preparation.
 - [Bowtie](https://bowtie.report/), the cross-implementation JSON Schema test harness. ata's
   harness runs Draft 2020-12 and draft 7 there; on the harness at ata 1.16.1 the official suite
@@ -71,17 +71,19 @@ file.
 
 | Dimension | Schema | ata-AOT | runtime validator | Difference |
 |---|---|---|---|---|
-| Bundle (gzipped) | simple | 1.0 KB | 52.7 KB | 50.5x smaller |
-| Bundle (gzipped) | complex | 4.8 KB | 52.7 KB | 11.0x smaller |
-| Bundle (gzipped) | nested | 2.3 KB | 52.7 KB | 23.1x smaller |
+| Bundle (gzipped) | simple | 1.1 KB | 52.7 KB | 48.1x smaller |
+| Bundle (gzipped) | complex | 7.6 KB | 52.7 KB | 7.0x smaller |
+| Bundle (gzipped) | nested | 4.1 KB | 52.7 KB | 13.0x smaller |
 | Cold start | simple | 21 ms | 40 ms | 1.9x faster |
-| Throughput (1M ops) | simple | 258 Mops/s | 102 Mops/s | 2.5x faster |
-| Compile time | simple | 8 µs | 1.61 ms | 191x faster |
+| Throughput (1M ops) | simple | 257 Mops/s | 114 Mops/s | 2.3x faster |
+| Compile time | simple | 14 µs | 1.52 ms | 111x faster |
 
 The runtime column is the default validator most frameworks ship. Reproduce on your machine
-with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-08-13. Across three runs throughput moved between 258 and 278
-Mops/s and the compile ratio between 150x and 199x, so treat the last two rows as an order
-of magnitude rather than a constant.
+with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-09-17,
+on ata-validator 1.25.0, whose emitted modules carry full error detail and a schema hash, which
+is where the growth over earlier 1.x module sizes comes from. Across three runs throughput moved
+between 257 and 297 Mops/s and the compile ratio between 104x and 112x, so treat the last two
+rows as an order of magnitude rather than a constant.
 
 The wins are largest on bundle size and compile time because AOT moves work from runtime to
 build time. Throughput and cold start are also faster because the compiled validator is a
@@ -209,19 +211,19 @@ is the most common way to get a misleading number out of this library.
 
 | | compiled with `ata build` | runtime `new Validator(schema)` |
 |---|---|---|
-| In a bundle, gzipped | **1.9 KB** | 75.6 KB |
-| Time to a served request | **3.5 ms** | 10.7 ms |
+| In a bundle, gzipped | **4.5 KB** | 87.0 KB |
+| Time to a served request | **3.4 ms** | 10.6 ms |
 | Schema known when | build time | any time |
 
 The bundle row is a ten-field user schema built with
 `bun build --minify --target=browser`. The startup row is a Hono route on Bun 1.4, best
-of seven, against 3.6 ms for the same app doing no validation at all, so the compiled
+of seven, against 3.7 ms for the same app doing no validation at all, so the compiled
 path costs nothing measurable to start. The runtime
 figure is what it is because a schema that arrives at run time can use any keyword, so
 the whole engine has to be there. The compiled module imports nothing and contains only
 the checks your schema asks for.
 
-**On a server, use whichever fits your schemas.** 76 KB of JavaScript on a Node or Bun
+**On a server, use whichever fits your schemas.** 87 KB of JavaScript on a Node or Bun
 process is not a cost anyone notices, and the runtime API is the simpler thing to reach
 for. Speed is the same either way once warm.
 
@@ -450,7 +452,7 @@ const v = new Validator(schema, {
 
 ### Build-time compile (`ata compile`)
 
-The `ata` CLI turns a JSON Schema file into a self-contained JavaScript module. No runtime dependency on `ata-validator`, so only the generated validator ships to the browser. Typical output is about 2 KB gzipped for a ten-field schema, against 74 KB for the runtime bundled for the browser.
+The `ata` CLI turns a JSON Schema file into a self-contained JavaScript module. No runtime dependency on `ata-validator`, so only the generated validator ships to the browser. Typical output is about 4.5 KB gzipped for a ten-field schema, full error detail included, against 87 KB for the runtime bundled for the browser.
 
 ```bash
 npx ata compile schemas/user.json -o src/generated/user.validator.mjs
