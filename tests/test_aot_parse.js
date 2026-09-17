@@ -476,6 +476,38 @@ const compile = (schema) => {
   }
 }
 
+// 18. prototype-named keys and parse(). A schema that declares a property
+// with an Object.prototype name (constructor, toString) routes to the
+// interpreter and gets no standalone module at all, so those names cannot
+// reach the emitted clone; the emitter still writes them defensively with
+// computed keys, Object.hasOwn and defineProperty in case that routing ever
+// narrows. What IS reachable is a record: the keys come from the input, and
+// JSON.parse can hand the loop an own key named "__proto__". Assignment
+// would rewrite the output's prototype instead of creating the property.
+{
+  const named = toStandaloneModule(
+    new Validator({ type: 'object', properties: { a: { type: 'number' }, toString: { type: 'string' } }, required: ['a'] }),
+    { format: 'cjs', parse: true },
+  )
+  check('a prototype-named property routes off codegen, no module', named === null)
+
+  const schema = {
+    type: 'object',
+    additionalProperties: { type: 'object', properties: { v: { type: 'number' } }, required: ['v'] },
+  }
+  const m = compile(schema)
+  if (m && typeof m.parse === 'function') {
+    const input = JSON.parse('{"__proto__": {"v": 1, "junk": 2}, "plain": {"v": 3}}')
+    const out = m.parse(input)
+    check('record keeps an own __proto__ key as an own key',
+      Object.hasOwn(out, '__proto__') && out['__proto__'].v === 1 && !('junk' in out['__proto__']))
+    check('record output prototype is untouched', Object.getPrototypeOf(out) === Object.prototype)
+    check('object prototype is untouched', !Object.hasOwn(Object.prototype, 'v'))
+  } else {
+    check('record module exists for the __proto__ input test', false)
+  }
+}
+
 fs.rmSync(dir, { recursive: true, force: true })
 if (failed) process.exit(1)
 console.log('aot parse: strips, defaults, composed shapes under the subset proof; declines where it cannot prove the copy')

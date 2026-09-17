@@ -30,6 +30,23 @@ function buildDefaultsApplier(schema) {
   };
 }
 
+// Write an own property. Plain assignment of a key named `__proto__` does
+// not create a property at all: it hits the Object.prototype setter and
+// rewrites the object's prototype, which is how a schema could reach
+// Object.prototype itself. defineProperty has no such special case.
+function setOwn(obj, key, val) {
+  if (key === "__proto__") {
+    Object.defineProperty(obj, key, {
+      value: val,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  } else {
+    obj[key] = val;
+  }
+}
+
 function collectDefaults(schema, actions, path) {
   if (typeof schema !== "object" || schema === null) return;
   const props = schema.properties;
@@ -40,10 +57,11 @@ function collectDefaults(schema, actions, path) {
       if (!path) {
         actions.push((data) => {
           if (typeof data === "object" && data !== null && !Object.hasOwn(data, key)) {
-            data[key] =
+            setOwn(data,
+              key,
               typeof defaultVal === "object" && defaultVal !== null
                 ? JSON.parse(JSON.stringify(defaultVal))
-                : defaultVal;
+                : defaultVal);
           }
         });
       } else {
@@ -52,6 +70,11 @@ function collectDefaults(schema, actions, path) {
           let target = data;
           for (let j = 0; j < parentPath.length; j++) {
             if (typeof target !== "object" || target === null) return;
+            // Own keys only. `target[key]` for an inherited name walks the
+            // prototype chain: a parent named `__proto__` that the instance
+            // does not carry resolved to Object.prototype, and the child
+            // defaults were written onto it, for every object in the realm.
+            if (!Object.hasOwn(target, parentPath[j])) return;
             target = target[parentPath[j]];
           }
           if (
@@ -59,10 +82,11 @@ function collectDefaults(schema, actions, path) {
             target !== null &&
             !Object.hasOwn(target, key)
           ) {
-            target[key] =
+            setOwn(target,
+              key,
               typeof defaultVal === "object" && defaultVal !== null
                 ? JSON.parse(JSON.stringify(defaultVal))
-                : defaultVal;
+                : defaultVal);
           }
         });
       }
@@ -263,6 +287,10 @@ function buildPreprocessCodegen(schema, options) {
   if (options.coerceTypes) {
     for (const [key, prop] of Object.entries(props)) {
       if (!prop || typeof prop !== 'object' || !prop.type) continue;
+      // Coercion writes with plain assignment, which for a key named
+      // __proto__ rewrites the prototype instead. The raw value still goes
+      // through validation, so skipping is a refusal to coerce, not a hole.
+      if (key === '__proto__') continue;
       const t = Array.isArray(prop.type) ? null : prop.type;
       if (!t) continue;
       const k = JSON.stringify(key);
@@ -289,7 +317,11 @@ function buildPreprocessCodegen(schema, options) {
       if (prop && typeof prop === 'object' && prop.default !== undefined) {
         const k = JSON.stringify(key);
         const def = JSON.stringify(prop.default);
-        lines.push(`if(!Object.hasOwn(d,${k}))d[${k}]=${def}`);
+        // Assignment to a key named __proto__ hits the prototype setter
+        // instead of creating a property; defineProperty writes an own key.
+        lines.push(key === '__proto__'
+          ? `if(!Object.hasOwn(d,${k}))Object.defineProperty(d,${k},{value:${def},writable:true,enumerable:true,configurable:true})`
+          : `if(!Object.hasOwn(d,${k}))d[${k}]=${def}`);
       }
     }
   }

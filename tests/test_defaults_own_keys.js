@@ -34,30 +34,65 @@ const proto = JSON.parse(
   '{"type":"object","properties":{"__proto__":{"type":"object","default":{},"properties":{"polluted":{"type":"boolean","default":true}}}}}'
 )
 
-for (const engine of ['auto', 'interpreter']) {
-  ok(`${engine}: a property named constructor receives its default`, () => {
-    const v = new Validator(ctor, { engine, useDefaults: true })
-    const data = {}
-    assert.strictEqual(v.validate(data).valid, true)
-    assert.strictEqual(data.constructor, 'x')
-    assert.strictEqual(Object.hasOwn(data, 'constructor'), true)
-  })
+// a `__proto__` in properties with no default of its own: the applier used
+// to walk data.__proto__ (Object.prototype) as the parent and write the
+// child default there. The worst shape, because nothing needs to be present
+// in the input at all.
+const protoNoParentDefault = JSON.parse(
+  '{"type":"object","properties":{"__proto__":{"type":"object","properties":{"polluted_walk":{"type":"boolean","default":true}}}}}'
+)
 
-  ok(`${engine}: a default under __proto__ never lands on Object.prototype`, () => {
-    const v = new Validator(proto, { engine, useDefaults: true })
-    v.validate({})
-    assert.strictEqual(Object.hasOwn(Object.prototype, 'polluted'), false)
-    assert.strictEqual(({}).polluted, undefined)
-  })
-}
-
-// the interpreter's applier walks nested properties; the parent it walks is
-// an own key too
-ok('interpreter: a nested property named constructor receives its default', () => {
-  const v = new Validator(ctor, { engine: 'interpreter', useDefaults: true })
+ok('a property named constructor receives its default', () => {
+  const v = new Validator(ctor, { useDefaults: true })
   const data = {}
   assert.strictEqual(v.validate(data).valid, true)
-  assert.deepStrictEqual(Object.entries(data), [['constructor', 'x'], ['nested', { constructor: 'y' }]])
+  assert.strictEqual(data.constructor, 'x')
+  assert.strictEqual(Object.hasOwn(data, 'constructor'), true)
 })
+
+ok('a default under __proto__ never lands on Object.prototype', () => {
+  const v = new Validator(proto, { useDefaults: true })
+  const data = {}
+  v.validate(data)
+  assert.strictEqual(Object.hasOwn(Object.prototype, 'polluted'), false)
+  assert.strictEqual(({}).polluted, undefined)
+  // and the instance's own prototype was not rewritten by the parent fill
+  assert.strictEqual(Object.getPrototypeOf(data), Object.prototype)
+})
+
+ok('a __proto__ parent the instance does not carry is not walked', () => {
+  const v = new Validator(protoNoParentDefault, { useDefaults: true })
+  v.validate({})
+  assert.strictEqual(Object.hasOwn(Object.prototype, 'polluted_walk'), false)
+  assert.strictEqual(({}).polluted_walk, undefined)
+})
+
+// The interpreted engine applies defaults through the closure mutators.
+// There is no per-validator switch on this tree, so the engine is selected
+// the way a CSP page selects it: in a child process with code generation
+// blocked. An infinite loop or a pollution there must not take this test
+// down with it, hence the subprocess.
+{
+  const { execFileSync } = require('node:child_process')
+  const script = `
+    const assert = require('assert')
+    const { Validator } = require(${JSON.stringify(require.resolve('../index.js'))})
+    const ctor = ${JSON.stringify(ctor)}
+    const proto = JSON.parse('{"type":"object","properties":{"__proto__":{"type":"object","default":{},"properties":{"polluted":{"type":"boolean","default":true}}}}}')
+    const walk = JSON.parse('{"type":"object","properties":{"__proto__":{"type":"object","properties":{"polluted_walk":{"type":"boolean","default":true}}}}}')
+    const data = {}
+    assert.strictEqual(new Validator(ctor, { useDefaults: true }).validate(data).valid, true)
+    assert.deepStrictEqual(Object.entries(data), [['constructor', 'x'], ['nested', { constructor: 'y' }]])
+    new Validator(proto, { useDefaults: true }).validate({})
+    new Validator(walk, { useDefaults: true }).validate({})
+    assert.strictEqual(Object.hasOwn(Object.prototype, 'polluted'), false)
+    assert.strictEqual(Object.hasOwn(Object.prototype, 'polluted_walk'), false)
+    console.log('child ok')
+  `
+  const out = execFileSync(process.execPath, ['--disallow-code-generation-from-strings', '-e', script], { encoding: 'utf8' })
+  assert.ok(out.includes('child ok'))
+  pass++
+  console.log('  PASS  interpreter (codegen blocked): own-key defaults, nested fill, no pollution')
+}
 
 console.log(`\n${pass} passed`)
