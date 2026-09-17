@@ -9,11 +9,14 @@
 // O(input) and keeps one hidden class. And it leaves the caller's object
 // alone, which removeAdditional cannot do.
 //
-// It is emitted only where the rebuild is provably exact. Anything that makes
-// the allowed key set someone else's decision ($ref, composition,
-// patternProperties, an additionalProperties schema) gets no parse() at all,
-// because a sanitiser that silently drops an allowed property is worse than
-// one that does not exist.
+// It is emitted only where the rebuild is provably exact. A local, acyclic
+// $ref made of nothing but the reference and annotations is inlined first,
+// so generated schemas ($defs + $ref) qualify. Anything else that makes the
+// allowed key set someone else's decision (a cyclic or external $ref, a $ref
+// with constraining siblings, patternProperties, an additionalProperties
+// schema) gets no parse() at all, because a sanitiser that silently drops an
+// allowed property is worse than one that does not exist. And since 1.26.0
+// the decline is loud: onWarning fires and the module carries a NOTE.
 
 const { Validator } = require('..')
 const { toStandaloneModule } = require('../lib/aot.js')
@@ -138,11 +141,11 @@ const compile = (schema) => {
 // 5. shapes where the clone cannot be proven exact get no parse()
 {
   const cases = [
-    ['$ref', { $defs: { n: { type: 'object', properties: { x: { type: 'number' } } } }, type: 'object', properties: { a: { $ref: '#/$defs/n' } }, required: ['a'] }],
+    ['cyclic $ref', { $defs: { n: { type: 'object', properties: { next: { $ref: '#/$defs/n' } } } }, type: 'object', properties: { a: { $ref: '#/$defs/n' } }, required: ['a'] }],
     ['allOf', { allOf: [{ type: 'object', properties: { a: { type: 'number' } } }] }],
     ['patternProperties', { type: 'object', properties: { a: { type: 'number' } }, patternProperties: { '^x': { type: 'number' } } }],
     ['additionalProperties schema', { type: 'object', properties: { a: { type: 'number' } }, additionalProperties: { type: 'string' } }],
-    ['nested $ref', { $defs: { n: { type: 'object', properties: { x: { type: 'number' } } } }, type: 'object', properties: { nested: { type: 'object', properties: { deep: { $ref: '#/$defs/n' } }, required: ['deep'] } }, required: ['nested'] }],
+    ['$ref with a constraining sibling', { $defs: { n: { type: 'object', properties: { x: { type: 'number' } } } }, type: 'object', properties: { a: { $ref: '#/$defs/n', minProperties: 1 } } }],
   ]
   for (const [name, schema] of cases) {
     const m = compile(schema)
@@ -237,6 +240,133 @@ const compile = (schema) => {
   check('isValid still works', m.isValid({ a: 1 }) === true && m.isValid({}) === false)
   const r = m.validate({})
   check('validate still reports', r.valid === false && r.errors.length > 0)
+}
+
+// 11. a bare local $ref is inlined, so generated schemas ($defs + $ref) get
+// parse() instead of a silent decline. Defaults follow the runtime exactly:
+// a default written next to the $ref fills, a default written inside the
+// referenced definition does not, because validate() with useDefaults draws
+// the same line and parse() must not be more generous than validate().
+{
+  const schema = {
+    type: 'object',
+    $defs: {
+      address: {
+        type: 'object',
+        properties: {
+          city: { type: 'string' },
+          country: { type: 'string', default: 'TR' },
+        },
+        required: ['city'],
+      },
+    },
+    properties: {
+      name: { type: 'string' },
+      home: { $ref: '#/$defs/address' },
+    },
+    required: ['name'],
+  }
+  const m = compile(schema)
+  check('local $ref gets parse', m && typeof m.parse === 'function')
+  if (m && typeof m.parse === 'function') {
+    const input = { name: 'a', extra: 1, home: { city: 'x', junk: 2 } }
+    const out = m.parse(input)
+    check('ref target strips unknown keys', out.home && out.home.city === 'x' && !('junk' in out.home) && !('extra' in out))
+    check('inner default does not fill, same as the runtime', !('country' in out.home))
+    const r = new Validator(schema).validate({ name: 'a', home: { city: 'x' } })
+    const p = m.parse({ name: 'a', home: { city: 'x' } })
+    check('parse output equals runtime validate().data', JSON.stringify(p) === JSON.stringify(r.data))
+  }
+}
+
+// 12. a chain of local refs resolves through each hop
+{
+  const schema = {
+    type: 'object',
+    $defs: {
+      leaf: { type: 'object', properties: { v: { type: 'number' } }, required: ['v'] },
+      mid: { type: 'object', properties: { leaf: { $ref: '#/$defs/leaf' } }, required: ['leaf'] },
+    },
+    properties: { top: { $ref: '#/$defs/mid' } },
+    required: ['top'],
+  }
+  const m = compile(schema)
+  check('ref chain gets parse', m && typeof m.parse === 'function')
+  if (m && typeof m.parse === 'function') {
+    const out = m.parse({ top: { leaf: { v: 1, x: 2 }, y: 3 } })
+    check('ref chain strips at every hop', out.top.leaf.v === 1 && !('x' in out.top.leaf) && !('y' in out.top))
+  }
+}
+
+// 13. a cyclic local $ref cannot be inlined: no parse, and the decline is
+// loud through onWarning instead of only visible in the export list.
+{
+  const schema = {
+    type: 'object',
+    $defs: { node: { type: 'object', properties: { next: { $ref: '#/$defs/node' }, v: { type: 'number' } } } },
+    properties: { root: { $ref: '#/$defs/node' } },
+  }
+  const warned = []
+  const src = toStandaloneModule(new Validator(schema), {
+    format: 'cjs', parse: true, onWarning: (w) => warned.push(w),
+  })
+  check('cyclic ref gets no parse', !/_ataParse/.test(src))
+  check('cyclic ref decline warns', warned.length === 1 && /parse/.test(warned[0]))
+}
+
+// 14. a $ref with a non-annotation sibling stays un-inlined. That shape is
+// interpreter-only today, so the whole module is declined (null), which the
+// build layer already reports; there is no quiet module missing its parse.
+{
+  const schema = {
+    type: 'object',
+    $defs: { a: { type: 'object', properties: { v: { type: 'number' } } } },
+    properties: { p: { $ref: '#/$defs/a', minProperties: 1 } },
+  }
+  const src = toStandaloneModule(new Validator(schema), { format: 'cjs', parse: true })
+  check('constraining sibling of $ref declines the module, not just parse', src === null)
+}
+
+// 15. the declines that already existed are loud now too
+{
+  const warned = []
+  toStandaloneModule(new Validator({ type: 'object', properties: { a: { type: 'number' } }, patternProperties: { '^x': { type: 'number' } } }), {
+    format: 'cjs', parse: true, onWarning: (w) => warned.push(w),
+  })
+  check('patternProperties decline warns', warned.length === 1 && /parse/.test(warned[0]))
+}
+
+// 16. no warning when parse is generated, and none when parse was not asked for
+{
+  const quiet = []
+  toStandaloneModule(new Validator({ type: 'object', properties: { a: { type: 'number' } }, required: ['a'] }), {
+    format: 'cjs', parse: true, onWarning: (w) => quiet.push(w),
+  })
+  check('a generated parse does not warn', quiet.length === 0)
+  const unasked = []
+  toStandaloneModule(new Validator({ type: 'object', $defs: { n: { type: 'object' } }, properties: { p: { $ref: '#/$defs/n' } } }), {
+    format: 'cjs', onWarning: (w) => unasked.push(w),
+  })
+  check('no parse request, no parse warning', unasked.every((w) => !/parse\(\)/.test(w)))
+}
+
+// 17. parse through an inlined ref stays exactly as strict as validate
+{
+  const schema = {
+    type: 'object',
+    $defs: { item: { type: 'object', properties: { v: { type: 'number' } }, required: ['v'] } },
+    properties: { it: { $ref: '#/$defs/item' } },
+    required: ['it'],
+  }
+  const m = compile(schema)
+  if (m && typeof m.parse === 'function') {
+    let threw = false
+    try { m.parse({ it: {} }) } catch (e) { threw = e.name === 'AtaValidationError' }
+    check('inlined ref parse still throws on invalid', threw)
+    check('inlined ref verdict agrees with runtime', m.isValid({ it: { v: 1 } }) === true && m.isValid({ it: {} }) === false)
+  } else {
+    check('inlined ref parse exists for strictness test', false)
+  }
 }
 
 fs.rmSync(dir, { recursive: true, force: true })

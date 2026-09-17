@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- `toStandaloneModule(schema, { parse: true })` inlines local, acyclic `$ref`s before the clone proof runs, so schemas that keep their shapes in `$defs` and reference them, which is every schema a generator emits, now get a `parse()`. Only a node that is exactly a `$ref` plus annotations is inlined; a cycle, an external reference or a constraining sibling keyword leaves the reference in place and the clone declines as before. Defaults follow the runtime exactly: a `default` written next to the `$ref` fills, a `default` written inside the referenced definition does not, because `validate()` with `useDefaults` draws the same line and `parse()` must not be more generous than `validate()`. A new test holds `parse()` output equal to the runtime's `validate().data` on the same input.
+- When `parse: true` is requested and the clone still cannot be proven, the decline is loud: `onWarning` fires with the reason, and the emitted module carries a NOTE comment saying it has no `parse` export. Previously the only way to notice was reading the export list.
+
+### Fixed
+
+- The runtime compiler built `patternProperties` (and combined `additionalProperties`) child validators with `new Function`, which discarded the parent's helper scope: a child schema that needed a compiled pattern or format helper threw `ReferenceError` at validation time. Child checks are now generated inline in the parent validator and share its helper bindings. Reported and fixed by @jdalton in #46.
+- The TypeScript declarations emitted next to a compiled module now declare the `schemaHash` export; 1.25.0 added it to every module but not to the generated `.d.mts`, so importing it by name failed type checking while working at runtime.
+
 ## 1.25.0 - 2026-09-17
 
 ### Fixed
