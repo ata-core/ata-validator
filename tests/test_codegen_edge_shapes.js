@@ -109,6 +109,10 @@ checkShape('patternProperties with boolean values', { patternProperties: { '^f':
   [{ bar: 1 }, false],
   [{ zap: 1 }, true],
 ]);
+checkShape('patternProperties value with a pattern', { patternProperties: { '^x': { type: 'string', pattern: '^https?://[^/\\s]+' } } }, [
+  [{ x: 'https://example.com' }, true],
+  [{ x: 'not-a-url' }, false],
+]);
 checkShape('dependentSchemas with boolean values', { dependentSchemas: { foo: true, bar: false } }, [
   [{ foo: 1 }, true],
   [{ bar: 1 }, false],
@@ -159,6 +163,10 @@ checkShape('additionalProperties schema with patternProperties', { properties: {
   [{ a: 1, x1: 2, other: 's' }, true],
   [{ other: 1 }, false],
   [{ x1: 's' }, false],
+]);
+checkShape('additionalProperties pattern with patternProperties', { patternProperties: { '^x': { type: 'number' } }, additionalProperties: { type: 'string', pattern: '^https?://[^/\\s]+' } }, [
+  [{ x: 1, other: 'https://example.com' }, true],
+  [{ other: 'not-a-url' }, false],
 ]);
 
 // Two patterns with additionalProperties: false. A key matching only the
