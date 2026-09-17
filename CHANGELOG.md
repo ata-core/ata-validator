@@ -2,6 +2,17 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- `parse()` is now emitted for the record shape: `additionalProperties` as a schema, which is what `z.record` and every generator's map type compile to, with or without declared `properties` beside it. The key set is open by declaration, so keeping every key is exact, and every undeclared value is rebuilt against the one schema that governs it, stripping unknown keys inside it the same way a declared property's rebuild would. Defaults under a record value are not filled, because the runtime's `useDefaults` does not fill them there and `parse()` output stays equal to `validate().data`. Still declined, loudly: `additionalProperties: true` (the value is unconstrained, and this pass only copies what it can prove), applicators next to a record (a branch could constrain some keys' values beyond the record schema), and `patternProperties` (a key matching several patterns must satisfy all of them at once, which the rebuild cannot pick a shape for).
+- `onWarning` now receives a second argument, `{ kind }`, naming which capability degraded: `'error-detail'` or `'parse'`. A build that requested both can tell the warnings apart instead of treating any warning as degraded errors. `build()` result warnings carry the same `kind` field. Existing single-argument callbacks keep working unchanged.
+
+### Fixed
+
+- Two more fixed-name collisions in the generated-code path, the same family as the `patternProperties` helper-scope bug in 1.26.0: a record whose values are themselves records (`additionalProperties` nested in itself) generated an inner loop that redeclared the outer loop's variables and threw `ReferenceError: Cannot access '_av' before initialization` at validation time, and `patternProperties` inside a `patternProperties` value schema had the same collision on its own loop variables. All three loop names now carry a unique suffix. The combined error generator already did this; the boolean generator now matches it.
+
 ## 1.26.0 - 2026-09-17
 
 ### Added

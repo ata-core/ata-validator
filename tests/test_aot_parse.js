@@ -144,7 +144,8 @@ const compile = (schema) => {
     ['cyclic $ref', { $defs: { n: { type: 'object', properties: { next: { $ref: '#/$defs/n' } } } }, type: 'object', properties: { a: { $ref: '#/$defs/n' } }, required: ['a'] }],
     ['allOf', { allOf: [{ type: 'object', properties: { a: { type: 'number' } } }] }],
     ['patternProperties', { type: 'object', properties: { a: { type: 'number' } }, patternProperties: { '^x': { type: 'number' } } }],
-    ['additionalProperties schema', { type: 'object', properties: { a: { type: 'number' } }, additionalProperties: { type: 'string' } }],
+    ['additionalProperties true', { type: 'object', properties: { a: { type: 'number' } }, additionalProperties: true }],
+    ['an applicator next to a record', { type: 'object', additionalProperties: { type: 'string' }, allOf: [{ type: 'object' }] }],
     ['$ref with a constraining sibling', { $defs: { n: { type: 'object', properties: { x: { type: 'number' } } } }, type: 'object', properties: { a: { $ref: '#/$defs/n', minProperties: 1 } } }],
   ]
   for (const [name, schema] of cases) {
@@ -348,6 +349,112 @@ const compile = (schema) => {
     format: 'cjs', onWarning: (w) => unasked.push(w),
   })
   check('no parse request, no parse warning', unasked.every((w) => !/parse\(\)/.test(w)))
+}
+
+// 17a. z.record: additionalProperties as a schema is provable. Every key is
+// allowed, every value is rebuilt against that one schema, so the map shape
+// generators emit gets a parse() instead of a decline.
+{
+  const schema = {
+    type: 'object',
+    additionalProperties: {
+      type: 'object',
+      properties: { include: { type: 'array', items: { type: 'string' } }, note: { type: 'string', default: 'none' } },
+      required: ['include'],
+    },
+  }
+  const m = compile(schema)
+  check('record gets parse', m && typeof m.parse === 'function')
+  if (m && typeof m.parse === 'function') {
+    const input = { us: { include: ['a'], junk: 1 }, eu: { include: [] } }
+    const out = m.parse(input)
+    check('record keeps every key', 'us' in out && 'eu' in out)
+    check('record strips inside values', !('junk' in out.us))
+    // The runtime's useDefaults does not fill defaults under a record value,
+    // and parse() mirrors the runtime exactly rather than improving on it.
+    check('record does not fill value defaults, same as the runtime', !('note' in out.us) && !('note' in out.eu))
+    check('record leaves the input alone', input.us.junk === 1)
+    const r = new Validator(schema).validate({ us: { include: ['a'] } })
+    check('record parse equals runtime validate().data', JSON.stringify(m.parse({ us: { include: ['a'] } })) === JSON.stringify(r.data))
+  }
+}
+
+// 17b. declared properties and a record part on the same node
+{
+  const schema = {
+    type: 'object',
+    properties: { version: { type: 'number' } },
+    required: ['version'],
+    additionalProperties: { type: 'object', properties: { v: { type: 'number' } }, required: ['v'] },
+  }
+  const m = compile(schema)
+  check('mixed record gets parse', m && typeof m.parse === 'function')
+  if (m && typeof m.parse === 'function') {
+    const out = m.parse({ version: 1, flagA: { v: 2, x: 3 } })
+    check('mixed record: declared key kept', out.version === 1)
+    check('mixed record: extra key kept, value stripped', out.flagA && out.flagA.v === 2 && !('x' in out.flagA))
+  }
+}
+
+// 17c. a record of records recurses
+{
+  const schema = {
+    type: 'object',
+    additionalProperties: {
+      type: 'object',
+      additionalProperties: { type: 'object', properties: { v: { type: 'number' } }, required: ['v'] },
+    },
+  }
+  const m = compile(schema)
+  check('record of records gets parse', m && typeof m.parse === 'function')
+  if (m && typeof m.parse === 'function') {
+    const out = m.parse({ a: { b: { v: 1, x: 2 } } })
+    check('record of records strips at the leaf', out.a.b.v === 1 && !('x' in out.a.b))
+  }
+}
+
+// 17d. the gateway shape: a $ref to a record, both passes composed
+{
+  const schema = {
+    type: 'object',
+    $defs: {
+      match: {
+        type: 'object',
+        additionalProperties: { type: 'object', properties: { include: { type: 'array', items: { type: 'string' } } }, required: ['include'] },
+      },
+    },
+    properties: { match: { $ref: '#/$defs/match' } },
+    required: ['match'],
+  }
+  const m = compile(schema)
+  check('ref to a record gets parse', m && typeof m.parse === 'function')
+  if (m && typeof m.parse === 'function') {
+    const out = m.parse({ match: { any: { include: ['x'], junk: 1 } }, extra: 2 })
+    check('ref-record strips around and inside', !('extra' in out) && out.match.any.include[0] === 'x' && !('junk' in out.match.any))
+  }
+}
+
+// 17e. additionalProperties: true stays declined, loudly: an unconstrained
+// value can be anything, and this pass only copies what it can name.
+{
+  const warned = []
+  const src = toStandaloneModule(new Validator({ type: 'object', properties: { a: { type: 'number' } }, additionalProperties: true }), {
+    format: 'cjs', parse: true, onWarning: (w, meta) => warned.push([w, meta]),
+  })
+  check('AP true gets no parse', !/_ataParse/.test(src))
+  check('AP true decline warns', warned.length === 1)
+}
+
+// 17f. warnings are distinguishable: a parse decline says so in meta.kind,
+// so a build that asked for parse does not mistake it for degraded errors.
+{
+  const kinds = []
+  toStandaloneModule(new Validator({
+    type: 'object',
+    $defs: { node: { type: 'object', properties: { next: { $ref: '#/$defs/node' } } } },
+    properties: { root: { $ref: '#/$defs/node' } },
+  }), { format: 'cjs', parse: true, onWarning: (w, meta) => kinds.push(meta && meta.kind) })
+  check('parse decline carries kind parse', kinds.length === 1 && kinds[0] === 'parse')
 }
 
 // 17. parse through an inlined ref stays exactly as strict as validate

@@ -109,6 +109,26 @@ checkShape('patternProperties with boolean values', { patternProperties: { '^f':
   [{ bar: 1 }, false],
   [{ zap: 1 }, true],
 ]);
+checkShape('a record of records (additionalProperties nested in itself)', {
+  type: 'object',
+  additionalProperties: { type: 'object', additionalProperties: { type: 'object', properties: { v: { type: 'number' } }, required: ['v'] } },
+}, [
+  [{ a: { b: { v: 1 } } }, true],
+  [{ a: { b: {} } }, false],
+]);
+checkShape('patternProperties value with its own patternProperties', {
+  patternProperties: { '^x': { type: 'object', patternProperties: { '^y': { type: 'number' } } } },
+}, [
+  [{ x1: { y1: 1 } }, true],
+  [{ x1: { y1: 'no' } }, false],
+]);
+checkShape('patternProperties whose additionalProperties value holds a record', {
+  patternProperties: { '^p': { type: 'number' } },
+  additionalProperties: { type: 'object', additionalProperties: { type: 'number' } },
+}, [
+  [{ p1: 1, other: { k: 2 } }, true],
+  [{ p1: 1, other: { k: 'no' } }, false],
+]);
 checkShape('patternProperties value with a pattern', { patternProperties: { '^x': { type: 'string', pattern: '^https?://[^/\\s]+' } } }, [
   [{ x: 'https://example.com' }, true],
   [{ x: 'not-a-url' }, false],
