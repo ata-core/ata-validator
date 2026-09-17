@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.52",
-    "ata-validator": "^1.22.0",
+    "ata-validator": "^1.25.0",
     "hono": "^4.13.7",
     "valibot": "^1.5.0",
     "zod": "^4.6.5"
