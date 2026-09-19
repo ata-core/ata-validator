@@ -896,6 +896,18 @@ class Validator {
     this._rawIsCallers = typeof schema !== "string";
     this._options = options;
     this._noOpts = !opts;
+    // engine: 'interpreter' keeps this validator off code generation: no
+    // `new Function`, no shared compile cache, the eval-free interpreted
+    // engine answers validate(), isValidObject() and validateJSON(). For a
+    // schema that arrives from outside the trust boundary (a plugin's
+    // declared config shape, a tenant's upload), where turning it into source
+    // is not an acceptable execution model. ATA_FORCE_NAPI does this for the
+    // whole process; the option does it for one validator. A misspelling
+    // must not fall through to codegen, so anything else is refused.
+    if (options.engine !== undefined && options.engine !== 'auto' && options.engine !== 'interpreter') {
+      throw new TypeError("engine must be 'auto' or 'interpreter', got " + JSON.stringify(options.engine));
+    }
+    this._interpretOnly = options.engine === 'interpreter';
     this._initialized = false;
     this._nativeReady = false;
     this._compiled = null;
@@ -1044,11 +1056,14 @@ class Validator {
     // Check cache first -- reuse compiled functions for same schema
     const sm = this._schemaMap.size > 0 ? this._schemaMap : null;
     const mapKey = compileCacheKey(this._schemaStr, this._schemaMap);
+    var _forceNapi = this._interpretOnly || (typeof process !== 'undefined' && process.env && process.env.ATA_FORCE_NAPI);
     // Custom formats are JS functions: bypass the compile cache since they can
-    // differ between validators that share the same schema string.
-    const cached = (this._userFormats || this._usesKeywords) ? null : _compileCache.get(mapKey);
+    // differ between validators that share the same schema string. An
+    // interpreter-only validator never touches it either way: a function a
+    // trusted validator compiled for the same schema string must not answer
+    // for it.
+    const cached = (this._userFormats || this._usesKeywords || _forceNapi) ? null : _compileCache.get(mapKey);
     let jsFn, jsCombinedFn, jsErrFn, _isCodegen = false;
-    var _forceNapi = typeof process !== 'undefined' && process.env && process.env.ATA_FORCE_NAPI;
     // v1 removes the bookending requirement for $dynamicRef. Only the
     // interpreted engine implements that; the JS compiler and the native
     // engine both resolve the 2020-12 way, so a v1 schema using the keyword
@@ -1063,15 +1078,16 @@ class Validator {
     // either. The closure path does not call `new Function` itself, so it
     // survives the block and would quietly handle schemas it gets wrong; the
     // interpreted engine is both eval-free and more correct, so go straight
-    // there.
-    if (this._v1Dynamic || this._usesKeywords || !codegenAvailable()) {
+    // there. The forced case is decided before the probe: the probe is a
+    // `new Function` too, and a validator that promised none must not run it.
+    if (_forceNapi || this._v1Dynamic || this._usesKeywords || !codegenAvailable()) {
       jsFn = null; jsCombinedFn = null; jsErrFn = null;
     // `full` separates an entry that holds every compiled function from one
     // the verdict-only fast path seeded, where `combined` and `errFn` are null
     // because nothing has tried to build them yet. Both halves of that
     // distinction are null, and reading the second as the first costs this
     // schema its generated error function for the life of the process.
-    } else if (cached && cached.jsFn !== undefined && !_forceNapi) {
+    } else if (cached && cached.jsFn !== undefined) {
       // `full` says the error and combined functions exist too. An entry
       // without it still carries a verdict function worth reusing; the pair is
       // built by _buildDeferred below if something asks for an error, and the
@@ -1084,7 +1100,7 @@ class Validator {
       jsErrFn = cached.errFn;
       _isCodegen = !!cached.isCodegen;
       this._engine = _isCodegen ? 'codegen' : jsFn ? 'closure' : null;
-    } else if (!_forceNapi) {
+    } else {
       const uf = this._userFormats;
       const _cgFn = compileToJSCodegen(schemaObj, sm, uf);
       jsFn = _cgFn || compileToJS(schemaObj, null, sm);
@@ -1100,8 +1116,6 @@ class Validator {
       if (!uf) {
         _compileCache.set(mapKey, { jsFn, combined: undefined, errFn: undefined, isCodegen: _isCodegen, full: false });
       }
-    } else {
-      jsFn = null; jsCombinedFn = null; jsErrFn = null;
     }
     this._jsFn = jsFn;
     if (this._engine === undefined) this._engine = null;
@@ -1111,7 +1125,10 @@ class Validator {
     // shape (e.g. Fastify `params: { $ref: 'shared#' }` or property refs like
     // `{ id: { $ref: 'shared#/properties/id' } }`).
     const preprocessSchema = resolveSchemaForPreprocess(schemaObj, this._schemaMap);
-    let preprocess = buildPreprocessCodegen(preprocessSchema, options);
+    // The mutator pass (defaults, coercion, removal) is generated source too,
+    // with the schema's `default` values embedded; an interpreter-only
+    // validator takes the closure mutators instead.
+    let preprocess = this._interpretOnly ? null : buildPreprocessCodegen(preprocessSchema, options);
     if (!preprocess) {
       const applyDefaults = options.useDefaults === false ? null : buildDefaultsApplier(preprocessSchema);
       const applyCoerce = options.coerceTypes ? buildCoercer(preprocessSchema) : null;
@@ -1999,7 +2016,7 @@ class Validator {
       return;
     }
     this._ensureVocabularies();
-    if (typeof process !== 'undefined' && process.env && process.env.ATA_FORCE_NAPI) return;
+    if (this._interpretOnly || (typeof process !== 'undefined' && process.env && process.env.ATA_FORCE_NAPI)) return;
     if (!this._schemaStr) this._schemaStr = JSON.stringify(this._schemaObj);
     const sm = this._schemaMap.size > 0 ? this._schemaMap : null;
     const mapKey = compileCacheKey(this._schemaStr, this._schemaMap);

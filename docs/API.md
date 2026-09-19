@@ -36,6 +36,7 @@ new Validator(false).isValidObject(anything); // false
 | `coerceTypes` | boolean | false | Convert types in-place. `"42"` becomes `42` for integer fields. |
 | `removeAdditional` | boolean | false | Remove properties not defined in schema. |
 | `useDefaults` | boolean | true | Fill in `default` values on absent properties, in place, before validating. Set `false` to leave the input untouched. |
+| `engine` | `'auto'` \| `'interpreter'` | `'auto'` | `'interpreter'` keeps the schema off code generation: no `new Function`, no shared compile cache; the eval-free interpreted engine answers `validate()`, `isValidObject()` and `validateJSON()`. For a schema that arrives from outside the trust boundary. Any other value throws. |
 | `assertFormat` | boolean | true | Assert `format`. Set `false` to treat it as an annotation. |
 | `formats` | object | none | Custom format checkers, `{ name: (value) => boolean }`. See Supported Formats below. |
 | `keywords` | object | none | Custom keywords, `{ name: definition }`. A schema that uses one runs on the interpreted engine. See [custom-keywords.md](custom-keywords.md). |
@@ -131,7 +132,8 @@ the generator declines), `'interpreter'` (schemas the generator cannot
 represent, and every schema where `new Function` is blocked) or `'native'`
 (reserved; object validation no longer routes to the C++ engine). The verdict is
 the same on every engine; the cost is not. A diagnostic for startup logs and
-benchmarks, not a setting.
+benchmarks; the `engine` constructor option is the setting
+(`new Validator(schema, { engine: 'interpreter' })` answers `'interpreter'`).
 
 ```javascript
 new Validator({ type: 'object', properties: { id: { type: 'integer' } } }).engine(); // 'codegen'
