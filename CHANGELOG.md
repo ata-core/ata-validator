@@ -2,11 +2,15 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.28.0 - 2026-09-23
 
 ### Added
 
 - `engine: 'interpreter'`, a per-validator setting that keeps a schema off code generation: no `new Function`, no shared compile cache; the eval-free interpreted engine answers `validate()`, `isValidObject()` and `validateJSON()`. The default is the right trade for a schema the application wrote. A schema that arrives at runtime from a plugin or a tenant is input, and until now the only way to validate against one without executing source derived from it was the process-wide `ATA_FORCE_NAPI` switch. `engine()` reports `'interpreter'` for such a validator; any value other than `'auto'` or `'interpreter'` throws, so a misspelling cannot fall through to the generator. `tests/test_engine_option.js` holds the verdicts equal across engines and proves, with `Function` guarded, that the interpreter validator never builds a function from source while the default one does. Contributed by @d4tocchini in #43.
+
+### Changed
+
+- The position map behind `dataFrame` is built without per-node work, which makes an invalid document cheaper to report on. It used to record an entry for every node in the document: a JSON pointer rebuilt from a path array with `concat`, `map` and `join`, a binary search and an object allocation for the value and another pair for its key, and a `JSON.parse` of every string value whose result was then discarded. String values are now spanned and not decoded, a key decodes only when its token holds an escape or a raw control character, the pointer is carried down the walk instead of being rebuilt, and line and column are resolved at the end for the nodes that were recorded. On a 132 KB config with three errors the map went from 2800 to about 1040 microseconds, which is 19.8x down to 7.3x the cost of `JSON.parse` on the same text, and the whole `validateJSON` call went from 3673 to 1825 microseconds. Output is unchanged: 112661 fuzzed documents, random and truncated and CRLF and BOM-prefixed and byte-punched, map identically against the previous walker, field order and throws included, so a document that declined to map still declines. Standalone modules built with `{ positions: true }` embed this walk, so they carry the same improvement once rebuilt. `tests/test_position_map_cost.js` gates it as a ratio to `JSON.parse` rather than as a time, because the cost is what regressed.
 
 ## 1.27.1 - 2026-09-17
 

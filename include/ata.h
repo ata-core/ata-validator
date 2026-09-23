@@ -8,13 +8,13 @@
 #include <variant>
 #include <vector>
 
-#define ATA_VERSION "1.27.1"
+#define ATA_VERSION "1.28.0"
 
 namespace ata {
 
 inline constexpr uint32_t VERSION_MAJOR = 1;
-inline constexpr uint32_t VERSION_MINOR = 27;
-inline constexpr uint32_t VERSION_REVISION = 1;
+inline constexpr uint32_t VERSION_MINOR = 28;
+inline constexpr uint32_t VERSION_REVISION = 0;
 
 inline constexpr std::string_view version() noexcept {
   return ATA_VERSION;
