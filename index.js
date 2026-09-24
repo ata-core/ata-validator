@@ -1555,7 +1555,11 @@ class Validator {
         : jsonValidateInner;
       this.validateJSON = useSimdjsonForLarge && native && !preprocess
         ? (jsonStr) => {
-            if (jsonStr.length >= SIMDJSON_THRESHOLD) {
+            // `_skipNativeFast` is set by the scanner short-circuit below when it
+            // has already decided the document is invalid. The encode and the
+            // native call would run only to return false, and the error path
+            // underneath does not need them.
+            if (jsonStr.length >= SIMDJSON_THRESHOLD && this._skipNativeFast !== true) {
               this._ensureNative();
               const buf = Buffer.from(jsonStr);
               if (native.rawFastValidate(this._fastSlot, buf))
@@ -2004,8 +2008,23 @@ class Validator {
               };
           return self.isValidJSON(jsonStr);
         };
-        if (options.abortEarly) {
+        // validateJSON gets the same short-circuit isValidJSON has. The verdict is
+        // a property of the text, and the scanner reads the text once and
+        // allocates nothing; above the simdjson threshold the path underneath
+        // encoded the whole document to a Buffer and called the native validator
+        // instead, which measured 340 microseconds against the scanner's 191 on a
+        // 149 KB config, the same against the published addon as against a local
+        // build.
+        //
+        // An accepted document stops at the scanner. A rejected one still has to
+        // produce errors, so it goes on to the path below, which is the
+        // rich-errors wrapper and everything under it; the flag only tells that
+        // path to skip an encode and a native call that would return false. Doing
+        // it the other way, returning errors from the inner function directly,
+        // would hand back errors that never passed through enrichment.
+        {
           const validateByParsing = this.validateJSON;
+          const abortEarly = !!options.abortEarly;
           this.validateJSON = (jsonStr) => {
             const scan = self._ensureScanner();
             if (scan === undefined) return validateByParsing(jsonStr);
@@ -2014,7 +2033,15 @@ class Validator {
               if (typeof text === 'string') {
                 const r = scan(text);
                 if (r === 1) return VALID_RESULT;
-                if (r === 0) return ABORT_EARLY_RESULT;
+                if (r === 0) {
+                  if (abortEarly) return ABORT_EARLY_RESULT;
+                  self._skipNativeFast = true;
+                  try {
+                    return validateByParsing(text);
+                  } finally {
+                    self._skipNativeFast = false;
+                  }
+                }
               }
               return validateByParsing(text);
             };
