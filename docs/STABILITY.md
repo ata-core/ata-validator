@@ -44,7 +44,10 @@ the verdict for every document. The emitters decline or degrade loudly
 where they cannot prove equivalence, and the differential test that holds
 both engines to the same answers runs in every CI build. A compiled module
 also exports `schemaHash` so a build can detect that its artifact no longer
-matches the schema it came from.
+matches the schema it came from, and `ataVersion` so it can detect that the
+ata which wrote it is no longer the one installed. Both are needed: an
+upgrade with no schema change leaves the hash matching, so the hash on its
+own reads a module from an older ata as current.
 
 ## Platform support
 

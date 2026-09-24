@@ -263,18 +263,29 @@ property with a default (the runtime fills it before checking `required`),
 and a default the property's own schema rejects (the runtime catches it at
 validation).
 
-Every emitted module exports `schemaHash`, a 16 character content hash of
-the schema it was compiled from, over a canonical JSON form so key order
-does not matter. `schemaHash(schema)` from `ata-validator/build` computes
-the same value, so a build can detect a stale artifact by comparing the two
-instead of embedding its own fingerprint. It is an integrity aid, not a
-security boundary.
+An artifact goes stale two ways, and an emitted module carries a fact for
+each. `schemaHash` is a 16 character content hash of the schema it was
+compiled from, over a canonical JSON form so key order does not matter;
+`schemaHash(schema)` from `ata-validator/build` computes the same value, so
+a build can tell the schema has changed without embedding its own
+fingerprint. `ataVersion` is the version of ata that wrote the module, so a
+build can tell that ata has changed. Check both. A module keeps validating
+its own schema correctly after an ata upgrade, which is why the schema hash
+alone will not tell you the file is old: upgrade ata, skip the build step,
+and a module compiled by the previous version goes on being used with
+nothing out of place. Anything that improves inside the emitted code, and
+the position walker for `validateJSON` is embedded there, arrives only when
+the file is rebuilt. Neither field is a security boundary.
 
 ```javascript
 const { schemaHash } = require('ata-validator/build');
+const { version } = require('ata-validator/package.json');
 const mod = await import('./compiled.mjs');
-if (mod.schemaHash !== schemaHash(currentSchema)) rebuild();
+if (mod.schemaHash !== schemaHash(currentSchema) || mod.ataVersion !== version) rebuild();
 ```
+
+A generated file also names the version on its first line, so the same
+question can be answered by reading it.
 
 With `positions: true` the module also exports `validateJSON(text)`: it
 parses the JSON text, validates, and on failure attaches a `dataFrame`

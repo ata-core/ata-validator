@@ -144,8 +144,10 @@ export function bundleCompact(schemas: unknown[], options?: BundleStandaloneOpti
  * Stable content hash of a schema, 16 hex characters, over a canonical JSON
  * form (keys sorted at every level). Every module from
  * {@link toStandaloneModule} exports its own `schemaHash`; comparing that
- * against `schemaHash(currentSchema)` tells a build the module is stale.
- * An integrity aid, not a security boundary.
+ * against `schemaHash(currentSchema)` tells a build the schema has changed.
+ * It does not tell the build that ata has changed, since an upgrade leaves
+ * the hash matching, so compare the module's `ataVersion` against the
+ * installed version as well. An integrity aid, not a security boundary.
  */
 export function schemaHash(schema: unknown): string;
 
