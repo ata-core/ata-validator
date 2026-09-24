@@ -1475,10 +1475,32 @@ class Validator {
         // The factory bakes the error function in as an argument and never
         // calls it for a document that passes, so a resolver here costs the
         // accepted path nothing and keeps the compile off the first call.
-        const hybridFn = jsFn._hybridFactory(VALID_RESULT, errPreferCombined);
+        // Until the first rejection this is the hybrid: the verdict function,
+        // with the error resolver baked in and never called for a document that
+        // passes. That keeps the combined function's compile off the first call,
+        // which is two thirds of what a first call costs.
+        //
+        // From the first rejection on, the combined function answers directly.
+        // It decides and collects in one pass, so the verdict pass in front of it
+        // was validating the document a second time: 134.1 microseconds against
+        // its 45.3 on a 1000-user array. Swapping rather than starting there keeps
+        // the lazy compile, and swapping at all is only free because the combined
+        // function now costs what the verdict function costs on accepted
+        // documents (1.02x on that array, 0.99x on a small body) since
+        // additionalProperties stopped materialising its key array. The
+        // indirection this needs measured inside the noise at both sizes.
+        let impl = null;
+        const onReject = (data) => {
+          const combined = combinedIfSafe();
+          if (combined) { impl = combined; return combined(data); }
+          return errOnly(data);
+        };
+        const hybridFn = jsFn._hybridFactory(VALID_RESULT, onReject);
+        impl = hybridFn;
+        const run = (data) => impl(data);
         this.validate = preprocess
-          ? (data) => { preprocess(data); return hybridFn(data); }
-          : hybridFn;
+          ? (data) => { preprocess(data); return run(data); }
+          : run;
       } else {
         // No hybrid factory, so the assembly needs the function itself rather
         // than a reference it can call later: build it now.
