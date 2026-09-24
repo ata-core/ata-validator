@@ -86,6 +86,26 @@ const SCHEMAS = [
   { not: { type: 'string' } },
   { if: { type: 'number' }, then: { minimum: 10 }, else: { type: 'string' } },
   { $defs: { n: { type: 'integer' } }, $ref: '#/$defs/n' },
+  // A def on a $ref cycle is emitted as a function of its own, so its keyword
+  // state has to stay inside it. additionalProperties is held back to the end
+  // of the function it is compiling, and the list it waits in hung off the
+  // whole compile rather than the one function, so this def's key set was
+  // flushed into the caller: `{id: 1}` was rejected for not being named `not`.
+  {
+    $defs: { f: { type: 'object', properties: { not: { $ref: '#/$defs/f' } }, additionalProperties: false } },
+    type: 'object',
+    properties: { id: { anyOf: [{ type: 'integer' }, { $ref: '#/$defs/f' }] } },
+    additionalProperties: false,
+  },
+  {
+    $defs: { node: { type: 'object', properties: { child: { $ref: '#/$defs/node' }, tag: { type: 'string' } }, additionalProperties: false } },
+    $ref: '#/$defs/node',
+  },
+  // the same cycle, with the other keyword that is held back the same way
+  {
+    $defs: { node: { type: 'object', properties: { child: { $ref: '#/$defs/node' } }, unevaluatedProperties: false } },
+    $ref: '#/$defs/node',
+  },
   { type: 'object', unevaluatedProperties: false, properties: { a: { type: 'number' } } },
   // enum and const, which compare structurally
   { enum: [1, 'a', null, { x: 1 }, [1, 2]] },
@@ -106,6 +126,9 @@ const VALUES = [
   { a: 1, extra: 1 }, { a: 1, nested: { x: 1, extra: 2 } },
   { n: '5' }, { n: true }, { 'x-a': 1 }, { 'x-a': 'no' }, { UPPER: 1 },
   { x: 1, y: [2] },
+  // documents that reach into a recursive def, including through its own key
+  { id: {} }, { id: { not: {} } }, { id: { not: { not: {} } } }, { id: { nope: 1 } },
+  { tag: 'a', child: { tag: 'b' } }, { child: { bad: 1 } },
 ]
 
 // The options are where a keyword-only comparison stops looking.
