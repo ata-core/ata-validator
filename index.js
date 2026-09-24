@@ -462,11 +462,18 @@ const { rankFor: schemaOrderRank, ordinalFor: schemaOrdinal } = require('./lib/s
 // that carry only message and path, such as the Standard Schema bridge.
 // Prototype accessors, not per-instance ones: see LazyRejection.
 class RichRejection {
-  constructor(result, data, positions, self, root, enrich) {
+  // `rawInput` is the JSON text validateJSON was given, or null for validate(data).
+  // The position map it implies is built in the `errors` getter, not here: it is
+  // a full walk of the document, it is only ever read through an error's
+  // dataFrame, and building it on every rejection cost a caller that reads
+  // `.valid` about 460 microseconds on a 50 KB document. Holding the text rather
+  // than reading `self._lastRawInput` later also keeps the result independent of
+  // what the instance does after this call returns.
+  constructor(result, data, rawInput, self, root, enrich) {
     this.valid = false;
     this._result = result;
     this._data = data;
-    this._positions = positions;
+    this._rawInput = rawInput;
     this._self = self;
     this._root = root;
     this._enrich = enrich;
@@ -490,11 +497,17 @@ Object.defineProperty(RichRejection.prototype, 'errors', {
       const enrich = this._enrich;
       let raw = this._result.errors || [];
       if (raw.length > 1) raw = sortErrorsBySchemaOrder(this._root, raw);
+      // The position map, resolved now that an error is actually being read.
+      let positions = null;
+      if (enrich && raw.length && this._rawInput != null) {
+        positions = self._pos().get(this._rawInput);
+        if (positions) self._posCache.reset();
+      }
       // One options object for the whole list, not one per error.
       const opts = enrich && raw.length
         ? {
             data: this._data,
-            positions: this._positions,
+            positions,
             schemaPositions: self._schemaPositions,
             schemaFile: self._source ? self._source.path : undefined,
           }
@@ -515,6 +528,98 @@ Object.defineProperty(RichRejection.prototype, 'errors', {
       this._cached = cached;
     }
     return this._cached;
+  },
+});
+
+// The rejection validateJSON returns. Everything the text path adds over
+// validate(data), the value tree enrichment needs, the position map, the
+// diagnostic payload, happens on first access to `.errors`. Reading `.valid`
+// touches none of it. The JSON text is held here rather than read back off the
+// validator, so the result does not depend on what the instance does next.
+class LazyJsonRejection {
+  constructor(result, jsonStr, self, enrich) {
+    this.valid = false;
+    this._result = result;
+    this._jsonStr = jsonStr;
+    this._self = self;
+    this._enrich = enrich;
+    this._cached = null;
+  }
+  toJSON() {
+    return { valid: false, errors: this.errors };
+  }
+}
+Object.defineProperty(LazyJsonRejection.prototype, 'errors', {
+  enumerable: true,
+  configurable: true,
+  get() {
+    if (this._cached !== null) return this._cached;
+    const self = this._self;
+    const enrich = this._enrich;
+    const jsonStr = this._jsonStr;
+    // Reading the inner errors realizes the inner lazy layer, if there was one.
+    const raw = this._result.errors || [];
+    if (!raw.length) { this._cached = raw; return raw; }
+
+    // The enrich pass plucks `received` from the value tree and the suggestion
+    // engine (required-typo, format hints, coercion nudges) walks it too.
+    let parsedData;
+    try { parsedData = JSON.parse(jsonStr); } catch { parsedData = undefined; }
+
+    // Errors the inner path already enriched carry a docUrl: only enrich() sets
+    // one. `code` is not a safe signal, because branch-collapse attaches codes
+    // to raw errors, and detecting on it left every collapsed oneOf/anyOf error
+    // unenriched on the text path.
+    if (!raw[0] || !raw[0].docUrl) {
+      const positions = self._pos().get(jsonStr);
+      // Declaration order, as validate() applies it; the text path used to
+      // enrich in emission order.
+      const ordered = raw.length > 1 ? sortErrorsBySchemaOrder(self._schemaObj, raw) : raw;
+      const enrichOpts = {
+        data: parsedData,
+        positions,
+        schemaPositions: self._schemaPositions,
+        schemaFile: self._source ? self._source.path : undefined,
+      };
+      const enriched = ordered.map((e) => enrich(e, enrichOpts));
+      if (enriched.length > 1) attachRelated(enriched);
+      attachDiagnosticSource(enriched, {
+        data: parsedData,
+        text: jsonStr,
+        positions,
+        schema: self._schemaObj,
+        mutatesInput: self._mutatesInput === true,
+      });
+      if (positions) self._posCache.reset();
+      this._cached = enriched;
+      return enriched;
+    }
+
+    // Already enriched, so the frames are usually attached too. Only a gap in
+    // them is worth another walk of the document: resolving the map to discover
+    // there was nothing to fill cost a second full walk on every rejection.
+    if (raw.some((e) => e && !e.dataFrame)) {
+      const positions = self._pos().get(jsonStr);
+      if (positions) {
+        for (const e of raw) {
+          if (e && !e.dataFrame) {
+            const path = e.path != null ? e.path : (e.instancePath || '');
+            const p = positions[path];
+            if (p) e.dataFrame = { byteOffset: p.byteOffset, length: p.length, line: p.line, col: p.col, text: p.text };
+          }
+        }
+        self._posCache.reset();
+      }
+    }
+    if (raw.length > 1) attachRelated(raw);
+    attachDiagnosticSource(raw, {
+      data: parsedData,
+      text: jsonStr,
+      schema: self._schemaObj,
+      mutatesInput: self._mutatesInput === true,
+    });
+    this._cached = raw;
+    return raw;
   },
 });
 
@@ -1681,15 +1786,15 @@ class Validator {
         // abortEarly returns the shared ATA9000 stub; preserve it as-is so the
         // perf fast path stays allocation-free and the documented code stays stable.
         if (result && result.valid === false && result !== ABORT_EARLY_RESULT) {
-          // Positions come from the raw input when validateJSON set one;
-          // resolved eagerly since the cache is reset per call.
-          const positions = (enrich && self._lastRawInput != null) ? self._pos().get(self._lastRawInput) : null;
-          if (positions) self._posCache.reset();
+          // The raw input travels with the rejection when validateJSON set one.
+          // The map it implies is built on first access to `.errors`, so a
+          // caller reading only `.valid` does not pay for a document walk.
+          const rawInput = enrich ? self._lastRawInput : null;
           // One instance of a class with prototype accessors. An object
           // literal with a getter here cost a closure plus an accessor
           // definition on every rejection, several hundred nanoseconds
           // before any error was read.
-          return new RichRejection(result, data, positions, self, root, enrich);
+          return new RichRejection(result, data, rawInput, self, root, enrich);
         }
         return result;
       };
@@ -1700,74 +1805,23 @@ class Validator {
       if (this._richErrors && this.validateJSON) {
         const innerJson = this.validateJSON;
         this.validateJSON = (jsonStr) => {
+          // The inner path reads _lastRawInput to hand the raw text to the
+          // rejection it builds. Cleared as soon as it returns: the rejection
+          // carries the text itself, so nothing outlives the call.
           this._lastRawInput = jsonStr;
           let result;
           try {
             result = innerJson(jsonStr);
           } finally {
-            // Don't clear here; the enrich step below needs the cache. We
-            // clear after enrich, or in the early-return path.
+            this._lastRawInput = null;
           }
-          if (result && !result.valid && result.errors && result.errors.length) {
-            // If errors came from the inner path that already ran through the
-            // wrapped this.validate (codegen jsonValidateFn -> validate path),
-            // they may already be enriched. Detect by presence of `docUrl`:
-            // only enrich() sets it. `code` is not a safe signal because
-            // branch-collapse attaches codes to raw errors, and detecting on
-            // it left every collapsed oneOf/anyOf error unenriched on the
-            // text path.
-            const first = result.errors[0];
-            // Re-parse the input once so the enrich pass can pluck `received`
-            // and feed the suggestion engine (required-typo, format hints,
-            // coercion nudges all need the live value tree), and so the
-            // diagnostic payload carries the data on both paths below.
-            let parsedData;
-            try { parsedData = JSON.parse(jsonStr); } catch { parsedData = undefined; }
-            if (!first || !first.docUrl) {
-              const positions = (this._lastRawInput != null) ? this._pos().get(this._lastRawInput) : null;
-              // Declaration order, as validate() applies it; the text path
-              // used to enrich in emission order.
-              const ordered = result.errors.length > 1 ? sortErrorsBySchemaOrder(this._schemaObj, result.errors) : result.errors;
-              const enrichOpts = {
-                data: parsedData,
-                positions,
-                schemaPositions: this._schemaPositions,
-                schemaFile: this._source ? this._source.path : undefined,
-              };
-              const enriched = ordered.map((e) => enrich(e, enrichOpts));
-              if (enriched.length > 1) attachRelated(enriched);
-              attachDiagnosticSource(enriched, {
-                data: parsedData,
-                text: jsonStr,
-                positions,
-                schema: this._schemaObj,
-                mutatesInput: this._mutatesInput === true,
-              });
-              if (positions) this._posCache.reset();
-              this._lastRawInput = null;
-              return { valid: false, errors: enriched };
-            }
-            // Already-enriched path: still attach dataFrame if missing.
-            const positions = (this._lastRawInput != null) ? this._pos().get(this._lastRawInput) : null;
-            if (positions) {
-              for (const e of result.errors) {
-                if (e && !e.dataFrame) {
-                  const path = e.path != null ? e.path : (e.instancePath || '');
-                  const p = positions[path];
-                  if (p) e.dataFrame = { byteOffset: p.byteOffset, length: p.length, line: p.line, col: p.col, text: p.text };
-                }
-              }
-              this._posCache.reset();
-            }
-            if (result.errors.length > 1) attachRelated(result.errors);
-            attachDiagnosticSource(result.errors, {
-              data: parsedData,
-              text: jsonStr,
-              schema: this._schemaObj,
-              mutatesInput: this._mutatesInput === true,
-            });
+          // Every diagnostic the text path adds is deferred. Deciding here
+          // whether there is anything to add would mean reading `result.errors`,
+          // and on the codegen path that realizes the inner lazy layer, which is
+          // the document walk this exists to avoid.
+          if (result && result.valid === false) {
+            return new LazyJsonRejection(result, jsonStr, this, enrich);
           }
-          this._lastRawInput = null;
           return result;
         };
       }
