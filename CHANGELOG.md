@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.30.1 - 2026-09-24
+
+### Fixed
+
+- A `$defs` entry that is both self-recursive and carries `additionalProperties: false` made the code generator reject valid documents. With `$defs.f` declaring `properties: { not: { $ref: '#/$defs/f' } }` alongside `additionalProperties: false`, and a root referring to it through an `anyOf`, `validate({ id: 1 })` returned false where the interpreted engine returned true. `additionalProperties` is held back to the end of the emitted function, because the body optimizes better when the key walk is last, and the list it waits in hung off the whole compile rather than the one function. A def on a `$ref` cycle is emitted as a function of its own, so the def's key set was flushed into whichever function was being compiled: the root above walked its own keys against the def's list and refused `id` for not being `not`. The combined generator never flushed that list at all, which drops the constraint rather than misplacing it. Modules built with `ata build` carry the same fault, since they go through the same generator. Present in 1.27.1, 1.29.0 and 1.30.0. A def now keeps its own list for the length of its own body. The shape is also in the engine differential now, which had the blind spot that let this ship: its corpus had `$defs` and it had `additionalProperties`, but never the two crossed with recursion. Without the fix it splits the engines on 30 of 21168 cases.
+
 ## 1.30.0 - 2026-09-24
 
 ### Fixed
