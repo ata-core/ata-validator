@@ -2,6 +2,14 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- `validateJSON(text)` defers every diagnostic to first access to `.errors`, the way `validate(data)` has since 1.9.0. Reading `.valid` on a 50 KB invalid document went from 585 to 152 microseconds, which is what the same validator costs with `richErrors: false`, and it parses the document zero times instead of once. Two things were eager and both had to move: the position map was resolved in the `validate` wrapper on every rejection where `validateJSON` had set the raw input, before the rejection object was even built, and the `validateJSON` wrapper then parsed the document and ran the whole enrich, frame and payload pass. Deferring only the first makes it slower, not faster, because the wrapper reads `result.errors[0]` to test for a `docUrl` and that realizes the map, whose cache is then reset, so the wrapper builds it again. Error content is unchanged. A check on a timer that reads a verdict and no message, which is where this shows up, now pays nothing for messages it does not read.
+- An emitted module records the ata that wrote it. `ataVersion` sits next to `schemaHash` and is declared in the emitted `.d.ts`, and every generated artifact names the version on its first line. Staleness was detectable on one axis only: the schema hash catches a changed schema, and an ata upgrade leaves it matching, so a module compiled by an older version reads as current and goes on being used, which hides anything that improves inside the emitted code. A standalone module imports nothing by design and cannot ask the installed ata about itself, so it carries the fact instead and a build compares both. The two CJS bundle paths had emitted no provenance line at all.
+- The npm package no longer ships `CHANGELOG.md`. Its history had reached about 13% of the packed tarball, 40 KB of every install, and it is a click away in the repository. The tarball is 263954 bytes, against a 307200 byte ceiling that had 3270 bytes of headroom left.
+
 ## 1.28.0 - 2026-09-23
 
 ### Added

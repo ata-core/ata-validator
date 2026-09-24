@@ -703,6 +703,9 @@ npm run test:suite
 
 ## Project
 
+- [CHANGELOG.md](CHANGELOG.md) records every release. It is kept in the
+  repository and not shipped in the npm package, where its history had grown to
+  about 13% of the install.
 - [CONTRIBUTING.md](CONTRIBUTING.md) explains how to build the project and what a
   pull request needs before it can be merged.
 - [GOVERNANCE.md](GOVERNANCE.md) says who decides what, which changes the project

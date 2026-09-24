@@ -118,7 +118,6 @@
     "t.d.ts",
     "bin/",
     "README.md",
-    "CHANGELOG.md",
     "LICENSE"
   ],
   "optionalDependencies": {
