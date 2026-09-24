@@ -500,7 +500,7 @@ Object.defineProperty(RichRejection.prototype, 'errors', {
       // The position map, resolved now that an error is actually being read.
       let positions = null;
       if (enrich && raw.length && this._rawInput != null) {
-        positions = self._pos().get(this._rawInput);
+        positions = self._pos().targeted(this._rawInput, wantedPointersFor(raw));
         if (positions) self._posCache.reset();
       }
       // One options object for the whole list, not one per error.
@@ -571,7 +571,7 @@ Object.defineProperty(LazyJsonRejection.prototype, 'errors', {
     // to raw errors, and detecting on it left every collapsed oneOf/anyOf error
     // unenriched on the text path.
     if (!raw[0] || !raw[0].docUrl) {
-      const positions = self._pos().get(jsonStr);
+      const positions = self._pos().targeted(jsonStr, wantedPointersFor(raw));
       // Declaration order, as validate() applies it; the text path used to
       // enrich in emission order.
       const ordered = raw.length > 1 ? sortErrorsBySchemaOrder(self._schemaObj, raw) : raw;
@@ -599,7 +599,7 @@ Object.defineProperty(LazyJsonRejection.prototype, 'errors', {
     // them is worth another walk of the document: resolving the map to discover
     // there was nothing to fill cost a second full walk on every rejection.
     if (raw.some((e) => e && !e.dataFrame)) {
-      const positions = self._pos().get(jsonStr);
+      const positions = self._pos().targeted(jsonStr, wantedPointersFor(raw.filter((e) => e && !e.dataFrame)));
       if (positions) {
         for (const e of raw) {
           if (e && !e.dataFrame) {
@@ -622,6 +622,31 @@ Object.defineProperty(LazyJsonRejection.prototype, 'errors', {
     return raw;
   },
 });
+
+// The pointers a set of errors will ask the position map about. lib/enrich-error
+// looks up the error's own path, and for an additional or unevaluated property
+// the child pointer named in `params`, unescaped, which is the form it asks for.
+// The escaped form goes in too: including a pointer that is never read costs
+// nothing, and the cache answers anything outside this set from the full map
+// rather than reporting no position.
+function wantedPointersFor (errors) {
+  const wanted = new Set();
+  for (const e of errors) {
+    if (!e) continue;
+    const path = e.path != null ? e.path : (e.instancePath || '');
+    wanted.add(path);
+    if (e.instancePath != null && e.instancePath !== path) wanted.add(e.instancePath);
+    const params = e.params;
+    const named = params && (params.additionalProperty || params.unevaluatedProperty);
+    if (typeof named === 'string') {
+      wanted.add(path + '/' + named);
+      if (named.indexOf('~') !== -1 || named.indexOf('/') !== -1) {
+        wanted.add(path + '/' + named.replace(/~/g, '~0').replace(/\//g, '~1'));
+      }
+    }
+  }
+  return wanted;
+}
 
 // A raw error without the `_o` ordering key, for the legacy error shape.
 function stripOrdinal(e) {
