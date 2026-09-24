@@ -25,7 +25,12 @@ console.log('\nata aot CLI smoke test\n');
   const r = spawnSync('node', [
     CLI, 'build', path.join(dir, '*.schema.json'),
     '--out-dir', outDir,
-    '--max-size', '8192',
+    // A value the fixture fits under, so the build exercises the flag rather
+    // than tripping it. Not a size budget: those live in
+    // benchmark/bench_aot_size.mjs, which gates growth per shape, and in
+    // tests/test_pack_purity.js for the package itself. Raised from 8192 when
+    // the one-pass email check put the complex fixture 6 bytes over.
+    '--max-size', '10240',
   ], { encoding: 'utf8' });
   if (r.status !== 0) ko('smoke build', `exit ${r.status}: ${r.stderr}`);
   else if (!fs.existsSync(path.join(outDir, 'a.compiled.mjs'))) ko('smoke build', 'a.compiled.mjs missing');
