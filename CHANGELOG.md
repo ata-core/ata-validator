@@ -2,6 +2,16 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.30.3 - 2026-09-25
+
+### Fixed
+
+- The buffer path threw once the native fast-schema registry filled up. The addon keeps compiled schemas for the zero-copy buffer path in a fixed array of 4096 slots, and registering the 4097th distinct schema threw `Max fast schema slots reached` out of `isValid()`, so every validator built after that point in the process was unusable on that path. A service that compiles a schema per tenant or per request reaches that on its own. Swallowing the throw on its own would have been worse than the throw: with no slot the instance holds -1, and the native bounds check turns a negative slot into "invalid", so a valid document would have been reported invalid. A full registry now routes `isValid`, `batchIsValid` and `countValid` through the JS engine instead, which is slower than the zero-copy walk and gives the same answer. The registry still deduplicates on schema text, so a process that builds the same schema repeatedly never fills it.
+
+### Changed
+
+- The differential fuzzer now checks something. It built one validator, set `ATA_FORCE_NAPI`, and built a second from the same schema object, which the identity cache answers with the first instance, so both results came from one compiled function and could not differ; it also counted every throw as a pass, which is how the exhaustion above had been passing, and used unseeded randomness, so a mismatch could not have been replayed. It now compares the compiled engine against the interpreted one from separate schema objects, treats a throw from one side as a divergence, seeds from `FUZZ_SEED`, and prints how many iterations reached the code generator, 92.5% of 10000 where the figure was previously unknowable. Its header records what it cannot find, measured rather than assumed: reverting either leaked-flag fix from 1.30.1 or 1.30.2 and running 20000 iterations still reports all clear, because those need a three-way coincidence of roughly one in a million per iteration, and the targeted corpus in `test_engine_differential.js` is what covers them.
+
 ## 1.30.2 - 2026-09-25
 
 ### Fixed
