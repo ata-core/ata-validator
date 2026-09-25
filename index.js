@@ -1672,37 +1672,59 @@ class Validator {
         this.isValid = (buf) => {
           self._ensureNative();
           const slot = self._fastSlot;
-          self.isValid = (b) => {
-            if (typeof b === 'string') b = Buffer.from(b);
-            else if (!(b instanceof Uint8Array)) throw new TypeError('isValid() requires a Buffer, Uint8Array, or string. For parsed objects, use isValidObject().');
-            return native.rawFastValidate(slot, b);
-          };
+          self.isValid = slot < 0
+            ? (b) => self._slowBufferValid(b, 'isValid')
+            : (b) => {
+              if (typeof b === 'string') b = Buffer.from(b);
+              else if (!(b instanceof Uint8Array)) throw new TypeError('isValid() requires a Buffer, Uint8Array, or string. For parsed objects, use isValidObject().');
+              return native.rawFastValidate(slot, b);
+            };
           return self.isValid(buf);
         };
         this.countValid = (ndjsonBuf) => {
           self._ensureNative();
           const slot = self._fastSlot;
-          self.countValid = (b) => {
-            if (typeof b === 'string') b = Buffer.from(b);
-            else if (!(b instanceof Uint8Array)) throw new TypeError('countValid() requires a Buffer, Uint8Array, or string');
-            const r = native.rawNDJSONValidate(slot, b);
-            let c = 0;
-            for (let i = 0; i < r.length; i++) if (r[i]) c++;
-            return c;
-          };
+          self.countValid = slot < 0
+            ? (b) => {
+              if (typeof b !== 'string' && !(b instanceof Uint8Array)) throw new TypeError('countValid() requires a Buffer, Uint8Array, or string');
+              const text = typeof b === 'string' ? b : Buffer.from(b.buffer, b.byteOffset, b.byteLength).toString('utf8');
+              let c = 0;
+              for (const line of text.split('\n')) {
+                if (line.trim() === '') continue;
+                if (self._slowBufferValid(line, 'countValid')) c++;
+              }
+              return c;
+            }
+            : (b) => {
+              if (typeof b === 'string') b = Buffer.from(b);
+              else if (!(b instanceof Uint8Array)) throw new TypeError('countValid() requires a Buffer, Uint8Array, or string');
+              const r = native.rawNDJSONValidate(slot, b);
+              let c = 0;
+              for (let i = 0; i < r.length; i++) if (r[i]) c++;
+              return c;
+            };
           return self.countValid(ndjsonBuf);
         };
         this.batchIsValid = (buffers) => {
           self._ensureNative();
           const slot = self._fastSlot;
-          self.batchIsValid = (bufs) => {
-            let v = 0;
-            for (const b of bufs) {
-              if (!(b instanceof Uint8Array)) throw new TypeError('batchIsValid() requires Buffer or Uint8Array elements');
-              if (native.rawFastValidate(slot, b)) v++;
+          self.batchIsValid = slot < 0
+            ? (bufs) => {
+              let v = 0;
+              for (const b of bufs) {
+                if (!(b instanceof Uint8Array)) throw new TypeError('batchIsValid() requires Buffer or Uint8Array elements');
+                if (self._slowBufferValid(b, 'batchIsValid')) v++;
+              }
+              return v;
             }
-            return v;
-          };
+            : (bufs) => {
+              let v = 0;
+              for (const b of bufs) {
+                if (!(b instanceof Uint8Array)) throw new TypeError('batchIsValid() requires Buffer or Uint8Array elements');
+                if (native.rawFastValidate(slot, b)) v++;
+              }
+              return v;
+            };
           return self.batchIsValid(buffers);
         };
       }
@@ -2106,7 +2128,37 @@ class Validator {
       nativeSchemaStr = JSON.stringify(merged);
     }
     this._compiled = new native.CompiledSchema(nativeSchemaStr);
-    this._fastSlot = native.fastRegister(nativeSchemaStr);
+    // The fast registry is a fixed array of slots in the addon, and registering
+    // a distinct schema past the last one throws. It is an accelerator for the
+    // buffer path, not a requirement, so a full registry leaves the slot at -1
+    // and the buffer methods answer from the JS engine instead. Letting this
+    // throw made every validator built after the 4096th unusable on that path.
+    try {
+      this._fastSlot = native.fastRegister(nativeSchemaStr);
+    } catch {
+      this._fastSlot = -1;
+    }
+  }
+
+  // The buffer path without a fast slot: decode, parse, and hand the value to
+  // the engine that does not need one. Slower than the zero-copy walk, and the
+  // same answer. A negative slot must never reach rawFastValidate, whose bounds
+  // check would report a valid document as invalid.
+  _slowBufferValid(input, who) {
+    let text;
+    if (typeof input === 'string') text = input;
+    else if (input instanceof Uint8Array) {
+      text = Buffer.from(input.buffer, input.byteOffset, input.byteLength).toString('utf8');
+    } else {
+      throw new TypeError(who + '() requires a Buffer, Uint8Array, or string');
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return false;
+    }
+    return this.isValidObject(parsed);
   }
 
   addSchema(schema) {
