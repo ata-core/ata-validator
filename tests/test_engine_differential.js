@@ -107,6 +107,24 @@ const SCHEMAS = [
     $ref: '#/$defs/node',
   },
   { type: 'object', unevaluatedProperties: false, properties: { a: { type: 'number' } } },
+  // Bookkeeping about the node being emitted used to live on the compile
+  // context, so a sibling that handled its own propertyNames made the next
+  // node emit no propertyNames check at all. `a` is compiled first here.
+  {
+    type: 'object',
+    properties: {
+      a: { type: 'object', patternProperties: { '^x': { type: 'number' } }, propertyNames: { pattern: '^x' } },
+      b: { type: 'object', propertyNames: { pattern: '^y' } },
+    },
+  },
+  // the same flag, clobbered downward instead of sideways
+  {
+    type: 'object',
+    propertyNames: { pattern: '^k' },
+    properties: {
+      kid: { type: 'object', patternProperties: { '^x': { type: 'number' } }, propertyNames: { pattern: '^x' } },
+    },
+  },
   // enum and const, which compare structurally
   { enum: [1, 'a', null, { x: 1 }, [1, 2]] },
   { const: { x: 1, y: [2] } },
@@ -129,6 +147,9 @@ const VALUES = [
   // documents that reach into a recursive def, including through its own key
   { id: {} }, { id: { not: {} } }, { id: { not: { not: {} } } }, { id: { nope: 1 } },
   { tag: 'a', child: { tag: 'b' } }, { child: { bad: 1 } },
+  // documents that reach the sibling and nested propertyNames shapes
+  { b: { yes: 1 } }, { b: { zzz: 1 } }, { a: { x1: 1 }, b: { zzz: 1 } },
+  { kid: { x1: 1 } }, { kid: { q: 1 } },
 ]
 
 // The options are where a keyword-only comparison stops looking.
