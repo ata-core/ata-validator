@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.30.2 - 2026-09-25
+
+### Fixed
+
+- A sibling's `propertyNames` disabled the next node's. The generators coordinate within one schema node using a couple of flags, "this node's `patternProperties` already emitted the `propertyNames` check" and "this node already emitted its key count early", and those were kept on the compile context, which outlives the node, and were never reset. With `properties: { a: { patternProperties: { '^x': ... }, propertyNames: { pattern: '^x' } }, b: { propertyNames: { pattern: '^y' } } }`, `a` is compiled first and sets the flag, `b` reads it and emits no `propertyNames` check at all, so `validate({ b: { zzz: 1 } })` returned true where the interpreted engine returned false. The constraint was not misplaced but absent, which accepts what it should refuse. The flag was clobbered downward as well as sideways, since a node's children are compiled between the point it is set and the point it is read, so a parent's `propertyNames` could vanish because a child had its own. Reachable on the verdict and combined generators; the error generator has its own handling and was already right. This is the same class as the deferred `additionalProperties` bug fixed in 1.30.1, per-node state on a per-compile object, and it was found by sweeping the compiler for the rest of that class rather than by a report. The flags are locals now, so the class is gone by construction. A new test enumerates every compile-context field and fails on one that is not genuinely per-compile, so the next such flag has to justify itself, and both shapes are in the engine differential, where they split the engines on 12 of 23664 cases without the fix.
+
 ## 1.30.1 - 2026-09-24
 
 ### Fixed
