@@ -2,6 +2,13 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.31.1 - 2026-09-26
+
+### Fixed
+
+- `validateJSON` accepted documents that `validate()` rejects, for a schema with a `$dynamicRef` back to the root. With `{ $dynamicAnchor: 'node', type: 'object', properties: { child: { $dynamicRef: '#node' } } }`, `validateJSON('{"child":5}')` returned `{ valid: true }` while `validate({ child: 5 })` returned false. The combined code generator has no named functions, so it cannot follow a reference to the root, and it emitted nothing there, which its function then answered as valid. `validateJSON` takes the error slot of the hybrid, and that slot was the combined function, so the verdict function's rejection was replaced by the combined function's acceptance. `validate()` and `isValidObject()` were not affected, because their outer layer takes the verdict from the boolean function. Present in 1.29.0 through 1.31.0. The combined generator now declines a `$dynamicRef` to the root or around a cycle, and every error resolver that runs after a verdict of false now turns a `valid: true` into a rejection with a generic error instead of returning it, so a disagreement between two generators cannot become an acceptance again.
+- `not: { $ref: '#' }` and `if: { $ref: '#' }` threw `ReferenceError: _validate is not defined` from `.errors` and from `validateJSON`. The error and combined generators compile the subschemas of `not`, `if` and `contains` with the boolean generator, which reaches the root through a function named `_validate` and a reference cycle through a named function in its preamble; neither exists in the other two generators' functions, and a cycle was cut so the reference checked nothing. Those shapes now decline and take the path that handles them. The combined generator also now binds the safe-regex factory for a pattern compiled this way, which had thrown on the first document that reached it. Both were found by inventorying the three generators side by side, not by a report.
+
 ## 1.31.0 - 2026-09-26
 
 ### Changed

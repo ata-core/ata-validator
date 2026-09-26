@@ -1,6 +1,6 @@
 {
   "name": "ata-validator",
-  "version": "1.31.0",
+  "version": "1.31.1",
   "description": "JSON Schema validation that compiles for speed and still runs where code generation is blocked. Compiled and interpreted engines answer identically at 100% of the official suite. TypeScript inference, Standard Schema V1, and a build step that emits dependency-free modules.",
   "main": "index.js",
   "module": "index.mjs",
@@ -121,13 +121,13 @@
     "LICENSE"
   ],
   "optionalDependencies": {
-    "@ata-validator/native-darwin-arm64": "1.31.0",
-    "@ata-validator/native-darwin-x64": "1.31.0",
-    "@ata-validator/native-linux-arm64-gnu": "1.31.0",
-    "@ata-validator/native-linux-arm64-musl": "1.31.0",
-    "@ata-validator/native-linux-x64-gnu": "1.31.0",
-    "@ata-validator/native-linux-x64-musl": "1.31.0",
-    "@ata-validator/native-win32-x64": "1.31.0"
+    "@ata-validator/native-darwin-arm64": "1.31.1",
+    "@ata-validator/native-darwin-x64": "1.31.1",
+    "@ata-validator/native-linux-arm64-gnu": "1.31.1",
+    "@ata-validator/native-linux-arm64-musl": "1.31.1",
+    "@ata-validator/native-linux-x64-gnu": "1.31.1",
+    "@ata-validator/native-linux-x64-musl": "1.31.1",
+    "@ata-validator/native-win32-x64": "1.31.1"
   },
   "peerDependencies": {
     "yaml": "^2.0.0"
