@@ -154,6 +154,8 @@ function bothEngines (schema, cases, label) {
     // Value expression to its prototype-flag local; withPlain sets an entry
     // for one node and restores the previous one in a finally.
     'plainOf',
+    // The removeAdditional node set, fixed for the whole compile.
+    'removeNodes',
   ])
 
   const src = require('node:fs').readFileSync(require.resolve('../lib/js-compiler.js'), 'utf8')

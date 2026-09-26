@@ -1316,6 +1316,23 @@ class Validator {
     this._mutatesInput = !!(preprocess || options.coerceTypes || options.removeAdditional);
     this._preprocess = preprocess;
 
+    // removeAdditional alone, the common parse-and-strip use: a verdict function
+    // that deletes unknown keys in the walk it already makes, where the pass
+    // above walks every object a second time just to find them. It answers
+    // the documents it accepts; anything it rejects takes the full path below,
+    // which removes, validates and reports exactly as before, so a rejected
+    // document is left as clean as it always was. The generator declines any
+    // schema where deleting during the walk could change an answer.
+    let fusedRemove = null;
+    if (preprocess && options.removeAdditional && !options.coerceTypes && !this._interpretOnly &&
+        !this._userFormats && !this._usesKeywords && !this._schemaStr.includes('"default"')) {
+      try {
+        fusedRemove = compileToJSCodegen(schemaObj, this._schemaMap.size > 0 ? this._schemaMap : null, null, { removeAdditional: true });
+      } catch {
+        fusedRemove = null;
+      }
+    }
+
     // Detect if schema is "selective" -- doesn't recurse into arrays/deep objects.
     const hasArrayTraversal =
       schemaObj &&
@@ -1587,9 +1604,11 @@ class Validator {
       // The verdict methods answer validate()'s question without building the
       // error list, so they run the same preprocess pass. Skipping it made the
       // two disagree on input that coercion or a default would have fixed.
-      _bindVerdict(this, preprocess
-        ? (data) => { preprocess(data); return jsFn(data) }
-        : jsFn);
+      _bindVerdict(this, fusedRemove
+        ? (data) => fusedRemove(data) || (preprocess(data), jsFn(data))
+        : preprocess
+          ? (data) => { preprocess(data); return jsFn(data) }
+          : jsFn);
       // Same preference as the object path: the combined function first, since
       // it validates and collects in one pass, and the error generator behind
       // it. `errPreferCombined` is that order, resolved on the first rejection
@@ -1942,12 +1961,22 @@ class Validator {
     // paths that only need a boolean.
     if (this.validate) {
       const _bare = this.validate;
-      this.validate = (data) => {
-        const r = _bare(data);
-        return (r.valid === true && r.data === undefined)
-          ? { valid: true, data, errors: r.errors }
-          : r;
-      };
+      this.validate = fusedRemove
+        // A document the removing verdict accepts is answered here, one call
+        // deep; anything else takes the full path, see fusedRemove above.
+        ? (data) => {
+            if (fusedRemove(data)) return { valid: true, data, errors: VALID_RESULT.errors };
+            const r = _bare(data);
+            return (r.valid === true && r.data === undefined)
+              ? { valid: true, data, errors: r.errors }
+              : r;
+          }
+        : (data) => {
+            const r = _bare(data);
+            return (r.valid === true && r.data === undefined)
+              ? { valid: true, data, errors: r.errors }
+              : r;
+          };
     }
 
     // Custom error messages: if any subschema declares an `errorMessage`
