@@ -1794,7 +1794,12 @@ class Validator {
         : _validate;
       _bindVerdict(this, this._fastVerdict
         ? this._fastVerdict
-        : (data) => _validate(data).valid);
+        // The rewrite runs first here too, as it does for validate() above; a
+        // verdict without it disagreed with validate() on input that coercion,
+        // a default or a removed key would have fixed.
+        : preprocess
+          ? (data) => { preprocess(data); return _validate(data).valid; }
+          : (data) => _validate(data).valid);
       this.validateAndParse = (jsonStr) => this._compiled.validateAndParse(jsonStr);
       {
         const slot = this._fastSlot;
