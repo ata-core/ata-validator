@@ -124,6 +124,33 @@ v.isValidObject({ name: 'Mert', age: 26 }); // true
 v.isValidObject({ name: 123 }); // false
 ```
 
+### v.parse(data)
+
+Validate, throw on failure, and return a copy holding only the properties
+the schema declares, with declared `default` values filled in for absent
+optional properties. The input is never modified. This is the runtime form
+of the `parse()` an ahead-of-time module exports with `parse: true` (see
+below), built by the same code and admitting the same schemas.
+
+```javascript
+const v = new Validator({
+  type: 'object',
+  properties: { name: { type: 'string' }, role: { type: 'string', default: 'user' } },
+  required: ['name'],
+});
+v.parse({ name: 'Mert', extra: 1 }); // { name: 'Mert', role: 'user' }
+v.parse({ name: 5 }); // throws AtaValidationError, with the errors on e.errors
+```
+
+The copy is built from the schema's own key list, so unknown keys are
+dropped without being enumerated, which makes this faster than
+`removeAdditional`, which deletes them from the input. It throws a
+`TypeError` on its first call instead of answering when the keys to keep
+cannot be proven from the schema (a recursive or non-local `$ref`,
+`patternProperties`, or an applicator that names an undeclared property), when `coerceTypes`,
+`removeAdditional: 'all'` or custom keywords are in use, or when code
+generation is blocked. Use `validate()` with `removeAdditional` there.
+
 ### v.engine()
 
 Which engine answers `validate()` for this schema: `'codegen'` (generated JS,
@@ -251,8 +278,9 @@ With `parse: true` the module also exports `parse(data)`: validate, throw
 on failure, and return a copy of the input holding only the properties the
 schema declares, with declared `default` values filled in for absent
 optional properties. An object or array default is a fresh value on every
-call. It is emitted only where the rebuild is provably exact. A `$ref` or
-`patternProperties` declines. In-place applicators (`allOf`, `anyOf`,
+call. It is emitted only where the rebuild is provably exact. A local
+`$ref` to a definition is inlined; a recursive or non-local `$ref`, and
+`patternProperties`, decline. In-place applicators (`allOf`, `anyOf`,
 `oneOf`, `if`/`then`/`else`, `unevaluatedProperties: false`) are admitted
 when every property name they mention is already declared in the node's own
 `properties`, so the common config shape, a conditional over declared fields

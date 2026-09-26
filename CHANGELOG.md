@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.32.0 - 2026-09-26
+
+### Added
+
+- `Validator#parse(data)` validates, throws an `AtaValidationError` carrying the validator's errors on failure, and returns a copy holding only the properties the schema declares, with declared defaults filled in. The input is not modified. It is the runtime form of the `parse()` an ahead-of-time module exports with `parse: true`, built by the same emitter and admitting the same schemas; where that emitter cannot prove which keys to keep, or where `coerceTypes`, `removeAdditional: 'all'` or custom keywords are in use, `parse()` throws a `TypeError` saying so instead of answering. A test holds it to the module's `parse()` over 3600 random documents: the same copy, the same rejection, the same decline, and the input left alone. Because the copy is built from the schema's key list, unknown keys are dropped without being enumerated: on a seven-property document, Node 25 on an M4, it takes 3.2 ns a call where `validate()` with `removeAdditional` takes 10.9 ns, and a `parseSafe` case written with it measures 77M operations a second on the Moltar harness, against 57M through `removeAdditional` in 1.31.3.
+
+### Changed
+
+- `type: number` is checked with one `Number.isFinite(v)` call instead of `typeof v === 'number' && isFinite(v)`. The two answer the same for every value, NaN and Infinity still fail, and the single call is cheaper; every code generator, the closure compiler, the interpreter and the flat-object validator use it now. On the Moltar harness, Node 24 on an M4, `assertLoose` went from 159M to 169M operations a second and `parseSafe` from 78M to 82M. On a seven-property object parsed from JSON with one `number` field, `isValidObject` went from 5.0 to 4.5 ns.
+- The `parse()` an ahead-of-time module exports builds its copy from a plain object literal with the declared keys written out, instead of computed keys and `Object.hasOwn`, which V8 does not inline. On the same document a call went from 4.1 to 2.9 ns.
+- The copy emitter moved from `lib/aot-impl.js` to `lib/clone-emit.js`, so the browser bundle, which now reaches it through `Validator#parse`, does not also pull in the AOT compiler.
+
 ## 1.31.3 - 2026-09-26
 
 ### Fixed
