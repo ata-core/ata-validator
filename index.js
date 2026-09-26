@@ -2895,6 +2895,59 @@ Validator.prototype._extendValidate = function (resolve) {
 // closure, where wrapping the five entry points cost a closure per entry point,
 // the wrappers themselves and an accessor, most of what building a wrapped
 // validator took.
+// parse(data): validate, then return a copy holding only what the schema
+// declares, the way the parse() export of an ahead-of-time module does, with
+// the same emitter behind both. Building the copy from the schema's own key
+// list costs less than finding and deleting unknown keys, and leaves the
+// caller's object alone. Where the key set cannot be proven (a $ref it cannot
+// inline, patternProperties, an open object) the method declines with an
+// error instead of guessing, as the module ships no parse() there; so it does
+// under options that rewrite input, whose answers a copy would not reproduce.
+Validator.prototype.parse = function (data) {
+  let fn = this._parseFn;
+  if (fn === undefined) {
+    fn = _buildParse(this);
+    Object.defineProperty(this, '_parseFn', { value: fn, writable: true, configurable: true, enumerable: false });
+  }
+  return fn(data);
+};
+
+function _buildParse(self) {
+  const decline = (why) => () => {
+    throw new TypeError(`parse() is not available for this validator: ${why}. Use validate() with removeAdditional instead.`);
+  };
+  const o = self._options;
+  if (o.coerceTypes || o.removeAdditional === 'all' || self._usesKeywords || self._verdictTail !== null || self._validateTail !== null) {
+    return decline('its options or keywords rewrite or extend what the schema checks');
+  }
+  const { cloneExprFor } = require('./lib/clone-emit');
+  const expr = cloneExprFor(self._schemaObj);
+  if (!expr) return decline('the set of keys to keep cannot be proven from the schema');
+  let copy;
+  try {
+    // eslint-disable-next-line no-new-func
+    copy = new Function('data', 'return ' + expr);
+  } catch {
+    return decline('code generation is not allowed here');
+  }
+  self._ensureCompiled();
+  const verdict = self._jsFn;
+  if (typeof verdict !== 'function') return decline('the schema has no generated verdict function');
+  return (data) => {
+    if (!verdict(data)) {
+      const e = new Error('validation failed');
+      e.name = 'AtaValidationError';
+      let target = data;
+      if (self._mutatesInput) {
+        try { target = structuredClone(data); } catch { target = data; }
+      }
+      e.errors = self.validate(target).errors;
+      throw e;
+    }
+    return copy(data);
+  };
+}
+
 Validator.prototype._extendChecks = function (resolve) {
   if (typeof resolve !== 'function') throw new TypeError('_extendChecks expects a function');
   this._extendValidate(resolve);

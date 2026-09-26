@@ -497,6 +497,16 @@ export interface Validator<T = unknown> {
   /** Parse JSON and validate against the schema. Returns the parsed value and the validation result. Works without the native addon. */
   validateAndParse(jsonString: string | Buffer): ValidateAndParseResult<T>;
 
+  /**
+   * Validate, then return a copy holding only the properties the schema declares, with defaults
+   * filled. The input is not modified. Throws an error named `AtaValidationError`, with `errors`,
+   * when the value is invalid, and a `TypeError` where the kept key set cannot be proven from the
+   * schema (a $ref it cannot inline, patternProperties, an object that allows unknown keys) or the
+   * validator rewrites input (`coerceTypes`, custom keywords). Same result as the `parse` export of
+   * a module built with `ata build`.
+   */
+  parse(data: unknown): T;
+
   /** Ultra-fast buffer validation via native addon */
   isValid(input: Buffer | Uint8Array | string): boolean;
 
