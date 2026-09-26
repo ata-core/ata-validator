@@ -1406,7 +1406,7 @@ class Validator {
                       return this._compiled.validate(x);
                     });
         }
-        return _errOnlyImpl(d);
+        return _mustReject(_errOnlyImpl(d));
       };
 
       // Best path: combined validator (single pass, validates + collects errors)
@@ -1450,7 +1450,7 @@ class Validator {
       let _errPreferredImpl = null;
       const errPreferCombined = (d) => {
         if (_errPreferredImpl === null) _errPreferredImpl = combinedIfSafe() || errOnly;
-        return _errPreferredImpl(d);
+        return _mustReject(_errPreferredImpl(d));
       };
 
       // The boolean engine is the verdict authority for these paths; the
@@ -1513,7 +1513,7 @@ class Validator {
         let impl = null;
         const onReject = (data) => {
           const combined = combinedIfSafe();
-          if (combined) { impl = combined; return combined(data); }
+          if (combined) { impl = combined; return _mustReject(combined(data)); }
           return errOnly(data);
         };
         const hybridFn = jsFn._hybridFactory(VALID_RESULT, onReject);
@@ -2665,6 +2665,19 @@ Object.defineProperty(Validator.prototype, "~standard", {
     return std;
   },
 });
+
+// The error resolvers run only after a verdict function has said no. If one
+// answers valid anyway, two generators disagree, and the verdict is the one
+// to keep: returning the resolver's answer is how a vacuous combined function
+// turned a rejection into an acceptance in validateJSON. The disagreement is
+// reported as a generic failure rather than hidden.
+const _VERDICT_DISAGREES = Object.freeze({
+  valid: false,
+  errors: Object.freeze([Object.freeze({ keyword: 'validation', instancePath: '', schemaPath: '#', params: Object.freeze({}), message: 'schema validation failed' })]),
+});
+function _mustReject(r) {
+  return r && r.valid === false ? r : _VERDICT_DISAGREES;
+}
 
 // Install the verdict method. Every place that binds isValidObject comes
 // through here, so a check registered with _extendVerdict survives the method

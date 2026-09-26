@@ -148,6 +148,9 @@ function bothEngines (schema, cases, label) {
     'rootDefs', 'rootSchema', 'schemaMap', 'shared', 'sourceMap', 'userFormats',
     'usesBranchCollapse', 'usesRecursion', 'usesSafeRe', 'varCounter', '_constPool',
     '_apLoopId',
+    // A depth counter like refStack, not a flag: nestedGenCode raises it and
+    // lowers it in a finally, so it is zero again whenever a node finishes.
+    'nestedBoolean',
   ])
 
   const src = require('node:fs').readFileSync(require.resolve('../lib/js-compiler.js'), 'utf8')
