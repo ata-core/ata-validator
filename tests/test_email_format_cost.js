@@ -72,15 +72,13 @@ function med (fn, iters) {
 }
 
 const N = 2000
-let i = 0
-const emailNs = med(() => f.email(emails[(i++) % N]), N)
-i = 0
-const hostNs = med(() => f.hostname(domains[(i++) % N]), N)
-const ratio = emailNs / hostNs
-
 const BUDGET = 2.6
-if (ratio > BUDGET) {
-  console.error(`FAIL email format cost: email is ${ratio.toFixed(2)}x the hostname check it contains (${emailNs.toFixed(0)} ns vs ${hostNs.toFixed(0)} ns), over the ${BUDGET}x budget`)
-  process.exit(1)
-}
-console.log(`email format cost: ${ratio.toFixed(2)}x the hostname check it contains (budget ${BUDGET})`)
+require('./_ratio_gate').ratioGate(() => {
+  let i = 0
+  const emailNs = med(() => f.email(emails[(i++) % N]), N)
+  i = 0
+  const hostNs = med(() => f.hostname(domains[(i++) % N]), N)
+  const ratio = emailNs / hostNs
+  const failures = ratio > BUDGET ? [`FAIL email format cost: email is ${ratio.toFixed(2)}x the hostname check it contains (${emailNs.toFixed(0)} ns vs ${hostNs.toFixed(0)} ns), over the ${BUDGET}x budget`] : []
+  return { failures, ratio }
+}, (r) => `email format cost: ${r.ratio.toFixed(2)}x the hostname check it contains (budget ${BUDGET})`)

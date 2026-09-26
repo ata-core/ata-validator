@@ -78,16 +78,14 @@ function med (fn, iters) {
 const docs = []
 for (let i = 0; i < 100; i++) docs.push({ a: 'x' + i, b: i, c: true })
 let i = 0
-const A = [], B = []
-for (let r = 0; r < 5; r++) {
-  A.push(med(() => combined(docs[(i++) % 100]).valid, 5000))
-  B.push(med(() => verdict(docs[(i++) % 100]), 5000))
-}
-const ratio = median(A) / median(B)
-
 const BUDGET = 1.9
-if (ratio > BUDGET) {
-  console.error(`FAIL additionalProperties combined cost: the combined function is ${ratio.toFixed(2)}x the verdict function on a valid document, over the ${BUDGET}x budget; it is materialising the keys when nothing is extra`)
-  process.exit(1)
-}
-console.log(`additionalProperties combined cost: ${ratio.toFixed(2)}x the verdict function on a valid document (budget ${BUDGET})`)
+require('./_ratio_gate').ratioGate(() => {
+  const A = [], B = []
+  for (let r = 0; r < 5; r++) {
+    A.push(med(() => combined(docs[(i++) % 100]).valid, 5000))
+    B.push(med(() => verdict(docs[(i++) % 100]), 5000))
+  }
+  const ratio = median(A) / median(B)
+  const failures = ratio > BUDGET ? [`FAIL additionalProperties combined cost: the combined function is ${ratio.toFixed(2)}x the verdict function on a valid document, over the ${BUDGET}x budget; it is materialising the keys when nothing is extra`] : []
+  return { failures, ratio }
+}, (r) => `additionalProperties combined cost: ${r.ratio.toFixed(2)}x the verdict function on a valid document (budget ${BUDGET})`)

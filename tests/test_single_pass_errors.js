@@ -102,25 +102,19 @@ function med (fn, iters) {
 
 const N = 20
 let i = 0
-const errT = [], verdictT = [], validT = []
-for (let r = 0; r < 5; r++) {
-  errT.push(med(() => v.validate(bad[(i++) % 40]).errors.length, N))
-  verdictT.push(med(() => v.isValidObject(bad[(i++) % 40]), N))
-  validT.push(med(() => v.validate(good[(i++) % 40]).valid, N))
-}
-const errRatio = median(errT) / median(verdictT)
-const validRatio = median(validT) / median(verdictT)
-
 const ERR_BUDGET = 2.4
 const VALID_BUDGET = 1.25
-let failed = false
-if (errRatio > ERR_BUDGET) {
-  console.error(`FAIL single pass errors: reading errors costs ${errRatio.toFixed(2)}x the verdict, over the ${ERR_BUDGET}x budget; the document is being validated more than once`)
-  failed = true
-}
-if (validRatio > VALID_BUDGET) {
-  console.error(`FAIL single pass errors: an accepted document costs ${validRatio.toFixed(2)}x the verdict API, over the ${VALID_BUDGET}x budget; the accepted path was taxed to pay for the error path`)
-  failed = true
-}
-if (failed) process.exit(1)
-console.log(`single pass errors: errors ${errRatio.toFixed(2)}x the verdict (budget ${ERR_BUDGET}), accepted ${validRatio.toFixed(2)}x (budget ${VALID_BUDGET})`)
+require('./_ratio_gate').ratioGate(() => {
+  const errT = [], verdictT = [], validT = []
+  for (let r = 0; r < 5; r++) {
+    errT.push(med(() => v.validate(bad[(i++) % 40]).errors.length, N))
+    verdictT.push(med(() => v.isValidObject(bad[(i++) % 40]), N))
+    validT.push(med(() => v.validate(good[(i++) % 40]).valid, N))
+  }
+  const errRatio = median(errT) / median(verdictT)
+  const validRatio = median(validT) / median(verdictT)
+  const failures = []
+  if (errRatio > ERR_BUDGET) failures.push(`FAIL single pass errors: reading errors costs ${errRatio.toFixed(2)}x the verdict, over the ${ERR_BUDGET}x budget; the document is being validated more than once`)
+  if (validRatio > VALID_BUDGET) failures.push(`FAIL single pass errors: an accepted document costs ${validRatio.toFixed(2)}x the verdict API, over the ${VALID_BUDGET}x budget; the accepted path was taxed to pay for the error path`)
+  return { failures, errRatio, validRatio }
+}, (r) => `single pass errors: errors ${r.errRatio.toFixed(2)}x the verdict (budget ${ERR_BUDGET}), accepted ${r.validRatio.toFixed(2)}x (budget ${VALID_BUDGET})`)

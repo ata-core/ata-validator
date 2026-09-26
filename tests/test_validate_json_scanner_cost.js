@@ -101,26 +101,20 @@ function med (fn, iters) {
 
 const N = 20
 let i = 0
-const scanT = [], validT = [], parseT = [], invalidT = []
-for (let r = 0; r < 5; r++) {
-  scanT.push(med(() => v.isValidJSON(texts[(i++) % 40]), N))
-  validT.push(med(() => v.validateJSON(texts[(i++) % 40]).valid, N))
-  parseT.push(med(() => JSON.parse(texts[(i++) % 40]), N))
-  invalidT.push(med(() => v.validateJSON(badTexts[(i++) % 40]).valid, N))
-}
-const validRatio = median(validT) / median(scanT)
-const invalidRatio = median(invalidT) / median(parseT)
-
 const VALID_BUDGET = 1.35
 const INVALID_BUDGET = 2.6
-let failed = false
-if (validRatio > VALID_BUDGET) {
-  console.error(`FAIL validateJSON scanner cost: a valid document costs ${validRatio.toFixed(2)}x isValidJSON, over the ${VALID_BUDGET}x budget; the verdict is not coming from the scanner`)
-  failed = true
-}
-if (invalidRatio > INVALID_BUDGET) {
-  console.error(`FAIL validateJSON scanner cost: an invalid document costs ${invalidRatio.toFixed(2)}x JSON.parse, over the ${INVALID_BUDGET}x budget; the scan is being paid on top of the native attempt`)
-  failed = true
-}
-if (failed) process.exit(1)
-console.log(`validateJSON scanner cost: valid ${validRatio.toFixed(2)}x isValidJSON (budget ${VALID_BUDGET}), invalid ${invalidRatio.toFixed(2)}x JSON.parse (budget ${INVALID_BUDGET})`)
+require('./_ratio_gate').ratioGate(() => {
+  const scanT = [], validT = [], parseT = [], invalidT = []
+  for (let r = 0; r < 5; r++) {
+    scanT.push(med(() => v.isValidJSON(texts[(i++) % 40]), N))
+    validT.push(med(() => v.validateJSON(texts[(i++) % 40]).valid, N))
+    parseT.push(med(() => JSON.parse(texts[(i++) % 40]), N))
+    invalidT.push(med(() => v.validateJSON(badTexts[(i++) % 40]).valid, N))
+  }
+  const validRatio = median(validT) / median(scanT)
+  const invalidRatio = median(invalidT) / median(parseT)
+  const failures = []
+  if (validRatio > VALID_BUDGET) failures.push(`FAIL validateJSON scanner cost: a valid document costs ${validRatio.toFixed(2)}x isValidJSON, over the ${VALID_BUDGET}x budget; the verdict is not coming from the scanner`)
+  if (invalidRatio > INVALID_BUDGET) failures.push(`FAIL validateJSON scanner cost: an invalid document costs ${invalidRatio.toFixed(2)}x JSON.parse, over the ${INVALID_BUDGET}x budget; the scan is being paid on top of the native attempt`)
+  return { failures, validRatio, invalidRatio }
+}, (r) => `validateJSON scanner cost: valid ${r.validRatio.toFixed(2)}x isValidJSON (budget ${VALID_BUDGET}), invalid ${r.invalidRatio.toFixed(2)}x JSON.parse (budget ${INVALID_BUDGET})`)
