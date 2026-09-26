@@ -2,6 +2,20 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.31.0 - 2026-09-26
+
+### Changed
+
+- `format: "uri"` answers the usual shape of a URL with one regular expression before it walks the string: a scheme, then either "//" and a host with no userinfo, port, brackets or percent escapes, or no authority at all, then characters RFC 3986 allows. Everything it accepts the walk accepts too, and anything it declines the walk decides as before. On a 34-character URL it takes 25 ns where the walk took 43. A test holds the subset relation over half a million strings and fails on the first draft of the expression, which accepted `http://[::1` by backtracking the "//" into a path.
+- `format: "ipv4"` is one regular expression, measured equal to the walk it replaces on 312000 strings and 12 ns against 17 on a dotted quad. `format: "ipv6"` accepts the uncompressed eight-group form with one expression first, 30 ns against 64, and leaves every other form, compressed or with an embedded IPv4, to the walk; it is only tried from 15 characters, so a short rejection does not pay for it.
+- The error generator declared its helpers, the uri tables, compiled patterns, `anyOf` collapse functions and name sets, inside the generated function, so they were rebuilt on every call: 655 ns on a product document with no errors, where the verdict function takes about 200. They are built once now, for schemas without `$defs` or recursion, whose helpers read per-call state and keep the old form. Reading `.errors` on that document went from 786 ns to 435.
+- The Standard Schema adapter cached parsed paths in a `Map`, which hashes every path freshly concatenated by a rejection before it can look anything up. It compares against the few cached paths of the same length instead: a rejection with sixteen issues went from 1771 ns to 1250.
+- `new Validator(schema)` no longer registers the instance in the identity cache that lets a later `new Validator(sameSchema)` return it. Setting that `WeakMap` entry cost about 780 ns against 150 for the rest of the constructor. The instance is registered when it first compiles instead. Two validators built from one schema object before either is used are now two instances; after the first has validated anything, the second call returns it as before.
+- `t.object` reads its members with one `Object.values` call and uses the fresh key list as `required` when no member is optional. The builder output is unchanged.
+- New internal hooks for wrappers that enforce checks a schema does not carry, used by `@ata-project/keywords` 0.3.3: `_extendChecks(resolve)` registers a check and its error collector once, and the validator runs the check inside its generated verdict function in place of the final `return true`, applies it to `validate()` and to the three JSON entry points, and appends the collector's errors after the schema's own. The wrapper no longer holds the entry points behind accessors, which had put the instance into V8's dictionary mode, so every property read on it, `validator.validate` included, had been a hash lookup. A test checks over 3867 suite cases that the check runs exactly when the schema accepts.
+
+Measured on the schemabenchmarks.dev harness on an M4 with Node 26, which is the Node version its CI runs, against 1.30.3 with `@ata-project/keywords` 0.3.2, interleaved: initialization 3190 ns to 659, validation of the valid product 361 to 235, parsing 368 to 243, Standard Schema valid 367 to 247 and invalid 1998 to 1061. The rejecting rows were already at the harness floor of about 21 ns and stay there. These are not the site's figures, which come from its own runners and have not been rerun.
+
 ## 1.30.3 - 2026-09-25
 
 ### Fixed
