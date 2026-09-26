@@ -1123,6 +1123,11 @@ class Validator {
     this._lastRawInput = null;
     // undefined: not built yet. null: this schema has no scanner.
     this._scanner = undefined;
+    // Checks a wrapper registered through _extendChecks. Declared here so
+    // registering one does not change the instance's shape.
+    this._verdictTail = null;
+    this._validateTail = null;
+    this._entryExt = null;
 
     // Public methods start as memoized accessors on the prototype; nothing is
     // allocated per instance until one is first read. See _defineLazyMethod
@@ -1570,9 +1575,9 @@ class Validator {
       // The verdict methods answer validate()'s question without building the
       // error list, so they run the same preprocess pass. Skipping it made the
       // two disagree on input that coercion or a default would have fixed.
-      this.isValidObject = preprocess
+      _bindVerdict(this, preprocess
         ? (data) => { preprocess(data); return jsFn(data) }
-        : jsFn;
+        : jsFn);
       // Same preference as the object path: the combined function first, since
       // it validates and collects in one pass, and the error generator behind
       // it. `errPreferCombined` is that order, resolved on the first rejection
@@ -1785,9 +1790,9 @@ class Validator {
             return _validate(data);
           }
         : _validate;
-      this.isValidObject = this._fastVerdict
+      _bindVerdict(this, this._fastVerdict
         ? this._fastVerdict
-        : (data) => _validate(data).valid;
+        : (data) => _validate(data).valid);
       this.validateAndParse = (jsonStr) => this._compiled.validateAndParse(jsonStr);
       {
         const slot = this._fastSlot;
@@ -1845,9 +1850,9 @@ class Validator {
             ? (data) => { preprocess(data); return interp.validate(data); }
             : (data) => interp.validate(data));
       this.validate = run;
-      this.isValidObject = this._fastVerdict
+      _bindVerdict(this, this._fastVerdict
         ? this._fastVerdict
-        : (data) => run(data).valid;
+        : (data) => run(data).valid);
       this.validateJSON = (jsonStr) => {
         try {
           return run(JSON.parse(jsonStr));
@@ -1976,28 +1981,52 @@ class Validator {
     // schema coerces or defaults (preprocess mutates before the verdict),
     // under abortEarly (already a frozen stub), and for $dynamicRef (the
     // boolean engine is not the authority there).
+    // A check registered through _extendValidate joins here when it can: the
+    // verdict comes from the generated function with the check compiled in,
+    // and the check's own errors are appended when somebody reads them. A
+    // rejection then costs what it costs without the check. Where this layer
+    // is not installed, the end of this method wraps validate() instead.
+    const _vx = this._validateTail !== null ? this._validateTail() : null;
+    let _vxApplied = false;
     if (this._fastVerdict && !preprocess && !options.abortEarly && this.validate) {
       const _full = this.validate;
-      const _fast = this._fastVerdict;
+      const _fast = _vx ? _fuseTail(this._fastVerdict, _vx.check) : this._fastVerdict;
+      const _extra = _vx ? _vx.errors : null;
+      _vxApplied = true;
       const EMPTY_ERRORS = Object.freeze([]);
       const _verdictFallback = [{ keyword: 'validation', instancePath: '', schemaPath: '#', params: {}, message: 'schema validation failed' }];
+      const _withExtra = (own, data) => {
+        const more = _extra === null ? null : _extra(data);
+        if (more && more.length) return own ? own.concat(more) : more;
+        // The data changed between the verdict and this read; keep the
+        // verdict and say so rather than inventing a specific error.
+        return own || _verdictFallback;
+      };
       const _buildErrors = (data) => {
         const r = _full(data);
-        return (r && r.valid === false && r.errors && r.errors.length)
-          ? r.errors
-          // The data changed between the verdict and this read; keep the
-          // verdict and say so rather than inventing a specific error.
-          : _verdictFallback;
+        return _withExtra((r && r.valid === false && r.errors && r.errors.length) ? r.errors : null, data);
       };
       const _buildRawErrors = (data) => {
         const r = _full(data);
-        if (!r || r.valid !== false) return _verdictFallback;
-        const raw = typeof r._ataRaw === 'function' ? r._ataRaw() : r.errors;
-        return raw && raw.length ? raw : _verdictFallback;
+        let raw = null;
+        if (r && r.valid === false) {
+          raw = typeof r._ataRaw === 'function' ? r._ataRaw() : r.errors;
+          if (!raw || !raw.length) raw = null;
+        }
+        return _withExtra(raw, data);
       };
       this.validate = (data) => {
         if (_fast(data)) return { valid: true, data, errors: EMPTY_ERRORS };
         return new LazyRejection(_buildErrors, data, _buildRawErrors);
+      };
+    }
+    if (_vx && !_vxApplied && this.validate) {
+      const inner = this.validate;
+      const { check, errors } = _vx;
+      this.validate = (data) => {
+        const r = inner(data);
+        if (r.valid && check(data)) return r;
+        return new ExtendedRejection(r, data, errors);
       };
     }
 
@@ -2047,8 +2076,8 @@ class Validator {
         this.isValidJSON = (jsonStr) => {
           const scan = self._ensureScanner();
           if (scan === undefined) return byParsing(jsonStr);
-          if (scan === null) { self.isValidJSON = byParsing; return byParsing(jsonStr); }
-          self.isValidJSON = memoizable
+          if (scan === null) { _bindEntry(self, 'isValidJSON', byParsing); return byParsing(jsonStr); }
+          _bindEntry(self, 'isValidJSON', memoizable
             ? (text) => {
                 if (typeof text !== 'string') return byParsing(text);
                 if (text === _memoText) return _memoVerdict;
@@ -2063,7 +2092,7 @@ class Validator {
                 const r = scan(text);
                 if (r === -1) return byParsing(text);
                 return r === 1;
-              };
+              });
           return self.isValidJSON(jsonStr);
         };
         // validateJSON gets the same short-circuit isValidJSON has. The verdict is
@@ -2086,8 +2115,8 @@ class Validator {
           this.validateJSON = (jsonStr) => {
             const scan = self._ensureScanner();
             if (scan === undefined) return validateByParsing(jsonStr);
-            if (scan === null) { self.validateJSON = validateByParsing; return validateByParsing(jsonStr); }
-            self.validateJSON = (text) => {
+            if (scan === null) { _bindEntry(self, 'validateJSON', validateByParsing); return validateByParsing(jsonStr); }
+            _bindEntry(self, 'validateJSON', (text) => {
               if (typeof text === 'string') {
                 const r = scan(text);
                 if (r === 1) return VALID_RESULT;
@@ -2102,21 +2131,25 @@ class Validator {
                 }
               }
               return validateByParsing(text);
-            };
+            });
             return self.validateJSON(jsonStr);
           };
         }
       }
 
-
-    // Save to identity cache for ultra-fast reuse with same schema object.
-    // Only an instance built without options may answer a later
-    // `new Validator(schema)`: one built with options (richErrors: false,
-    // coerceTypes, formats, ...) would hand its options to a caller that
-    // asked for none.
-    if (this._noOpts && this._schemaObj && typeof this._schemaObj === 'object') {
-      _identityCache.set(this._schemaObj, this);
+    // An extension registered through _extendValidate covers the JSON entry
+    // points too. They are final here except for the scanner stubs above,
+    // which rebind themselves on first use through _bindEntry, so the
+    // extension is applied to whatever each one is now and again on rebind.
+    if (_vx) {
+      this._entryExt = _jsonEntryWrappers(_vx);
+      for (const name of ['validateJSON', 'isValidJSON', 'validateAndParse']) {
+        if (Object.prototype.hasOwnProperty.call(this, name) && typeof this[name] === 'function') _bindEntry(this, name, this[name]);
+      }
     }
+
+
+    _rememberInstance(this);
   }
 
   // Which engine answers validate() for this schema: 'codegen' (generated
@@ -2219,7 +2252,8 @@ class Validator {
     const cached = (this._userFormats || this._usesKeywords) ? null : _compileCache.get(mapKey);
     if (cached && cached.jsFn) {
       this._jsFn = cached.jsFn;
-      this.isValidObject = cached.jsFn;
+      _bindVerdict(this, cached.jsFn);
+      _rememberInstance(this);
       return;
     }
     const uf = this._userFormats;
@@ -2227,7 +2261,8 @@ class Validator {
     const jsFn = _cg || compileToJS(this._schemaObj, null, sm);
     this._jsFn = jsFn;
     if (jsFn) {
-      this.isValidObject = jsFn;
+      _bindVerdict(this, jsFn);
+      _rememberInstance(this);
       // A partial entry: the verdict function is real, the other two are not
       // built yet rather than declined. `undefined` is the not-built marker
       // the full compile's _buildDeferred looks for; `null` would read as
@@ -2629,6 +2664,216 @@ Object.defineProperty(Validator.prototype, "~standard", {
   },
 });
 
+// Install the verdict method. Every place that binds isValidObject comes
+// through here, so a check registered with _extendVerdict survives the method
+// being replaced as the validator compiles further, which it does more than
+// once over its life.
+function _bindVerdict(self, fn) {
+  const resolve = self._verdictTail;
+  if (resolve !== null && typeof fn === 'function') {
+    const tail = resolve();
+    if (typeof tail === 'function') fn = _fuseTail(fn, tail);
+  }
+  self.isValidObject = fn;
+}
+
+// Bind one of the JSON entry points, through the extension wrapper when there is one.
+function _bindEntry(self, name, fn) {
+  const ext = self._entryExt;
+  self[name] = ext !== null && ext[name] ? ext[name](fn) : fn;
+}
+
+// The JSON entry points under an extension: the schema answers first, and only
+// text it accepts is parsed for the check, so a rejection costs nothing extra.
+function _jsonEntryWrappers({ check, errors }) {
+  const parse = (text) => JSON.parse(typeof text === 'string' ? text : new TextDecoder().decode(text));
+  return {
+    validateJSON: (inner) => (text) => {
+      const res = inner(text);
+      if (!res.valid) return res;
+      let data;
+      try { data = parse(text); } catch { return res; }
+      if (check(data)) return res;
+      const e = errors(data);
+      return e && e.length ? { valid: false, errors: e } : { valid: false, errors: [_EXT_FALLBACK] };
+    },
+    isValidJSON: (inner) => (text) => {
+      if (!inner(text)) return false;
+      let data;
+      try { data = parse(text); } catch { return true; }
+      return check(data);
+    },
+    validateAndParse: (inner) => (text) => {
+      const res = inner(text);
+      if (!res.valid) return res;
+      if (check(res.value)) return res;
+      const e = errors(res.value);
+      return { valid: false, value: res.value, errors: e && e.length ? e : [_EXT_FALLBACK] };
+    },
+  };
+}
+const _EXT_FALLBACK = Object.freeze({ keyword: 'validation', instancePath: '', schemaPath: '#', params: {}, message: 'schema validation failed' });
+
+// A verdict function that also runs `tail` on what it accepts. The generated
+// function can take the check in place of its final `return true`, one call
+// per document; anything else is composed.
+function _fuseTail(fn, tail) {
+  const fused = typeof fn._withTail === 'function' ? fn._withTail(tail) : null;
+  return fused || ((d) => fn(d) && tail(d));
+}
+
+// The rejection validate() returns on the paths where an extension check could
+// not join the lazy layer: the inner result, plus the check's errors appended
+// on first read. `inner` may itself be valid, when only the check failed.
+class ExtendedRejection {
+  constructor(inner, data, collect) {
+    this.valid = false;
+    this._inner = inner;
+    this._data = data;
+    this._collect = collect;
+    this._errors = null;
+  }
+  toJSON() {
+    return { valid: false, errors: this.errors };
+  }
+  _ataRaw() {
+    const inner = this._inner;
+    const more = this._collect(this._data) || [];
+    const raw = inner.valid ? more : (typeof inner._ataRaw === 'function' ? inner._ataRaw() : inner.errors).concat(more);
+    return raw.length ? raw : [_EXT_FALLBACK];
+  }
+}
+Object.defineProperty(ExtendedRejection.prototype, 'errors', {
+  enumerable: true,
+  configurable: true,
+  get() {
+    if (this._errors === null) {
+      const inner = this._inner;
+      const more = this._collect(this._data) || [];
+      const all = inner.valid ? more : inner.errors.concat(more);
+      this._errors = all.length ? all : [_EXT_FALLBACK];
+    }
+    return this._errors;
+  },
+});
+
+// For wrappers that enforce a check the schema does not carry, such as the
+// `instanceof` keyword of @ata-project/keywords. `resolve` is called whenever
+// the verdict method is bound, which is after the schema has been normalized,
+// and returns the check, a function of the document that answers true or
+// false, or null when there is nothing to add. Only isValidObject takes it;
+// the other entry points, which report errors, stay the wrapper's to handle.
+//
+// Before this, such a wrapper had to hold isValidObject behind an accessor so
+// that the validator's own rebinding could not drop its check, and every call
+// paid for the accessor and two more calls: 10.1 ns against 4.2 on a document
+// the schema rejects at its third property.
+Validator.prototype._verdictTail = null;
+Validator.prototype._validateTail = null;
+Validator.prototype._entryExt = null;
+
+// Let `new Validator(schema)` with the same schema object return this instance.
+// Only an instance built without options may answer that call: one built with
+// options (richErrors: false, coerceTypes, formats, ...) would hand its options
+// to a caller that asked for none, and an extended one would enforce checks the
+// caller never registered. Both the caller's object and the normalized one are
+// keys, since a later caller passes the former.
+function _rememberInstance(self) {
+  if (!self._noOpts || self._verdictTail !== null || self._validateTail !== null) return;
+  const raw = self._rawSchema;
+  if (raw && typeof raw === 'object' && !_identityCache.has(raw)) _identityCache.set(raw, self);
+  const obj = self._schemaObj;
+  if (obj !== raw && obj && typeof obj === 'object' && !_identityCache.has(obj)) _identityCache.set(obj, self);
+}
+
+// An extended validator answers differently from a plain one for the same
+// schema, so it must not be the instance `new Validator(sameSchema)` hands out.
+function _leaveIdentityCache(self) {
+  self._noOpts = false;
+  // Nothing is registered before the first compile, so there is nothing to
+  // take back.
+  if (!self._initialized && self._jsFn === null) return;
+  const raw = self._rawSchema;
+  if (raw && typeof raw === 'object' && _identityCache.get(raw) === self) _identityCache.delete(raw);
+  // The compiled form is cached too, at the end of the first compile. Read it
+  // only if it is already materialized: reading it otherwise builds it.
+  if (Object.prototype.hasOwnProperty.call(self, '_schemaObj')) {
+    const obj = self._schemaObj;
+    if (obj && typeof obj === 'object' && _identityCache.get(obj) === self) _identityCache.delete(obj);
+  }
+}
+
+// The same kind of extension for validate(): `resolve` returns { check, errors }
+// or null, where `errors(data)` lists the check's own errors, or returns null
+// when there are none. The check's errors come after the schema's, and a value
+// that fails only the check is rejected with the check's errors alone. Must be
+// called before validate() is first used, which is when it is compiled; later
+// calls throw rather than being silently ignored.
+Validator.prototype._extendValidate = function (resolve) {
+  if (typeof resolve !== 'function') throw new TypeError('_extendValidate expects a function');
+  if (this._initialized) throw new Error('_extendValidate must be called before the validator compiles');
+  _leaveIdentityCache(this);
+  const prev = this._validateTail;
+  this._validateTail = prev === null ? resolve : () => {
+    const a = prev(), b = resolve();
+    if (!a) return b;
+    if (!b) return a;
+    return {
+      check: (d) => a.check(d) && b.check(d),
+      errors: (d) => {
+        const x = a.errors(d), y = b.errors(d);
+        if (!x) return y;
+        if (!y) return x;
+        return x.concat(y);
+      },
+    };
+  };
+  return this;
+};
+
+// Both extensions in one call, from one resolver that returns { check, errors }
+// or null. This is the form @ata-project/keywords uses: registering costs one
+// closure, where wrapping the five entry points cost a closure per entry point,
+// the wrappers themselves and an accessor, most of what building a wrapped
+// validator took.
+Validator.prototype._extendChecks = function (resolve) {
+  if (typeof resolve !== 'function') throw new TypeError('_extendChecks expects a function');
+  this._extendValidate(resolve);
+  return this._extendVerdict(() => {
+    const x = resolve();
+    return x ? x.check : null;
+  });
+};
+
+// Whether this instance enforces a check its schema does not carry. The
+// ahead-of-time emitters build a module from the schema alone, so they refuse
+// an instance that says yes rather than emit one that accepts too much.
+// Reading it resolves the registered checks; only an emitter reads it.
+Object.defineProperty(Validator.prototype, '_externalChecks', {
+  configurable: true,
+  get() {
+    if (this._validateTail !== null && this._validateTail()) return true;
+    if (this._verdictTail !== null && typeof this._verdictTail() === 'function') return true;
+    return false;
+  },
+});
+
+Validator.prototype._extendVerdict = function (resolve) {
+  if (typeof resolve !== 'function') throw new TypeError('_extendVerdict expects a function');
+  _leaveIdentityCache(this);
+  const prev = this._verdictTail;
+  this._verdictTail = prev === null ? resolve : () => {
+    const a = prev(), b = resolve();
+    if (typeof a !== 'function') return b;
+    if (typeof b !== 'function') return a;
+    return (d) => a(d) && b(d);
+  };
+  // A method bound before this call was bound without the check. Rebind it.
+  // An unbound one binds through _bindVerdict on its first call.
+  if (Object.prototype.hasOwnProperty.call(this, 'isValidObject')) _bindVerdict(this, this.isValidObject);
+  return this;
+};
+
 function _defineLazyMethod(name, maker) {
   Object.defineProperty(Validator.prototype, name, {
     configurable: true,
@@ -2674,13 +2919,13 @@ _defineLazyMethod('isValidObject', (self) => (data) => {
   if (_tier.tier === 0) {
     const _plan = buildTier0Plan(self._schemaObj);
     let _n = 0;
-    self.isValidObject = (d) => {
+    _bindVerdict(self, (d) => {
       const r = tier0Validate(_plan, d);
       if (++_n === 2) {
         try { self._ensureCodegen(); } catch {}
       }
       return r;
-    };
+    });
   } else {
     // `new Function` is a property of the realm, not of the schema: under a
     // strict CSP or `--disallow-code-generation-from-strings` this throws
