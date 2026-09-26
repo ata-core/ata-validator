@@ -22,7 +22,7 @@ const { resolvePointer } = require('./lib/pointer.js');
 
 const { Validator } = require('./index');
 const { METASCHEMAS } = require('./lib/metaschemas');
-const { createShaper } = require('./lib/compat-errors');
+const { createShaper, asReferenceKeyword } = require('./lib/compat-errors');
 
 const DRAFT7 = 'http://json-schema.org/draft-07/schema#';
 const DRAFT2020 = 'https://json-schema.org/draft/2020-12/schema';
@@ -185,7 +185,7 @@ class Ata {
         validate.errors = null;
         return true;
       }
-      let errors = shaper === null ? result.errors : shaper(result.errors, data);
+      let errors = shaper === null ? result.errors.map(asReferenceKeyword) : shaper(result.errors, data);
       // Errors the shaper synthesises, the `if` wrapper among them, are built
       // from the group rather than carried up from the validator, so verbose
       // mode has to fill in the value they point at here or they would be the
