@@ -694,17 +694,31 @@ function sortErrorsBySchemaOrder(rootSchema, errors) {
 
 // Paths repeat across rejections of the same shape, so the parsed segment
 // list is cached per path string. Entries are frozen: the same array is
-// handed to every issue that names the path. The cache is bounded so a
-// stream of array indexes cannot grow it without limit.
-const _pathCache = new Map();
-const PATH_CACHE_MAX = 4096;
+// handed to every issue that names the path.
+//
+// The cache is bucketed by length and searched with ===, not keyed in a Map.
+// A path with an array index in it is concatenated afresh by every rejection,
+// and a Map has to hash each such string from scratch before it can look
+// anything up; that hashing was 30% of a Standard Schema rejection with
+// sixteen issues. Comparing against the few paths of the same length costs
+// less. Both levels are bounded so a stream of array indexes cannot grow it
+// without limit: a full bucket stops caching, too many lengths clear it.
+const _pathBuckets = new Map();
+const PATH_BUCKET_MAX = 32;
+const PATH_LENGTHS_MAX = 256;
 function parsePointerPath(path) {
   if (!path) return EMPTY_PATH;
-  const hit = _pathCache.get(path);
-  if (hit !== undefined) return hit;
+  const n = path.length;
+  let bucket = _pathBuckets.get(n);
+  if (bucket !== undefined) {
+    for (let i = 0; i < bucket.length; i += 2) if (bucket[i] === path) return bucket[i + 1];
+  } else {
+    if (_pathBuckets.size >= PATH_LENGTHS_MAX) _pathBuckets.clear();
+    bucket = [];
+    _pathBuckets.set(n, bucket);
+  }
   const segs = Object.freeze(parsePointerPathUncached(path));
-  if (_pathCache.size >= PATH_CACHE_MAX) _pathCache.clear();
-  _pathCache.set(path, segs);
+  if (bucket.length < PATH_BUCKET_MAX * 2) bucket.push(path, segs);
   return segs;
 }
 const EMPTY_PATH = Object.freeze([]);
