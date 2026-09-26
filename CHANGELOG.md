@@ -2,6 +2,17 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.31.2 - 2026-09-26
+
+### Fixed
+
+- `isValidObject` accepted objects missing a required property, on its first calls, when that property had no entry in `properties`. `new Validator({ type: 'object', required: ['id'] }).isValidObject({})` returned true. The first calls of `isValidObject` go through a small validator for flat object schemas, which checks presence through the per-property constraints, so a required name without one was never checked; the schema moved to generated code on the second call, and never did when the generator declined the schema, as it does for a required name such as `constructor`. Present since at least 1.14.1. Such a schema is no longer given to that validator.
+- A property inherited through the prototype chain counted as present. `required: ['toString']` was satisfied by `{}`, whose `toString` comes from `Object.prototype`, through `isValidObject` for every such name and through every entry point for `dependentRequired`, and `properties: { constructor: { type: 'string' } }` rejected `{}` because the inherited `constructor` was checked against the subschema. The generators asked whether a key was present with `'k' in d` or `d.k !== undefined`, both of which see inherited names; the interpreted engine asks `Object.hasOwn`, which is what JSON Schema means. Every generator, the closure compiler and the flat-object validator now answer the same way: a name on `Object.prototype` is checked with `hasOwnProperty`, and any other name with `in` on an object whose prototype is `Object.prototype`, which is every object `JSON.parse` returns, and with `hasOwnProperty` on anything else, such as a class instance or an object from `Object.create`. On the product schema of the schemabenchmarks.dev harness the verdict is unchanged at about 200 ns. Present since at least 1.14.1. A test compares every name on `Object.prototype` across the keywords that ask about presence and every entry point against the interpreted engine, 1132 comparisons.
+- Errors from the combined code generator carried the source escapes of a key: a property named `it's` was reported at `#/properties/it\'s/type`, and `instancePath` had the same backslash. The generator built those error objects once from text meant for generated source instead of from the values. Present since at least 1.29.0.
+- A root `false` schema reported the keyword `false schema` with code ATA9001, while a nested one, and the interpreted engine, report `not` with ATA4005. It is `not` everywhere now. `ata-validator/compat` names it `false schema` for both, as the validator it mirrors does; before this it matched that validator only at the root.
+
+A new test compares the errors of both error-reporting generators against the interpreted engine over the official suite and schemas with keys that need escaping, 3548 results; the verdict agreement test compared only verdicts, which is how the two error faults above went unnoticed.
+
 ## 1.31.1 - 2026-09-26
 
 ### Fixed
