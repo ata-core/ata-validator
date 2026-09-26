@@ -61,7 +61,16 @@ const shape = {
 {
   const plain = { type: 'object', properties: { a: { even: true } } };
   const a = new Validator(plain);
-  assert.strictEqual(new Validator(plain), a, 'identity cache');
+  // Registration waits for the first compile: a WeakMap entry cost five times
+  // the rest of the constructor, for instances that may never validate.
+  assert.notStrictEqual(new Validator(plain), a, 'construction alone does not register the instance');
+  a.validate({ a: 1 });
+  assert.strictEqual(new Validator(plain), a, 'identity cache after the first compile');
+  const b = { type: 'object', properties: { n: { type: 'number' } } };
+  const vb = new Validator(b);
+  vb.isValidObject({ n: 1 });
+  vb.isValidObject({ n: 2 });
+  assert.strictEqual(new Validator(b), vb, 'identity cache after the verdict-only compile');
   const k = new Validator(plain, { keywords: { even: (s, d) => !s || d % 2 === 0 } });
   assert.strictEqual(k.validate({ a: 3 }).valid, false);
   assert.strictEqual(k.engine(), 'interpreter');

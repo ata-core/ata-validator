@@ -1136,10 +1136,12 @@ class Validator {
     // "~standard" (Standard Schema V1) is a lazy prototype accessor too;
     // see below the class. Consumers only pay for it if they read it.
 
-    // Populate identity cache so repeated `new Validator(sameSchema)` short-circuits.
-    if (!opts && typeof schema === "object" && schema !== null) {
-      _identityCache.set(schema, this);
-    }
+    // The identity cache, which lets a later `new Validator(sameSchema)` return
+    // this instance, is filled on the first compile rather than here. A WeakMap
+    // entry is an ephemeron the collector has to trace separately, and setting
+    // one cost about 780 ns against 150 for the rest of this constructor, five
+    // times over for an instance that may never validate anything. Once an
+    // instance has compiled, the shortcut behaves as before.
   }
 
   // `$vocabulary` says which keywords the dialect has, and answering needs the
