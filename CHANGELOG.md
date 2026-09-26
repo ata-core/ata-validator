@@ -2,6 +2,20 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.31.3 - 2026-09-26
+
+### Fixed
+
+- `validate()` threw a TypeError with `removeAdditional` when an object above a level to clean was missing or null: with `{ type: 'object', properties: { c: { type: 'object', properties: { d: { type: 'object', additionalProperties: false } } } } }`, `validate({})` threw reading `d` of undefined. The removal pass checked each level only for itself and read it through its parent. Each level's removal now sits inside its parent's check. Present since at least 1.14.1.
+- With `removeAdditional`, a node with `properties: {}` and `additionalProperties: false` kept its keys; every key there is additional, and the interpreted engine already removed them.
+- Where the code generator declines a schema, for example one with a property named `toString`, `isValidObject()` skipped coercion, defaults and key removal, and answered differently from `validate()`: with `coerceTypes`, `{ n: '5' }` against `{ n: { type: 'integer' } }` was valid through one and invalid through the other.
+
+### Changed
+
+- Reading `.errors` got slower in 1.31.2, 3.9 to 5.8 us on a product document with fifteen errors, because the own-property test read the object's prototype inside a shared helper for every key. The prototype is read once per object now, and only where a key test uses it, which brings the error path back to 3.9 us and removes the five percent the check cost `assertLoose` on the Moltar benchmark. The AOT module of a 50-property schema is about 390 bytes larger gzipped than before 1.31.2, which is what the exact own-property check costs there.
+- `removeAdditional` deletes unknown keys during the verdict walk instead of in a separate pass before it, for schemas where that cannot change an answer. A document the verdict accepts is answered in one walk; anything else takes the full path, which removes, validates and reports as before. The fused path is limited to schemas built from keywords that only look at declared properties or scalar values, since a keyword that sees a key before it is deleted, such as `minProperties`, an object `const` or an `anyOf` branch, could pass where it fails after removal; a test compares the result, the errors and the object left behind against the interpreted engine over 12000 random documents. On the Moltar harness, Node 24 on an M4, runtime `parseSafe` went from 31M to 57M operations a second.
+- Internal: `lib/plan-source.js` generates a verdict function from interpreter plans, the first part of replacing the three code generators with one. It agrees with the interpreted engine on 3980 results over 461 schemas and matches the current generator's speed on the product schema. It is not wired into `Validator` yet.
+
 ## 1.31.2 - 2026-09-26
 
 ### Fixed
