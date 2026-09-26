@@ -151,6 +151,9 @@ function bothEngines (schema, cases, label) {
     // A depth counter like refStack, not a flag: nestedGenCode raises it and
     // lowers it in a finally, so it is zero again whenever a node finishes.
     'nestedBoolean',
+    // Value expression to its prototype-flag local; withPlain sets an entry
+    // for one node and restores the previous one in a finally.
+    'plainOf',
   ])
 
   const src = require('node:fs').readFileSync(require.resolve('../lib/js-compiler.js'), 'utf8')

@@ -104,5 +104,26 @@ for (const k of NAMES) {
   }
 }
 
+// The shape of the fix, not only its answers. Every node that asks about
+// presence reads its object's prototype once into a local, and every key test
+// in it reads that local. A key test that falls back to the shared helper,
+// which reads the prototype itself, cost the error path a microsecond on a
+// product document: the helper sees every object shape and is megamorphic.
+{
+  const jc = require('../lib/js-compiler');
+  const VALID = Object.freeze({ valid: true, errors: Object.freeze([]) });
+  const item = { type: 'object', properties: { id: { type: 'number' }, t: { type: 'string', minLength: 1 }, u: { type: 'string' } }, required: ['id', 't'] };
+  const schema = { type: 'object', properties: { id: { type: 'number' }, name: { type: 'string' }, note: { type: 'string' }, items: { type: 'array', items: item } }, required: ['id', 'name'], dependentRequired: { note: ['name'] } };
+  const sources = {
+    verdict: jc.compileToJSCodegen(schema, null, undefined)._source,
+    errors: jc.compileToJSCodegenWithErrors(schema, null, undefined)._errSource,
+  };
+  for (const [name, src] of Object.entries(sources)) {
+    assert.ok(src && /_pk\d+/.test(src), `${name}: no per-object prototype flag was emitted`);
+    compared++;
+    if (/_ok\(/.test(src.replace(/function _ok\([^)]*\)\{[^}]*\}/g, ''))) report(`${name}: a key test reads the prototype through _ok instead of the node's flag`);
+  }
+}
+
 assert.strictEqual(bad, 0, `${bad} disagreements on inherited property names`);
 console.log(`ok: presence is an own-property question on every entry point, ${compared} comparisons`);
