@@ -2,6 +2,15 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.32.2 - 2026-09-27
+
+### Changed
+
+- Compiling a schema no longer builds forms of it that nothing has asked for. Every compile rewrote the generated source into the hybrid form used by `validate()` and `validateJSON()` and into the tail form used by extended validators, and compiled the hybrid with a second `new Function`, before the first document was checked. The default `validate()` reaches the hybrid only when errors are read, and `validateJSON()` only when it is called, so most validators paid for it and never used it. Both forms are now built on demand, and `validate()` and `validateJSON()` answer their first 64 calls through the verdict function and the error resolver before switching to the hybrid, so a validator that serves a few requests never compiles it and a busy one runs the same code as before. The exact own-property checks added in 1.31.2 made the generated source about 40% larger, which is what made this cost visible. Per schema, measured on 2000 distinct schemas on an Apple M4 Pro, Node 25: 143 to 179 us on 1.32.1, 72 to 74 us now, against 93 us on 1.25.0. From a cold process to the first validated request with ten route schemas, medians of 31 runs: 3.62 to 3.50 ms through `isValidObject` and 3.71 to 3.36 ms through `validate()`. A new test runs the official suite through both tiers of `validate()` and `validateJSON()`, with and without `coerceTypes`, and compares their answers, 5204 of them.
+- The own-property helpers are hoisted one by one where something uses them, instead of as one block, and the prototype test is written with shorter aliases. Compiled modules are 6 to 10 bytes smaller gzipped.
+
+Checked against 1.32.1 before release, interleaved across processes: request cost, `validate()`, `validateJSON()` and reading errors are unchanged within noise; `validate()` with `coerceTypes` went from 25 to 22 ns; the runtime bundled for the browser is 0.2 KB larger gzipped, 91.9 KB, which is the tiering code itself.
+
 ## 1.32.1 - 2026-09-27
 
 ### Changed
