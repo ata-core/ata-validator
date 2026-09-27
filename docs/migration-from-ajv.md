@@ -266,9 +266,9 @@ fastify.register(require('fastify-ata'), {
 ```
 
 On serverless cold start (10 route schemas, from a cold process to the first validated
-request) the plugin path costs about 3.1 ms against 19.6 ms for the default ajv pipeline.
-Registration itself is about 1.1 ms; ata compiles lazily, so the rest lands on the first
-request rather than at boot. Reproduce with `node benchmark/bench_fastify_boot.mjs`.
+request) the plugin path costs about 3.9 ms against 20.2 ms for the default ajv pipeline,
+measured on ata 1.32.1. Registration itself is about 0.2 ms; ata compiles lazily, so the
+rest lands on the first request rather than at boot. Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
 ## Standard Schema V1
 
@@ -291,7 +291,7 @@ npx ata compile schemas/user.json -o src/user.validator.mjs --name User
 
 Output:
 
-- `src/user.validator.mjs` - about 1 KB gzipped
+- `src/user.validator.mjs`, a few KB gzipped: 2.6 KB for the ten-field user schema in `tests/fixtures/error-dx/user.schema.json`
 - `src/user.validator.d.mts` - TypeScript declarations, `isValid` is a type predicate
 
 Usage:
@@ -304,20 +304,20 @@ if (isValid(data)) {
 }
 ```
 
-The generated file has zero runtime dependency on `ata-validator`. For browser / edge deployments (Cloudflare Workers, Vercel Edge) this drops validator-related bundle weight from roughly 27 KB gzipped down to 1 KB.
+The generated file has zero runtime dependency on `ata-validator`. For browser / edge deployments (Cloudflare Workers, Vercel Edge) this drops validator-related bundle weight from about 91 KB gzipped for the runtime to 1.2 KB for that schema when only `isValid` is imported, measured with `bun build --minify --target=browser` on ata 1.32.1.
 
 ## Performance expectations
 
-These numbers are from M4 Pro / Node 25. Run-to-run variance is about +/- 5%.
+These numbers are from M4 Pro / Node 25. Run-to-run variance is about +/- 5%. The cold start and suite rows were rerun on ata 1.32.1; the warm path, `abortEarly` and HTTP rows come from an earlier 1.x release and have not been rerun since.
 
 | Scenario | ajv | ata | Honest delta |
 |---|---|---|---|
 | Warm path, simple schema (S1) | ~9 ns | ~9 ns | tied |
 | Warm path, 10 fields (S2) | ~18 ns | ~19 ns | tied |
 | Invalid with `abortEarly` | ~15 ns | ~4 ns | 4x faster |
-| Serverless cold start (10 Fastify route schemas, to first validated request) | 19.6 ms | 3.1 ms | 6.4x faster |
+| Serverless cold start (10 Fastify route schemas, to first validated request) | 20.2 ms | 3.9 ms | 5.2x faster |
 | Fastify HTTP throughput | ~70k req/s | ~70k req/s | tied |
-| JSON Schema Test Suite | ~98% | 98.5% | parity |
+| JSON Schema Test Suite, full, three dialects | not measured here | 100% | |
 
 Pure warm-path validation is essentially tied with ajv. The measurable wins for most projects are on cold start, bundle size, and the invalid path. Do not migrate expecting a throughput boost on a classic long-running server; the HTTP stack dominates.
 

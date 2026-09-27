@@ -34,7 +34,7 @@ Example: the instance methods `toStandalone()`/`toStandaloneModule()` were depre
 
 ## Spec coverage
 
-ata-validator targets JSON Schema Draft 2020-12 (plus Draft 7). Against the full official suite with nothing excluded it passes 1285 of 1290 Draft 2020-12 cases (99.6%) and 911 of 922 Draft 7 cases (98.8%); `npm run test:suite` reproduces both figures and names every remaining failure. Known limitations are documented in the README's "Known limitations" section and are considered scope decisions, not bugs, for the 1.x line.
+ata-validator targets JSON Schema Draft 2020-12 (plus Draft 7). Against the full official suite with nothing excluded it passes 1301 of 1301 Draft 2020-12 cases, 929 of 929 Draft 7 cases and 1135 of 1135 cases of the v1 dialect, the same with code generation blocked; `npm run test:suite` reproduces all three and would name any failure. Known limitations are documented in the README's "Known limitations" section and are considered scope decisions, not bugs, for the 1.x line.
 
 ## Compiled output
 
