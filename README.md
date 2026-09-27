@@ -7,6 +7,24 @@ JSON Schema validation that compiles for speed and still runs where code generat
 
 1.0 is a stability commitment: see [docs/STABILITY.md](docs/STABILITY.md) for the semver, deprecation, and error-code guarantees.
 
+## Used by
+
+Projects whose code depends on ata, from GitHub's dependency graph, and the framework that lists
+its plugin, with what each does with it:
+
+- [Socket](https://github.com/SocketDev) uses ata, compiled ahead of time, in the shared build
+  tooling of its repositories.
+- [Fastify](https://fastify.dev/ecosystem/) lists the
+  [`fastify-ata`](https://github.com/ata-core/fastify-ata) plugin in its ecosystem.
+- [react-jsonschema-form](https://github.com/rjsf-team/react-jsonschema-form) ships an ata
+  validator in its main repository, in a runtime and a precompiled form.
+- [JollyPixel](https://github.com/JollyPixel/editor) parses and validates JSON on its back end
+  with ata, compiled ahead of time.
+- [better-drizzle](https://github.com/almeidazs/better-drizzle) ships an ata plugin for queries
+  and rows.
+- [svelte-jsonschema-form](https://github.com/x0k/svelte-jsonschema-form) publishes an ata
+  validator package, runtime and precompiled.
+
 ## Quick start
 
 ```bash
@@ -50,24 +68,6 @@ if (isValid(req.body)) {
 ```
 
 The `.compiled.mjs` modules are self-contained: zero runtime dependency on ata-validator, fully tree-shakeable, with TypeScript types emitted alongside.
-
-## Used by
-
-Projects whose code depends on ata, from GitHub's dependency graph, and what each does with it:
-
-- [react-jsonschema-form](https://github.com/rjsf-team/react-jsonschema-form) ships an ata
-  validator in its main repository, in a runtime and a precompiled form.
-- [Socket](https://github.com/SocketDev) uses ata, compiled ahead of time, in the shared build
-  tooling of its repositories.
-- [JollyPixel](https://github.com/JollyPixel/editor) parses and validates JSON on its back end
-  with ata, compiled ahead of time.
-- [better-drizzle](https://github.com/almeidazs/better-drizzle) ships an ata plugin for queries
-  and rows.
-- [svelte-jsonschema-form](https://github.com/x0k/svelte-jsonschema-form) publishes an ata
-  validator package, runtime and precompiled.
-
-Fastify's [ecosystem page](https://fastify.dev/ecosystem/) lists the
-[`fastify-ata`](https://github.com/ata-core/fastify-ata) plugin.
 
 ## Measured by others
 
