@@ -2,6 +2,19 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.32.3 - 2026-09-27
+
+### Fixed
+
+- A `pattern` of one character class repeated a fixed number of times accepted strings it should reject when the class had more than one range or character. `^[A-Za-z]{2}$` accepted `"xyz"` and `"1a"` through `isValidObject`, `validate()` and `validateJSON()`, while the interpreted engine and the regex itself reject both. Such patterns are compiled to one character test per position, and the test for a class like `[A-Za-z]` was emitted as `a||b` without parentheses, so joining the positions with `&&` bound it as `(length && a) || (b && ...)` and the length check stopped applying. Present since 0.12.1. The class test is now grouped. A new test builds 1500 seeded random fixed-length patterns and strings that match, miss by one character, run long or short or carry non-ASCII characters, and compares every entry point and the interpreted engine with the regex, 102010 answers; it found 2667 disagreements before the fix. Country codes, currency codes and short identifiers written as such patterns are the common case; if you rely on one, upgrade.
+
+### Changed
+
+- A pattern that matches one fixed-length sequence, such as `^[A-Z]{3}-\d{4}$` for a SKU, is compiled into character tests instead of going through the regex matcher. On a thousand realistic order bodies with one such pattern per line item, checking a valid body went from about 560 to 385 ns. An ahead-of-time module no longer embeds the regex matcher for such a pattern: a schema with two of them went from 6283 to 1422 bytes gzipped.
+- `parse()` copies a property whose schema is an `enum` or a `const` of plain values with no `type`, such as `{ enum: ['USD', 'EUR'] }`. It declined the whole schema before, since it could not prove what to keep inside such a property; a value that passes can only be one of those plain values, so there is nothing inside it to strip.
+
+Checked against 1.32.2 before release, interleaved across processes: cold start, compile cost, request cost, `validate()`, `validateJSON()` and reading errors are unchanged within noise; the runtime bundled for the browser is 0.5 KB larger gzipped, 92.4 KB, which is the new pattern compiler and the enum copy.
+
 ## 1.32.2 - 2026-09-27
 
 ### Changed
