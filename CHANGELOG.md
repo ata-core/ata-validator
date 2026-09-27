@@ -2,6 +2,13 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.32.1 - 2026-09-27
+
+### Changed
+
+- Generated code no longer depends on the `__proto__` accessor to tell a plain object from any other. It asks whether an object's prototype is `Object.prototype` before trusting `in` for property presence, and it read that prototype through `Object.prototype.__proto__`, which Deno removes. On Deno every read came back undefined, every object took the per-key `hasOwnProperty` path, and an ahead-of-time module that imports nothing took 40 ns a call where Node takes 2.2. Where the accessor is missing the prototype now comes from `Object.getPrototypeOf`, chosen by a constant the engine folds, so Node is unchanged. On Deno 2.1.9, M4, `isValidObject` on a seven-property object went from about 42 to 17.5 ns. The answers were already correct on Deno; only the cost changes. A new test compares every object entry point with the interpreted engine over 12000 documents, 5886 of them with keys on a prototype, and runs again in a process with the accessor deleted. Ahead-of-time modules need a rebuild to pick this up.
+- The error-reporting code generator checks `additionalProperties: false` by counting keys first when every declared property is required, and compares key names only when the count or a presence test disagrees. On an accepted document it had compared every key against every declared name, which put it at 2.1 to 3.3 times the verdict function on CI runners; locally the ratio went from 1.70-1.97 to 1.62-1.81.
+
 ## 1.32.0 - 2026-09-26
 
 ### Added
