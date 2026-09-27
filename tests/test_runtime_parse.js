@@ -15,7 +15,8 @@ const pick = (a) => a[rnd(a.length)];
 
 function leaf() {
   return pick([{ type: 'string' }, { type: 'number' }, { type: 'integer', minimum: 0 }, { type: 'boolean' },
-    { type: 'string', default: 'dflt' }, { type: 'string', enum: ['a', 'b'] }, { type: 'array', items: { type: 'number' } }]);
+    { type: 'string', default: 'dflt' }, { type: 'string', enum: ['a', 'b'] }, { type: 'array', items: { type: 'number' } },
+    { enum: ['a', 'b', 1] }, { const: 'k' }]);
 }
 function objectSchema(depth) {
   const props = {};
@@ -36,6 +37,7 @@ function objectSchema(depth) {
 function leafValue(sub) {
   if (rnd(5) === 0) return pick(['s', 1, -2, 2.5, true, null, [1, 2]]);
   if (sub.enum) return pick(sub.enum);
+  if (sub.const !== undefined) return sub.const;
   switch (sub.type) {
     case 'string': return pick(['s', 'longer']);
     case 'number': return pick([1, 2.5, -3]);
