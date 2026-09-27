@@ -371,6 +371,9 @@ const _identityCache = new WeakMap();
 
 const SIMDJSON_PADDING = 64;
 const VALID_RESULT = Object.freeze({ valid: true, errors: Object.freeze([]) });
+// How many calls a validator answers through its verdict function before its
+// validate() and validateJSON() compile the single-function hybrid.
+const HYBRID_TIER_CALLS = 64;
 const ABORT_EARLY_RESULT = Object.freeze({
   valid: false,
   errors: Object.freeze([Object.freeze({
@@ -1543,8 +1546,20 @@ class Validator {
           if (combined) { impl = combined; return _mustReject(combined(data)); }
           return errOnly(data);
         };
-        const hybridFn = jsFn._hybridFactory(VALID_RESULT, onReject);
-        impl = hybridFn;
+        // Tiered: the first calls go through the verdict function and the
+        // resolver, and the hybrid is compiled once the validator is in use.
+        // Compiling it up front was a second parse of the whole schema on
+        // every validator, most of which answer a handful of requests or only
+        // verdicts. A refused compile stays on the first tier.
+        let warm = 0;
+        const first = (data) => {
+          if (++warm >= HYBRID_TIER_CALLS && impl === first) {
+            impl = jsFn._hybridFactory(VALID_RESULT, onReject) || ((d) => (jsFn(d) ? VALID_RESULT : onReject(d)));
+            return impl(data);
+          }
+          return jsFn(data) ? VALID_RESULT : onReject(data);
+        };
+        impl = first;
         const run = (data) => impl(data);
         this.validate = preprocess
           ? (data) => { preprocess(data); return run(data); }
@@ -1613,11 +1628,18 @@ class Validator {
       // it validates and collects in one pass, and the error generator behind
       // it. `errPreferCombined` is that order, resolved on the first rejection
       // instead of at compile time.
-      const hybridFn = jsFn._hybridFactory
-        ? jsFn._hybridFactory(VALID_RESULT, errPreferCombined)
-        : null;
-      const jsonValidateInner = hybridFn
-        || ((obj) => (jsFn(obj) ? VALID_RESULT : errPreferCombined(obj)));
+      // Tiered the same way as validate() above.
+      let jsonHybrid = null;
+      let jsonWarm = 0;
+      const jsonValidateInner = (obj) => {
+        if (jsonHybrid !== null) return jsonHybrid(obj);
+        if (++jsonWarm >= HYBRID_TIER_CALLS) {
+          jsonHybrid = (jsFn._hybridFactory && jsFn._hybridFactory(VALID_RESULT, errPreferCombined))
+            || ((o) => (jsFn(o) ? VALID_RESULT : errPreferCombined(o)));
+          return jsonHybrid(obj);
+        }
+        return jsFn(obj) ? VALID_RESULT : errPreferCombined(obj);
+      };
       // Parsed text takes the same preprocess pass as a parsed object, so
       // validate(obj) and validateJSON(text) answer the same for the same
       // document. Without it, coercion, removal and defaults applied on one
