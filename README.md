@@ -7,7 +7,7 @@ JSON Schema validation that compiles for speed and still runs where code generat
 
 1.0 is a stability commitment: see [docs/STABILITY.md](docs/STABILITY.md) for the semver, deprecation, and error-code guarantees.
 
-## Used by
+## Who uses ata
 
 Projects whose code depends on ata, from GitHub's dependency graph, and the framework that lists
 its plugin, with what each does with it:
