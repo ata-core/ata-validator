@@ -1254,7 +1254,7 @@ class Validator {
     } else if (cached && cached.jsFn !== undefined) {
       // `full` says the error and combined functions exist too. An entry
       // without it still carries a verdict function worth reusing; the pair is
-      // built by _buildDeferred below if something asks for an error, and the
+      // built by _buildErr/_buildCombined below when something asks, and the
       // entry is upgraded then. `undefined` in `combined`/`errFn` means not
       // built yet; `null` means the compiler declined. Those two must never
       // blur: reading the first as the second is the bug this cache had once
@@ -1272,7 +1272,7 @@ class Validator {
       // are the other two thirds of a cold first call (8.2, 10.4 and 7.8 ms on
       // a 120-property config schema, most of it V8 compiling each generator
       // the first time it is entered), and a caller that never reads an error
-      // never needs them. _buildDeferred compiles them on the first rejection.
+      // never needs them. _buildErr/_buildCombined compile them on demand.
       jsCombinedFn = undefined;
       jsErrFn = undefined;
       _isCodegen = !!_cgFn;
@@ -1348,23 +1348,31 @@ class Validator {
           )));
     const useSimdjsonForLarge = !hasArrayTraversal;
 
-    // Builds the two generators the compile step left out, once, and upgrades
-    // the shared cache entry. `undefined` means not built yet; `null` means the
-    // compiler declined. Conflating those is what once cost every schema its
-    // generated error function for the life of the process, so they stay apart.
-    const _buildDeferred = () => {
-      if (jsCombinedFn !== undefined && jsErrFn !== undefined) return;
-      const uf2 = this._userFormats;
-      if (jsCombinedFn === undefined) jsCombinedFn = compileToJSCombined(schemaObj, VALID_RESULT, sm, uf2) || null;
-      if (jsErrFn === undefined) jsErrFn = compileToJSCodegenWithErrors(schemaObj, sm, uf2) || null;
-      if (!uf2) {
-        const entry = _compileCache.get(mapKey);
-        if (entry && entry.jsFn === jsFn) {
-          entry.combined = jsCombinedFn;
-          entry.errFn = jsErrFn;
-          entry.full = true;
-        }
+    // Build the generators the compile step left out, each only when something
+    // asks for it, and upgrade the shared cache entry. A first rejection needs
+    // one of the two, not both; building both was a millisecond of V8 compiling
+    // a generator nobody called. `undefined` means not built yet; `null` means
+    // the compiler declined. Conflating those is what once cost every schema
+    // its generated error function for the life of the process, so they stay
+    // apart, and `full` is set only once both exist.
+    const _upgradeCacheEntry = () => {
+      if (this._userFormats) return;
+      const entry = _compileCache.get(mapKey);
+      if (entry && entry.jsFn === jsFn) {
+        if (jsCombinedFn !== undefined) entry.combined = jsCombinedFn;
+        if (jsErrFn !== undefined) entry.errFn = jsErrFn;
+        if (jsCombinedFn !== undefined && jsErrFn !== undefined) entry.full = true;
       }
+    };
+    const _buildCombined = () => {
+      if (jsCombinedFn !== undefined) return;
+      jsCombinedFn = compileToJSCombined(schemaObj, VALID_RESULT, sm, this._userFormats) || null;
+      _upgradeCacheEntry();
+    };
+    const _buildErr = () => {
+      if (jsErrFn !== undefined) return;
+      jsErrFn = compileToJSCodegenWithErrors(schemaObj, sm, this._userFormats) || null;
+      _upgradeCacheEntry();
     };
 
     if (jsFn) {
@@ -1414,7 +1422,7 @@ class Validator {
       let _errOnlyImpl = null;
       const errOnly = (d) => {
         if (_errOnlyImpl === null) {
-          _buildDeferred();
+          _buildErr();
           let safe = null;
           if (jsErrFn) {
             try {
@@ -1452,7 +1460,7 @@ class Validator {
       const combinedIfSafe = () => {
         if (_combinedProbed) return _safeCombined;
         _combinedProbed = true;
-        _buildDeferred();
+        _buildCombined();
         if (jsCombinedFn) {
           try {
             const probe = {};
@@ -2333,7 +2341,7 @@ class Validator {
       _rememberInstance(this);
       // A partial entry: the verdict function is real, the other two are not
       // built yet rather than declined. `undefined` is the not-built marker
-      // the full compile's _buildDeferred looks for; `null` would read as
+      // the full compile's _buildErr/_buildCombined look for; `null` would read as
       // "the compiler declined" and cost the schema its error function, which
       // is the bug this cache had once already. `isCodegen` rides along so a
       // validator that later reuses this entry reports the same engine it
