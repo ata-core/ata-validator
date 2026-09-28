@@ -2,7 +2,7 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.35.0 - 2026-09-28
 
 ### Added
 
@@ -28,7 +28,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 - `validateAndParse()` parses with `JSON.parse` and validates with `validate()` everywhere. Without the addon it threw when it was a validator's first call, and on the interpreted engine every time.
 - On a 51 KB rejected document, `validateJSON(text).valid` costs 43 µs against 168: the verdict no longer builds the addon's error list. Reading the errors costs 250 µs against 287.
 - Error messages read the same on every engine. `contains` said `contains: need at least 1 match(es)` and `contains: at most 2 match(es)` on the default engine and `must contain at least 1 valid item(s)` and `must NOT contain more than 2 valid item(s)` on the interpreted one; both now use the second pair. The interpreted engine now names the duplicate items in a `uniqueItems` error and joins a type list with a comma, `must be integer, string`, as the default engine did. Error codes, keywords and paths are unchanged.
-- The validator core and the code generator are separate modules now, with the generator registered by the package entry; the package exports the same names. With the lazy loading above, the browser bundle for the user schema in `tests/fixtures/error-dx` is 92.9 KB gzipped against 92.2 KB on 1.34.0. The split exists so the interpreted engine can be tested in a process with no code generator, which is the test that found the interpreter bugs above.
+- The validator core and the code generator are separate modules now, with the generator registered by the package entry; the package exports the same names. With the lazy loading above, the browser bundle for the user schema in `tests/fixtures/error-dx` is 93.2 KB gzipped against 92.2 KB on 1.34.0. The split exists so the interpreted engine can be tested in a process with no code generator, which is the test that found the interpreter bugs above.
 
 Checked against 1.34.0 before release, interleaved across processes from two worktrees: accepting and rejecting a request (`benchmark/bench_docs_site.mjs`), compiling 2000 distinct schemas, 1000 JSON-parsed order bodies with and without code generation, a small rejected `validateJSON` with its errors read, and the Fastify boot benchmark all measure within run-to-run noise; the start-up figures are above. The compiled module for the user schema is 2.2 KB gzipped on both. New tests hold the fixes: every official suite case through `validateJSON` and `validate()`, plain and padded past the threshold, errors compared field by field (6730 documents); the interpreted engine in a process without the code generator against the default engine, with and without the addon (6922 documents); the compiled wrapper against the runtime (12045 checks); both ESM entries against the CommonJS one; and the addon staying unloaded until a buffer call.
 
