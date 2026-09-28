@@ -452,6 +452,17 @@ export interface BundleStandaloneOptions extends ValidatorOptions {
 export interface StandardSchemaV1Props<Output = unknown, Input = unknown> {
   version: 1;
   vendor: "ata-validator";
+  /**
+   * Standard JSON Schema: the schema this validator checks, as a copy, for a
+   * consumer that publishes it (the MCP SDK's `inputSchema`, for one). The
+   * target must be the dialect the schema declares, and a schema without
+   * `$schema` is 2020-12. Any other target throws; ata does not convert
+   * between dialects.
+   */
+  jsonSchema: {
+    input(options: { target: "draft-2020-12" | "draft-07" | (string & {}); libraryOptions?: Record<string, unknown> }): Record<string, unknown>;
+    output(options: { target: "draft-2020-12" | "draft-07" | (string & {}); libraryOptions?: Record<string, unknown> }): Record<string, unknown>;
+  };
   validate(
     value: unknown
   ):

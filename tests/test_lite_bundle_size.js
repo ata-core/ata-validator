@@ -11,7 +11,9 @@ const path = require('path')
 const zlib = require('zlib')
 const esbuild = require('esbuild')
 
-const BUDGET = 46000 // bytes gzipped by zlib level 9; measured 45009 on 2026-09-28
+// bytes gzipped by zlib level 9. Measured 45009 on 2026-09-28 at 1.35.0, 45863 at
+// 1.36.1, and 46034 once `~standard.jsonSchema` (Standard JSON Schema) was added.
+const BUDGET = 46300
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

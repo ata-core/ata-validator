@@ -6,6 +6,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Added
 
+- Standard JSON Schema: `validator['~standard'].jsonSchema.input({ target })` and `.output()` return the schema the validator checks, as a copy, so a consumer that publishes schemas can take an ata `Validator` as it is. The MCP TypeScript SDK is one: on `@modelcontextprotocol/server` 2.2.0 a `new Validator(schema)` passed as a tool's `inputSchema` or `outputSchema` is published in `tools/list` and checks every call, with ata's error messages, tested end to end over an in-memory client and server. The target has to be the dialect the schema declares, and a schema without `$schema` is 2020-12; any other target throws, since ata does not convert between dialects.
 - `fromCompiled(mod, schema, { useDefaults: false })`: the compile-away wrapper now reproduces `new Validator(schema, { useDefaults: false })`, leaving the input as it is. Any other option throws a `TypeError` instead of being ignored, and `compiledOptions` from `ata-validator/build` lists what is supported, so a bundler plugin can tell which calls with options it may replace. Found by reading a real user's code: every runtime `Validator` in JollyPixel's network worker is built with `{ useDefaults: false }`, which compile-away had to leave alone. The parity test now also runs the seeded schemas with defaults under that option, comparing results and the input afterwards: 19680 checks over 814 schemas, no differences; making the wrapper ignore the option makes 1110 of them differ.
 
 ## 1.36.1 - 2026-09-28

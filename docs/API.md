@@ -466,6 +466,24 @@ if ('value' in result) {
 `types` exists only in the type system. The spec defines it as type-only, and
 nothing reads it at runtime.
 
+
+### Standard JSON Schema
+
+`v['~standard'].jsonSchema.input({ target })` (and `.output()`, the same
+document, since ata does not transform values) returns a copy of the schema
+the validator checks, for consumers that publish schemas. The MCP TypeScript
+SDK takes a `Validator` this way as a tool's `inputSchema` or `outputSchema`:
+
+```javascript
+server.registerTool('greet', {
+  inputSchema: new Validator({ type: 'object', properties: { name: { type: 'string' } }, required: ['name'] }),
+}, async ({ name }) => ({ content: [{ type: 'text', text: `Hello, ${name}` }] }))
+```
+
+`target` must be the dialect the schema declares, `'draft-2020-12'` or
+`'draft-07'`; a schema without `$schema` is 2020-12. Any other target throws a
+`TypeError`; ata does not convert between dialects.
+
 ## Utility Functions
 
 ### validate(schema, data)
