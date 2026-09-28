@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.34.0 - 2026-09-28
+
+### Added
+
+- `ata-validator/compat` exports its class as `Ajv` too, so `import { Ajv, type ErrorObject, type Options } from 'ajv'` switches by changing only the module name. Its `ErrorObject` type takes the same type parameters as the reference's and types `parentSchema`, `schema` and `data` the same way, so code that names `ErrorObject<string, Record<string, any>, unknown>` or passes an error to a function typed for the reference compiles unchanged.
+
+### Fixed
+
+- The compat entry worded a `type` error the way ata does rather than the way the reference does, which broke tests that match messages. A field declared `{ type: 'integer', nullable: true }` reported `must be integer, null` with `params.type` of `['integer', 'null']`; the reference reports `must be integer` with `params.type` of `'integer'`, adding `null` only when the declared type is already a list. A type list was joined with a comma and a space; the reference uses a bare comma, `must be string,number`. Found by running the TypeSpec compiler's own test suite against the compat entry: with the import changed on one line it builds and passes all 4474 of its tests, where two failed on these messages before.
+
+Checked against 1.33.3 before release: only the compat entry changed, its error wording and its types; `Validator`, `validate()`, the generated code and the AOT output are untouched. The four checks pass, and the new parity cases fail on 1.33.3 with the differences described above.
+
 ## 1.33.3 - 2026-09-28
 
 ### Fixed
