@@ -89,6 +89,15 @@ const validate = ajv.compile(schema)
 if (validate(data)) { ... } else { console.log(validate.errors) }
 ```
 
+The ESM and TypeScript form works the same way, named import included:
+
+```ts
+// Was:
+import { Ajv, type ErrorObject, type Options } from 'ajv'
+// Now:
+import { Ajv, type ErrorObject, type Options } from 'ata-validator/compat'
+```
+
 `ata-validator/compat` implements the class surface production code calls: `compile`, `compileAsync`, `validate`, `addSchema`, `getSchema`, `removeSchema`, `validateSchema`, `addFormat`, `addKeyword` (the `validate`, `compile` and `macro` forms), `addVocabulary`, `errorsText`, and the constructor options `allErrors`, `coerceTypes`, `useDefaults`, `removeAdditional`, `verbose`, `validateFormats`, `validateSchema`, `formats`, `keywords` and `schemas`. A schema that names no `$schema` is read as draft-07, as the default class does.
 
 Errors come back in the shape and the order the reference reports them: `keyword`, `instancePath`, `schemaPath`, `params`, `message`, the failing branches before an `anyOf` or `oneOf`, each bad name before its `propertyNames`, and with `allErrors` off, the first failing keyword's group only. `tests/test_ajv_parity.js` runs a corpus of real call shapes through both implementations and compares verdicts, error sets, messages, coerced data and `errorsText()` output.

@@ -518,5 +518,34 @@ test('the reference formats plugin is refused with a pointer to the built-ins', 
   assert(threw, 'addFormats(ata) throws');
 });
 
+// ----- a config loader with nullable fields (TypeSpec's tspconfig shape) ---
+
+parity('a type error on a nullable field names the declared type', (Klass) => {
+  const ajv = new Klass({ allErrors: true, allowUnionTypes: true });
+  const validate = ajv.compile({
+    type: 'object',
+    properties: {
+      emit: { type: 'array', nullable: true, items: { type: 'string' } },
+      maxFiles: { type: 'integer', nullable: true },
+      either: { type: ['string', 'number'], nullable: true },
+    },
+  });
+  const ok = validate({ emit: 5, maxFiles: 'x', either: {} });
+  const errs = validate.errors.map((e) => [e.instancePath, e.params, e.message]);
+  return { ok, errs: errs.sort((a, b) => (a[0] < b[0] ? -1 : 1)) };
+});
+
+parity('a type union is worded with a bare comma', (Klass) => {
+  const ajv = new Klass({ allErrors: true, allowUnionTypes: true });
+  const validate = ajv.compile({ type: 'object', properties: { v: { type: ['string', 'number'] } } });
+  const ok = validate({ v: true });
+  return { ok, errs: validate.errors.map((e) => [e.instancePath, e.params, e.message]) };
+});
+
+test('the class is exported as Ajv too, the name ajv 8 exports', () => {
+  assert(require('../compat').Ajv === Ata, 'require(...).Ajv is the class');
+  assert(new (require('../compat').Ajv)().compile({ type: 'string' })('x') === true, 'and it works');
+});
+
 console.log(`\n${passed}/${passed + failed} tests passed.\n`);
 process.exit(failed > 0 ? 1 : 0);

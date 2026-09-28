@@ -68,3 +68,15 @@ void taggedString;
 
 const taggedArray = t.array(t.number(), { typeof: 'object' });
 void taggedArray;
+
+// --- compat: the named Ajv export and a reference-shaped ErrorObject ---
+// Code written against the reference's `import { Ajv, type ErrorObject }`
+// compiles with only the module name changed.
+import { Ajv as CompatAjv, type ErrorObject as CompatErrorObject, type Options as CompatOptions } from '../compat.js';
+const compatOptions: CompatOptions = { allErrors: true, coerceTypes: true };
+const compat = new CompatAjv(compatOptions);
+compat.addFormat('absolute-path', { type: 'string', validate: (p: string) => p.startsWith('/') });
+const compatValidate = compat.compile({ type: 'string' });
+const compatErrors: CompatErrorObject<string, Record<string, any>, unknown>[] = compatValidate.errors ?? [];
+const firstParent: Record<string, any> | undefined = compatErrors[0]?.parentSchema;
+void firstParent;

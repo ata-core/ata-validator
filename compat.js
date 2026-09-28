@@ -432,3 +432,4 @@ Ata.attachDataFrames = function attachDataFrames(errors, text) {
 module.exports = Ata;
 module.exports.default = Ata;
 module.exports.Ata = Ata;
+module.exports.Ajv = Ata;

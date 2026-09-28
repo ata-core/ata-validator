@@ -36,14 +36,25 @@ declare class Ata {
 }
 
 declare namespace Ata {
-  interface ErrorObject {
+  /** The same class under the name ajv 8 exports it by: `import { Ajv } from 'ata-validator/compat'`. */
+  const Ajv: typeof Ata;
+  type Ajv = Ata;
+  // Generic the way the reference's ErrorObject is, so code that names
+  // `ErrorObject<string, Record<string, any>, unknown>` compiles against this
+  // entry unchanged, and an error from here passes where one from the
+  // reference is expected.
+  interface ErrorObject<K extends string = string, P = Record<string, any>, S = unknown> {
     instancePath: string;
     schemaPath: string;
-    keyword: string;
-    params: Record<string, unknown>;
+    keyword: K;
+    params: P;
     message: string;
     /** Present when `verbose: true`. */
-    parentSchema?: unknown;
+    schema?: S;
+    /** Present when `verbose: true`. */
+    parentSchema?: Record<string, any>;
+    /** Present when `verbose: true`. */
+    data?: unknown;
     /** Present on errors produced under `propertyNames`. */
     propertyName?: string;
     [extra: string]: unknown;
