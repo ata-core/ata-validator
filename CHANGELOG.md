@@ -15,7 +15,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
-- A definition that is only a reference to another, `X: { $ref: '#/definitions/XUnion' }`, no longer sends the schema to the interpreted engine. TypeScript-to-schema generators emit it for every named union, so schemas generated from TypeScript types mostly could not be compiled ahead of time: PostHog's ExperimentMetric schema, 71 definitions with 4 aliases, was one. A chain of aliases that loops still declines. On SchemaStore, 401 of the 487 schemas with sample documents now take the code generator (387 before) and 389 can be compiled away (375), with no differences between engines over the 2213 documents.
+- A definition that is only a reference to another, `X: { $ref: '#/definitions/XUnion' }`, no longer sends the schema to the interpreted engine. TypeScript-to-schema generators emit it for every named union, so schemas generated from TypeScript types mostly could not be compiled ahead of time: PostHog's ExperimentMetric schema, 71 definitions with 4 aliases, was one. A chain of aliases that loops still declines. - `propertyNames: { $ref: '#/definitions/Key' }` and `propertyNames: { type: 'string', ... }` no longer send a schema to the interpreted engine. The reference is replaced by what it names, through aliases, and `type: 'string'` is dropped since every property name is a string, on a copy the generators read; errors keep the path the interpreted engine reports. What is left must be keywords the generators express (`minLength`, `maxLength`, `pattern`, `const`, `enum`), and anything else still declines. Uniswap's token-list schema uses both forms and can now be compiled ahead of time.
+
+With both changes, 408 of the 487 SchemaStore schemas with sample documents take the code generator (387 before) and 396 can be compiled away (375), with no differences between engines over the 2213 documents.
+- `lib/plan-source.js`, which nothing in the package loads, is no longer published: 304507 bytes packed instead of 307804.
 
 ## 1.36.1 - 2026-09-28
 
