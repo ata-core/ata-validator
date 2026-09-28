@@ -386,6 +386,47 @@ const validators = Validator.loadBundle(require('./validators.js'), schemas);
 validators[0].validate(data);
 ```
 
+### Compiling `new Validator(schema)` away
+
+For a bundler plugin that replaces `new Validator(schema)` with a module
+compiled at build time, so the runtime compiler stays out of the bundle
+while the code keeps the `Validator` API. Three functions from
+`ata-validator/build` decide and build; `fromCompiled` from
+`ata-validator/compiled` is what the bundle imports instead.
+
+```javascript
+// At build time
+const { compiledModuleFor, compiledSchemaFor } = require('ata-validator/build');
+const source = compiledModuleFor(schema, { format: 'esm' }); // string, or null
+const normalized = compiledSchemaFor(schema);
+
+// In the bundle, where `new Validator(schema)` was
+import { fromCompiled } from 'ata-validator/compiled';
+import * as mod from './schema.compiled.mjs';
+const v = fromCompiled(mod, normalized);
+v.validate(data); v.isValidObject(data); v.validateJSON(text); v.isValidJSON(text);
+```
+
+- `compiledModuleFor(schema, { format })` returns the module source, or
+  `null` where the replacement would not answer as `new Validator(schema)`
+  does: a schema with custom `errorMessage`s, one the emitter cannot
+  compile, and one whose detailed errors the generator cannot produce.
+  Leave those calls to the runtime.
+- `compiledEligible(schema)` is the first of those checks alone, without
+  building anything.
+- `compiledSchemaFor(schema)` is the schema a default `Validator` reads
+  after normalization. `fromCompiled` needs it, not the original, so that
+  defaults, error order and diagnostics follow the same document.
+
+`fromCompiled` answers the four methods as a `Validator` with default
+options does, errors and filled-in defaults included. Only default options
+are covered; a call with options stays on the runtime. Two tests hold the
+equivalence: `tests/test_compiled_parity.js` over the official suite and
+seeded schemas with defaults (15180 checks over 814 schemas), and
+`npm run test:schemastore` over SchemaStore's sample documents, where 725
+of the 977 schemas can be compiled away. The wrapper is 9.9 KB gzipped in
+a browser bundle.
+
 ## Standard Schema V1
 
 ata-validator implements the [Standard Schema](https://github.com/standard-schema/standard-schema) interface.

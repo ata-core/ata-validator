@@ -8,6 +8,9 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 - `compiledSchemaFor(schema)` in `ata-validator/build`: the normalized schema a default `Validator` reads, which `fromCompiled()` now takes so its defaults, error order and diagnostics follow the same document the runtime does.
 - A `baseURI` option: the URI the root schema was retrieved from, which its relative `$ref`s resolve against when it declares no `$id` of its own. Draft-07 ignores an `$id` beside a root `$ref`, and SchemaStore writes its schemas that way, so a relative reference in them, `bitrise-step.json` from `bitrise.json` say, had no base to resolve against. Run against SchemaStore's own sample documents, with each schema given the address it is served from, ata answers 99.05% of the 2213 JSON samples as SchemaStore expects; of the 21 it does not, 17 need a schema outside SchemaStore that the offline run could not fetch, and 4 depend on draft-07 applying keywords beside `$ref`, which the specification says to ignore and ata ignores.
+- `npm run test:schemastore <checkout>`: every SchemaStore schema against SchemaStore's own sample documents, requiring the default engine, the interpreted engine and the compile-away wrapper to give the same verdict and the same errors. It found the silent accept, the `ReferenceError` and the engine-dependent error order below, all of which passed the official suite. CI runs it weekly and on changes to the engine, against a pinned SchemaStore commit: 487 schemas on 2213 documents, 375 of them compiled away too, no differences.
+- A test that pins the modules an ordinary schema's first answers load, so a module joining every process's start is a decision rather than a side effect.
+- `docs/API.md` documents `compiledModuleFor`, `compiledSchemaFor`, `compiledEligible` and `fromCompiled`.
 
 ### Fixed
 
