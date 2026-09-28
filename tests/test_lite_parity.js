@@ -78,7 +78,7 @@ function answer (Validator, c) {
 
 if (process.argv[2] === '--child') {
   const lite = require('../lite')
-  const loaded = Object.keys(require.cache).filter((k) => /js-compiler|codegen-paths|codegen-parse|scan-compiler|clone-emit|ts-gen|render-/.test(k))
+  const loaded = Object.keys(require.cache).filter((k) => /js-compiler|codegen-parse|scan-compiler|clone-emit|ts-gen|render-|\/index\.js$/.test(k))
   const probe = new lite.Validator({ type: 'string' })
   const report = { loaded, engine: probe.engine(), answers: cases().map((c) => answer(lite.Validator, c)) }
   let parseError = null
