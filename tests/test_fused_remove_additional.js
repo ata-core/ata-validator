@@ -101,5 +101,9 @@ for (let i = 0; i < 1500; i++) {
 }
 
 assert.strictEqual(bad, 0, `${bad} disagreements with remove-then-validate`);
-assert.ok(fusedSchemas > 150, `only ${fusedSchemas} schemas took the fused path; the comparison is not exercising it`);
+// 228 of these schemas took the fused path until 1.35.0, when a node with
+// `additionalProperties: true` made the generator's safety gate skip its
+// subtree. Schemas with a property named `toString` below such a node now
+// decline as they always did at the root, which leaves 109 with this seed.
+assert.ok(fusedSchemas > 100, `only ${fusedSchemas} schemas took the fused path; the comparison is not exercising it`);
 console.log(`ok: fused removeAdditional matches remove-then-validate on ${compared} documents, ${fusedSchemas} fused schemas`);
