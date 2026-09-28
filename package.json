@@ -35,11 +35,6 @@
       "import": "./t.mjs",
       "require": "./t.js"
     },
-    "./lite": {
-      "types": "./lite.d.ts",
-      "import": "./lite.mjs",
-      "require": "./lite.js"
-    },
     "./package.json": "./package.json"
   },
   "sideEffects": false,
@@ -121,9 +116,6 @@
     "t.js",
     "t.mjs",
     "t.d.ts",
-    "lite.d.ts",
-    "lite.mjs",
-    "lite.js",
     "bin/",
     "README.md",
     "LICENSE"

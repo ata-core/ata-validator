@@ -2,6 +2,22 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- With `engine: 'interpreter'`, `validateJSON()` and `isValidJSON()` parsed the text and checked it without applying defaults, coercion or `removeAdditional`, so they could accept a document `validate()` rejects. A schema whose default fails its own constraints, `{ properties: { bar: { type: 'string', minLength: 4, default: 'bad' } } }`, accepted `'{}'` there. This happened wherever the native addon loaded, which is a default install on a supported platform; without the addon the text path was already right. `engine: 'interpreter'` is the option for schemas from outside the trust boundary, so this was the worst place for it.
+- Where the error generator declines a schema, errors came from the native addon when it was installed and from the interpreted engine when it was not. The two word errors differently, and the addon's carry `schemaPath: null`, so the same validator reported `expected type number, got string` on one machine and `must be number` on another. The interpreted engine now answers on every platform. Schemas affected include property names with quotes, backslashes or control characters, and `additionalProperties: false` next to a recursive `$ref: '#'`.
+- `abortEarly: true` returned full errors instead of the `ATA9000` result from `validate()` under `engine: 'interpreter'` with the addon loaded, and from `validateJSON()` on the code generation path unless the JSON scanner had answered. Both return the `ATA9000` result now, as `validate()` did on every other path.
+- A boolean root schema with a `schemas` registry threw `TypeError: Cannot create property '$defs' on boolean` under `engine: 'interpreter'`.
+
+### Changed
+
+- Error messages read the same on every engine. `contains` said `contains: need at least 1 match(es)` and `contains: at most 2 match(es)` on the default engine and `must contain at least 1 valid item(s)` and `must NOT contain more than 2 valid item(s)` on the interpreted one; both now use the second pair. The interpreted engine now names the duplicate items in a `uniqueItems` error and joins a type list with a comma, `must be integer, string`, as the default engine did. Error codes, keywords and paths are unchanged.
+- The validator core and the code generator are separate modules now, with the generator registered by the package entry. The package exports the same names. It makes the full browser bundle 1.3 KB larger, 93.4 KB gzipped against 92.2 KB on 1.34.0 for the user schema in `tests/fixtures/error-dx`, and the core is one more file to load at startup: from `require` to a first rejected document, 8.84 to 8.97 ms at the median of 51 processes each, pure JS. The split exists so the interpreted engine can be tested in a process that has no code generator, which is the test that found the four bugs above.
+
+Checked against 1.34.0 before release, interleaved across processes from two worktrees: accepting and rejecting a request (`benchmark/bench_docs_site.mjs`), compiling 2000 distinct schemas, 1000 JSON-parsed order bodies with and without code generation, and the Fastify boot benchmark all measure within run-to-run noise. The compiled module for the user schema is 2275 bytes gzipped on both. The new test runs every case of the official suite in three dialects and a matrix of rewriting options through the interpreted engine in a process without the code generator, with and without the addon, and compares verdicts, errors and rewritten data with the default engine: 6922 documents, no differences.
+
 ## 1.34.0 - 2026-09-28
 
 ### Added
