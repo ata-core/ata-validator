@@ -14,7 +14,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { Validator } = require('..')
-const { compiledModuleFor, compiledEligible } = require('../build')
+const { compiledModuleFor, compiledEligible, compiledSchemaFor } = require('../build')
 const { fromCompiled } = require('../lib/compiled')
 
 const DIALECTS = {
@@ -45,7 +45,7 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
       if (!src) { unbuilt++; continue }
       schemas++
       const runtime = new Validator(schema)
-      const compiled = fromCompiled(load(src), schema)
+      const compiled = fromCompiled(load(src), compiledSchemaFor(schema))
       for (const t of group.tests) {
         const text = JSON.stringify(t.data)
         const checks = [
@@ -60,6 +60,57 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
           const want = a(), got = b()
           if (want !== got) diffs.push(`${dialect}/${file} :: ${group.description} :: ${t.description} :: ${name}\n    runtime  ${want.slice(0, 300)}\n    compiled ${got.slice(0, 300)}`)
         }
+      }
+    }
+  }
+}
+// The suite has few defaults below the top level; seeded nested schemas with
+// defaults at every depth, as a default Validator fills them.
+{
+  let x = 0xdef4
+  const rnd = (k) => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return (x >>> 0) % k }
+  const pick = (a) => a[rnd(a.length)]
+  const node = (depth) => {
+    const properties = {}
+    for (const k of ['a', 'b', 'c']) {
+      if (rnd(3) === 0) continue
+      if (depth > 0 && rnd(2) === 0) properties[k] = node(depth - 1)
+      else {
+        const leaf = pick([{ type: 'integer', minimum: 0 }, { type: 'string', minLength: 2 }, { type: 'boolean' }])
+        if (rnd(2) === 0) leaf.default = pick([1, -1, 'xy', 'z', true])
+        properties[k] = leaf
+      }
+    }
+    const s = { type: 'object', properties }
+    if (rnd(3) === 0) s.default = {}
+    return s
+  }
+  const docFor = (s, depth) => {
+    const o = {}
+    for (const [k, p] of Object.entries(s.properties || {})) {
+      if (rnd(3) === 0) continue
+      o[k] = p.properties && depth > 0 ? docFor(p, depth - 1) : pick([5, 'ab', true, 'q', -2, null])
+    }
+    return o
+  }
+  for (let i = 0; i < 150; i++) {
+    const schema = node(3)
+    const src = compiledModuleFor(schema, { format: 'cjs' })
+    if (!src) { unbuilt++; continue }
+    schemas++
+    const runtime = new Validator(schema)
+    const compiled = fromCompiled(load(src), compiledSchemaFor(schema))
+    for (let j = 0; j < 5; j++) {
+      const text = JSON.stringify(docFor(schema, 3))
+      for (const [name, a, b] of [
+        ['validate', () => show(runtime.validate(JSON.parse(text))), () => show(compiled.validate(JSON.parse(text)))],
+        ['isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(compiled.isValidObject(JSON.parse(text)))],
+        ['validateJSON', () => show(runtime.validateJSON(text)), () => show(compiled.validateJSON(text))],
+        ['isValidJSON', () => String(runtime.isValidJSON(text)), () => String(compiled.isValidJSON(text))],
+      ]) {
+        compared++
+        const want = a(), got = b()
+        if (want !== got) diffs.push(`nested defaults ${JSON.stringify(schema).slice(0, 200)} on ${text} :: ${name}\n    runtime  ${want.slice(0, 300)}\n    compiled ${got.slice(0, 300)}`)
       }
     }
   }
