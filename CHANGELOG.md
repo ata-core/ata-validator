@@ -2,6 +2,17 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- The code generator accepted documents a schema rejects when the constraint sat below a node with `additionalProperties: true`. Its safety check stopped at such a node and called everything under it safe, so a construct the generator cannot express was dropped instead of handed to the interpreted engine: `{ properties: { f: { additionalProperties: false } }, additionalProperties: true }` accepted `{ f: { x: 1 } }`. It has done so since 1.0.0. Checks the generator made only on the root schema, a Unicode property escape in a `patternProperties` key and `propertyNames` keywords it cannot express, now apply at every depth too. Found by running the 977 SchemaStore schemas against their own sample documents on both engines, where SchemaStore's invalid samples for treefmt and popxf were accepted. A new test runs every official suite case again with the schema placed under a permissive parent, in three positions, and requires both engines to agree: 8490 cases.
+- A `pattern` error from the code generator lost the backslashes of the pattern it quotes: `\.litertlm$` was reported as `.litertlm$`. The generated code wrote the pattern into a string literal unescaped.
+
+### Changed
+
+- A `$ref` with only annotations beside it, such as `description`, `title`, `default`, `examples`, `deprecated` or an `x-` vendor key, is compiled like a bare `$ref`. Any sibling key sent the whole schema to the interpreted engine before, and editor-oriented schemas put a description next to nearly every `$ref`. A sibling that validates, or one the list does not know, still declines. Of the SchemaStore schemas with sample documents, 57 more now take the code generator than on 1.35.0 (325 of 487, from 268), with every sample document answered as the interpreted engine answers it.
+
 ## 1.35.0 - 2026-09-28
 
 ### Added
