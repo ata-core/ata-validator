@@ -615,7 +615,8 @@ function emitCoercions(node, ov, lines, st, depth) {
       if (isScalarCoercible(prop)) lines.push(...scalarCoercion(a, prop.type));
       // Wrapping a lone value in an array is a top-level rule only, as it was.
       else if (depth === 0 && prop.type === 'array' && st.arrayMode) lines.push(`if(${k} in ${ov}&&${a}!==undefined&&!Array.isArray(${a}))${a}=[${a}]`);
-      if (coercesInside(prop, new Set(), st.memo)) {
+      // A leaf, the common case, has nothing below it to coerce.
+      if ((prop.properties || prop.items) && coercesInside(prop, new Set(), st.memo)) {
         const n = '_c' + st.n++;
         lines.push(`{const ${n}=${a};if(typeof ${n}==='object'&&${n}!==null){`);
         emitCoercions(prop, n, lines, st, depth + 1);
@@ -697,19 +698,36 @@ function buildPreprocessCodegen(schema, options) {
   // take the schema.
   const st = { n: 0, seen: new Set(), cycle: false, arrayMode: options.coerceTypes === 'array', memo: new Map() };
   if (options.coerceTypes) emitCoercions(schema, 'd', lines, st, 0);
-  if (options.useDefaults !== false) emitDefaults(schema, 'd', lines, st);
+  // hasDefaultsInside answers without emitting; most schemas have no default,
+  // and the emitting walk allocates for every property it visits.
+  if (options.useDefaults !== false && hasDefaultsInside(schema, new Set())) emitDefaults(schema, 'd', lines, st);
   if (st.cycle) return null;
 
   if (lines.length === 0) return null;
   // Data may legitimately be null or a non-object (e.g. a `['object','null']`
   // schema), so the per-property mutations must not run on it.
   lines.unshift(`if(d===null||typeof d!=='object')return`);
-  try {
-    return new Function('d', lines.join('\n'));
-  } catch {
-    return null;
+  // The pass depends on property names, types, defaults and which objects
+  // are closed, not on the constraints the verdict checks, so routes that
+  // take the same shape with different limits (a page/limit querystring, an
+  // id param) emit the same source. Compiling it is most of what building the
+  // pass costs, so the function is kept by its source and compiled once. It
+  // holds no state: it rewrites the object it is given and nothing else.
+  const src = lines.join('\n');
+  let fn = _preprocessBySource.get(src);
+  if (fn === undefined) {
+    try {
+      fn = new Function('d', src);
+    } catch {
+      fn = null;
+    }
+    if (_preprocessBySource.size >= PREPROCESS_SOURCE_LIMIT) _preprocessBySource.clear();
+    _preprocessBySource.set(src, fn);
   }
+  return fn;
 }
+const _preprocessBySource = new Map();
+const PREPROCESS_SOURCE_LIMIT = 4096;
 
 
 // parse() for the full package: a generated function that copies the keys the
