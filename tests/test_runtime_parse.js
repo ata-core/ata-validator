@@ -130,6 +130,26 @@ for (let i = 0; i < 600; i++) {
   assert.throws(() => new Validator({ type: 'object', properties: { u: { anyOf: [{ type: 'number' }, { type: 'object' }] } } }).parse({ u: {} }), TypeError);
 }
 
+// A validator with added checks, the way withKeywords from
+// @ata-project/keywords adds instanceof: parse() runs the added check in its
+// verdict, carries a property checked with instanceof over as it is, and a
+// rejection by the added check throws with its error. This refused with a
+// TypeError until 1.33.2, which a benchmark read as parse() failing on valid data.
+{
+  const schema = { type: 'object', required: ['id', 'created'], properties: { id: { type: 'number' }, created: { type: 'object', properties: {}, instanceof: 'Date' }, tags: { type: 'array', items: { type: 'string' } } } };
+  const v = new Validator(schema);
+  const isDate = (d) => typeof d !== 'object' || d === null || d.created instanceof Date;
+  v._extendChecks(() => ({ check: isDate, errors: (d) => (isDate(d) ? [] : [{ keyword: 'instanceof', instancePath: '/created', schemaPath: '#/properties/created/instanceof', params: {}, message: 'must be instanceof Date' }]) }));
+  const when = new Date(0);
+  const out = v.parse({ id: 1, created: when, tags: ['a'], extra: true });
+  assert.strictEqual(out.created, when, 'a Date checked with instanceof is carried over as it is');
+  assert.deepStrictEqual(Object.keys(out), ['id', 'created', 'tags'], 'undeclared keys are still dropped');
+  let e = null;
+  try { v.parse({ id: 1, created: { not: 'a date' } }); } catch (err) { e = err; }
+  assert.ok(e && e.name === 'AtaValidationError', 'the added check rejects through parse()');
+  assert.ok(e.errors.some((x) => x.keyword === 'instanceof'), 'and its error comes with the rejection');
+}
+
 assert.strictEqual(bad, 0, `${bad} disagreements with the module's parse()`);
 assert.ok(parsed > 200 && declined > 50, `parsed ${parsed}, declined ${declined}: too few of either to mean much`);
 console.log(`ok: runtime parse() matches the module's on ${compared} documents (${parsed} copies, ${declined} declines)`);

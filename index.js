@@ -2953,9 +2953,12 @@ function _buildParse(self) {
   if (o.coerceTypes) return decline('coerceTypes rewrites the input before it is checked');
   if (o.removeAdditional === 'all') return decline("removeAdditional: 'all' decides the kept keys at check time");
   if (self._usesKeywords) return decline('custom keywords are in use, and what they accept is not known to the copy');
-  if (self._verdictTail !== null || self._validateTail !== null) {
-    return decline('checks were added to this validator (for example by withKeywords from @ata-project/keywords), and a value they accept, such as a Date, has no copy the schema can describe', 'Use validate(); a valid result carries the input as it is.');
-  }
+  // Checks added to the validator (withKeywords from @ata-project/keywords
+  // adds instanceof and typeof) only narrow what passes; they do not change
+  // which keys the schema declares. The verdict then goes through
+  // isValidObject, which runs them, and a property they check with instanceof
+  // is carried over as it is (see clone-emit).
+  const extended = self._verdictTail !== null || self._validateTail !== null;
   const { cloneExprFor } = require('./lib/clone-emit');
   const expr = cloneExprFor(self._schemaObj);
   if (!expr) return decline('the set of keys to keep cannot be proven from the schema');
@@ -2967,8 +2970,8 @@ function _buildParse(self) {
     return decline('code generation is not allowed here');
   }
   self._ensureCompiled();
-  const verdict = self._jsFn;
-  if (typeof verdict !== 'function') return decline('the schema has no generated verdict function');
+  const verdict = extended ? (d) => self.isValidObject(d) : self._jsFn;
+  if (typeof self._jsFn !== 'function') return decline('the schema has no generated verdict function');
   return (data) => {
     if (!verdict(data)) {
       const e = new Error('validation failed');

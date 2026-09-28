@@ -151,6 +151,12 @@ cannot be proven from the schema (a recursive or non-local `$ref`,
 `removeAdditional: 'all'` or custom keywords are in use, or when code
 generation is blocked. Use `validate()` with `removeAdditional` there.
 
+Checks added to the validator, such as `withKeywords` from
+`@ata-project/keywords`, work with `parse()`: they only narrow what passes,
+the verdict runs them, and their errors come with a rejection. A property
+checked with `instanceof` holds an instance of a class, such as a `Date`, so
+it is carried over into the copy as it is rather than copied key by key.
+
 ### v.engine()
 
 Which engine answers `validate()` for this schema: `'codegen'` (generated JS,
