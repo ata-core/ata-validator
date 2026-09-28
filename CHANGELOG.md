@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Added
+
+- A `baseURI` option: the URI the root schema was retrieved from, which its relative `$ref`s resolve against when it declares no `$id` of its own. Draft-07 ignores an `$id` beside a root `$ref`, and SchemaStore writes its schemas that way, so a relative reference in them, `bitrise-step.json` from `bitrise.json` say, had no base to resolve against. Run against SchemaStore's own sample documents, with each schema given the address it is served from, ata answers 99.05% of the 2213 JSON samples as SchemaStore expects; of the 21 it does not, 17 need a schema outside SchemaStore that the offline run could not fetch, and 4 depend on draft-07 applying keywords beside `$ref`, which the specification says to ignore and ata ignores.
+
 ### Fixed
 
 - The code generator accepted documents a schema rejects when the constraint sat below a node with `additionalProperties: true`. Its safety check stopped at such a node and called everything under it safe, so a construct the generator cannot express was dropped instead of handed to the interpreted engine: `{ properties: { f: { additionalProperties: false } }, additionalProperties: true }` accepted `{ f: { x: 1 } }`. It has done so since 1.0.0. Checks the generator made only on the root schema, a Unicode property escape in a `patternProperties` key and `propertyNames` keywords it cannot express, now apply at every depth too. Found by running the 977 SchemaStore schemas against their own sample documents on both engines, where SchemaStore's invalid samples for treefmt and popxf were accepted. A new test runs every official suite case again with the schema placed under a permissive parent, in three positions, and requires both engines to agree: 8490 cases.

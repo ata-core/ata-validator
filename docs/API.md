@@ -37,6 +37,7 @@ new Validator(false).isValidObject(anything); // false
 | `removeAdditional` | boolean | false | Remove properties not defined in schema. |
 | `useDefaults` | boolean | true | Fill in `default` values on absent properties, in place, before validating. Set `false` to leave the input untouched. |
 | `engine` | `'auto'` \| `'interpreter'` | `'auto'` | `'interpreter'` keeps the schema off code generation: no `new Function`, no shared compile cache; the eval-free interpreted engine answers `validate()`, `isValidObject()` and `validateJSON()`. For a schema that arrives from outside the trust boundary. Any other value throws. |
+| `baseURI` | string | none | The URI the schema was retrieved from. Relative `$ref`s resolve against it when the schema declares no `$id` of its own, including a draft-07 root whose `$id` sits beside a `$ref` and is therefore ignored. An editor or loader that knows where a schema came from passes it here. |
 | `assertFormat` | boolean | true | Assert `format`. Set `false` to treat it as an annotation. |
 | `formats` | object | none | Custom format checkers, `{ name: (value) => boolean }`. See Supported Formats below. |
 | `keywords` | object | none | Custom keywords, `{ name: definition }`. A schema that uses one runs on the interpreted engine. See [custom-keywords.md](custom-keywords.md). |

@@ -407,6 +407,12 @@ export interface ValidatorOptions {
    * `'log'` warns through `logger` (or the console) and continues.
    */
   strictSchema?: boolean | 'log';
+  /**
+   * The URI the schema was retrieved from. Relative references resolve against
+   * it when the schema declares no `$id` of its own, including a draft-07 root
+   * whose `$id` sits beside a `$ref` and is therefore ignored.
+   */
+  baseURI?: string;
   /** Receives `strictSchema: 'log'` warnings; `false` silences them. */
   logger?: { warn(...args: unknown[]): void } | false;
   /**
