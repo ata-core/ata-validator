@@ -23,15 +23,20 @@ check('typical request schemas take the generated path', () => {
     { oneOf: [{ type: 'object', required: ['a'], properties: { a: { type: 'integer' } } }, { type: 'object', required: ['b'], properties: { b: { type: 'string' } } }] },
     { type: 'object', properties: { type: { enum: ['card', 'bank'] }, iban: { type: 'string' } }, if: { properties: { type: { const: 'bank' } } }, then: { required: ['iban'] } },
     { $defs: { addr: { type: 'object', properties: { zip: { type: 'string' } } } }, type: 'object', properties: { home: { $ref: '#/$defs/addr' } } },
+    // additionalProperties: false with no properties, only patterns: declined
+    // by the generator's gate until the generators learned to emit it.
+    { type: 'object', patternProperties: { '^x-': { type: 'string' } }, additionalProperties: false },
   ]
   for (const s of shapes) assert.strictEqual(new Validator(s, { schemas: [shared] }).engine(), 'codegen', JSON.stringify(s))
 })
 
 check('shapes the generator declines report the engine that answers', () => {
-  const v = new Validator({ type: 'object', patternProperties: { '^x-': { type: 'string' } }, additionalProperties: false })
+  // A $ref with a validating keyword beside it: the generators emit the $ref
+  // and skip the rest of the node, so the gate sends it elsewhere.
+  const v = new Validator({ $defs: { n: { type: 'integer' } }, type: 'object', properties: { a: { $ref: '#/$defs/n', minimum: 5 } } })
   assert.ok(['interpreter', 'closure', 'native'].includes(v.engine()))
-  assert.strictEqual(v.validate({ 'x-a': 'ok' }).valid, true)
-  assert.strictEqual(v.validate({ 'x-a': 1 }).valid, false)
+  assert.strictEqual(v.validate({ a: 7 }).valid, true)
+  assert.strictEqual(v.validate({ a: 2 }).valid, false)
 })
 
 check('the type is one of four names', () => {
