@@ -746,16 +746,16 @@ core._registerCodegen({
 // The parts no Validator calls: TypeScript generation, the error renderers,
 // the spec output format, the retry message for language models, the schema
 // description and the suggestion helper. ata-validator/lite leaves them out.
-const { toTypeScript } = require('./lib/ts-gen');
-const { renderPretty } = require('./lib/render-pretty');
-const { renderCompact } = require('./lib/render-compact');
-const { toOutput } = require('./lib/output-format');
-const { toRetryMessage } = require('./lib/retry-message');
-const { describeSchema } = require('./lib/describe-schema');
-const { renderJSON } = require('./lib/render-json');
-const { suggestFor } = require('./lib/suggestions');
-const { reprValue } = require('./lib/enrich-error');
-const { setDiagnosticSource: attachDiagnosticSource } = require('./lib/diagnostic-source');
+// Each loads its module on first call. None of them is on the path to a first
+// validated request, and together they were about a sixth of what requiring
+// the package cost.
+function toTypeScript (...a) { return require('./lib/ts-gen').toTypeScript(...a); }
+function renderPretty (...a) { return require('./lib/render-pretty').renderPretty(...a); }
+function renderCompact (...a) { return require('./lib/render-compact').renderCompact(...a); }
+function toOutput (...a) { return require('./lib/output-format').toOutput(...a); }
+function toRetryMessage (...a) { return require('./lib/retry-message').toRetryMessage(...a); }
+function describeSchema (...a) { return require('./lib/describe-schema').describeSchema(...a); }
+function renderJSON (...a) { return require('./lib/render-json').renderJSON(...a); }
 
 // Walk a JSON pointer (RFC 6901 escapes) into a data tree. Mirrors the helper
 // inside lib/suggestions.js, kept local to avoid exporting an internal.
@@ -772,6 +772,8 @@ function _walkPointer (root, pointer) {
 // suggestions pass the error array through this after validation.
 function attachSuggestions (errors, data) {
   if (!errors) return errors;
+  const { suggestFor } = require('./lib/suggestions');
+  const { reprValue } = require('./lib/enrich-error');
   for (const e of errors) {
     if (!e || e.suggestion) continue;
     let received = e.received;
@@ -788,7 +790,7 @@ function attachSuggestions (errors, data) {
   }
   // AOT modules import nothing, so this is their only route to a frame. The
   // caller holds the original object and ran no preprocessing through here.
-  attachDiagnosticSource(errors, { data, mutatesInput: false });
+  require('./lib/diagnostic-source').setDiagnosticSource(errors, { data, mutatesInput: false });
   return errors;
 }
 
