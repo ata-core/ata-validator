@@ -24,4 +24,17 @@ for (const file of ['index.mjs', 'index.browser.mjs']) {
   const esm = await import('../index.mjs')
   for (const k of cjs) assert.notStrictEqual(esm[k], undefined, `index.mjs ${k}`)
   console.log(`ok: both ESM entries export the ${cjs.length} public names of index.js`)
+  // The subpath entries list their names by hand too. build.mjs lacked
+  // compiledModuleFor, which 1.35.0 introduced for bundler plugins, and
+  // schemaHash, which build.d.ts declares.
+  const SUBPATH_INTERNAL = { compat: new Set(['attachDataFrames']) }
+  let checked = 0
+  for (const sub of ['build', 'compiled', 'aot', 'compat', 't', 'lite']) {
+    const skip = SUBPATH_INTERNAL[sub] || new Set()
+    const names = Object.keys(require(`../${sub}.js`)).filter((k) => k !== 'default' && !skip.has(k))
+    const mod = await import(`../${sub}.mjs`)
+    for (const k of names) assert.notStrictEqual(mod[k], undefined, `${sub}.mjs does not export ${k}`)
+    checked += names.length
+  }
+  console.log(`ok: the six subpath ESM entries export the ${checked} names of their CommonJS entries`)
 })().catch((e) => { console.error(e); process.exit(1) })

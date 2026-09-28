@@ -155,3 +155,26 @@ export function schemaHash(schema: unknown): string;
  * schema, plus `parse` when {@link ToStandaloneModuleOptions.parse} is set
  * and `validateJSON` when {@link ToStandaloneModuleOptions.positions} is. */
 export function toStandaloneModule(schema: unknown, options?: ToStandaloneModuleOptions): string | null;
+
+/**
+ * Whether `new Validator(schema)` with default options can be replaced by
+ * `fromCompiled()` from `ata-validator/compiled`. False for a schema with
+ * custom `errorMessage`s. A caller also needs {@link compiledModuleFor} to
+ * return a module.
+ */
+export function compiledEligible(schema: unknown): boolean;
+
+/**
+ * The schema a default `Validator` reads after normalization. Pass it to
+ * `fromCompiled()`, so defaults, error order and diagnostics follow the same
+ * document the runtime does.
+ */
+export function compiledSchemaFor(schema: unknown): object;
+
+/**
+ * The module that replaces `new Validator(schema)`, or null where the
+ * replacement would not answer as the runtime does: a schema
+ * {@link compiledEligible} declines, one the emitter cannot compile, and one
+ * whose detailed errors the generator cannot produce.
+ */
+export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cjs' }): string | null;

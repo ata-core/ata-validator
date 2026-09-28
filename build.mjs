@@ -8,4 +8,8 @@ export const watch = mod.watch;
 export const bundleStandalone = mod.bundleStandalone;
 export const bundleCompact = mod.bundleCompact;
 export const toStandaloneModule = mod.toStandaloneModule;
+export const schemaHash = mod.schemaHash;
+export const compiledEligible = mod.compiledEligible;
+export const compiledSchemaFor = mod.compiledSchemaFor;
+export const compiledModuleFor = mod.compiledModuleFor;
 export default mod;
