@@ -1,0 +1,45 @@
+name: SchemaStore
+
+# Every SchemaStore schema against SchemaStore's own sample documents, on the
+# default engine, the interpreted engine and the compile-away wrapper, which
+# must all give the same answer. See scripts/schemastore-differential.js.
+#
+# SchemaStore is pinned so a result changes only when ata does. Move the pin
+# on purpose, rerun, and update the minimums below with what the run reports.
+
+on:
+  push:
+    branches: [master]
+    paths: ['lib/**', 'index.js', 'build.js', 'compiled.js', 'scripts/schemastore-differential.js', '.github/workflows/schemastore.yml']
+  pull_request:
+    branches: [master]
+    paths: ['lib/**', 'index.js', 'build.js', 'compiled.js', 'scripts/schemastore-differential.js', '.github/workflows/schemastore.yml']
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  differential:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: SchemaStore/schemastore
+          ref: ad43bde04cc506e7da0c176e76bdf91e0b703cc8
+          path: schemastore
+          sparse-checkout: |
+            src/schemas/json
+            src/test
+            src/negative_test
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # No install: ata has no required dependencies, and this runs the pure
+      # JS engines. At the pin: 487 schemas compared on 2213 documents, 375
+      # of them compiled away too.
+      - name: Compare engines on SchemaStore
+        run: node scripts/schemastore-differential.js schemastore --min-documents 2213 --min-compiled 375
