@@ -2,6 +2,21 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.33.0 - 2026-09-28
+
+### Fixed
+
+- `parse()` handed back an array of primitives as the input's own array rather than a copy, so a caller who changed the copy changed the input with it. `{ tags: ['a'] }` against `{ tags: { type: 'array', items: { type: 'string' } } }` returned an object whose `tags` was the input's `tags`. It is now a new array. The `parse()` an ahead-of-time module exports is built by the same emitter; rebuild emitted modules to pick it up.
+
+### Changed
+
+- A required property that is itself an object or an array is read into a local once, and its checks read the local. The verdict read `data.customer` again on every line, and V8 cannot reuse the first read across the helper calls in between. On a thousand realistic order bodies (nested customer and address objects, 1 to 20 line items), checking a valid body went from 388 to 292 ns; with the formats and the pattern taken out of the same schema, from 185 to 103 ns. Emitted modules get slightly smaller: 9341 to 9313 bytes for the error-dx fixture.
+- The first check of a schema costs less. Most of what it cost was V8 compiling ata's own code generators the first time they ran, and the verdict generator held every keyword family in one 65 KB function, so every schema paid to compile `unevaluatedProperties`, `patternProperties`, `$ref` and the applicators whether it used them or not. Those families now live in functions of their own in all three generators, and a schema compiles only the ones it uses. The generated code is byte for byte the same on all 2970 compiles of the official suite. On the order schema, from a cold process: first `isValidObject` 2.81 to 2.25 ms, first `parse()` 3.93 to 3.41 ms.
+- A first rejection whose errors are read builds one generator, not two. It built both the error generator and the combined one although it uses only one; the other is built when the validator needs it. First rejection with errors read on the order schema: 7.40 to 5.14 ms. A new test checks that one is built on each of the 224 suite groups that go through code generation, and that the errors do not change once the validator is warm.
+- `parse()` copies a property whose schema is an `anyOf` or `oneOf` of primitive branches, such as `number | null` in the form zod's JSON Schema writes it. It declined the whole schema before; a value that passes one of those branches is a primitive, so there is nothing inside it to strip.
+
+Checked against 1.32.3 before release, interleaved across processes, Apple M4 Pro, Node 25, pure JS: from a cold process to the first validated request with ten route schemas, 3.36 to 2.93 ms (median of three rounds of 15 runs); compiling 2000 distinct schemas in a warm process, unchanged at 115 us each; the request-cost bench is slower on no row, a valid verdict 43.0 to 39.7 ns; the runtime bundled for the browser is unchanged at 94.3 KB gzipped, 2.3 KB larger before compression, which is the split generators.
+
 ## 1.32.3 - 2026-09-27
 
 ### Fixed
