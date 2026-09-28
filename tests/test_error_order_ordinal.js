@@ -59,10 +59,11 @@ const schema = {
   assert.ok(raw.length >= 6, 'several errors, got ' + raw.length);
   for (const e of raw) assert.strictEqual(typeof e._o, 'number', 'every generated error carries _o: ' + JSON.stringify(e));
   const keys = raw.map((e) => e.keyword + '@' + e.instancePath);
-  // Errors under a $ref target carry the referencing site's path, which
-  // resolves no further than the `items` object, so those two keep their
-  // emission order (required before properties), exactly as before.
-  const expected = ['type@/id', 'minLength@/title', 'minLength@/tags/1', 'required@/images/0', 'type@/images/0/url', 'oneOf@/discount'];
+  // Errors under a $ref target carry the referencing site's path. They sort
+  // at the `$ref` and, among themselves, in the target's declaration order:
+  // `properties` before `required`, as they would inline. They used to keep
+  // the order the engine emitted them in, which differed between engines.
+  const expected = ['type@/id', 'minLength@/title', 'minLength@/tags/1', 'type@/images/0/url', 'required@/images/0', 'oneOf@/discount'];
   assert.deepStrictEqual(keys, expected);
   // The public list is unchanged in shape: no ordinal leaks into it.
   assert.strictEqual(r.errors[0]._o, undefined);
