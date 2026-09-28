@@ -16,7 +16,9 @@ const pick = (a) => a[rnd(a.length)];
 function leaf() {
   return pick([{ type: 'string' }, { type: 'number' }, { type: 'integer', minimum: 0 }, { type: 'boolean' },
     { type: 'string', default: 'dflt' }, { type: 'string', enum: ['a', 'b'] }, { type: 'array', items: { type: 'number' } },
-    { enum: ['a', 'b', 1] }, { const: 'k' }]);
+    { enum: ['a', 'b', 1] }, { const: 'k' }, { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    { oneOf: [{ type: 'string' }, { enum: [1, 2] }] }, { anyOf: [{ type: 'number' }, { type: 'object' }] },
+    { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'integer' }] } }]);
 }
 function objectSchema(depth) {
   const props = {};
@@ -110,6 +112,22 @@ for (let i = 0; i < 600; i++) {
   assert.deepStrictEqual(v.parse(ok), { a: 1, b: 'x' });
   assert.deepStrictEqual(ok, { a: 1 }, 'the input is not modified on success');
   assert.throws(() => new Validator({ type: 'object', properties: { n: { type: 'number' } } }, { coerceTypes: true }).parse({ n: '1' }), TypeError);
+}
+
+// A union whose every branch is a primitive is copied as it is; a union with
+// an object branch cannot say which keys to keep and declines. An array of
+// primitives comes back as a fresh array, so changing the copy leaves the
+// input's array alone.
+{
+  const v = new Validator({ type: 'object', required: ['t'], properties: { t: { type: 'array', items: { type: 'string' } }, u: { anyOf: [{ type: 'number', minimum: 1 }, { type: 'null' }] } } });
+  const input = { t: ['a'], u: null, extra: 1 };
+  const out = v.parse(input);
+  assert.strictEqual(JSON.stringify(out), '{"t":["a"],"u":null}');
+  assert.notStrictEqual(out.t, input.t, 'a primitive array is copied, not shared');
+  out.t.push('b');
+  assert.deepStrictEqual(input.t, ['a'], 'changing the copy leaves the input alone');
+  assert.throws(() => v.parse({ t: ['a'], u: 0 }), (e) => e.name === 'AtaValidationError');
+  assert.throws(() => new Validator({ type: 'object', properties: { u: { anyOf: [{ type: 'number' }, { type: 'object' }] } } }).parse({ u: {} }), TypeError);
 }
 
 assert.strictEqual(bad, 0, `${bad} disagreements with the module's parse()`);
