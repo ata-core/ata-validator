@@ -695,6 +695,39 @@ function buildPreprocessCodegen(schema, options) {
 }
 
 
+// parse() for the full package: a generated function that copies the keys the
+// schema declares, behind the generated verdict. The refusals every build
+// shares stay in validator-core.js; this is the part that needs the code
+// generator.
+function buildParse (self, decline, extended) {
+  const { cloneExprFor } = require('./lib/clone-emit');
+  const expr = cloneExprFor(self._schemaObj);
+  if (!expr) return decline('the set of keys to keep cannot be proven from the schema');
+  let copy;
+  try {
+    // eslint-disable-next-line no-new-func
+    copy = new Function('data', 'return ' + expr);
+  } catch {
+    return decline('code generation is not allowed here');
+  }
+  self._ensureCompiled();
+  const verdict = extended ? (d) => self.isValidObject(d) : self._jsFn;
+  if (typeof self._jsFn !== 'function') return decline('the schema has no generated verdict function');
+  return (data) => {
+    if (!verdict(data)) {
+      const e = new Error('validation failed');
+      e.name = 'AtaValidationError';
+      let target = data;
+      if (self._mutatesInput) {
+        try { target = structuredClone(data); } catch { target = data; }
+      }
+      e.errors = self.validate(target).errors;
+      throw e;
+    }
+    return copy(data);
+  };
+}
+
 // Everything that turns a schema into JavaScript source, registered with the
 // core: the three code generators and the paths above, the generated
 // preprocess pass, the JSON-text scanner, the parse() copy and the
@@ -706,7 +739,7 @@ core._registerCodegen({
   compileVerdict: installCodegenPaths.compileVerdict,
   installScanner: installCodegenPaths.installScanner,
   buildPreprocess: buildPreprocessCodegen,
-  buildParse: (self, decline, extended) => require('./lib/codegen-parse.js')(self, decline, extended),
+  buildParse,
   aot: () => require('./lib/aot.js'),
 });
 
