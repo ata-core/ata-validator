@@ -2,6 +2,15 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.33.3 - 2026-09-28
+
+### Fixed
+
+- The one-shot `validate(schema, data)` returned the native engine's raw result whenever the native addon was loaded, which is every default install on a supported platform: numeric error codes, `path` in place of `instancePath`, no `keyword`, different messages, and no `data` on success. It has done so since the first native binding; `Validator` was brought to the documented shape in 1.11.0 and this entry point was missed. It now goes through a `Validator` like every other entry point, so its result matches `new Validator(schema).validate(data)` exactly, and a schema passed again comes from the compile cache: on a small object schema a call went from 2294 to 26 ns. A new test runs every case of the official suite through both and compares them. Reported through the missing `data` in #49.
+- `validate()` takes its return type from the schema, as `validateAsync()` and `parseAsync()` already did: a schema written with `defineSchema` or as a `const` literal types `data`, and a `Validator` instance can be passed in place of a schema. A type argument, `validate<T>(schema, data)`, still works for a schema TypeScript cannot see into, such as one read from a file; it is an assertion, not something the schema is checked against, and the declaration now says so. #49.
+
+Checked against 1.33.2 before release: only the one-shot `validate()` changed; with the native addon loaded, a call on a small object schema went from 2294 to 26 ns. The four checks pass, and the type tests fail on the old declaration with the error from #49.
+
 ## 1.33.2 - 2026-09-28
 
 ### Fixed
