@@ -2,6 +2,14 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.33.2 - 2026-09-28
+
+### Fixed
+
+- `parse()` works on a validator with checks added to it, such as `withKeywords` from @ata-project/keywords. It refused them with a `TypeError`, so on the product schema of the schemabenchmarks project, which checks two dates with `instanceof: 'Date'`, every call threw and a benchmark harness counted each valid document as a failure. The added checks only narrow what passes, so `parse()` now runs them in its verdict and reports their errors with a rejection, and a property checked with `instanceof` is carried into the copy as it is: it holds a `Date` or another class instance, and copying the keys its schema declares would have turned a `Date` into `{}`. Custom keywords registered through the `keywords` option are still refused, since what they accept is not known to the copy. The project's own test file, run against this build with a `parse()` configuration added, passes all 60 of that configuration's cases; against 1.32.0 it failed 26.
+
+Checked against 1.33.1 before release, both built from worktrees and interleaved across processes: `parse()` on a plain object schema costs the same, 10.1 ns; the verdict, `validate()` and compile paths are untouched.
+
 ## 1.33.1 - 2026-09-28
 
 ### Changed
