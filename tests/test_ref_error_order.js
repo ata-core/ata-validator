@@ -64,7 +64,7 @@ check('every engine and compile-away report the inline order', () => {
       default: new Validator(schema),
       interpreter: new Validator(schema, { engine: 'interpreter' }),
     }
-    // A $ref to a $ref runs on the interpreter, so there is no module for it.
+    // Every shape compiles, the $ref to a $ref (an alias) included.
     const c = compiled(schema)
     if (c) { engines.compiled = c; compiledShapes++ }
     for (const o of docs) {
@@ -77,7 +77,7 @@ check('every engine and compile-away report the inline order', () => {
       }
     }
   }
-  assert.strictEqual(compiledShapes, 5, 'compile-away covered ' + compiledShapes + ' shapes')
+  assert.strictEqual(compiledShapes, 6, 'compile-away covered ' + compiledShapes + ' shapes')
 })
 
 check('a $ref declared after a sibling keyword sorts after it', () => {

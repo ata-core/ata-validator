@@ -9,6 +9,14 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 - Standard JSON Schema: `validator['~standard'].jsonSchema.input({ target })` and `.output()` return the schema the validator checks, as a copy, so a consumer that publishes schemas can take an ata `Validator` as it is. The MCP TypeScript SDK is one: on `@modelcontextprotocol/server` 2.2.0 a `new Validator(schema)` passed as a tool's `inputSchema` or `outputSchema` is published in `tools/list` and checks every call, with ata's error messages, tested end to end over an in-memory client and server. The target has to be the dialect the schema declares, and a schema without `$schema` is 2020-12; any other target throws, since ata does not convert between dialects.
 - `fromCompiled(mod, schema, { useDefaults: false })`: the compile-away wrapper now reproduces `new Validator(schema, { useDefaults: false })`, leaving the input as it is. Any other option throws a `TypeError` instead of being ignored, and `compiledOptions` from `ata-validator/build` lists what is supported, so a bundler plugin can tell which calls with options it may replace. Found by reading a real user's code: every runtime `Validator` in JollyPixel's network worker is built with `{ useDefaults: false }`, which compile-away had to leave alone. The parity test now also runs the seeded schemas with defaults under that option, comparing results and the input afterwards: 19680 checks over 814 schemas, no differences; making the wrapper ignore the option makes 1110 of them differ.
 
+### Fixed
+
+- Errors raised inside a recursive definition named the definition's own schema path, `#/$defs/Node/required`, where the interpreted engine and an inlined definition name the path the value was reached by, `#/properties/kids/items/required`. The generated helper for such a definition now takes the schema path as an argument, as it already took the instance path. It showed on SchemaStore's web-types schema once aliases (below) let it compile.
+
+### Changed
+
+- A definition that is only a reference to another, `X: { $ref: '#/definitions/XUnion' }`, no longer sends the schema to the interpreted engine. TypeScript-to-schema generators emit it for every named union, so schemas generated from TypeScript types mostly could not be compiled ahead of time: PostHog's ExperimentMetric schema, 71 definitions with 4 aliases, was one. A chain of aliases that loops still declines. On SchemaStore, 401 of the 487 schemas with sample documents now take the code generator (387 before) and 389 can be compiled away (375), with no differences between engines over the 2213 documents.
+
 ## 1.36.1 - 2026-09-28
 
 ### Fixed

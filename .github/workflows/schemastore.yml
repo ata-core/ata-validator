@@ -39,7 +39,7 @@ jobs:
           node-version: 22
 
       # No install: ata has no required dependencies, and this runs the pure
-      # JS engines. At the pin: 487 schemas compared on 2213 documents, 375
+      # JS engines. At the pin: 487 schemas compared on 2213 documents, 389
       # of them compiled away too.
       - name: Compare engines on SchemaStore
-        run: node scripts/schemastore-differential.js schemastore --min-documents 2213 --min-compiled 375
+        run: node scripts/schemastore-differential.js schemastore --min-documents 2213 --min-compiled 389
