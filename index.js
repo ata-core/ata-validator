@@ -18,8 +18,25 @@ const { compileToJS, compileToJSCodegen } = jsCompiler;
 // _ensureCompiled in `ctx`; the error and combined functions are built later
 // by the builders, so they are read through ctx.err() and ctx.combined().
 
+// A rejection the native walker decided from the text alone. The errors come
+// from parsing and validating in JS, on first read, so a caller that reads
+// only `.valid` never parses the document.
+class TextRejection {
+  constructor (text, validateText) {
+    this.valid = false;
+    this._text = text;
+    this._validateText = validateText;
+    this._errors = null;
+  }
+
+  get errors () {
+    if (this._errors === null) this._errors = core._internals._mustReject(this._validateText(this._text)).errors;
+    return this._errors;
+  }
+}
+
 function installCodegenPaths (ctx) {
-  const { ABORT_EARLY_RESULT, HYBRID_TIER_CALLS, SIMDJSON_THRESHOLD, VALID_RESULT, _bindVerdict, _mustReject, isV1Dialect, native, resolveSchemaByPath } = core._internals;
+  const { ABORT_EARLY_RESULT, HYBRID_TIER_CALLS, SIMDJSON_THRESHOLD, VALID_RESULT, _bindVerdict, _jsonSyntaxRejection, _mustReject, isV1Dialect, native, resolveSchemaByPath } = core._internals;
   const { jsFn, _isCodegen, preprocess, fusedRemove, options, schemaObj, useSimdjsonForLarge, _buildCombined, _buildErr } = ctx;
   // errFn: the generated error function when it is safe, else the
   // interpreted engine, on every platform alike.
@@ -293,38 +310,47 @@ function installCodegenPaths (ctx) {
   const jsonValidateFn = preprocess
     ? (obj) => { preprocess(obj); return jsonValidateInner(obj) }
     : jsonValidateInner;
+  // A document at or above the simdjson threshold is answered by the native
+  // walker without being parsed, except for the shapes lib/buffer-gate.js
+  // lists, where the walker disagrees with validate(); those schemas never
+  // ask it. A rejection's errors come from the same path as a small
+  // document's, on first read. The addon's own validateJSON used to supply
+  // them and accepted documents validate() rejects, 231 of the official
+  // suite's cases once padded past the threshold.
+  let nativeText; // undefined until the first large document
+  const nativeVerdict = (jsonStr) => {
+    if (nativeText === undefined) {
+      nativeText = !!native && !require('./lib/buffer-gate.js').bufferNeedsSlowPath(schemaObj, this._schemaMap, this._keywords);
+      if (nativeText) {
+        this._ensureNative();
+        if (!(this._fastSlot >= 0)) nativeText = false;
+      }
+    }
+    return nativeText ? native.rawFastValidate(this._fastSlot, Buffer.from(jsonStr)) : undefined;
+  };
+  const validateText = (jsonStr) => {
+    let obj;
+    try {
+      obj = JSON.parse(jsonStr);
+    } catch (e) {
+      if (!(e instanceof SyntaxError)) throw e;
+      return _jsonSyntaxRejection(e);
+    }
+    return jsonValidateFn(obj);
+  };
   this.validateJSON = useSimdjsonForLarge && native && !preprocess
     ? (jsonStr) => {
         // `_skipNativeFast` is set by the scanner short-circuit below when it
         // has already decided the document is invalid. The encode and the
-        // native call would run only to return false, and the error path
-        // underneath does not need them.
+        // native call would run only to return false.
         if (jsonStr.length >= SIMDJSON_THRESHOLD && this._skipNativeFast !== true) {
-          this._ensureNative();
-          const buf = Buffer.from(jsonStr);
-          if (native.rawFastValidate(this._fastSlot, buf))
-            return VALID_RESULT;
-          if (options.abortEarly) return ABORT_EARLY_RESULT;
-          return this._compiled.validateJSON(jsonStr);
+          const ok = nativeVerdict(jsonStr);
+          if (ok === true) return VALID_RESULT;
+          if (ok === false) return options.abortEarly ? ABORT_EARLY_RESULT : new TextRejection(jsonStr, validateText);
         }
-        try {
-          return jsonValidateFn(JSON.parse(jsonStr));
-        } catch (e) {
-          if (!(e instanceof SyntaxError)) throw e;
-        }
-        this._ensureNative();
-        return this._compiled.validateJSON(jsonStr);
+        return validateText(jsonStr);
       }
-    : (jsonStr) => {
-        try {
-          return jsonValidateFn(JSON.parse(jsonStr));
-        } catch (e) {
-          if (!(e instanceof SyntaxError)) throw e;
-          if (!native) return { valid: false, errors: [{ keyword: 'syntax', instancePath: '', schemaPath: '#', params: {}, message: e.message }] };
-        }
-        this._ensureNative();
-        return this._compiled.validateJSON(jsonStr);
-      };
+    : validateText;
   // The addon validates the bytes as they are, which is the wrong answer
   // when the schema asks for coercion, removal or defaults: those change
   // what counts as valid. With a preprocess pass configured the text is

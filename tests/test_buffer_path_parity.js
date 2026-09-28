@@ -50,6 +50,7 @@ const registry = {}
   }
 })(REMOTES, '')
 
+const PAD = ' '.repeat(9000)
 let compared = 0
 const disagreements = []
 
@@ -74,11 +75,12 @@ for (const [dialect, dialectUri] of Object.entries(DIALECTS)) {
       }
 
       for (const test of group.tests) {
+        const text = JSON.stringify(test.data)
         let viaValue
         let viaBuffer
         try {
-          viaValue = validator.validate(test.data).valid
-          viaBuffer = validator.isValid(Buffer.from(JSON.stringify(test.data)))
+          viaValue = validator.validate(JSON.parse(text)).valid
+          viaBuffer = validator.isValid(Buffer.from(text))
         } catch {
           // An API that refuses the input on both paths is not a disagreement.
           continue
@@ -90,6 +92,23 @@ for (const [dialect, dialectUri] of Object.entries(DIALECTS)) {
               `      validate=${viaValue} isValid(buffer)=${viaBuffer}` +
               `  schema=${JSON.stringify(schema).slice(0, 110)}`,
           )
+        }
+        // The text entry points hand a document at or above the simdjson
+        // threshold to the native engine. Leading whitespace changes nothing
+        // about a JSON document, so padding puts every case on that path.
+        // validateJSON used to ask the native walker first there without the
+        // gate, and accepted what validate() rejects.
+        const padded = PAD + text
+        for (const [name, got] of [['validateJSON', () => validator.validateJSON(padded).valid], ['isValidJSON', () => validator.isValidJSON(padded)]]) {
+          const answer = got()
+          compared++
+          if (answer !== viaValue) {
+            disagreements.push(
+              `${dialect}/${file} :: ${group.description} :: ${test.description}\n` +
+                `      validate=${viaValue} ${name}(padded to ${padded.length} bytes)=${answer}` +
+                `  schema=${JSON.stringify(schema).slice(0, 110)}`,
+            )
+          }
         }
       }
     }
@@ -106,7 +125,7 @@ console.log(`  ${disagreements.length} disagreements, known gap is ${KNOWN_GAP}\
 
 if (disagreements.length > KNOWN_GAP) {
   console.log(`  the gap grew by ${disagreements.length - KNOWN_GAP}. A sample:\n`)
-  for (const d of disagreements.slice(0, 15)) console.log(`  ${d}\n`)
+  for (const d of disagreements.slice(0, Number(process.env.SHOW) || 15)) console.log(`  ${d}\n`)
   process.exit(1)
 }
 
