@@ -8,7 +8,7 @@
 // the function's on everything else too.
 
 const assert = require('assert');
-const formats = require('../lib/formats');
+const formats = { ...require('../lib/formats'), ...require('../lib/formats-source') };
 const { Validator } = require('..');
 
 let walk = null;

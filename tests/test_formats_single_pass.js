@@ -5,7 +5,7 @@
 // regular expression cares about plus a non-ASCII digit. The old forms are
 // kept here, not imported, so the test keeps meaning after they are gone.
 const assert = require('node:assert');
-const F = require('../lib/formats');
+const F = { ...require('../lib/formats'), ...require('../lib/formats-source') };
 
 const OLD = {
   date: (s) => { if (s.length !== 10 || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false; const m = +s.slice(5, 7), d = +s.slice(8, 10); return m >= 1 && m <= 12 && d >= 1 && d <= 31; },

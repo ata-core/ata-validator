@@ -9,7 +9,7 @@
 // bytes that decide the answer.
 
 const assert = require('assert');
-const formats = require('../lib/formats');
+const formats = { ...require('../lib/formats'), ...require('../lib/formats-source') };
 const { Validator } = require('..');
 
 function corpus () {

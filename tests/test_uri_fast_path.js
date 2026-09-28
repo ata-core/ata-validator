@@ -13,7 +13,7 @@
 // must leave to the walk.
 
 const assert = require('assert');
-const formats = require('../lib/formats');
+const formats = { ...require('../lib/formats'), ...require('../lib/formats-source') };
 
 const FAST = formats.URI_FAST;
 
