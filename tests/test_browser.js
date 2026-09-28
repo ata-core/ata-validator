@@ -25,8 +25,9 @@ delete require.cache[require.resolve("../index")];
 const { Validator, validate, version, createPaddedBuffer, SIMDJSON_PADDING } = require("../index");
 const aot = require("../lib/aot");
 
-// Restore original resolve
-Module._resolveFilename = origResolve;
+// The redirect stays for the whole run: a bundler swaps the loader for good,
+// and the package loads the addon on first use, not when it is required.
+void origResolve;
 
 let passed = 0;
 let failed = 0;

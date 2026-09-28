@@ -36,7 +36,7 @@ class TextRejection {
 }
 
 function installCodegenPaths (ctx) {
-  const { ABORT_EARLY_RESULT, HYBRID_TIER_CALLS, SIMDJSON_THRESHOLD, VALID_RESULT, _bindVerdict, _jsonSyntaxRejection, _mustReject, isV1Dialect, native, resolveSchemaByPath } = core._internals;
+  const { ABORT_EARLY_RESULT, HYBRID_TIER_CALLS, SIMDJSON_THRESHOLD, VALID_RESULT, _bindVerdict, _jsonSyntaxRejection, _mustReject, getNative, isV1Dialect, resolveSchemaByPath } = core._internals;
   const { jsFn, _isCodegen, preprocess, fusedRemove, options, schemaObj, useSimdjsonForLarge, _buildCombined, _buildErr } = ctx;
   // errFn: the generated error function when it is safe, else the
   // interpreted engine, on every platform alike.
@@ -320,13 +320,13 @@ function installCodegenPaths (ctx) {
   let nativeText; // undefined until the first large document
   const nativeVerdict = (jsonStr) => {
     if (nativeText === undefined) {
-      nativeText = !!native && !require('./lib/buffer-gate.js').bufferNeedsSlowPath(schemaObj, this._schemaMap, this._keywords);
+      nativeText = !!getNative() && !require('./lib/buffer-gate.js').bufferNeedsSlowPath(schemaObj, this._schemaMap, this._keywords);
       if (nativeText) {
         this._ensureNative();
         if (!(this._fastSlot >= 0)) nativeText = false;
       }
     }
-    return nativeText ? native.rawFastValidate(this._fastSlot, Buffer.from(jsonStr)) : undefined;
+    return nativeText ? getNative().rawFastValidate(this._fastSlot, Buffer.from(jsonStr)) : undefined;
   };
   const validateText = (jsonStr) => {
     let obj;
@@ -338,7 +338,7 @@ function installCodegenPaths (ctx) {
     }
     return jsonValidateFn(obj);
   };
-  this.validateJSON = useSimdjsonForLarge && native && !preprocess
+  this.validateJSON = useSimdjsonForLarge && !preprocess
     ? (jsonStr) => {
         // `_skipNativeFast` is set by the scanner short-circuit below when it
         // has already decided the document is invalid. The encode and the
@@ -366,14 +366,11 @@ function installCodegenPaths (ctx) {
     if (preprocess) preprocess(parsed);
     return jsFn(parsed);
   };
-  this.isValidJSON = useSimdjsonForLarge && native && !preprocess
+  this.isValidJSON = useSimdjsonForLarge && !preprocess
     ? (jsonStr) => {
         if (jsonStr.length >= SIMDJSON_THRESHOLD) {
-          this._ensureNative();
-          return native.rawFastValidate(
-            this._fastSlot,
-            Buffer.from(jsonStr),
-          );
+          const ok = nativeVerdict(jsonStr);
+          if (ok !== undefined) return ok;
         }
         return verdictFromText(jsonStr);
       }
@@ -395,85 +392,6 @@ function installCodegenPaths (ctx) {
   // reads what arrived. The compiler declines any schema it cannot answer
   // and a compiled scanner returns BAIL for a document shape it cannot
   // answer, and then the parse path below takes over unchanged.
-  // validateAndParse: parse the JSON, then validate. Pure JS (JSON.parse +
-  // validate) so it works with or without the native addon and in browsers.
-  {
-    const self = this;
-    this.validateAndParse = (jsonStr) => {
-      let value;
-      try {
-        value = JSON.parse(typeof jsonStr === 'string' ? jsonStr : new TextDecoder().decode(jsonStr));
-      } catch (e) {
-        return { valid: false, value: undefined, errors: [{ code: 'ATA9001', message: 'invalid JSON: ' + e.message, keyword: '__parse__', instancePath: '', schemaPath: '', params: {} }] };
-      }
-      const r = self.validate(value);
-      return { valid: r.valid, value, errors: r.errors };
-    };
-  }
-  // Buffer APIs: lazy native init — only compile native schema on first buffer call.
-  // This keeps cold start fast (JS codegen only) for users who only use validate().
-  if (native) {
-    const self = this;
-    this.isValid = (buf) => {
-      self._ensureNative();
-      const slot = self._fastSlot;
-      self.isValid = slot < 0
-        ? (b) => self._slowBufferValid(b, 'isValid')
-        : (b) => {
-          if (typeof b === 'string') b = Buffer.from(b);
-          else if (!(b instanceof Uint8Array)) throw new TypeError('isValid() requires a Buffer, Uint8Array, or string. For parsed objects, use isValidObject().');
-          return native.rawFastValidate(slot, b);
-        };
-      return self.isValid(buf);
-    };
-    this.countValid = (ndjsonBuf) => {
-      self._ensureNative();
-      const slot = self._fastSlot;
-      self.countValid = slot < 0
-        ? (b) => {
-          if (typeof b !== 'string' && !(b instanceof Uint8Array)) throw new TypeError('countValid() requires a Buffer, Uint8Array, or string');
-          const text = typeof b === 'string' ? b : Buffer.from(b.buffer, b.byteOffset, b.byteLength).toString('utf8');
-          let c = 0;
-          for (const line of text.split('\n')) {
-            if (line.trim() === '') continue;
-            if (self._slowBufferValid(line, 'countValid')) c++;
-          }
-          return c;
-        }
-        : (b) => {
-          if (typeof b === 'string') b = Buffer.from(b);
-          else if (!(b instanceof Uint8Array)) throw new TypeError('countValid() requires a Buffer, Uint8Array, or string');
-          const r = native.rawNDJSONValidate(slot, b);
-          let c = 0;
-          for (let i = 0; i < r.length; i++) if (r[i]) c++;
-          return c;
-        };
-      return self.countValid(ndjsonBuf);
-    };
-    this.batchIsValid = (buffers) => {
-      self._ensureNative();
-      const slot = self._fastSlot;
-      self.batchIsValid = slot < 0
-        ? (bufs) => {
-          let v = 0;
-          for (const b of bufs) {
-            if (!(b instanceof Uint8Array)) throw new TypeError('batchIsValid() requires Buffer or Uint8Array elements');
-            if (self._slowBufferValid(b, 'batchIsValid')) v++;
-          }
-          return v;
-        }
-        : (bufs) => {
-          let v = 0;
-          for (const b of bufs) {
-            if (!(b instanceof Uint8Array)) throw new TypeError('batchIsValid() requires Buffer or Uint8Array elements');
-            if (native.rawFastValidate(slot, b)) v++;
-          }
-          return v;
-        };
-      return self.batchIsValid(buffers);
-    };
-  }
-
 };
 
 // The verdict function alone, for isValidObject() before a full compile: the
