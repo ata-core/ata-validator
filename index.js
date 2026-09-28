@@ -2523,13 +2523,16 @@ class Validator {
   }
 }
 
+// One-shot validate. It goes through a Validator like every other entry
+// point, so the result has one shape everywhere: `data` on success, errors
+// with a code, a keyword and an instancePath. From the first native binding
+// until 1.33.3 it handed the schema straight to the native engine whenever
+// the addon was loaded, which is every default install on a supported
+// platform, and returned that engine's raw result: numeric codes, `path`
+// instead of `instancePath`, no keyword, and no `data`. The compile cache keeps
+// a schema passed again from compiling again.
 function validate(schema, data) {
-  if (native) {
-    const schemaStr =
-      typeof schema === "string" ? schema : JSON.stringify(schema);
-    return native.validate(schemaStr, data);
-  }
-  // JS fallback: compile and validate
+  if (schema instanceof Validator) return schema.validate(data);
   const v = new Validator(typeof schema === "string" ? JSON.parse(schema) : schema);
   return v.validate(data);
 }

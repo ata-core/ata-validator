@@ -424,11 +424,19 @@ nothing reads it at runtime.
 
 ### validate(schema, data)
 
-One-shot validation without creating a Validator instance. Uses native C++ path.
+One-shot validation. Returns the same result as `new Validator(schema).validate(data)`:
+`data` on success, errors with a code, keyword and path on failure. A schema passed
+again comes from the compile cache, so calling it in a loop does not recompile.
+Takes a schema object, a schema as a JSON string, or an existing `Validator`.
 
 ```javascript
-const { validate } = require('ata-validator');
-const result = validate({ type: 'string' }, 'hello');
+const { validate, defineSchema } = require('ata-validator');
+const result = validate({ type: 'string' }, 'hello'); // { valid: true, data: 'hello', errors: [] }
+
+// In TypeScript, a schema written with defineSchema types `data`:
+const user = defineSchema({ type: 'object', properties: { name: { type: 'string' } }, required: ['name'] });
+const r = validate(user, input);
+if (r.valid) r.data.name; // string
 ```
 
 ### createPaddedBuffer(jsonString)

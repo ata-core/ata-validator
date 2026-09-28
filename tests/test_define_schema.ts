@@ -58,3 +58,33 @@ const _badNested: JSONSchema = {
   },
 };
 void _badNested;
+
+// --- One-shot validate() types data from the schema (issue #49) ---
+
+import { validate, validateAsync, Validator } from '../index.js';
+
+const person = defineSchema({
+  type: 'object',
+  properties: { name: { type: 'string' }, age: { type: 'integer' } },
+  required: ['name'],
+});
+const r = validate(person, {});
+if (r.valid) {
+  const n: string = r.data.name;
+  const a: number | undefined = r.data.age;
+  void n; void a;
+  // @ts-expect-error -- `nickname` is not declared by the schema
+  void r.data.nickname;
+}
+// A Validator instance carries its type into validate() as it does into validateAsync().
+const personValidator = new Validator(person);
+const rv = validate(personValidator, {});
+if (rv.valid) {
+  const n2: string = rv.data.name;
+  void n2;
+}
+void validateAsync(person, {}).then((x) => { if (x.valid) { const n3: string = x.data.name; void n3; } });
+// A schema TypeScript cannot see into takes the type as an argument, as before.
+const fromFile: object = JSON.parse('{"type":"number"}');
+const rf = validate<number>(fromFile, 5);
+if (rf.valid) { const x: number = rf.data; void x; }

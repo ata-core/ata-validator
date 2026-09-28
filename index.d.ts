@@ -564,7 +564,22 @@ export interface ValidatorConstructor {
 /** Compile a schema into a reusable validator. */
 export const Validator: ValidatorConstructor;
 
-/** One-shot validate: creates a Validator, validates data, returns result. */
+/**
+ * One-shot validate: validates data against a schema or an existing
+ * {@link Validator} and returns the result. A schema written with
+ * {@link defineSchema} (or as a `const` literal) types `data` from the schema
+ * itself. The last form takes the type as an argument for a schema TypeScript
+ * cannot see into, such as one read from a file; that type is an assertion,
+ * not something the schema is checked against.
+ */
+export function validate<T>(
+  validator: Validator<T>,
+  data: unknown
+): ValidationResult<T>;
+export function validate<const S extends JSONSchema>(
+  schema: S,
+  data: unknown
+): ValidationResult<Infer<S>>;
 export function validate<T = unknown>(
   schema: object | string,
   data: unknown
