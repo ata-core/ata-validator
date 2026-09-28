@@ -2,12 +2,16 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.33.1 - 2026-09-28
 
 ### Changed
 
 - With code generation blocked, the way Cloudflare Workers and a strict CSP block it, checking an object costs what it did before 1.31.2 again. The eval-free engine tests whether each property is the object's own, and since 1.31.2 that test compared the name against every name on `Object.prototype`, then ran `in`, then read the prototype through its accessor, for every property of every object. It is now one `hasOwnProperty` call, which gives the same answer. On the 14-property schema zod's JSON Schema produces for the @ata-project/zod benchmark, Apple M4 Pro, Node 25, `--disallow-code-generation-from-strings`: accepting 776 to 626 ns, rejecting 155 to 103 ns, against 641 and 106 on 1.31.1. Found by measuring every release from 1.25.0 to 1.33.0 on that path; the slowdown entered in 1.31.2 and stayed. Schemas the interpreted engine answers without that test, such as the request-cost benchmark's, are unchanged.
 - When `parse()` refuses a validator, the error names which reason applies: `coerceTypes`, `removeAdditional: 'all'`, custom keywords, or checks added to the validator such as `withKeywords` from @ata-project/keywords. It gave one sentence for all four, and on a schema with an `instanceof: 'Date'` check a benchmark read the refusal as `parse()` failing on valid data. For added checks it now points at `validate()`, whose valid result carries the input unchanged.
+
+The official test suite pin moves to ab079cc: the three dialects still pass every case, 1301, 929 and 1135, and the optional format tests go from 764 to 771 passes with the same 95 failures as before, the new ones all passing.
+
+Checked against 1.33.0 before release, both built from equivalent worktrees and interleaved across processes: from a cold process to the first validated request with ten route schemas, 2.69 and 2.68 ms; the request-cost bench unchanged within noise with code generation allowed and with it blocked.
 
 ## 1.33.0 - 2026-09-28
 
