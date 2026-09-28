@@ -2943,12 +2943,18 @@ Validator.prototype.parse = function (data) {
 };
 
 function _buildParse(self) {
-  const decline = (why) => () => {
-    throw new TypeError(`parse() is not available for this validator: ${why}. Use validate() with removeAdditional instead.`);
+  const decline = (why, instead = 'Use validate() with removeAdditional instead.') => () => {
+    throw new TypeError(`parse() is not available for this validator: ${why}. ${instead}`);
   };
   const o = self._options;
-  if (o.coerceTypes || o.removeAdditional === 'all' || self._usesKeywords || self._verdictTail !== null || self._validateTail !== null) {
-    return decline('its options or keywords rewrite or extend what the schema checks');
+  // Each refusal names its own reason: a caller who hit the combined one could
+  // not tell a coercion option from a keyword package, and read a deliberate
+  // refusal as a failure of valid data.
+  if (o.coerceTypes) return decline('coerceTypes rewrites the input before it is checked');
+  if (o.removeAdditional === 'all') return decline("removeAdditional: 'all' decides the kept keys at check time");
+  if (self._usesKeywords) return decline('custom keywords are in use, and what they accept is not known to the copy');
+  if (self._verdictTail !== null || self._validateTail !== null) {
+    return decline('checks were added to this validator (for example by withKeywords from @ata-project/keywords), and a value they accept, such as a Date, has no copy the schema can describe', 'Use validate(); a valid result carries the input as it is.');
   }
   const { cloneExprFor } = require('./lib/clone-emit');
   const expr = cloneExprFor(self._schemaObj);
