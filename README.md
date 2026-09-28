@@ -240,15 +240,15 @@ is the most common way to get a misleading number out of this library.
 
 | | compiled with `ata build` | runtime `new Validator(schema)` |
 |---|---|---|
-| In a bundle, gzipped | **2.2 KB** | 93.4 KB |
-| Time to a served request | **3.6 ms** | 11.4 ms |
+| In a bundle, gzipped | **2.2 KB** | 92.9 KB |
+| Time to a served request | **3.5 ms** | 7.7 ms |
 | Schema known when | build time | any time |
 
 The bundle row is the ten-field user schema in
 `tests/fixtures/error-dx/user.schema.json`, every export of the compiled module against
-`new Validator(schema)`, built with `bun build --minify --target=browser` on ata 1.34.1.
+`new Validator(schema)`, built with `bun build --minify --target=browser` on ata 1.35.0.
 The startup row is a Hono route on Bun 1.4, best of seven, median of three rounds, from
-`benchmark/bundle`, against 3.4 ms for the same app doing no validation at all, so the
+`benchmark/bundle`, against 3.5 ms for the same app doing no validation at all, so the
 compiled path costs nothing measurable to start. The runtime figure is what it is because
 a schema that arrives at run time can use any keyword, so the whole engine has to be
 there. The compiled module imports nothing and contains only the checks your schema asks
@@ -486,7 +486,7 @@ const v = new Validator(schema, {
 
 ### Build-time compile (`ata compile`)
 
-The `ata` CLI turns a JSON Schema file into a self-contained JavaScript module. No runtime dependency on `ata-validator`, so only the generated validator ships to the browser. For the ten-field user schema in `tests/fixtures/error-dx/user.schema.json` the module is 2.2 KB gzipped, full error detail included, against 93.4 KB for the runtime bundled for the browser.
+The `ata` CLI turns a JSON Schema file into a self-contained JavaScript module. No runtime dependency on `ata-validator`, so only the generated validator ships to the browser. For the ten-field user schema in `tests/fixtures/error-dx/user.schema.json` the module is 2.2 KB gzipped, full error detail included, against 92.9 KB for the runtime bundled for the browser.
 
 ```bash
 npx ata compile schemas/user.json -o src/generated/user.validator.mjs
@@ -528,11 +528,11 @@ npx ata build 'schemas/*.json' --out-dir build/validators --check
 Run with `--watch` during development for incremental rebuilds.
 
 Bundle sizes for the 10-field user schema in `tests/fixtures/error-dx/user.schema.json`,
-minified and gzipped, measured with `bun build --minify --target=browser` on ata 1.34.1:
+minified and gzipped, measured with `bun build --minify --target=browser` on ata 1.35.0:
 
 | What the app imports | Size | Notes |
 |---|---|---|
-| `Validator` from `ata-validator` | 93.4 KB | The compiler ships with it, because a runtime schema can use any keyword |
+| `Validator` from `ata-validator` | 92.9 KB | The compiler ships with it, because a runtime schema can use any keyword |
 | `isValid` from the compiled module | **1.3 KB** | Nothing else is reachable, so the error collector is dropped |
 | `validate` from the compiled module | **2.0 KB** | Adds the detailed error collector |
 
