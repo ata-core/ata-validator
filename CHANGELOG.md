@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- 1.36.0 kept an entry in its preprocess cache for every schema, including the ones with nothing to rewrite, keyed by the whole schema text, so each validator in use held 0.21 KB more than on 1.35.0: 8.33 KB against 8.12 in `benchmark/bench_memory.cjs used`. Only generated passes are kept now, and the figure is 8.12 KB again.
+
 ## 1.36.0 - 2026-09-28
 
 ### Added
