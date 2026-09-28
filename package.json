@@ -12,7 +12,10 @@
         "import": "./index.browser.mjs",
         "require": "./index.js"
       },
-      "import": "./index.mjs",
+      "import": {
+        "module-sync": "./index.node.mjs",
+        "default": "./index.mjs"
+      },
       "require": "./index.js"
     },
     "./compat": {
@@ -107,6 +110,7 @@
   "files": [
     "index.js",
     "index.mjs",
+    "index.node.mjs",
     "index.browser.mjs",
     "index.d.ts",
     "aot.js",
