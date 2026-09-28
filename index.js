@@ -568,11 +568,116 @@ function emitRemovals(node, access, lines, depth, seen) {
   else lines.push(`if(${access}!==null&&typeof ${access}==='object'&&!Array.isArray(${access})){${body.join('\n')}}`);
 }
 
+// The coercions the closure pass applies, emitted. Values: `number` and
+// `integer` from numeric strings and booleans, `string` from numbers and
+// booleans, `boolean` from "true"/"1" and "false"/"0".
+const COERCIBLE_TYPES = new Set(['number', 'integer', 'string', 'boolean']);
+function scalarCoercion(a, t) {
+  if (t === 'integer') return [`if(typeof ${a}==='string'){var _n=Number(${a});if(${a}!==''&&Number.isInteger(_n))${a}=_n}`, `if(typeof ${a}==='boolean')${a}=${a}?1:0`];
+  if (t === 'number') return [`if(typeof ${a}==='string'){var _n=Number(${a});if(${a}!==''&&!isNaN(_n))${a}=_n}`, `if(typeof ${a}==='boolean')${a}=${a}?1:0`];
+  if (t === 'string') return [`if(typeof ${a}==='number'||typeof ${a}==='boolean')${a}=String(${a})`];
+  return [`if(${a}==='true'||${a}==='1')${a}=true`, `if(${a}==='false'||${a}==='0')${a}=false`];
+}
+function isScalarCoercible(node) {
+  return !!(node && typeof node === 'object' && typeof node.type === 'string' && COERCIBLE_TYPES.has(node.type));
+}
+// Whether anything below `node` is coerced, as buildNodeCoercer decides it.
+// Remembered per node for the build, since every enclosing node asks again.
+function coercesInside(node, seen, memo) {
+  if (!node || typeof node !== 'object' || seen.has(node)) return false;
+  if (memo && memo.has(node)) return memo.get(node);
+  seen.add(node);
+  let found = false;
+  if (node.properties) {
+    for (const [key, prop] of Object.entries(node.properties)) {
+      if (key === '__proto__' || !prop || typeof prop !== 'object') continue;
+      if (isScalarCoercible(prop) || coercesInside(prop, seen, memo)) { found = true; break; }
+    }
+  }
+  if (!found && node.items && typeof node.items === 'object' && !Array.isArray(node.items)) {
+    found = isScalarCoercible(node.items) || coercesInside(node.items, seen, memo);
+  }
+  seen.delete(node);
+  if (memo) memo.set(node, found);
+  return found;
+}
+function emitCoercions(node, ov, lines, st, depth) {
+  if (st.seen.has(node)) { st.cycle = true; return; }
+  st.seen.add(node);
+  if (node.properties) {
+    for (const [key, prop] of Object.entries(node.properties)) {
+      // Coercion writes with plain assignment, which for a key named
+      // __proto__ rewrites the prototype instead. The raw value still goes
+      // through validation, so skipping is a refusal to coerce, not a hole.
+      if (key === '__proto__' || !prop || typeof prop !== 'object') continue;
+      const k = JSON.stringify(key);
+      const a = `${ov}[${k}]`;
+      if (isScalarCoercible(prop)) lines.push(...scalarCoercion(a, prop.type));
+      // Wrapping a lone value in an array is a top-level rule only, as it was.
+      else if (depth === 0 && prop.type === 'array' && st.arrayMode) lines.push(`if(${k} in ${ov}&&${a}!==undefined&&!Array.isArray(${a}))${a}=[${a}]`);
+      if (coercesInside(prop, new Set(), st.memo)) {
+        const n = '_c' + st.n++;
+        lines.push(`{const ${n}=${a};if(typeof ${n}==='object'&&${n}!==null){`);
+        emitCoercions(prop, n, lines, st, depth + 1);
+        lines.push('}}');
+      }
+    }
+  }
+  const it = node.items;
+  if (it && typeof it === 'object' && !Array.isArray(it) && (isScalarCoercible(it) || coercesInside(it, new Set(), st.memo))) {
+    const i = '_i' + st.n++;
+    lines.push(`if(Array.isArray(${ov}))for(let ${i}=0;${i}<${ov}.length;${i}++){`);
+    if (isScalarCoercible(it)) lines.push(...scalarCoercion(`${ov}[${i}]`, it.type));
+    if (coercesInside(it, new Set(), st.memo)) {
+      const n = '_c' + st.n++;
+      lines.push(`{const ${n}=${ov}[${i}];if(typeof ${n}==='object'&&${n}!==null){`);
+      emitCoercions(it, n, lines, st, depth + 1);
+      lines.push('}}');
+    }
+    lines.push('}');
+  }
+  st.seen.delete(node);
+}
+function hasDefaultsInside(node, seen) {
+  if (!node || typeof node !== 'object' || !node.properties || seen.has(node)) return false;
+  seen.add(node);
+  let found = false;
+  for (const prop of Object.values(node.properties)) {
+    if (prop && typeof prop === 'object' && (prop.default !== undefined || hasDefaultsInside(prop, seen))) { found = true; break; }
+  }
+  seen.delete(node);
+  return found;
+}
+function emitDefaults(node, ov, lines, st) {
+  if (st.seen.has(node)) { st.cycle = true; return; }
+  st.seen.add(node);
+  for (const [key, prop] of Object.entries(node.properties || {})) {
+    if (!prop || typeof prop !== 'object') continue;
+    const k = JSON.stringify(key);
+    if (prop.default !== undefined) {
+      const def = JSON.stringify(prop.default);
+      // Assignment to a key named __proto__ hits the prototype setter
+      // instead of creating a property; defineProperty writes an own key.
+      lines.push(key === '__proto__'
+        ? `if(!Object.hasOwn(${ov},${k}))Object.defineProperty(${ov},${k},{value:${def},writable:true,enumerable:true,configurable:true})`
+        : `if(!Object.hasOwn(${ov},${k}))${ov}[${k}]=${def}`);
+    }
+    // Into an own property that holds an object, arrays included, as the
+    // closure pass walks it.
+    if (prop.properties && hasDefaultsInside(prop, new Set())) {
+      const n = '_d' + st.n++;
+      lines.push(`if(Object.hasOwn(${ov},${k})){const ${n}=${ov}[${k}];if(typeof ${n}==='object'&&${n}!==null){`);
+      emitDefaults(prop, n, lines, st);
+      lines.push('}}');
+    }
+  }
+  st.seen.delete(node);
+}
+
 // Generate a fast preprocess function via codegen instead of closure arrays
 function buildPreprocessCodegen(schema, options) {
   if (typeof schema !== 'object' || schema === null || !schema.properties) return null;
   const lines = [];
-  const props = schema.properties;
 
   // removeAdditional: strip unknown keys at every level the schema describes,
   // not just the top one. The closure path below (collectRemovals) always
@@ -584,48 +689,16 @@ function buildPreprocessCodegen(schema, options) {
     emitRemovals(schema, 'd', lines, 0, new Set());
   }
 
-  // coerceTypes: inline per property
-  if (options.coerceTypes) {
-    for (const [key, prop] of Object.entries(props)) {
-      if (!prop || typeof prop !== 'object' || !prop.type) continue;
-      // Coercion writes with plain assignment, which for a key named
-      // __proto__ rewrites the prototype instead. The raw value still goes
-      // through validation, so skipping is a refusal to coerce, not a hole.
-      if (key === '__proto__') continue;
-      const t = Array.isArray(prop.type) ? null : prop.type;
-      if (!t) continue;
-      const k = JSON.stringify(key);
-      if (t === 'integer') {
-        lines.push(`if(typeof d[${k}]==='string'){var _n=Number(d[${k}]);if(d[${k}]!==''&&Number.isInteger(_n))d[${k}]=_n}`);
-        lines.push(`if(typeof d[${k}]==='boolean')d[${k}]=d[${k}]?1:0`);
-      } else if (t === 'number') {
-        lines.push(`if(typeof d[${k}]==='string'){var _n=Number(d[${k}]);if(d[${k}]!==''&&!isNaN(_n))d[${k}]=_n}`);
-        lines.push(`if(typeof d[${k}]==='boolean')d[${k}]=d[${k}]?1:0`);
-      } else if (t === 'string') {
-        lines.push(`if(typeof d[${k}]==='number'||typeof d[${k}]==='boolean')d[${k}]=String(d[${k}])`);
-      } else if (t === 'boolean') {
-        lines.push(`if(d[${k}]==='true'||d[${k}]==='1')d[${k}]=true`);
-        lines.push(`if(d[${k}]==='false'||d[${k}]==='0')d[${k}]=false`);
-      } else if (t === 'array' && options.coerceTypes === 'array') {
-        lines.push(`if(${k} in d&&d[${k}]!==undefined&&!Array.isArray(d[${k}]))d[${k}]=[d[${k}]]`);
-      }
-    }
-  }
-
-  // defaults: inline per property
-  if (options.useDefaults !== false) {
-    for (const [key, prop] of Object.entries(props)) {
-      if (prop && typeof prop === 'object' && prop.default !== undefined) {
-        const k = JSON.stringify(key);
-        const def = JSON.stringify(prop.default);
-        // Assignment to a key named __proto__ hits the prototype setter
-        // instead of creating a property; defineProperty writes an own key.
-        lines.push(key === '__proto__'
-          ? `if(!Object.hasOwn(d,${k}))Object.defineProperty(d,${k},{value:${def},writable:true,enumerable:true,configurable:true})`
-          : `if(!Object.hasOwn(d,${k}))d[${k}]=${def}`);
-      }
-    }
-  }
+  // Coercion and defaults reach every depth the closure passes in
+  // validator-core.js reach, with the same rules in the same order, so the
+  // interpreted engine, which uses those passes, gives the same answer. Both
+  // used to stop at the top-level properties. A schema object that contains
+  // itself declines here, and the closure passes, which carry a guard for it,
+  // take the schema.
+  const st = { n: 0, seen: new Set(), cycle: false, arrayMode: options.coerceTypes === 'array', memo: new Map() };
+  if (options.coerceTypes) emitCoercions(schema, 'd', lines, st, 0);
+  if (options.useDefaults !== false) emitDefaults(schema, 'd', lines, st);
+  if (st.cycle) return null;
 
   if (lines.length === 0) return null;
   // Data may legitimately be null or a non-object (e.g. a `['object','null']`
