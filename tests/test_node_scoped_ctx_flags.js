@@ -156,6 +156,18 @@ function bothEngines (schema, cases, label) {
     'plainOf',
     // The removeAdditional node set, fixed for the whole compile.
     'removeNodes',
+    // Hoisted oneOf/anyOf branch functions by schema or reference. A hoisted
+    // branch reads only module-level names, so it is valid for the whole
+    // compile wherever the same branch recurs.
+    'hoistedBranch', 'hoistedAny',
+    // Whether a local $ref means the same thing everywhere in this document,
+    // decided once from the root.
+    'refKeysSafe',
+    // Source hoisted so far, against the budget; only grows.
+    'preambleChars',
+    // Prototype-flag names that were read. Names are unique per compile, so a
+    // name in the set belongs to exactly one withPlain node.
+    'plainUsed',
   ])
 
   const src = require('node:fs').readFileSync(require.resolve('../lib/js-compiler.js'), 'utf8')
