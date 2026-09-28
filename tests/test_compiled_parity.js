@@ -98,21 +98,37 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
     const src = compiledModuleFor(schema, { format: 'cjs' })
     if (!src) { unbuilt++; continue }
     schemas++
-    const runtime = new Validator(schema)
-    const compiled = fromCompiled(load(src), compiledSchemaFor(schema))
-    for (let j = 0; j < 5; j++) {
-      const text = JSON.stringify(docFor(schema, 3))
-      for (const [name, a, b] of [
-        ['validate', () => show(runtime.validate(JSON.parse(text))), () => show(compiled.validate(JSON.parse(text)))],
-        ['isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(compiled.isValidObject(JSON.parse(text)))],
-        ['validateJSON', () => show(runtime.validateJSON(text)), () => show(compiled.validateJSON(text))],
-        ['isValidJSON', () => String(runtime.isValidJSON(text)), () => String(compiled.isValidJSON(text))],
-      ]) {
-        compared++
-        const want = a(), got = b()
-        if (want !== got) diffs.push(`nested defaults ${JSON.stringify(schema).slice(0, 200)} on ${text} :: ${name}\n    runtime  ${want.slice(0, 300)}\n    compiled ${got.slice(0, 300)}`)
+    const mod = load(src)
+    const normalized = compiledSchemaFor(schema)
+    // With defaults, and with `useDefaults: false`, the one option the wrapper
+    // takes: the input is then left as it is, on both sides.
+    for (const opts of [undefined, { useDefaults: false }]) {
+      const runtime = new Validator(schema, opts)
+      const compiled = fromCompiled(mod, normalized, opts)
+      const label = opts ? 'useDefaults: false' : 'nested defaults'
+      for (let j = 0; j < 5; j++) {
+        const text = JSON.stringify(docFor(schema, 3))
+        for (const [name, a, b] of [
+          ['validate', () => show(runtime.validate(JSON.parse(text))), () => show(compiled.validate(JSON.parse(text)))],
+          ['validate, input after', () => { const d = JSON.parse(text); runtime.validate(d); return JSON.stringify(d) }, () => { const d = JSON.parse(text); compiled.validate(d); return JSON.stringify(d) }],
+          ['isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(compiled.isValidObject(JSON.parse(text)))],
+          ['validateJSON', () => show(runtime.validateJSON(text)), () => show(compiled.validateJSON(text))],
+          ['isValidJSON', () => String(runtime.isValidJSON(text)), () => String(compiled.isValidJSON(text))],
+        ]) {
+          compared++
+          const want = a(), got = b()
+          if (want !== got) diffs.push(`${label} ${JSON.stringify(schema).slice(0, 200)} on ${text} :: ${name}\n    runtime  ${want.slice(0, 300)}\n    compiled ${got.slice(0, 300)}`)
+        }
       }
     }
+  }
+}
+// Options the wrapper does not reproduce are refused, not ignored.
+{
+  const src = compiledModuleFor({ type: 'string' }, { format: 'cjs' })
+  const mod = load(src)
+  for (const opts of [{ coerceTypes: true }, { removeAdditional: true }, { useDefaults: false, allErrors: true }, null, 'x']) {
+    assert.throws(() => fromCompiled(mod, { type: 'string' }, opts), TypeError, JSON.stringify(opts))
   }
 }
 fs.rmSync(dir, { recursive: true, force: true })

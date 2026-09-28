@@ -14,4 +14,12 @@ export interface CompiledValidator<T = unknown> {
   isValidJSON(json: string): boolean;
 }
 
-export function fromCompiled<T = unknown>(mod: CompiledModule, schema: object): CompiledValidator<T>;
+/** The Validator options `fromCompiled` reproduces. Any other option throws. */
+export const COMPILED_OPTIONS: readonly ['useDefaults'];
+
+export interface CompiledOptions {
+  /** `false` leaves the input unchanged, as `new Validator(schema, { useDefaults: false })` does. */
+  useDefaults?: boolean;
+}
+
+export function fromCompiled<T = unknown>(mod: CompiledModule, schema: object, options?: CompiledOptions): CompiledValidator<T>;

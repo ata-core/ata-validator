@@ -178,3 +178,10 @@ export function compiledSchemaFor(schema: unknown): object;
  * whose detailed errors the generator cannot produce.
  */
 export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cjs' }): string | null;
+
+/**
+ * The Validator options `fromCompiled()` reproduces, so a plugin can tell
+ * whether `new Validator(schema, options)` can be replaced. Absent before
+ * ata-validator 1.37.0, where only calls without options can be.
+ */
+export const compiledOptions: readonly string[];

@@ -12,4 +12,5 @@ export const schemaHash = mod.schemaHash;
 export const compiledEligible = mod.compiledEligible;
 export const compiledSchemaFor = mod.compiledSchemaFor;
 export const compiledModuleFor = mod.compiledModuleFor;
+export const compiledOptions = mod.compiledOptions;
 export default mod;

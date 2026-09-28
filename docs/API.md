@@ -419,8 +419,12 @@ v.validate(data); v.isValidObject(data); v.validateJSON(text); v.isValidJSON(tex
   defaults, error order and diagnostics follow the same document.
 
 `fromCompiled` answers the four methods as a `Validator` with default
-options does, errors and filled-in defaults included. Only default options
-are covered; a call with options stays on the runtime. Two tests hold the
+options does, errors and filled-in defaults included. It also takes
+`{ useDefaults: false }` as a third argument, for
+`new Validator(schema, { useDefaults: false })`: the input is then left as it
+is. Any other option throws, so a call that uses one stays on the runtime.
+`compiledOptions` from `ata-validator/build` lists the options it takes; it is
+absent before 1.37.0, where only calls without options can be replaced. Two tests hold the
 equivalence: `tests/test_compiled_parity.js` over the official suite and
 seeded schemas with defaults (15180 checks over 814 schemas), and
 `npm run test:schemastore` over SchemaStore's sample documents, where 725
