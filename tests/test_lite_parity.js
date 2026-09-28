@@ -84,6 +84,11 @@ if (process.argv[2] === '--child') {
   let parseError = null
   try { new lite.Validator({ type: 'object', properties: { a: { type: 'string' } } }).parse({ a: 'x' }) } catch (e) { parseError = e.constructor.name }
   report.parseError = parseError
+  // The methods that need the code generator refuse with a TypeError that
+  // names lite, rather than failing somewhere inside.
+  report.refusals = ['bundle', 'bundleCompact', 'bundleStandalone', 'loadBundle', 'fromStandalone'].map((m) => {
+    try { lite.Validator[m]({}, {}); return m + ': no error' } catch (e) { return e instanceof TypeError && /lite/.test(e.message) ? 'ok' : m + ': ' + e.message }
+  })
   fs.writeFileSync(process.argv[3], JSON.stringify(report))
   process.exit(0)
 }
@@ -101,6 +106,7 @@ function runChild (noNative) {
   assert.deepStrictEqual(report.loaded, [], 'the code generator entered a process that loaded only lite: ' + report.loaded.join(', '))
   assert.strictEqual(report.engine, 'interpreter', 'lite answers on the interpreted engine')
   assert.strictEqual(report.parseError, 'TypeError', 'parse() declines in lite with a TypeError')
+  assert.deepStrictEqual(report.refusals, ['ok', 'ok', 'ok', 'ok', 'ok'])
   return report
 }
 const children = [['with the addon', runChild(false)], ['without the addon', runChild(true)]]
