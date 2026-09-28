@@ -47,7 +47,14 @@ const OPTIONS = [
   { label: 'coerceTypes alone', opts: { coerceTypes: true, removeAdditional: false } },
 ]
 
-for (const { label: optLabel, opts } of OPTIONS) {
+// The interpreted engine takes its own route to every entry point, and its
+// validateJSON once parsed and validated without the rewrite, so each case runs
+// on both engines.
+const ENGINES = [{}, { engine: 'interpreter' }]
+
+for (const eng of ENGINES) for (const { label: base, opts: baseOpts } of OPTIONS) {
+  const optLabel = eng.engine ? `${base} (interpreter)` : base
+  const opts = { ...baseOpts, ...eng }
   for (const c of CASES) {
     // removeAdditional is off in the second group, so an unknown key is a
     // rejection there rather than something to strip.
@@ -85,6 +92,19 @@ ok('a verdict method coerces in place, like validate', () => {
   assert.strictEqual(d.age, 26)
 })
 
+// A default the schema itself rejects: once filled in, validate() says no, and
+// every text entry point has to say the same. The interpreted validateJSON
+// accepted {} here through 1.34.0.
+for (const eng of ENGINES) {
+  ok(`an invalid default rejects on every entry point${eng.engine ? ' (interpreter)' : ''}`, () => {
+    const v = new Validator({ properties: { bar: { type: 'string', minLength: 4, default: 'bad' } } }, eng)
+    assert.strictEqual(v.validate({}).valid, false)
+    assert.strictEqual(v.isValidObject({}), false)
+    assert.strictEqual(v.validateJSON('{}').valid, false)
+    assert.strictEqual(v.isValidJSON('{}'), false)
+  })
+}
+
 ok('without preprocessing options nothing is mutated', () => {
   const v = new Validator(schema, { useDefaults: false })
   const d = { age: 26, active: true }
@@ -92,4 +112,4 @@ ok('without preprocessing options nothing is mutated', () => {
   assert.deepStrictEqual(d, { age: 26, active: true })
 })
 
-console.log(`${pass}/${CASES.length * OPTIONS.length * 2 + 3} verdict preprocess tests passed.`)
+console.log(`${pass}/${ENGINES.length * (CASES.length * OPTIONS.length * 2 + 1) + 3} verdict preprocess tests passed.`)
