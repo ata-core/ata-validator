@@ -11,7 +11,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
-- A `$ref` with only annotations beside it, such as `description`, `title`, `default`, `examples`, `deprecated` or an `x-` vendor key, is compiled like a bare `$ref`. Any sibling key sent the whole schema to the interpreted engine before, and editor-oriented schemas put a description next to nearly every `$ref`. A sibling that validates, or one the list does not know, still declines. Of the SchemaStore schemas with sample documents, 57 more now take the code generator than on 1.35.0 (325 of 487, from 268), with every sample document answered as the interpreted engine answers it.
+- A `$ref` with only annotations beside it, such as `description`, `title`, `default`, `examples`, `deprecated` or an `x-` vendor key, is compiled like a bare `$ref`. Any sibling key sent the whole schema to the interpreted engine before, and editor-oriented schemas put a description next to nearly every `$ref`. A sibling that validates, or one the list does not know, still declines. Of the SchemaStore schemas with sample documents, 57 more now take the code generator than on 1.35.0 (325 of 487, from 268). With `useDefaults: false`, every one of their 2213 sample documents gets the same verdict and the same errors from both engines, apart from the order of the errors on one schema. With defaults on, 7 schemas still differ, because the generated preprocess pass fills defaults only at the top level while the interpreted engine fills them at every depth; that is not fixed yet.
 
 ## 1.35.0 - 2026-09-28
 
