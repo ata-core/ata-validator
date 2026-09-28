@@ -98,20 +98,21 @@ file.
 
 | Dimension | Schema | ata-AOT | runtime validator | Difference |
 |---|---|---|---|---|
-| Bundle (gzipped) | simple | 1.3 KB | 52.7 KB | 39.8x smaller |
-| Bundle (gzipped) | complex | 7.8 KB | 52.7 KB | 6.7x smaller |
-| Bundle (gzipped) | nested | 4.5 KB | 52.7 KB | 11.8x smaller |
-| Cold start | simple | 22 ms | 48 ms | 2.2x faster |
-| Throughput (1M ops) | simple | 307 Mops/s | 100 Mops/s | 3.1x faster |
-| Compile time | simple | 17 µs | 1.62 ms | 93x faster |
+| Bundle (gzipped) | simple | 1.3 KB | 58.1 KB | 43.9x smaller |
+| Bundle (gzipped) | complex | 7.8 KB | 58.1 KB | 7.4x smaller |
+| Bundle (gzipped) | nested | 4.5 KB | 58.1 KB | 12.9x smaller |
+| Cold start | simple | 22 ms | 44 ms | 2.0x faster |
+| Throughput (1M ops) | simple | 266 Mops/s | 109 Mops/s | 2.4x faster |
+| Compile time | simple | 19 µs | 1.67 ms | 87x faster |
 
 The runtime column is the default validator most frameworks ship. Reproduce on your machine
-with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-09-27,
-on ata-validator 1.32.1. Emitted modules are about 0.2 to 0.4 KB larger gzipped than on 1.25.0,
-which is what the exact own-property checks added in 1.31.2 cost. Across three runs throughput
-moved between 296 and 307 Mops/s against 99 to 107, cold start between 21 and 22 ms against 41
-to 48, and the compile ratio between 87x and 95x, so treat the last three rows as an order of
-magnitude rather than a constant.
+with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-09-28,
+on ata-validator 1.33.1. The runtime column's bundle measured 52.7 KB on the previous run and
+58.1 KB now, with ata's modules unchanged in size. Across three runs throughput moved
+between 231 and 280 Mops/s against 97 to 109, cold start between 21 and 22 ms against 40 to 44,
+and the compile ratio between 80x and 87x. The throughput row times a single one-million-call
+loop of a few milliseconds, so it moves the most from run to run; treat the last three rows as
+an order of magnitude rather than a constant.
 
 The wins are largest on bundle size and compile time because AOT moves work from runtime to
 build time. Throughput and cold start are also faster because the compiled validator is a
@@ -239,20 +240,20 @@ is the most common way to get a misleading number out of this library.
 
 | | compiled with `ata build` | runtime `new Validator(schema)` |
 |---|---|---|
-| In a bundle, gzipped | **2.3 KB** | 91.4 KB |
-| Time to a served request | **3.4 ms** | 11.2 ms |
+| In a bundle, gzipped | **2.2 KB** | 92.3 KB |
+| Time to a served request | **3.5 ms** | 11.2 ms |
 | Schema known when | build time | any time |
 
 The bundle row is the ten-field user schema in `tests/fixtures/error-dx/user.schema.json`,
 every export of the compiled module against `new Validator(schema)`, built with
-`bun build --minify --target=browser` on ata 1.32.1. The startup row is a Hono route on
+`bun build --minify --target=browser` on ata 1.33.1. The startup row is a Hono route on
 Bun 1.4, best of seven, from `benchmark/bundle`, against 3.5 ms for the same app doing no
 validation at all, so the compiled path costs nothing measurable to start. The runtime
 figure is what it is because a schema that arrives at run time can use any keyword, so
 the whole engine has to be there. The compiled module imports nothing and contains only
 the checks your schema asks for.
 
-**On a server, use whichever fits your schemas.** 91 KB of JavaScript on a Node or Bun
+**On a server, use whichever fits your schemas.** 92 KB of JavaScript on a Node or Bun
 process is not a cost anyone notices, and the runtime API is the simpler thing to reach
 for. Speed is the same either way once warm.
 
@@ -526,13 +527,13 @@ npx ata build 'schemas/*.json' --out-dir build/validators --check
 Run with `--watch` during development for incremental rebuilds.
 
 Bundle sizes for the 10-field user schema in `tests/fixtures/error-dx/user.schema.json`,
-minified and gzipped, measured with `bun build --minify --target=browser` on ata 1.32.1:
+minified and gzipped, measured with `bun build --minify --target=browser` on ata 1.33.1:
 
 | What the app imports | Size | Notes |
 |---|---|---|
-| `Validator` from `ata-validator` | 91.3 KB | The compiler ships with it, because a runtime schema can use any keyword |
-| `isValid` from the compiled module | **1.2 KB** | Nothing else is reachable, so the error collector is dropped |
-| `validate` from the compiled module | **2.1 KB** | Adds the detailed error collector |
+| `Validator` from `ata-validator` | 92.3 KB | The compiler ships with it, because a runtime schema can use any keyword |
+| `isValid` from the compiled module | **1.3 KB** | Nothing else is reachable, so the error collector is dropped |
+| `validate` from the compiled module | **2.0 KB** | Adds the detailed error collector |
 
 `--abort-early` makes the generated source about three times smaller, and after
 bundling it makes no difference: importing only `isValid` already leaves the error
@@ -555,7 +556,7 @@ through a `setFormats()` export the module carries. `docs/API.md` has the
 details.
 
 **Fastify startup, 10 route schemas, from a cold process to the first validated request:
-ajv 20.2 ms, ata 3.9 ms, no build step required.** ata registers in 0.2 ms of that and
+ajv 20.2 ms, ata 2.7 ms, no build step required.** ata registers in 0.2 ms of that and
 compiles on the first request, so counting only registration would overstate the gap.
 Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
