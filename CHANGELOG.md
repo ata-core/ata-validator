@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- A pattern that a backtracking engine also runs in linear time now goes to the platform `RegExp` instead of ata's linear-time engine: every quantifier on a single character or class, at most one of them unbounded and then anchored with `^`, few bounded choices in total, and only escapes both engines read alike. The answers are the same, and a compiled module whose patterns are all like that no longer embeds the engine, about 15 KB of it before gzip: Uniswap's token-list validator went from 13.6 to 10.9 KB gzipped. Of SchemaStore's 1187 patterns, 857 qualify; both engines gave the same answer on all 171400 generated inputs, and none took more than 100 ms on a 50000-character input built to make a backtracking engine retry. A new test holds this on the official suite's patterns and adversarial inputs, and patterns that could retry, such as `(a+)+$` or `^a+a+$`, stay on the linear-time engine.
+
 ## 1.37.1 - 2026-09-29
 
 ### Fixed
