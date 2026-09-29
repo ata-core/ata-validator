@@ -32,13 +32,13 @@ npm install --save-dev ata-validator
 npx ata build 'schemas/*.json' --out-dir src/generated
 ```
 
-The `ata-validator` package itself is pure JavaScript. The native accelerator (simdjson parsing, parallel NDJSON, buffer APIs) ships as per-platform optional packages that npm installs automatically where they fit, the same pattern Vite uses for esbuild. Seven targets are built: macOS on arm64 and x64, Linux on x64 and arm64 against both glibc and musl, and Windows on x64. A platform without a prebuild still installs and validates, on the pure-JS engine. For a guaranteed zero-binary install:
+The `ata-validator` package itself is pure JavaScript. The native accelerator (simdjson parsing, parallel NDJSON, buffer APIs) ships as per-platform optional packages that npm installs automatically where they fit, the same pattern Vite uses for esbuild. Seven targets are built: macOS on arm64 and x64, Linux on x64 and arm64 against both glibc (2.17 or later, below the 2.28 Node itself needs) and musl, and Windows on x64. A platform without a prebuild still installs and validates, on the pure-JS engine. For a guaranteed zero-binary install:
 
 ```bash
 npm install ata-validator --omit=optional
 ```
 
-or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup scores the same on the official suite as the native one, 1301 of 1301 Draft 2020-12 cases. Only the buffer and parallel APIs (`isValid` on raw buffers, `countValid`, `batchIsValid`, `validateAndParse`) need the native engine and say so with a clear error.
+or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup scores the same on the official suite as the native one, 1301 of 1301 Draft 2020-12 cases. The buffer and parallel APIs (`isValid` on raw buffers, `isValidPrepadded`, `isValidNDJSON`, `isValidParallel`, `countValid`, `batchIsValid`, `validateAndParse`) work without the addon too, answering through the same checks as `isValidJSON()`, slower than the addon: 177 ns against 92 for a small document on Node 25. In a browser, which has no `Buffer`, they throw and name the methods to use instead.
 
 Those four now agree with `validate()` on every case of the official suite, 3365 across three dialects. The native walker behind them does not handle every shape (`contains`, `unevaluatedProperties`, `patternProperties`, tuple `items`, cross-document `$ref`, a few formats), so for schemas using one of those the buffer APIs parse the bytes and answer through `validate()`; the list is in `lib/buffer-gate.js`. Typical request schemas stay on the zero-copy path. `npm test` holds the disagreement count at zero.
 

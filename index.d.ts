@@ -439,7 +439,8 @@ export interface ValidatorOptions {
    * answers `validate()`, `isValidObject()` and `validateJSON()`. For a schema
    * that arrives from outside the trust boundary. The verdict is the same on
    * every engine; the cost is not. The buffer APIs (`isValid`, `countValid`,
-   * `batchIsValid`) are native-only and unaffected.
+   * `batchIsValid`) use the native addon where it loads, which this option
+   * does not affect; without it they answer through the engine it picks.
    */
   engine?: 'auto' | 'interpreter';
 }

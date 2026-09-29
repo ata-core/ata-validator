@@ -173,6 +173,32 @@ it. The rest is the mechanism: a result object and a closure per failing validat
 then a pass that ranks and sorts, then a pass that maps every raw error into a new
 enriched one. ajv writes into an array it already has.
 
+### Remeasured on 2026-09-29, before 1.39.0
+
+The same comparison rebuilt: official suite, Draft 2020-12, the cases all three
+compile and agree on, formats as annotations, no defaults, all errors. The corpus
+came out a little different, 306 schemas and 1064 instances of which 453 are
+invalid. Node 25.2.1, ajv 8.20.0, @exodus/schemasafe 1.3.0, medians of three runs
+of eleven interleaved rounds each:
+
+| | verdict only | errors read on every failure |
+|---|---|---|
+| ata | 0.036 ms | 0.370 ms |
+| ata, `richErrors: false` | | 0.266 ms |
+| ata, `abortEarly: true` | | 0.083 ms |
+| ajv | 0.061 ms | 0.071 ms |
+| @exodus/schemasafe | 0.084 ms | 0.072 ms |
+
+On these small schemas the gap is still there, about 5x with errors read, and
+1.39.0 did not change it: this table measures the same for 1.38.0 within noise.
+What 1.39.0 changed is the cost on large schemas and documents, where the error
+function did work nobody read: on Uniswap's token list, rejecting the 1723-token
+default list and reading its errors went from 2169 to 1352 us, against 1476 for ajv
+with allErrors on the same machine. The structural cause here is unchanged: a
+rejected document goes through the verdict function and then the error function,
+and its errors are sorted and enriched when read. Enrichment is about 0.1 ms of the
+0.37.
+
 ### What one round of optimization bought, and what it did not
 
 A CPU profile put `schemaOrderRank` at 8.5% of the error path. It split the schema
