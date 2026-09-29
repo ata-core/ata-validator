@@ -190,40 +190,34 @@ test("removeAdditional without native", () => {
   assert(!("extra" in data), "expected extra property removed");
 });
 
-// --- Buffer APIs throw clear errors ---
+// --- Buffer APIs without the addon ---
+// With Buffer available (Node without the addon) they answer as validate()
+// does on the parsed document. Without Buffer, a real browser, there is
+// nothing to decode with and they throw a message that names the alternatives.
 
-test("isValid throws without native", () => {
+test("buffer APIs answer through validate() without native", () => {
+  const v = new Validator({ type: "object", required: ["a"] });
+  assert(v.isValid(Buffer.from('{"a":1}')) === true, "expected valid");
+  assert(v.isValid(Buffer.from("{}")) === false, "expected invalid");
+  assert(v.countValid(Buffer.from('{"a":1}\n{}\n{"a":2}\n')) === 2, "expected 2 valid lines");
+  const r = v.isValidParallel(Buffer.from('{"a":1}\n{}\n'));
+  assert(r.length === 2 && r[0] === true && r[1] === false, "expected [true, false]");
+});
+
+test("buffer APIs throw without native and without Buffer", () => {
   const v = new Validator({ type: "object" });
+  const saved = globalThis.Buffer;
   let threw = false;
   try {
-    v.isValid(Buffer.from("{}"));
+    delete globalThis.Buffer;
+    v.isValid(new Uint8Array([123, 125]));
   } catch (e) {
     threw = true;
-    assert(e.message.includes("Native addon required"), "expected native error");
+    assert(e.message.includes("Native addon required"), "expected native error, got " + e.message);
+  } finally {
+    globalThis.Buffer = saved;
   }
   assert(threw, "expected isValid to throw");
-});
-
-test("countValid throws without native", () => {
-  const v = new Validator({ type: "object" });
-  let threw = false;
-  try {
-    v.countValid(Buffer.from("{}"));
-  } catch (e) {
-    threw = true;
-  }
-  assert(threw, "expected countValid to throw");
-});
-
-test("isValidParallel throws without native", () => {
-  const v = new Validator({ type: "object" });
-  let threw = false;
-  try {
-    v.isValidParallel(Buffer.from("{}"));
-  } catch (e) {
-    threw = true;
-  }
-  assert(threw, "expected isValidParallel to throw");
 });
 
 // --- version() fallback ---

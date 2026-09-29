@@ -41,8 +41,23 @@ for (const f of fs.readdirSync(base).filter((x) => x.endsWith('.json'))) {
 }
 const v = new Validator({ type: 'object' })
 assert.strictEqual(v.isValid(Buffer.from('{bad')), false, 'text that does not parse is invalid')
+// The options that change what validate() sees: coercion, defaults, removal,
+// and a custom keyword. The buffer answer must follow each of them.
+const shaped = { type: 'object', properties: { n: { type: 'integer', minimum: 2 }, s: { type: 'string', default: 'x', minLength: 1 }, b: { type: 'boolean' } }, required: ['n', 's'], additionalProperties: false }
+const texts = ['{"n":"3"}', '{"n":3}', '{"n":1,"s":"a"}', '{"n":"x"}', '{"n":3,"s":""}', '{"n":3,"extra":1}', '{"n":3,"s":"a","b":"true"}', '[]', 'null', '{"n":3.0,"s":"ok"}']
+let optionCases = 0
+for (const options of [{ coerceTypes: true }, { useDefaults: true }, { removeAdditional: true }, { coerceTypes: true, useDefaults: true, removeAdditional: 'all' }, { keywords: { even: { validate: (s, d) => typeof d !== 'number' || d % 2 === 0 } } }]) {
+  const sch = options.keywords ? { ...shaped, properties: { ...shaped.properties, n: { ...shaped.properties.n, even: true } } } : shaped
+  const w = new Validator(sch, options)
+  for (const text of texts) {
+    const expected = w.validate(JSON.parse(text)).valid
+    assert.strictEqual(w.isValid(Buffer.from(text)), expected, JSON.stringify(options) + ' ' + text)
+    assert.deepStrictEqual(w.isValidNDJSON(Buffer.from(text + '\\n' + text + '\\n')), [expected, expected], 'ndjson ' + JSON.stringify(options) + ' ' + text)
+    optionCases++
+  }
+}
 assert.ok(cases > 1000, 'only ' + cases + ' cases')
-console.log('ok: without the native addon the buffer APIs agree with validate() on ' + cases + ' suite cases over ' + schemas + ' schemas')
+console.log('ok: without the native addon the buffer APIs agree with validate() on ' + cases + ' suite cases over ' + schemas + ' schemas and ' + optionCases + ' cases under coercion, defaults, removal and a custom keyword')
 `
 const r = spawnSync(process.execPath, ['-e', child], { encoding: 'utf8', env: { ...process.env, ATA_NO_NATIVE: '1' } })
 process.stdout.write(r.stdout)
