@@ -160,6 +160,9 @@ function bothEngines (schema, cases, label) {
     // branch reads only module-level names, so it is valid for the whole
     // compile wherever the same branch recurs.
     'hoistedBranch', 'hoistedAny',
+    // Definitions referenced from several places, counted once from the root:
+    // the errors generator writes each of them as one helper.
+    'sharedDefs',
     // Whether a local $ref means the same thing everywhere in this document,
     // decided once from the root.
     'refKeysSafe',
