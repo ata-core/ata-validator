@@ -14,8 +14,9 @@ const esbuild = require('esbuild')
 // bytes gzipped by zlib level 9. Measured 45009 on 2026-09-28 at 1.35.0, 45863 at
 // 1.36.1, and 46034 once `~standard.jsonSchema` (Standard JSON Schema) was added.
 // 46317 once the regex engine became one function whose text the standalone
-// emitter embeds, which removed its generated copy from the package.
-const BUDGET = 46400
+// emitter embeds, which removed its generated copy from the package. 46520
+// once branch errors were ordered and shaped the same whichever engine answers.
+const BUDGET = 46700
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

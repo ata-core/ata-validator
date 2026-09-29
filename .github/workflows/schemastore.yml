@@ -39,7 +39,10 @@ jobs:
           node-version: 22
 
       # No install: ata has no required dependencies, and this runs the pure
-      # JS engines. At the pin: 487 schemas compared on 2213 documents, 396
-      # of them compiled away too.
+      # JS engines. At the pin: 487 schemas compared on 2213 documents, 395
+      # of them compiled away too. It was 396 until cloudify.json moved to the
+      # interpreter: one of its definitions includes itself through allOf, and
+      # generated code threw a RangeError reading the errors of a document
+      # with a string where that definition expects an object.
       - name: Compare engines on SchemaStore
-        run: node scripts/schemastore-differential.js schemastore --min-documents 2213 --min-compiled 396
+        run: node scripts/schemastore-differential.js schemastore --min-documents 2213 --min-compiled 395

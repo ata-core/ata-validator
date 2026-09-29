@@ -34,7 +34,12 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
   assert.ok(ver === pkg.version, `${name} must be exact-pinned to the core version (got ${ver})`);
 }
 
-// Size ceiling: 300 KB hard cap; adjust only with a reviewed reason.
-assert.ok(manifest.size < 300 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// Size ceiling; adjust only with a reviewed reason. It is here to catch weight
+// nobody meant to ship, as the changelog once was (13% of the tarball). 300 KB
+// until 1.39.0, when three silent-accept fixes, engine-independent error lists
+// and the same-value $ref cycle gate took the package past it after comments
+// had been trimmed twice to stay under; the same release strips the native
+// binaries, which takes 250-300 KB off every install with an addon.
+assert.ok(manifest.size < 320 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
