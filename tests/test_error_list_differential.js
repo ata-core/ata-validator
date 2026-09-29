@@ -63,6 +63,24 @@ const errorsOf = (v, d) => {
   assert.strictEqual(errorsOf(new Validator(schema), { x: 1 }), want, 'the default engine answers it the same way instead of throwing')
 }
 
+// The error function builds its helpers once and keeps the cycle guard's state
+// between calls. A custom keyword that validates with the same validator calls
+// it while it runs; that call must not share the running one's state.
+{
+  const schema = { $defs: { N: { type: 'object', properties: { x: { type: 'integer' }, k: { $ref: '#/$defs/N' } }, reentrant: true } }, $ref: '#/$defs/N' }
+  const make = (engine) => {
+    let v = null
+    const keywords = { reentrant: { validate: (s, d) => !(d && d.probe) || (v.validate({ x: 'bad' }).errors.length === 1) } }
+    v = new Validator(schema, engine ? { engine, keywords } : { keywords })
+    return v
+  }
+  const doc = { x: 'no', probe: 1, k: { x: 1 } }
+  const want = errorsOf(make('interpreter'), doc)
+  const v = make()
+  assert.strictEqual(errorsOf(v, doc), want, 'a nested call from a custom keyword')
+  assert.strictEqual(errorsOf(v, { k: { x: 'z' } }), errorsOf(make('interpreter'), { k: { x: 'z' } }), 'the next call after a nested one')
+}
+
 const SCHEMAS = Number(process.env.SCHEMAS || 1500)
 let compared = 0, generated = 0
 const diffs = []

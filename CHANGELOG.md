@@ -21,6 +21,17 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
+- Reading the errors of a rejected document is faster on schemas with `anyOf` and `$defs`, with the same errors. Three changes to the generated error function:
+  - `anyOf` stops at the first passing branch. It used to run every branch with full error collection even after one passed.
+  - Branches are first asked only whether they pass, stopping at their first error. When the branch holds an `anyOf` of its own that fails, it no longer collects and collapses that `anyOf`'s alternatives only for the next branch to pass. On Uniswap's token list, an object value tried against the branch for primitive values did this 2353 times per validation.
+  - With `$defs`, the helpers (definition functions, patterns, name sets, branch functions) are built once per validator instead of on every call. Reading an error list on a large schema with many definitions used to rebuild all of them first.
+
+  Measured on Node 25 against 1.38.0:
+  - Uniswap's token-list schema, rejecting its 1723-token default list with four errors and reading them: 2169 to 1352 us.
+  - SchemaStore's 125 schemas with rejected sample documents, reading every error list: 5501 to 4551 us in total.
+  - The first error read in a fresh process: 16.87 to 14.96 ms.
+
+  Accepting documents, compiling, cold start and small schemas measured the same, within 3%.
 - The Linux glibc addons are built in a manylinux_2_28 container, the same floor Node's own Linux binaries have, instead of on the CI runner's Ubuntu 24.04. They needed glibc 2.38 and the GCC 13 libstdc++, so on Debian 12 (the `node:22` Docker image), Debian 11, Ubuntu 22.04, Amazon Linux 2023 and Rocky Linux 9 the addon failed to load and ata ran on pure JS, with the binary installed and unused. Checked on all five for arm64 and x64: 1.38.0's addon loads on none of them, the new build on all of them, answering correctly. It now needs glibc 2.17 and GLIBCXX 3.4.22, and the build fails if that floor rises.
 - Native binaries are stripped of symbols again. pkg-prebuilds stripped them until 1.1.0 replaced it with a plain build, and nothing noticed the step was gone. Linux x64 went from 1.73 to 1.42 MB and arm64 from 1.52 to 1.25 MB; a local macOS arm64 build went from 1.31 to 1.16 MB. The prebuild workflow now loads each binary it ships, after stripping and signing, and requires it to answer. On the arm64 build, nine interleaved rounds against 1.38.0's binary measured no slowdown.
 - Without the native addon, the buffer APIs decode the bytes and answer through `isValidJSON()`, which reads text the scanner covers without parsing it, instead of parsing and calling `validate()`. A small document went from 350 to 177 ns on Node 25; the addon answers it in 92. The answers are `validate()`'s, and the test for this path now also covers coercion, defaults, removal and a custom keyword.
