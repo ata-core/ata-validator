@@ -13,6 +13,8 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
   None of SchemaStore's schemas changed engine: 408 still run generated code, 396 still compile away, and all 2213 sample documents get the same answer as before. A new test, `tests/test_unevaluated_differential.js`, builds schemas from the applicators that produce annotations and holds every path, the generated verdict and error functions, `validate()`, `isValidObject()` and standalone modules, to the interpreter. On the previous code it finds 1133 differences in 36000 documents; now none, and none over twelve seeds and 576000 documents.
 
+- For a value of the wrong type, `enum` and `const` errors were missing when the error list came from the single-pass error function: `{ type: 'number', enum: [1, 2, 3] }` reported only `type` for `'x'`, where the interpreted engine, and other validators, report `type` and `enum`. Both keywords apply to values of any type. The error-shape differential now includes `type` next to `enum` and `const`; on the previous code 207 of its 3168 cases differ. Found by comparing against another validator in the react-jsonschema-form playground.
+
 ### Changed
 
 - Without the native addon, the buffer APIs decode the bytes and answer through `isValidJSON()`, which reads text the scanner covers without parsing it, instead of parsing and calling `validate()`. A small document went from 350 to 177 ns on Node 25; the addon answers it in 92. The answers are `validate()`'s, and the test for this path now also covers coercion, defaults, removal and a custom keyword.

@@ -53,6 +53,11 @@ const SCHEMAS = [
   { type: 'number', exclusiveMinimum: 5, exclusiveMaximum: 1 },
   { enum: ['a', 'b'] },
   { const: { x: 1 } },
+  // enum and const next to type: a value of the wrong type fails both
+  { type: 'number', enum: [1, 2, 3] },
+  { type: 'string', const: 'a' },
+  { type: ['number', 'null'], enum: [1, null] },
+  { type: 'object', const: { x: 1 } },
   { not: { type: 'string' } },
   { anyOf: [{ type: 'string' }, { type: 'number', minimum: 5 }] },
   { oneOf: [{ type: 'number', maximum: 5 }, { type: 'number', minimum: 3 }] },
