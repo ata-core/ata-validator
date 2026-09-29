@@ -80,13 +80,14 @@ r = collectEvaluated({
 assert('not — does not contribute', r.props, ['a'])
 assert('not — not dynamic', r.dynamic, false)
 
-// standalone if (no then/else) → contributes nothing
+// standalone if (no then/else): its names count only when it passes, so the
+// result is dynamic and the generator decides at run time or declines
 r = collectEvaluated({
   if: { properties: { foo: {} } },
   unevaluatedProperties: false
 })
-assert('standalone if — no contribution', r.props, [])
-assert('standalone if — not dynamic', r.dynamic, false)
+assert('standalone if: names it may contribute', r.props, ['foo'])
+assert('standalone if: dynamic', r.dynamic, true)
 
 // items/prefixItems tracking
 r = collectEvaluated({
