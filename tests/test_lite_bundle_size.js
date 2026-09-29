@@ -16,8 +16,10 @@ const esbuild = require('esbuild')
 // 46317 once the regex engine became one function whose text the standalone
 // emitter embeds, which removed its generated copy from the package. 46520
 // once branch errors were ordered and shaped the same whichever engine answers,
-// 46826 once a rejection read its errors in one layer instead of three.
-const BUDGET = 46900
+// 46826 once a rejection read its errors in one layer instead of three, and
+// 47059 once `verbose` moved into the core: lite, which is the interpreted
+// engine only, ignored the option before.
+const BUDGET = 47150
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

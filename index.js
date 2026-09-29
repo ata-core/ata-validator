@@ -36,7 +36,7 @@ class TextRejection {
 }
 
 function installCodegenPaths (ctx) {
-  const { ABORT_EARLY_RESULT, HYBRID_TIER_CALLS, SIMDJSON_THRESHOLD, VALID_RESULT, _bindVerdict, _jsonSyntaxRejection, _mustReject, getNative, isV1Dialect, resolveSchemaByPath } = core._internals;
+  const { ABORT_EARLY_RESULT, HYBRID_TIER_CALLS, SIMDJSON_THRESHOLD, VALID_RESULT, _bindVerdict, _jsonSyntaxRejection, _mustReject, _verboseWrap, getNative, isV1Dialect, resolveSchemaByPath } = core._internals;
   const { jsFn, _isCodegen, preprocess, fusedRemove, options, schemaObj, useSimdjsonForLarge, _buildCombined, _buildErr } = ctx;
   // errFn: the generated error function when it is safe, else the
   // interpreted engine, on every platform alike.
@@ -256,33 +256,7 @@ function installCodegenPaths (ctx) {
     // The verbose fields are added here, so a path around this layer would
     // miss them.
     ctx.rejectBase = null;
-    const inner = this.validate;
-    const root = this._schemaObj;
-    const { resolvePointer } = require('./lib/pointer.js');
-    this.validate = (data) => {
-      const result = inner(data);
-      if (result && !result.valid && result.errors) {
-        const enriched = result.errors.map((err) => {
-          if (!err || err.parentSchema !== undefined) return err;
-          const parentSchema = resolveSchemaByPath(root, err.schemaPath);
-          // The last segment of the schema path is the keyword that
-          // failed, so its value on the parent is that keyword's schema.
-          const sp = typeof err.schemaPath === 'string' ? err.schemaPath : '';
-          const last = sp.slice(sp.lastIndexOf('/') + 1).replace(/~1/g, '/').replace(/~0/g, '~');
-          const keywordSchema = (parentSchema !== null && typeof parentSchema === 'object' && last)
-            ? parentSchema[last]
-            : undefined;
-          return {
-            ...err,
-            parentSchema,
-            schema: keywordSchema,
-            data: resolvePointer(data, err.instancePath, undefined),
-          };
-        });
-        return { valid: false, errors: enriched };
-      }
-      return result;
-    };
+    this.validate = _verboseWrap(this.validate, this._schemaObj);
   }
   // The verdict methods answer validate()'s question without building the
   // error list, so they run the same preprocess pass. Skipping it made the

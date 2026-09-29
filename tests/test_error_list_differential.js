@@ -97,6 +97,22 @@ for (const richErrors of [true, false]) {
   assert.notStrictEqual(v.validate({ a: 1 }).errors[0].message, 'edited', 'an edit stays with the caller')
 }
 
+// verbose adds parentSchema, schema and data on both engines; the interpreted
+// one used to leave them out.
+for (const [schema, doc] of [
+  [{ type: 'object', properties: { x: { type: 'string' } } }, { x: 1 }],
+  [{ $defs: { n: { type: 'object', properties: { k: { $ref: '#/$defs/n' }, x: { type: 'integer' } } } }, $ref: '#/$defs/n' }, { x: 'no', k: { x: 1.5 } }],
+]) {
+  for (const richErrors of [true, false]) {
+    const a = errorsOf(new Validator(schema, { verbose: true, richErrors }), doc)
+    const b = errorsOf(new Validator(schema, { verbose: true, richErrors, engine: 'interpreter' }), doc)
+    assert.strictEqual(a, b, 'verbose errors, richErrors ' + richErrors)
+    // `data` is always there; `parentSchema` is undefined for a path through a
+    // $ref, which JSON leaves out, on both engines alike.
+    assert.ok(a.includes('"data":'), 'verbose fields present: ' + a.slice(0, 200))
+  }
+}
+
 const SCHEMAS = Number(process.env.SCHEMAS || 1500)
 let compared = 0, generated = 0
 const diffs = []

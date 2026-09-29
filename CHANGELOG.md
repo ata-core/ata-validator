@@ -11,7 +11,11 @@ All notable changes to ata-validator are documented here. The format follows [Ke
   - The runtime's error functions write errors in the shape the legacy (`richErrors: false`) list returns, without the ordering key, `code` and `docUrl` that standalone modules need. Reading them no longer copies each error to remove those fields. The runtime derives `code` and `docUrl` from the keyword when it enriches, and orders errors by `schemaPath` through the same ordinal as before.
   - Errors at a fixed path are still copied per read, so each read gets its own objects to edit, as it always has.
 
-  Measured on the official suite's Draft 2020-12 cases, over the invalid documents of schemas that run generated code, against 1.39.1: legacy errors 470 to 372 ns per document, rich errors 658 to 521 ns. On one two-error body the read went from 96 to 62 ns. Reading only `.valid` costs the same as before, and so do accepting documents, compiling and cold start, within 3%.
+  Measured on the official suite's Draft 2020-12 cases, over the invalid documents of schemas that run generated code, against 1.39.1: legacy errors 470 to 372 ns per document, rich errors 658 to 521 ns. The interpreted engine takes the same direct path, and errors behind a `$ref`, whose order is found by walking the path back to a schema node, remember the answer instead of walking it on every read: on the suite's schemas that engine answers, legacy errors 539 to 510 ns, rich 752 to 709. On one two-error body the read went from 96 to 62 ns. Reading only `.valid` costs the same as before, and so do accepting documents, compiling and cold start, within 3%.
+
+### Fixed
+
+- `verbose` was ignored by the interpreted engine: the same validator added `parentSchema`, `schema` and `data` to its errors when generated code answered and left them out when the interpreter did, as it does under `engine: 'interpreter'`, for schemas code generation declines, and in every case in the lite build. Both engines now go through the same step.
 
 ## 1.39.1 - 2026-09-30
 
