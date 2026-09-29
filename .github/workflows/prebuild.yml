@@ -44,10 +44,6 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install re2 abseil mimalloc
 
-      - name: Install deps (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libre2-dev libabsl-dev
-
       - name: Setup MSVC
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
@@ -74,13 +70,35 @@ jobs:
           echo "VCPKG_TARGET_TRIPLET=x64-windows-static" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Install dependencies
+        if: runner.os != 'Linux'
         run: npm install
 
       - name: Build native addon
+        if: runner.os != 'Linux'
         run: npm run build
 
-      # `strip -Sx` rewrites the Mach-O and invalidates the ad-hoc signature
-      # the linker applied. arm64 macOS refuses to load unsigned code, so the
+      # Linux builds in a manylinux_2_28 container so the addon needs no newer
+      # glibc or libstdc++ than Node itself; the script strips the binary,
+      # checks the floor and loads it. See scripts/build-manylinux.sh.
+      - name: Build native addon (Linux, manylinux_2_28)
+        if: runner.os == 'Linux'
+        run: |
+          IMAGE=quay.io/pypa/manylinux_2_28_$([ "${{ matrix.arch }}" = "arm64" ] && echo aarch64 || echo x86_64)
+          docker run --rm -v "${{ github.workspace }}":/work -w /work "$IMAGE" bash scripts/build-manylinux.sh
+
+      # Symbols are for debugging, not for running, and they were a sixth of
+      # every Linux binary. pkg-prebuilds stripped them until 1.1.0 replaced it
+      # with a plain build, which dropped the strip without anyone noticing.
+      # -x keeps the exported symbols Node loads through; Linux strips in
+      # scripts/build-manylinux.sh.
+      - name: Strip symbols (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          strip -x build/Release/ata.node
+          ls -l build/Release/ata.node
+
+      # Stripping rewrites the Mach-O and invalidates the ad-hoc signature the
+      # linker applied. arm64 macOS refuses to load unsigned code, so the
       # binary must be re-signed and verified before it ships.
       - name: Re-sign and verify macOS prebuild
         if: runner.os == 'macOS'
@@ -90,6 +108,10 @@ jobs:
 
       - name: Assemble native package
         run: node scripts/make-native-package.js --binary build/Release/ata.node --target ${{ matrix.target }} --out native-packages
+
+      # The binary that ships, after strip and signing, must load and answer.
+      - name: Load the shipped addon
+        run: node scripts/smoke-native.js
 
       - name: Upload native package
         uses: actions/upload-artifact@v4
@@ -130,7 +152,10 @@ jobs:
                 rm -rf node_modules build &&
                 apk add --no-cache git python3 make g++ cmake re2-dev abseil-cpp-dev linux-headers &&
                 npm install &&
-                npx cmake-js build --target ata
+                npx cmake-js build --target ata &&
+                strip --strip-unneeded build/Release/ata.node &&
+                ls -l build/Release/ata.node &&
+                node scripts/smoke-native.js
               " && break
             status=$?
             if [ "$attempt" = "3" ]; then exit "$status"; fi
