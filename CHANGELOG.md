@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- Patterns using `\s`, `\S` or `.` could accept strings they should reject. JSON Schema patterns follow ECMA-262, where `\s` is every whitespace and line-terminator character, U+00A0, U+2028, U+3000 and U+FEFF among them, and `.` matches anything but a line terminator. The linear-time engine that runs user patterns stopped `\s` at U+00A0 and let `.` match a carriage return and U+2028, so `^\S+$` accepted `"a\u2028b"` and `^.+$` accepted `"a\rb"`. It has done so since that engine arrived in 0.17.3. The engine now uses the ECMA-262 sets. The native addon's RE2 has the same two differences, and it answered large texts and the buffer APIs, so a schema whose patterns use `\s`, `\S` or an unescaped `.` outside a class now takes the JS path there. A new test holds the engine to the platform's own `RegExp` on 900 pattern and input pairs with every such character, and every path, `validate()`, the interpreter, compiled modules, large `validateJSON`/`isValidJSON` text and `isValid(buffer)`, on 5760 checks.
+
 ## 1.37.0 - 2026-09-29
 
 ### Added
