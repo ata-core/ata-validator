@@ -62,11 +62,11 @@ test('object form: keyed by explicit key when no $id', () => {
   assert.strictEqual(v._schemaMap.get('address'), address)
 })
 
-test('object form: prefers $id over key', () => {
+test('object form: stored under its $id and under its key', () => {
   const address = { $id: 'real-address', type: 'object' }
   const v = new Validator({ type: 'object' }, { schemas: { someKey: address } })
   assert.ok(v._schemaMap.has('real-address'))
-  assert.ok(!v._schemaMap.has('someKey'))
+  assert.ok(v._schemaMap.has('someKey'))
 })
 
 test('object form: multiple schemas stored', () => {

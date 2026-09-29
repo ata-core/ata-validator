@@ -95,12 +95,14 @@ test('patternProperties: null values on non-matching keys are ok', () => {
   assertValid(fn, { req_name: 'ok', other: null }, 'null on non-matching key ok')
 })
 
-test('patternProperties: bail on boolean sub-schema', () => {
+test('patternProperties: boolean sub-schema', () => {
   const fn = compileToJSCodegen({
     type: 'object',
     patternProperties: { '^x': false }
   })
-  assert(fn === null, 'should bail to null for boolean sub-schema')
+  assert(fn !== null, 'compiles')
+  assert(fn({ y: 1 }) === true, 'a key the pattern misses is fine')
+  assert(fn({ x1: 1 }) === false, 'a key the pattern matches meets false')
 })
 
 test('patternProperties: bail on unicode property escape in pattern', () => {
@@ -149,12 +151,14 @@ test('dependentSchemas: key with special characters', () => {
   assertInvalid(fn, { 'foo-bar': true }, 'hyphenated key missing dependency')
 })
 
-test('dependentSchemas: bail on boolean sub-schema', () => {
+test('dependentSchemas: boolean sub-schema', () => {
   const fn = compileToJSCodegen({
     type: 'object',
     dependentSchemas: { foo: false }
   })
-  assert(fn === null, 'should bail for boolean dependentSchemas sub-schema')
+  assert(fn !== null, 'compiles')
+  assert(fn({ bar: 1 }) === true, 'absent trigger')
+  assert(fn({ foo: 1 }) === false, 'present trigger meets false')
 })
 
 console.log('\n--- propertyNames codegen ---\n')
@@ -225,12 +229,14 @@ test('propertyNames: empty object always valid', () => {
   assertValid(fn, {}, 'empty object has no keys to fail')
 })
 
-test('propertyNames: bail on boolean', () => {
+test('propertyNames: false', () => {
   const fn = compileToJSCodegen({
     type: 'object',
     propertyNames: false
   })
-  assert(fn === null, 'should bail for boolean propertyNames=false')
+  assert(fn !== null, 'compiles')
+  assert(fn({}) === true, 'an empty object has no names to reject')
+  assert(fn({ a: 1 }) === false, 'any name is rejected')
 })
 
 test('propertyNames: bail on unsupported keyword', () => {

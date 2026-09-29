@@ -2,6 +2,23 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- Three schema shapes were compiled with a check missing, so documents they forbid were accepted. Each goes back to at least 0.9.0, on `validate()`, `isValidObject()` and compiled modules alike, and the interpreted engine answered all three correctly.
+  - `unevaluatedProperties: false` next to an `if` without `then` or `else` emitted no check at all: `{ if: { properties: { foo: { const: 1 } } }, unevaluatedProperties: false }` accepted `{ bar: 1 }`. More generally, the code generator tracks which properties are evaluated with a few runtime models (if/then/else, one `anyOf` or `oneOf`, `dependentSchemas`, patterns), and each reads only the keywords it was written for. A schema whose evaluated properties come from anything else is no longer generated; the interpreter answers it.
+  - `anyOf` next to `unevaluatedProperties: true` or a schema was never checked, because the generator left it to the `unevaluatedProperties` model and only the `false` model checks it: `{ anyOf: [{ required: ['a'] }, { required: ['b'] }], unevaluatedProperties: true }` accepted `{}`.
+  - Under `additionalProperties: false`, counting an object's keys stands in for looking at each one when every declared property is required. The condition compared the lengths of the two lists instead, so `{ properties: { c: {} }, required: ['b'], additionalProperties: false }` accepted `{ b: 1 }`.
+
+  None of SchemaStore's schemas changed engine: 408 still run generated code, 396 still compile away, and all 2213 sample documents get the same answer as before. A new test, `tests/test_unevaluated_differential.js`, builds schemas from the applicators that produce annotations and holds every path, the generated verdict and error functions, `validate()`, `isValidObject()` and standalone modules, to the interpreter. On the previous code it finds 1133 differences in 36000 documents; now none, and none over twelve seeds and 576000 documents.
+
+### Changed
+
+- Without the native addon, the buffer APIs decode the bytes and answer through `isValidJSON()`, which reads text the scanner covers without parsing it, instead of parsing and calling `validate()`. A small document went from 350 to 177 ns on Node 25; the addon answers it in 92. The answers are `validate()`'s, and the test for this path now also covers coercion, defaults, removal and a custom keyword.
+- The linear-time regex engine is one function, and standalone modules embed that function's own text. The embed used to come from a generated copy of the engine as a string, which every install carried next to the engine itself. The packed tarball went from 308530 to 306590 bytes.
+- Nine test files were not run by `npm test` or CI. They are now, and the three that no longer matched the code, together with `tests/test_browser.js`, which still expected the buffer APIs to throw without the addon, were updated to the current behavior. `tests/fuzz_differential.js` runs in `npm test` too.
+
 ## 1.38.0 - 2026-09-29
 
 ### Changed
