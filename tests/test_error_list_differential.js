@@ -81,6 +81,22 @@ const errorsOf = (v, d) => {
   assert.strictEqual(errorsOf(v, { k: { x: 'z' } }), errorsOf(make('interpreter'), { k: { x: 'z' } }), 'the next call after a nested one')
 }
 
+// Each read gets its own error objects, which the caller may edit (a
+// translated message): the generated code keeps errors at a fixed path as
+// frozen literals shared across calls, and those must not reach the caller.
+for (const richErrors of [true, false]) {
+  const v = new Validator({ type: 'object', properties: { a: { type: 'string' } }, required: ['b'] }, { richErrors })
+  const first = v.validate({ a: 1 }).errors
+  const second = v.validate({ a: 1 }).errors
+  assert.ok(first.length === 2 && second.length === 2)
+  for (let i = 0; i < first.length; i++) {
+    assert.notStrictEqual(first[i], second[i], 'a fresh object per read')
+    assert.ok(!Object.isFrozen(first[i]), 'an error the caller can edit')
+  }
+  first[0].message = 'edited'
+  assert.notStrictEqual(v.validate({ a: 1 }).errors[0].message, 'edited', 'an edit stays with the caller')
+}
+
 const SCHEMAS = Number(process.env.SCHEMAS || 1500)
 let compared = 0, generated = 0
 const diffs = []

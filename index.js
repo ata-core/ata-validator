@@ -222,6 +222,11 @@ function installCodegenPaths (ctx) {
     this.validate = preprocess
       ? (data) => { preprocess(data); return run(data); }
       : run;
+    // What validate() returns for a document already known to fail, without
+    // deciding again: the lazy layer in lib/validator-core.js has its verdict
+    // and used to call validate() to get the errors, which ran the verdict a
+    // second time and built a second rejection around it.
+    if (!preprocess) ctx.rejectBase = onReject;
   } else {
     // No hybrid factory, so the assembly needs the function itself rather
     // than a reference it can call later: build it now.
@@ -230,6 +235,7 @@ function installCodegenPaths (ctx) {
       this.validate = preprocess
         ? (data) => { preprocess(data); return safeCombinedFn(data); }
         : safeCombinedFn;
+      if (!preprocess) ctx.rejectBase = (data) => _mustReject(safeCombinedFn(data));
     } else {
       this.validate = preprocess
         ? (data) => {
@@ -237,6 +243,7 @@ function installCodegenPaths (ctx) {
             return jsFn(data) ? VALID_RESULT : errOnly(data);
           }
         : (data) => (jsFn(data) ? VALID_RESULT : errOnly(data));
+      if (!preprocess) ctx.rejectBase = errOnly;
     }
   }
   // Verbose mode: populate parentSchema, schema and data on each error, the
@@ -246,6 +253,9 @@ function installCodegenPaths (ctx) {
   // migration ended up writing by hand. Errors may be frozen, so clone
   // them with the extra fields.
   if (this._verbose) {
+    // The verbose fields are added here, so a path around this layer would
+    // miss them.
+    ctx.rejectBase = null;
     const inner = this.validate;
     const root = this._schemaObj;
     const { resolvePointer } = require('./lib/pointer.js');

@@ -15,8 +15,9 @@ const esbuild = require('esbuild')
 // 1.36.1, and 46034 once `~standard.jsonSchema` (Standard JSON Schema) was added.
 // 46317 once the regex engine became one function whose text the standalone
 // emitter embeds, which removed its generated copy from the package. 46520
-// once branch errors were ordered and shaped the same whichever engine answers.
-const BUDGET = 46700
+// once branch errors were ordered and shaped the same whichever engine answers,
+// 46826 once a rejection read its errors in one layer instead of three.
+const BUDGET = 46900
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

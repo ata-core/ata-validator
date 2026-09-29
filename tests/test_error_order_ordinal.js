@@ -49,15 +49,23 @@ const schema = {
   assert.strictEqual(ordinalFor(schema, '#'), 0, 'the root is first');
 }
 
-// Errors from the generated code carry the ordinal and come out in
-// declaration order, as before.
+// Errors from the generated code come out in declaration order. The runtime's
+// error function writes them in the legacy shape, with no ordinal, code or
+// docUrl, so a read returns them without copying; the order comes from each
+// error's schemaPath through the same ordinalFor, cached per path. Standalone
+// modules still write the ordinal into their literals.
 {
   const v = new Validator(schema);
   const r = v.validate({ id: 'x', title: '', tags: ['ok', ''], images: [{ url: 1 }], discount: 0 });
   assert.strictEqual(v.engine(), 'codegen');
   const raw = r._ataRaw();
   assert.ok(raw.length >= 6, 'several errors, got ' + raw.length);
-  for (const e of raw) assert.strictEqual(typeof e._o, 'number', 'every generated error carries _o: ' + JSON.stringify(e));
+  for (const e of raw) {
+    if (e.keyword === 'oneOf' || e.keyword === 'anyOf') continue;
+    assert.deepStrictEqual(Object.keys(e), ['keyword', 'instancePath', 'schemaPath', 'params', 'message'], 'a generated error in the legacy shape: ' + JSON.stringify(e));
+  }
+  const src = require('../build').toStandaloneModule(schema, { format: 'cjs' });
+  assert.ok(/_o:\d/.test(src), 'standalone modules keep the ordinal in their literals');
   const keys = raw.map((e) => e.keyword + '@' + e.instancePath);
   // Errors under a $ref target carry the referencing site's path. They sort
   // at the `$ref` and, among themselves, in the target's declaration order:

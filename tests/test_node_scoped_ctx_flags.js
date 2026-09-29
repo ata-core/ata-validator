@@ -163,6 +163,9 @@ function bothEngines (schema, cases, label) {
     // Definitions referenced from several places, counted once from the root:
     // the errors generator writes each of them as one helper.
     'sharedDefs',
+    // Set once from the entry point's options: the runtime's combined function
+    // writes errors without the ordinal.
+    'noOrdinal',
     // Whether a local $ref means the same thing everywhere in this document,
     // decided once from the root.
     'refKeysSafe',
