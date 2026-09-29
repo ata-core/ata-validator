@@ -30,7 +30,6 @@ const bannedTokens = [
 // why the browser bundle cares.
 const browserOnlyBannedTokens = [
   'getSafeRegexEmbed',   // lib/aot.js
-  'Pike VM',             // lib/safe-regex-source.js (inside the source string)
   'DIVERGENT_FORMATS',   // lib/buffer-gate.js
 ];
 
