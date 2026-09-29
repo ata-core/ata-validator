@@ -104,6 +104,12 @@ if (CMAKE_JS_VERSION)
   target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_JS_INC})
   target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_JS_LIB})
   set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
+  # The addon does not link mimalloc, so it must not take mimalloc's operator
+  # new either. src/ata.cpp includes mimalloc-new-delete.h whenever the header
+  # is on the include path, and on Intel macOS Homebrew puts it on the default
+  # one: from 1.7.3 to 1.38.0 the darwin-x64 addon routed operator new to an
+  # unresolved mi_new and crashed the process the moment it loaded.
+  target_compile_definitions(${PROJECT_NAME} PRIVATE ATA_NO_MIMALLOC)
 endif()
 
 add_library(ata::ata ALIAS ata)

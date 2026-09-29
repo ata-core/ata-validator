@@ -42,7 +42,7 @@ jobs:
 
       - name: Install deps (macOS)
         if: runner.os == 'macOS'
-        run: brew install re2 abseil mimalloc
+        run: brew install re2 abseil
 
       - name: Setup MSVC
         if: runner.os == 'Windows'

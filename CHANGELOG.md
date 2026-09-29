@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.39.1 - 2026-09-30
+
+### Fixed
+
+- The Intel macOS addon (`@ata-validator/native-darwin-x64`) crashed the process the moment it loaded, from 1.7.3 to 1.38.0. `src/ata.cpp` includes mimalloc's `operator new` whenever `mimalloc-new-delete.h` is on the include path, and the addon never linked mimalloc; on Intel macOS Homebrew installs the header on the compiler's default path, so the addon's allocations went to an unresolved `mi_new` and jumped to address zero. Reproduced with 1.38.0's published binary under Rosetta, and on the CI runner once 1.39.0's prebuild loaded each binary before shipping it. The addon build now defines `ATA_NO_MIMALLOC`, which is what every other platform effectively had, since their build did not find the header. 1.39.0 was tagged but not published because of this; its changes ship in this release.
+
 ## 1.39.0 - 2026-09-29
 
 ### Fixed
