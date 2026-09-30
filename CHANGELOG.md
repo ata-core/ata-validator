@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- `renderPretty`, `renderCompact` and `renderJSON` threw a ReferenceError in a browser: they read `process` for colour, terminal width and the working directory, and the browser entry exports them. Without `process` they now render without colour, at the default width, with paths as given. `tests/test_render_without_process.js` calls each with the global removed and checks the output is the same as with it.
+
 ## 1.40.0 - 2026-09-30
 
 ### Added
