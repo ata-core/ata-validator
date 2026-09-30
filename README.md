@@ -554,7 +554,8 @@ included. For the plugin's three-schema test entry a minified Vite build goes fr
 checks takes 1.12 ms where the runtime takes 6.63 ms (median of 15 fresh processes). Across
 SchemaStore's 977 schemas, 725 can be compiled away; the rest stay on the runtime. Where the code only calls `isValidObject()` or `isValidJSON()`, the plugin uses
 `fromCompiledVerdict()` from `ata-validator/compiled-verdict` instead, which carries no error pipeline: a
-small app that only asks for a boolean bundles to 2.1 KB gzipped, against 11.5 KB with the full wrapper.
+small app that only asks for a boolean bundles to 2.6 KB gzipped, against 12.1 KB with the full wrapper, on
+ata 1.40.0 with `@ata-project/unplugin` 0.5.0.
 
 Programmatic API if you prefer to script it:
 

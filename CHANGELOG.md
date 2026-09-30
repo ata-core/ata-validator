@@ -6,13 +6,13 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Added
 
-- `ata-validator/compiled-verdict` exports `fromCompiledVerdict(mod, schema, options)`: the wrapper around an ahead-of-time module that answers only `isValidObject()` and `isValidJSON()`, as a default `Validator` does, defaults filled in first. It carries none of the error pipeline. `@ata-project/unplugin` puts it in place of `new Validator(schema)` when the code never reads errors; a small app that only calls `isValidObject()` goes from 102.0 KB to 2.1 KB gzipped, where the full wrapper gives 11.5 KB. The official suite holds it to the runtime's answers, input mutation from defaults included, in `tests/test_compiled_parity.js` (31536 checks over 817 schemas, with `fromCompiled`).
+- `ata-validator/compiled-verdict` exports `fromCompiledVerdict(mod, schema, options)`: the wrapper around an ahead-of-time module that answers only `isValidObject()` and `isValidJSON()`, as a default `Validator` does, defaults filled in first. It carries none of the error pipeline. `@ata-project/unplugin` puts it in place of `new Validator(schema)` when the code never reads errors; a small app that only calls `isValidObject()` goes from 102.0 KB to 2.6 KB gzipped, where the full wrapper gives 12.1 KB, measured on the published 1.40.0 with `@ata-project/unplugin` 0.5.0. (The release notes first said 2.1 and 11.5 KB, measured before the `_extendChecks` support below added about half a kilobyte to each wrapper.) The official suite holds it to the runtime's answers, input mutation from defaults included, in `tests/test_compiled_parity.js` (31536 checks over 817 schemas, with `fromCompiled`).
 
 - The compiled wrappers take a check the schema does not carry, registered with `_extendChecks` the way `withKeywords` from `@ata-project/keywords` registers `instanceof` and `typeof`, and answer under it as the runtime does: the verdict is the schema's and the check's, `validate()` lists the schema's errors and then the check's, and the JSON entry points run the check only on text the schema accepts. `withKeywords(fromCompiled(...))` therefore behaves as `withKeywords(new Validator(...))`. `tests/test_compiled_extension_parity.js` holds that over 19440 checks on 120 random schemas, with documents only the check rejects, documents both reject, and documents both accept all drawn. A wrapper without a registered check answers at the same speed as before (4.97 against 4.96 ns for `validate()`).
 
 ### Changed
 
-- The option check, defaults pass and JSON parsing the two wrappers share moved to `lib/compiled-common.js`. The full wrapper's bundle is 81 bytes larger gzipped for it (11451 to 11532 for the same app).
+- The option check, defaults pass and JSON parsing the two wrappers share moved to `lib/compiled-common.js`. The full wrapper's bundle was 81 bytes larger gzipped for it (11451 to 11532 for the same app), before the `_extendChecks` support.
 
 ## 1.39.2 - 2026-09-30
 
