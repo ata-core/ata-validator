@@ -2,7 +2,7 @@
 
 // Runs every SchemaStore schema against SchemaStore's own sample documents and
 // requires three answers to agree on each: the default engine, the interpreted
-// engine, and fromCompiled() around the module compiledModuleFor() writes,
+// engine, fromCompiled() and fromCompiledVerdict() around the module compiledModuleFor() writes,
 // where it writes one. Verdicts and errors are compared field by field.
 //
 // The official suite tests keywords one at a time. Real schemas combine them,
@@ -45,6 +45,7 @@ function one (root, file) {
   const { Validator } = require('..')
   const { compiledModuleFor, compiledSchemaFor } = require('../build')
   const { fromCompiled } = require('../lib/compiled')
+  const { fromCompiledVerdict } = require('../lib/compiled-verdict')
   const out = (o) => { process.stdout.write(JSON.stringify(o)); process.exit(0) }
   const name = path.basename(file, '.json')
   const docs = docsFor(root, name)
@@ -61,13 +62,14 @@ function one (root, file) {
     // A reference to a schema outside SchemaStore, most often.
     out({ skip: 'the runtime cannot use it: ' + String(e.message).slice(0, 80) })
   }
-  let compiled = null
+  let compiled = null, verdict = null
   try {
     const src = compiledModuleFor(schema, { format: 'cjs' })
     if (src) {
       const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ata-ss-')), 'm.cjs')
       fs.writeFileSync(f, src)
       compiled = fromCompiled(require(f), compiledSchemaFor(schema))
+      verdict = fromCompiledVerdict(require(f), compiledSchemaFor(schema))
     }
   } catch (e) {
     out({ engine: runtime.engine(), documents: 0, diffs: [{ doc: '(build)', what: 'compiledModuleFor returned a module that did not load: ' + e.message }] })
@@ -85,6 +87,8 @@ function one (root, file) {
       differ(doc, 'validate: runtime vs compiled', want, shape(compiled.validate(JSON.parse(text))))
       differ(doc, 'isValidObject: runtime vs compiled', String(runtime.isValidObject(JSON.parse(text))), String(compiled.isValidObject(JSON.parse(text))))
       differ(doc, 'validateJSON: runtime vs compiled', shape(runtime.validateJSON(text)), shape(compiled.validateJSON(text)))
+      differ(doc, 'isValidObject: runtime vs verdict', String(runtime.isValidObject(JSON.parse(text))), String(verdict.isValidObject(JSON.parse(text))))
+      differ(doc, 'isValidJSON: runtime vs verdict', String(runtime.isValidJSON(text)), String(verdict.isValidJSON(text)))
     }
   }
   out({ engine: runtime.engine(), compiled: !!compiled, documents: docs.length, diffs })
