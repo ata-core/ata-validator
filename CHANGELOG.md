@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Security
+
+- A property name in a schema could run as code in the validator ata generates for it. Where `required` or `dependentRequired` sits under `items`, `patternProperties`, `additionalProperties` or a `$ref`, and in every standalone module, the error for a missing property put its name in a single-quoted string literal escaped only for double quotes, so a name holding a single quote closed the literal and the rest of the name was compiled into the validator. It ran when a document missing that property was validated. Only a schema written to do this is affected, so an application that compiles schemas it does not control, at run time or with `ata build`, should upgrade; one whose schemas are its own is not exposed. Affected: 0.4.3 to 1.40.0. The helper that escapes these strings now escapes the single quote too; error messages and `params` are unchanged. `tests/test_schema_code_injection.js` puts strings built to break out of a literal into every string a schema can carry, runs each schema through every path that generates code (the runtime compiler, the interpreter, standalone modules, bundles, the compiled wrapper, `parse()`), validates documents carrying the same strings and renders the errors, and checks that none of it ran.
+
 ### Fixed
 
 - `renderPretty`, `renderCompact` and `renderJSON` threw a ReferenceError in a browser: they read `process` for colour, terminal width and the working directory, and the browser entry exports them. Without `process` they now render without colour, at the default width, with paths as given. `tests/test_render_without_process.js` calls each with the global removed and checks the output is the same as with it.
