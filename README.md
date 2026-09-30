@@ -187,16 +187,16 @@ const v = new Validator(schema, { source: { path: 'schemas/user.json', content: 
 const r = v.validateJSON(input)
 if (!r.valid) {
   console.error(renderPretty(r.errors))
-  // error[ATA3001]: value does not match format "email"
-  //   --> schemas/user.json:5:7
+  // error[ATA3001]: not a valid email: "not-an-email"
+  //   --> schemas/user.json:5:44
   //    |
-  //  5 |       "email": { "type": "string", "format": "email" }
-  //    |       ^^^^^^^  expected format 'email'
+  //  5 |     "email": { "type": "string", "format": "email" },
+  //    |                                            ^  expected format 'email'
   //    |
-  //   --> input, byte 23
+  //   --> input:1:24  (body.email)
   //    |
-  //  1 | {"name":"M","email":"not-an-email","age":-3}
-  //    |                     ^^^^^^^^^^^^^^  got "not-an-email"
+  //  1 | {"name":"Mert","email":"not-an-email","age":26}
+  //    |                        ^^^^^^^^^^^^^^  found "not-an-email"
   //    |
   //    = help: missing '@' and domain part
   //    = note: see https://ata-validator.com/e/ATA3001

@@ -16,6 +16,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 ### Fixed
 
 - `verbose` was ignored by the interpreted engine: the same validator added `parentSchema`, `schema` and `data` to its errors when generated code answered and left them out when the interpreter did, as it does under `engine: 'interpreter'`, for schemas code generation declines, and in every case in the lite build. Both engines now go through the same step.
+- `renderPretty` drew every caret one column left of the value it pointed at: the source line carried an extra leading space, so its `|` sat one column right of the bar on the rows above and below it. The bar now follows the width of the line number, so a caret lands on the first character of the value on lines 1 to 9, 10 to 99 and beyond. The README example is replaced with the output ata prints today.
 
 ## 1.39.1 - 2026-09-30
 

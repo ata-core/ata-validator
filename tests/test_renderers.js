@@ -81,4 +81,28 @@ const noColor = { color: 'never', cwd: '/nowhere' };
   assert.ok(out.includes('minLength: string shorter than minLength'), 'expected nested branch error');
 }
 
+// renderPretty: the caret lands on the first character of the value, and the
+// source line, blank rows and caret row share one bar column. The source line
+// once carried an extra leading space, so every caret sat one column left of
+// the value it pointed at. Three-digit line numbers widen the bar.
+{
+  const { Validator } = require('..');
+  const v = new Validator({ type: 'object', additionalProperties: false, properties: { email: { type: 'string', format: 'email' } } });
+  for (const blank of [2, 11, 149]) {
+    const body = '{' + '\n'.repeat(blank) + '  "email": "mert.example.com",\n  "role": "admin"\n}';
+    const lines = renderPretty(v.validateJSON(body).errors, noColor).split('\n');
+    let frames = 0;
+    for (let i = 1; i + 1 < lines.length; i++) {
+      if (!/^\s*\d+ \| /.test(lines[i])) continue;
+      frames++;
+      const src = lines[i], car = lines[i + 1], above = lines[i - 1];
+      const at = src.includes('"mert') ? src.indexOf('"mert') : src.indexOf('"role');
+      assert.strictEqual(car.indexOf('^'), at, `caret under the value at ${blank} blank lines:\n${src}\n${car}`);
+      assert.strictEqual(above.indexOf('|'), src.indexOf('|'), 'bar above the source line lines up');
+      assert.strictEqual(car.indexOf('|'), src.indexOf('|'), 'bar on the caret row lines up');
+    }
+    assert.strictEqual(frames, 2, 'both errors rendered a source frame');
+  }
+}
+
 console.log('ok: renderer snapshot tests');
