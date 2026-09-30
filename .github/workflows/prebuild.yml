@@ -8,6 +8,10 @@ on:
   # partial failure is safe.
   workflow_dispatch:
 
+# Read-only unless a job asks for more; the publish job raises id-token itself.
+permissions:
+  contents: read
+
 jobs:
   prebuild:
     strategy:
@@ -34,9 +38,9 @@ jobs:
             target: win32-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
@@ -46,7 +50,7 @@ jobs:
 
       - name: Setup MSVC
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         with:
           arch: x64
 
@@ -114,7 +118,7 @@ jobs:
         run: node scripts/smoke-native.js
 
       - name: Upload native package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: native-pkg-${{ matrix.target }}
           path: native-packages/
@@ -137,7 +141,7 @@ jobs:
             platform: linux/arm64
             target: linux-arm64-musl
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Build in Alpine container
         # The retry loop predates the native runners and stays as a cheap
@@ -163,7 +167,7 @@ jobs:
             sleep 15
           done
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
@@ -171,7 +175,7 @@ jobs:
         run: node scripts/make-native-package.js --binary build/Release/ata.node --target ${{ matrix.target }} --out native-packages
 
       - name: Upload native package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: native-pkg-${{ matrix.target }}
           path: native-packages/
@@ -183,9 +187,9 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
@@ -197,7 +201,7 @@ jobs:
         run: npm install --ignore-scripts
 
       - name: Download native packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: native-packages/
           pattern: native-pkg-*

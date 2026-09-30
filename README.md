@@ -4,6 +4,7 @@ JSON Schema validation that compiles for speed and still runs where code generat
 
 [![npm](https://img.shields.io/npm/v/ata-validator)](https://www.npmjs.com/package/ata-validator)
 [![License](https://img.shields.io/npm/l/ata-validator)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/ata-core/ata-validator/badge)](https://scorecard.dev/viewer/?uri=github.com/ata-core/ata-validator)
 
 1.0 is a stability commitment: see [docs/STABILITY.md](docs/STABILITY.md) for the semver, deprecation, and error-code guarantees.
 
