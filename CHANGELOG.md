@@ -15,6 +15,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Fixed
 
+- A standalone module built with `--source` from a schema file kept on one line grew with every error site: each error carried its source line inline, and on one line that line is the whole schema. A 2 KB product schema built to 181 KB minified, 7.5 KB gzipped. A source line longer than 120 characters is now written once at module scope and each frame is built once from it, frozen as before; the same schema builds to 41 KB minified, 5.8 KB gzipped, with identical errors. Shorter lines stay inline, where gzip folds the repeats, so a pretty-printed schema builds byte for byte as before.
 - `verbose` was ignored by the interpreted engine: the same validator added `parentSchema`, `schema` and `data` to its errors when generated code answered and left them out when the interpreter did, as it does under `engine: 'interpreter'`, for schemas code generation declines, and in every case in the lite build. Both engines now go through the same step.
 - `renderPretty` drew every caret one column left of the value it pointed at: the source line carried an extra leading space, so its `|` sat one column right of the bar on the rows above and below it. The bar now follows the width of the line number, so a caret lands on the first character of the value on lines 1 to 9, 10 to 99 and beyond. The README example is replaced with the output ata prints today.
 
