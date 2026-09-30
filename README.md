@@ -70,6 +70,8 @@ if (isValid(req.body)) {
 
 The `.compiled.mjs` modules are self-contained: zero runtime dependency on ata-validator, fully tree-shakeable, with TypeScript types emitted alongside.
 
+Code already written with `new Validator(schema)` gets the same result from the bundler plugin, without changes: [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata) replaces each call whose schema is known at build time with a compiled validator that answers the same, and the runtime leaves the bundle. For the plugin's three-schema test entry a minified Vite build goes from 122.5 KB to 16.7 KB gzipped on ata 1.39.2. Schemas that arrive at runtime keep the runtime, which is the right tool for them.
+
 ## Measured by others
 
 Public harnesses run ata without ata's involvement. Quote these before anything in this
@@ -260,7 +262,8 @@ for. Speed is the same either way once warm.
 
 **In a browser, on an edge runtime, or anywhere cold starts are charged, compile.** This
 is where the difference is the whole story, and it is also where `new Function` is often
-blocked outright, which the compiled module does not need.
+blocked outright, which the compiled module does not need. With a bundler, adding `@ata-project/unplugin`
+is enough: it compiles `new Validator(schema)` calls at build time, and leaves the rest alone.
 
 ## When to use the runtime API instead
 
@@ -546,8 +549,8 @@ To get the compiled module without changing code written against the runtime API
 `new Validator(schema)` whose schema is known at build time is replaced with the compiled
 module wrapped by `fromCompiled()` from `ata-validator/compiled`, which answers `validate()`,
 `isValidObject()`, `validateJSON()` and `isValidJSON()` as the runtime does, defaults and errors
-included. For the plugin's three-schema test entry a minified Vite build goes from 115.7 KB to
-15.5 KB gzipped. In Node, loading the wrapper and a compiled module and answering the first two
+included. For the plugin's three-schema test entry a minified Vite build goes from 122.5 KB to
+16.7 KB gzipped on ata 1.39.2. In Node, loading the wrapper and a compiled module and answering the first two
 checks takes 1.12 ms where the runtime takes 6.63 ms (median of 15 fresh processes). Across
 SchemaStore's 977 schemas, 725 can be compiled away; the rest stay on the runtime.
 
