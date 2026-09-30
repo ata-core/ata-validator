@@ -2,6 +2,16 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- `ata-validator/compiled-verdict` exports `fromCompiledVerdict(mod, schema, options)`: the wrapper around an ahead-of-time module that answers only `isValidObject()` and `isValidJSON()`, as a default `Validator` does, defaults filled in first. It carries none of the error pipeline. `@ata-project/unplugin` puts it in place of `new Validator(schema)` when the code never reads errors; a small app that only calls `isValidObject()` goes from 102.0 KB to 2.1 KB gzipped, where the full wrapper gives 11.5 KB. The official suite holds it to the runtime's answers, input mutation from defaults included, in `tests/test_compiled_parity.js` (31536 checks over 817 schemas, with `fromCompiled`).
+
+### Changed
+
+- The option check, defaults pass and JSON parsing the two wrappers share moved to `lib/compiled-common.js`. The full wrapper's bundle is 81 bytes larger gzipped for it (11451 to 11532 for the same app).
+
 ## 1.39.2 - 2026-09-30
 
 ### Changed

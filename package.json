@@ -43,6 +43,11 @@
       "import": "./compiled.mjs",
       "require": "./compiled.js"
     },
+    "./compiled-verdict": {
+      "types": "./compiled-verdict.d.ts",
+      "import": "./compiled-verdict.mjs",
+      "require": "./compiled-verdict.js"
+    },
     "./package.json": "./package.json"
   },
   "sideEffects": false,
@@ -130,6 +135,9 @@
     "compiled.js",
     "compiled.mjs",
     "compiled.d.ts",
+    "compiled-verdict.js",
+    "compiled-verdict.mjs",
+    "compiled-verdict.d.ts",
     "bin/",
     "README.md",
     "LICENSE"

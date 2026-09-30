@@ -16,6 +16,7 @@ const path = require('path')
 const { Validator } = require('..')
 const { compiledModuleFor, compiledEligible, compiledSchemaFor } = require('../build')
 const { fromCompiled } = require('../lib/compiled')
+const { fromCompiledVerdict } = require('../lib/compiled-verdict')
 
 const DIALECTS = {
   'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
@@ -45,7 +46,10 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
       if (!src) { unbuilt++; continue }
       schemas++
       const runtime = new Validator(schema)
-      const compiled = fromCompiled(load(src), compiledSchemaFor(schema))
+      const mod = load(src)
+      const compiled = fromCompiled(mod, compiledSchemaFor(schema))
+      // The verdict-only wrapper a plugin uses when code never reads errors.
+      const verdict = fromCompiledVerdict(mod, compiledSchemaFor(schema))
       for (const t of group.tests) {
         const text = JSON.stringify(t.data)
         const checks = [
@@ -54,6 +58,9 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
           ['isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(compiled.isValidObject(JSON.parse(text)))],
           ['validateJSON', () => show(runtime.validateJSON(text)), () => show(compiled.validateJSON(text))],
           ['isValidJSON', () => String(runtime.isValidJSON(text)), () => String(compiled.isValidJSON(text))],
+          ['verdict.isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(verdict.isValidObject(JSON.parse(text)))],
+          ['verdict.isValidJSON', () => String(runtime.isValidJSON(text)), () => String(verdict.isValidJSON(text))],
+          ['verdict, input after', () => { const d = JSON.parse(text); runtime.isValidObject(d); return JSON.stringify(d) }, () => { const d = JSON.parse(text); verdict.isValidObject(d); return JSON.stringify(d) }],
         ]
         for (const [name, a, b] of checks) {
           compared++
@@ -105,6 +112,7 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
     for (const opts of [undefined, { useDefaults: false }]) {
       const runtime = new Validator(schema, opts)
       const compiled = fromCompiled(mod, normalized, opts)
+      const verdict = fromCompiledVerdict(mod, normalized, opts)
       const label = opts ? 'useDefaults: false' : 'nested defaults'
       for (let j = 0; j < 5; j++) {
         const text = JSON.stringify(docFor(schema, 3))
@@ -114,6 +122,9 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
           ['isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(compiled.isValidObject(JSON.parse(text)))],
           ['validateJSON', () => show(runtime.validateJSON(text)), () => show(compiled.validateJSON(text))],
           ['isValidJSON', () => String(runtime.isValidJSON(text)), () => String(compiled.isValidJSON(text))],
+          ['verdict.isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(verdict.isValidObject(JSON.parse(text)))],
+          ['verdict.isValidJSON', () => String(runtime.isValidJSON(text)), () => String(verdict.isValidJSON(text))],
+          ['verdict, input after', () => { const d = JSON.parse(text); runtime.isValidObject(d); return JSON.stringify(d) }, () => { const d = JSON.parse(text); verdict.isValidObject(d); return JSON.stringify(d) }],
         ]) {
           compared++
           const want = a(), got = b()
@@ -129,6 +140,7 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
   const mod = load(src)
   for (const opts of [{ coerceTypes: true }, { removeAdditional: true }, { useDefaults: false, allErrors: true }, null, 'x']) {
     assert.throws(() => fromCompiled(mod, { type: 'string' }, opts), TypeError, JSON.stringify(opts))
+    assert.throws(() => fromCompiledVerdict(mod, { type: 'string' }, opts), TypeError, JSON.stringify(opts))
   }
 }
 fs.rmSync(dir, { recursive: true, force: true })

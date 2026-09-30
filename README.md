@@ -552,7 +552,9 @@ module wrapped by `fromCompiled()` from `ata-validator/compiled`, which answers 
 included. For the plugin's three-schema test entry a minified Vite build goes from 122.5 KB to
 16.7 KB gzipped on ata 1.39.2. In Node, loading the wrapper and a compiled module and answering the first two
 checks takes 1.12 ms where the runtime takes 6.63 ms (median of 15 fresh processes). Across
-SchemaStore's 977 schemas, 725 can be compiled away; the rest stay on the runtime.
+SchemaStore's 977 schemas, 725 can be compiled away; the rest stay on the runtime. Where the code only calls `isValidObject()` or `isValidJSON()`, the plugin uses
+`fromCompiledVerdict()` from `ata-validator/compiled-verdict` instead, which carries no error pipeline: a
+small app that only asks for a boolean bundles to 2.1 KB gzipped, against 11.5 KB with the full wrapper.
 
 Programmatic API if you prefer to script it:
 
