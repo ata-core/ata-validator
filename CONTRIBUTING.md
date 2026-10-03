@@ -13,21 +13,23 @@ npm run build
 
 ## Running Tests
 
-Before submitting a PR, make sure everything passes:
+Before submitting a PR, all four of these must pass. CI runs the same ones.
 
 ```bash
-# All tests
-node tests/test_lazy.js
-node tests/test_dual_path.js
-node tests/test_standard_schema.js
-node tests/test_compat.js
-node tests/run_suite.js
-
-# Quick check
-npm test
+npm test                     # unit and integration tests
+npm run test:suite           # official JSON Schema Test Suite: 2020-12, draft 7 and the v1 dialect
+node tests/test_no_eval.js   # the whole suite again with eval and new Function blocked
+npm run release:check        # package contents, error-code lock, version sync
 ```
 
-The JSON Schema Test Suite should show 937+ passed with 98.6%+ pass rate.
+The suite must stay at zero failures on all three dialects.
+
+## Tests for changes
+
+Every bug fix comes with a test that fails without the fix, and every new
+feature comes with tests for it. Add the test file to the `npm test` chain in
+`package.json`. A test that only proves something if it actually ran a check
+should assert how many checks it ran, so it cannot pass by doing nothing.
 
 ## Running Benchmarks
 
@@ -54,7 +56,7 @@ If your change affects performance, include before/after numbers in the PR descr
 ## What We're Looking For
 
 - Performance improvements with benchmark proof
-- Spec compliance fixes (the remaining 13 failing tests in run_suite.js)
+- Spec compliance fixes and cases the official test suite does not cover
 - Bug fixes with test cases
 - Documentation improvements
 
