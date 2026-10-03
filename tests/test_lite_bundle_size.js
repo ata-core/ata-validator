@@ -18,8 +18,10 @@ const esbuild = require('esbuild')
 // once branch errors were ordered and shaped the same whichever engine answers,
 // 46826 once a rejection read its errors in one layer instead of three, and
 // 47059 once `verbose` moved into the core: lite, which is the interpreted
-// engine only, ignored the option before.
-const BUDGET = 47150
+// engine only, ignored the option before. 47159 on CI (47138 here) once
+// normalization decodes percent-encoded `$ref` fragments, which the interpreter
+// in lite resolved already but the other engines did not.
+const BUDGET = 47250
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
