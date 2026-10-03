@@ -126,6 +126,6 @@ require('./_ratio_gate').ratioGate(() => {
   const invalidRatio = median(invalidR)
   const failures = []
   if (validRatio > VALID_BUDGET) failures.push(`FAIL validateJSON scanner cost: a valid document costs ${validRatio.toFixed(2)}x isValidJSON, over the ${VALID_BUDGET}x budget; the verdict is not coming from the scanner`)
-  if (invalidRatio > INVALID_BUDGET) failures.push(`FAIL validateJSON scanner cost: an invalid document costs ${invalidRatio.toFixed(2)}x JSON.parse, over the ${INVALID_BUDGET}x budget; the scan is being paid on top of the native attempt`)
+  if (invalidRatio > INVALID_BUDGET) failures.push(`FAIL validateJSON scanner cost: an invalid document costs ${invalidRatio.toFixed(2)}x JSON.parse, over the ${INVALID_BUDGET}x budget; the scan is being paid on top of the native attempt (${require('node:os').cpus()[0].model.trim()}, Node ${process.version})`)
   return { failures, validRatio, invalidRatio }
-}, (r) => `validateJSON scanner cost: valid ${r.validRatio.toFixed(2)}x isValidJSON (budget ${VALID_BUDGET}), invalid ${r.invalidRatio.toFixed(2)}x JSON.parse (budget ${INVALID_BUDGET})`)
+}, (r) => `validateJSON scanner cost (${require('node:os').cpus()[0].model.trim()}, Node ${process.version}): valid ${r.validRatio.toFixed(2)}x isValidJSON (budget ${VALID_BUDGET}), invalid ${r.invalidRatio.toFixed(2)}x JSON.parse (budget ${INVALID_BUDGET})`)
