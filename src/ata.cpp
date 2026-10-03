@@ -183,6 +183,10 @@ namespace ata {
 
 using namespace simdjson;
 
+// For a get() whose type was checked just before: the call cannot fail, and
+// GCC does not accept a (void) cast as using a warn_unused_result value.
+static inline void type_checked(simdjson::error_code) {}
+
 // Numbers as JSON.parse reads them, which is what validate() sees: every JSON
 // number is a double, big integers included, and an integer is a number with
 // no fractional part however it is written, so "1.0" and "1e2" are integers.
@@ -196,9 +200,9 @@ static bool is_number_type(dom::element_type t) {
 
 static double to_double(dom::element el) {
   switch (el.type()) {
-    case dom::element_type::DOUBLE: { double v = 0; (void)el.get(v); return v; }
-    case dom::element_type::INT64:  { int64_t v = 0; (void)el.get(v); return static_cast<double>(v); }
-    case dom::element_type::UINT64: { uint64_t v = 0; (void)el.get(v); return static_cast<double>(v); }
+    case dom::element_type::DOUBLE: { double v = 0; type_checked(el.get(v)); return v; }
+    case dom::element_type::INT64:  { int64_t v = 0; type_checked(el.get(v)); return static_cast<double>(v); }
+    case dom::element_type::UINT64: { uint64_t v = 0; type_checked(el.get(v)); return static_cast<double>(v); }
     case dom::element_type::BIGINT: {
       std::string_view digits;
       if (el.get_bigint().get(digits) != SUCCESS) return 0;
@@ -260,7 +264,7 @@ static bool read_count(dom::element el, uint64_t& out) {
 static std::string canonical_json(dom::element el) {
   switch (el.type()) {
     case dom::element_type::OBJECT: {
-      dom::object obj; (void)el.get(obj);
+      dom::object obj; type_checked(el.get(obj));
       std::vector<std::pair<std::string_view, dom::element>> entries;
       for (auto [k, v] : obj) entries.push_back({k, v});
       std::sort(entries.begin(), entries.end(),
@@ -277,7 +281,7 @@ static std::string canonical_json(dom::element el) {
       return r;
     }
     case dom::element_type::ARRAY: {
-      dom::array arr; (void)el.get(arr);
+      dom::array arr; type_checked(el.get(arr));
       std::string r = "[";
       bool first = true;
       for (auto v : arr) {
@@ -609,7 +613,7 @@ static schema_node_ptr compile_node(dom::element el,
   // Boolean schema
   if (el.is<bool>()) {
     bool bval;
-    (void)el.get(bval);
+    type_checked(el.get(bval));
     node->boolean_schema = bval;
     return node;
   }
@@ -619,7 +623,7 @@ static schema_node_ptr compile_node(dom::element el,
   }
 
   dom::object obj;
-  (void)el.get(obj);
+  type_checked(el.get(obj));
 
   // $ref
   dom::element ref_el;
@@ -693,10 +697,10 @@ static schema_node_ptr compile_node(dom::element el,
   if (obj["type"].get(type_el) == SUCCESS) {
     if (type_el.is<std::string_view>()) {
       std::string_view sv;
-      (void)type_el.get(sv);
+      type_checked(type_el.get(sv));
       node->type_mask |= json_type_bit(json_type_from_sv(sv));
     } else if (type_el.is<dom::array>()) {
-      dom::array type_arr; (void)type_el.get(type_arr); for (auto t : type_arr) {
+      dom::array type_arr; type_checked(type_el.get(type_arr)); for (auto t : type_arr) {
         std::string_view sv;
         if (t.get(sv) == SUCCESS) {
           node->type_mask |= json_type_bit(json_type_from_sv(sv));
@@ -768,7 +772,7 @@ static schema_node_ptr compile_node(dom::element el,
   // prefixItems (Draft 2020-12)
   dom::element pi_el;
   if (obj["prefixItems"].get(pi_el) == SUCCESS && pi_el.is<dom::array>()) {
-    dom::array pi_arr; (void)pi_el.get(pi_arr); for (auto item : pi_arr) {
+    dom::array pi_arr; type_checked(pi_el.get(pi_arr)); for (auto item : pi_arr) {
       node->prefix_items.push_back(compile_node(item, ctx));
     }
   }
@@ -796,14 +800,14 @@ static schema_node_ptr compile_node(dom::element el,
   // object constraints
   dom::element props_el;
   if (obj["properties"].get(props_el) == SUCCESS && props_el.is<dom::object>()) {
-    dom::object props_obj; (void)props_el.get(props_obj); for (auto [key, val] : props_obj) {
+    dom::object props_obj; type_checked(props_el.get(props_obj)); for (auto [key, val] : props_obj) {
       node->properties[std::string(key)] = compile_node(val, ctx);
     }
   }
 
   dom::element req_el;
   if (obj["required"].get(req_el) == SUCCESS && req_el.is<dom::array>()) {
-    dom::array req_arr; (void)req_el.get(req_arr); for (auto r : req_arr) {
+    dom::array req_arr; type_checked(req_el.get(req_arr)); for (auto r : req_arr) {
       std::string_view sv;
       if (r.get(sv) == SUCCESS) {
         node->required.emplace_back(sv);
@@ -814,7 +818,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element ap_el;
   if (obj["additionalProperties"].get(ap_el) == SUCCESS) {
     if (ap_el.is<bool>()) {
-      bool ap_bool; (void)ap_el.get(ap_bool); node->additional_properties_bool = ap_bool;
+      bool ap_bool; type_checked(ap_el.get(ap_bool)); node->additional_properties_bool = ap_bool;
     } else {
       node->additional_properties_schema = compile_node(ap_el, ctx);
     }
@@ -839,10 +843,10 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element dr_el;
   if (obj["dependentRequired"].get(dr_el) == SUCCESS &&
       dr_el.is<dom::object>()) {
-    dom::object dr_obj; (void)dr_el.get(dr_obj); for (auto [key, val] : dr_obj) {
+    dom::object dr_obj; type_checked(dr_el.get(dr_obj)); for (auto [key, val] : dr_obj) {
       std::vector<std::string> deps;
       if (val.is<dom::array>()) {
-        dom::array val_arr; (void)val.get(val_arr); for (auto d : val_arr) {
+        dom::array val_arr; type_checked(val.get(val_arr)); for (auto d : val_arr) {
           std::string_view sv;
           if (d.get(sv) == SUCCESS) deps.emplace_back(sv);
         }
@@ -855,7 +859,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element ds_el;
   if (obj["dependentSchemas"].get(ds_el) == SUCCESS &&
       ds_el.is<dom::object>()) {
-    dom::object ds_obj; (void)ds_el.get(ds_obj); for (auto [key, val] : ds_obj) {
+    dom::object ds_obj; type_checked(ds_el.get(ds_obj)); for (auto [key, val] : ds_obj) {
       node->dependent_schemas[std::string(key)] = compile_node(val, ctx);
     }
   }
@@ -868,7 +872,7 @@ static schema_node_ptr compile_node(dom::element el,
     ctx.compile_error = "patternProperties keyword requires RE2 support (built with ATA_NO_RE2)";
     return node;
 #else
-    dom::object pp_obj; (void)pp_el.get(pp_obj);
+    dom::object pp_obj; type_checked(pp_el.get(pp_obj));
     for (auto [key, val] : pp_obj) {
       schema_node::pattern_prop pp;
       pp.pattern = std::string(key);
@@ -896,7 +900,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element enum_el;
   if (obj["enum"].get(enum_el) == SUCCESS) {
     if (enum_el.is<dom::array>()) {
-      dom::array enum_arr; (void)enum_el.get(enum_arr); for (auto e : enum_arr) {
+      dom::array enum_arr; type_checked(enum_el.get(enum_arr)); for (auto e : enum_arr) {
         node->enum_values_minified.push_back(canonical_json(e));
       }
     }
@@ -911,19 +915,19 @@ static schema_node_ptr compile_node(dom::element el,
   // composition
   dom::element comp_el;
   if (obj["allOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    dom::array comp_arr; (void)comp_el.get(comp_arr);
+    dom::array comp_arr; type_checked(comp_el.get(comp_arr));
     for (auto s : comp_arr) {
       node->all_of.push_back(compile_node(s, ctx));
     }
   }
   if (obj["anyOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    dom::array comp_arr2; (void)comp_el.get(comp_arr2);
+    dom::array comp_arr2; type_checked(comp_el.get(comp_arr2));
     for (auto s : comp_arr2) {
       node->any_of.push_back(compile_node(s, ctx));
     }
   }
   if (obj["oneOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    dom::array comp_arr3; (void)comp_el.get(comp_arr3);
+    dom::array comp_arr3; type_checked(comp_el.get(comp_arr3));
     for (auto s : comp_arr3) {
       node->one_of.push_back(compile_node(s, ctx));
     }
@@ -950,7 +954,7 @@ static schema_node_ptr compile_node(dom::element el,
   // $defs / definitions
   dom::element defs_el;
   if (obj["$defs"].get(defs_el) == SUCCESS && defs_el.is<dom::object>()) {
-    dom::object defs_obj; (void)defs_el.get(defs_obj); for (auto [key, val] : defs_obj) {
+    dom::object defs_obj; type_checked(defs_el.get(defs_obj)); for (auto [key, val] : defs_obj) {
       std::string def_path = "#/$defs/" + std::string(key);
       auto compiled = compile_node(val, ctx);
       ctx.defs[def_path] = compiled;
@@ -959,7 +963,7 @@ static schema_node_ptr compile_node(dom::element el,
   }
   if (obj["definitions"].get(defs_el) == SUCCESS &&
       defs_el.is<dom::object>()) {
-    dom::object defs_obj; (void)defs_el.get(defs_obj); for (auto [key, val] : defs_obj) {
+    dom::object defs_obj; type_checked(defs_el.get(defs_obj)); for (auto [key, val] : defs_obj) {
       std::string def_path = "#/definitions/" + std::string(key);
       auto compiled = compile_node(val, ctx);
       ctx.defs[def_path] = compiled;
@@ -1564,7 +1568,7 @@ static void validate_node(const schema_node_ptr& node,
   // String validations
   if (vtype == et::STRING) {
     std::string_view sv;
-    (void)value.get(sv);
+    type_checked(value.get(sv));
     uint64_t len = utf8_length(sv);
 
     if (node->min_length.has_value() && len < node->min_length.value()) {
@@ -1600,7 +1604,7 @@ static void validate_node(const schema_node_ptr& node,
 
   // Array validations
   if (vtype == et::ARRAY) {
-    dom::array arr; (void)value.get(arr);
+    dom::array arr; type_checked(value.get(arr));
     uint64_t arr_size = arr.size();
     if(arr_size == 0xFFFFFF) [[unlikely]]	{
       // Fallback for large arrays where size() saturates — count manually to avoid overflow
@@ -1632,7 +1636,7 @@ static void validate_node(const schema_node_ptr& node,
         if (all_same && first_type == et::STRING) {
           std::set<std::string_view> seen;
           for (auto item : arr) {
-            std::string_view sv; (void)item.get(sv);
+            std::string_view sv; type_checked(item.get(sv));
             if (!seen.insert(sv).second) { has_dup = true; break; }
           }
         } else if (all_same && is_number_type(first_type)) {
@@ -1691,7 +1695,7 @@ static void validate_node(const schema_node_ptr& node,
 
   // Object validations
   if (vtype == et::OBJECT) {
-    dom::object obj; (void)value.get(obj);
+    dom::object obj; type_checked(value.get(obj));
 
     if (node->min_properties.has_value() || node->max_properties.has_value()) {
       uint64_t prop_count = 0;
@@ -1978,7 +1982,7 @@ static bool validate_fast(const schema_node_ptr& node,
   // String
   if (vtype == et::STRING) {
     std::string_view sv;
-    (void)value.get(sv);
+    type_checked(value.get(sv));
     uint64_t len = utf8_length(sv);
     if (node->min_length.has_value() && len < node->min_length.value()) return false;
     if (node->max_length.has_value() && len > node->max_length.value()) return false;
@@ -1993,7 +1997,7 @@ static bool validate_fast(const schema_node_ptr& node,
 
   // Array
   if (vtype == et::ARRAY) {
-    dom::array arr; (void)value.get(arr);
+    dom::array arr; type_checked(value.get(arr));
     uint64_t arr_size = arr.size();
     if(arr_size == 0xFFFFFF) [[unlikely]]	{
       // Fallback for large arrays where size() saturates — count manually to avoid overflow
@@ -2012,7 +2016,7 @@ static bool validate_fast(const schema_node_ptr& node,
         for (auto item : arr) { if (item.type() != first_type) { all_same = false; break; } }
         if (all_same && first_type == et::STRING) {
           std::set<std::string_view> seen;
-          for (auto item : arr) { std::string_view sv; (void)item.get(sv); if (!seen.insert(sv).second) return false; }
+          for (auto item : arr) { std::string_view sv; type_checked(item.get(sv)); if (!seen.insert(sv).second) return false; }
         } else if (all_same && is_number_type(first_type)) {
           std::set<double> seen;
           for (auto item : arr) { if (!seen.insert(to_double(item)).second) return false; }
@@ -2047,7 +2051,7 @@ static bool validate_fast(const schema_node_ptr& node,
 
   // Object
   if (vtype == et::OBJECT) {
-    dom::object obj; (void)value.get(obj);
+    dom::object obj; type_checked(value.get(obj));
 
     if (node->min_properties.has_value() || node->max_properties.has_value()) {
       uint64_t n = 0;
@@ -2280,30 +2284,31 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::EXPECT_BOOLEAN: if(t!=et::BOOL) return false; break;
     case cg::op::EXPECT_NULL: if(t!=et::NULL_VALUE) return false; break;
     case cg::op::EXPECT_TYPE_MULTI: {
-      if(!(value_type_mask(value) & p.type_masks[c.a])) return false; break;
+      if(!(value_type_mask(value) & p.type_masks[c.a])) return false;
+      break;
     }
     case cg::op::CHECK_MINIMUM: if(t_numeric&&t_dval<p.doubles[c.a])return false; break;
     case cg::op::CHECK_MAXIMUM: if(t_numeric&&t_dval>p.doubles[c.a])return false; break;
     case cg::op::CHECK_EX_MINIMUM: if(t_numeric&&t_dval<=p.doubles[c.a])return false; break;
     case cg::op::CHECK_EX_MAXIMUM: if(t_numeric&&t_dval>=p.doubles[c.a])return false; break;
     case cg::op::CHECK_MULTIPLE_OF: if(t_numeric&&!multiple_of_ok(t_dval,p.doubles[c.a]))return false; break;
-    case cg::op::CHECK_MIN_LENGTH: if(t==et::STRING){std::string_view sv;(void)value.get(sv);if(utf8_length(sv)<c.a)return false;} break;
-    case cg::op::CHECK_MAX_LENGTH: if(t==et::STRING){std::string_view sv;(void)value.get(sv);if(utf8_length(sv)>c.a)return false;} break;
+    case cg::op::CHECK_MIN_LENGTH: if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));if(utf8_length(sv)<c.a)return false;} break;
+    case cg::op::CHECK_MAX_LENGTH: if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));if(utf8_length(sv)>c.a)return false;} break;
 #ifndef ATA_NO_RE2
-    case cg::op::CHECK_PATTERN: if(t==et::STRING){std::string_view sv;(void)value.get(sv);if(!re2::RE2::PartialMatch(re2::StringPiece(sv.data(),sv.size()),*p.regexes[c.a]))return false;} break;
+    case cg::op::CHECK_PATTERN: if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));if(!re2::RE2::PartialMatch(re2::StringPiece(sv.data(),sv.size()),*p.regexes[c.a]))return false;} break;
 #else
     case cg::op::CHECK_PATTERN: break;
 #endif
-    case cg::op::CHECK_FORMAT: if(t==et::STRING){std::string_view sv;(void)value.get(sv);if(!check_format_by_id(sv,p.format_ids[c.a]))return false;} break;
-    case cg::op::CHECK_MIN_ITEMS: if(t==et::ARRAY){dom::array a;(void)value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s<c.a)return false;} break;
-    case cg::op::CHECK_MAX_ITEMS: if(t==et::ARRAY){dom::array a;(void)value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s>c.a)return false;} break;
-    case cg::op::CHECK_UNIQUE_ITEMS: if(t==et::ARRAY){dom::array a;(void)value.get(a);std::set<std::string> seen;for(auto x:a)if(!seen.insert(canonical_json(x)).second)return false;} break;
-    case cg::op::ARRAY_ITEMS: if(t==et::ARRAY){dom::array a;(void)value.get(a);for(auto x:a)if(!cg_exec(p,p.subs[c.a],x,undecidable))return false;} break;
-    case cg::op::CHECK_REQUIRED: if(t==et::OBJECT){dom::object o;(void)value.get(o);dom::element d;if(o[p.strings[c.a]].get(d)!=SUCCESS)return false;} break;
-    case cg::op::CHECK_MIN_PROPS: if(t==et::OBJECT){dom::object o;(void)value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n<c.a)return false;} break;
-    case cg::op::CHECK_MAX_PROPS: if(t==et::OBJECT){dom::object o;(void)value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n>c.a)return false;} break;
+    case cg::op::CHECK_FORMAT: if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));if(!check_format_by_id(sv,p.format_ids[c.a]))return false;} break;
+    case cg::op::CHECK_MIN_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s<c.a)return false;} break;
+    case cg::op::CHECK_MAX_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s>c.a)return false;} break;
+    case cg::op::CHECK_UNIQUE_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));std::set<std::string> seen;for(auto x:a)if(!seen.insert(canonical_json(x)).second)return false;} break;
+    case cg::op::ARRAY_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));for(auto x:a)if(!cg_exec(p,p.subs[c.a],x,undecidable))return false;} break;
+    case cg::op::CHECK_REQUIRED: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));dom::element d;if(o[p.strings[c.a]].get(d)!=SUCCESS)return false;} break;
+    case cg::op::CHECK_MIN_PROPS: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n<c.a)return false;} break;
+    case cg::op::CHECK_MAX_PROPS: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n>c.a)return false;} break;
     case cg::op::OBJ_PROPS_START: if(t==et::OBJECT){
-      dom::object o; (void)value.get(o);
+      dom::object o; type_checked(value.get(o));
       // collect prop defs
       struct pd{std::string_view nm;uint32_t si;};
       std::vector<pd> props; bool no_add=false;
@@ -2322,16 +2327,18 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::OBJ_PROP: case cg::op::OBJ_PROPS_END: case cg::op::CHECK_NO_ADDITIONAL: break;
     case cg::op::CHECK_ENUM_STR: {
       auto& es=p.enum_sets[c.a]; bool f=false;
-      if(t==et::STRING){std::string_view sv;(void)value.get(sv);for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
+      if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
       if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
-      if(!f)return false; break;
+      if(!f)return false;
+      break;
     }
     case cg::op::CHECK_ENUM: {
       auto& es=p.enum_sets[c.a]; bool f=false;
-      if(t==et::STRING){std::string_view sv;(void)value.get(sv);for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
-      if(!f&&value.is<int64_t>()){int64_t v;(void)value.get(v);auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
+      if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
+      if(!f&&value.is<int64_t>()){int64_t v;type_checked(value.get(v));auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
       if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
-      if(!f)return false; break;
+      if(!f)return false;
+      break;
     }
     case cg::op::CHECK_CONST: if(canonical_json(value)!=p.strings[c.a])return false; break;
     case cg::op::COMPOSITION:
@@ -2390,7 +2397,8 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
       // integer matches both "integer" and "number" type constraints
       uint8_t tbits = json_type_bit(t);
       if (t == json_type::integer) tbits |= json_type_bit(json_type::number);
-      if(!(tbits & p.type_masks[c.a])) return false; break;
+      if(!(tbits & p.type_masks[c.a])) return false;
+      break;
     }
     case cg::op::CHECK_MINIMUM:
     case cg::op::CHECK_MAXIMUM:

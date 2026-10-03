@@ -69,6 +69,12 @@ jobs:
       - name: Build native addon
         run: npm run build
 
+      # npm install brings the published per-platform engine of the same
+      # version, which the loader prefers over the build above; remove it so
+      # the tests run the engine built from this commit.
+      - name: Use the engine built from this commit
+        run: node -e "require('fs').rmSync('node_modules/@ata-validator', { recursive: true, force: true })"
+
       - name: Run Node.js tests
         run: npm test
 
@@ -115,6 +121,12 @@ jobs:
       - name: Build native addon
         run: npm run build
 
+      # npm install brings the published per-platform engine of the same
+      # version, which the loader prefers over the build above; remove it so
+      # the tests run the engine built from this commit.
+      - name: Use the engine built from this commit
+        run: node -e "require('fs').rmSync('node_modules/@ata-validator', { recursive: true, force: true })"
+
       - name: Run JSON Schema Test Suite
         run: npm run test:suite
 
@@ -137,6 +149,12 @@ jobs:
 
       - name: Build native addon
         run: npm run build
+
+      # npm install brings the published per-platform engine of the same
+      # version, which the loader prefers over the build above; remove it so
+      # the tests run the engine built from this commit.
+      - name: Use the engine built from this commit
+        run: node -e "require('fs').rmSync('node_modules/@ata-validator', { recursive: true, force: true })"
 
       - name: Run TS generator fixtures
         run: npm run test:ts
