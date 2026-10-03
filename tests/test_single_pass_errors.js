@@ -88,31 +88,45 @@ for (let i = 0; i < 40; i++) { good.push(mk(false, i)); bad.push(mk(true, i)) }
   console.log('ok: five enriched errors, and the verdict API still agrees')
 }
 
-const median = (a) => a.sort((x, y) => x - y)[a.length >> 1]
-function med (fn, iters) {
-  for (let i = 0; i < 30; i++) fn()
-  const runs = []
-  for (let r = 0; r < 9; r++) {
-    const t = process.hrtime.bigint()
-    for (let i = 0; i < iters; i++) fn()
-    runs.push(Number(process.hrtime.bigint() - t) / 1e3 / iters)
-  }
-  return median(runs)
+const median = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1]
+function time (fn, iters) {
+  const t = process.hrtime.bigint()
+  for (let i = 0; i < iters; i++) fn()
+  return Number(process.hrtime.bigint() - t) / iters
 }
 
-const N = 20
+// The three timings are taken in short alternating blocks, and each round gives
+// its own ratios. A shared runner changes speed from one moment to the next; when
+// the timings were taken one after another, a slow stretch landed on one of them
+// and moved the ratio by 20%. Within a round the three see the same machine, so
+// the slowdown divides out, and the median over rounds drops the rounds a pause
+// landed in. The accepted document is compared with the verdict on accepted
+// documents, the same work.
+const N = 10
+const ROUNDS = 25
 let i = 0
-const ERR_BUDGET = 2.4
+// Measured this way the single pass reads 2.1x to 2.3x, and the same document
+// validated twice, a verdict pass in front of the combined function, reads 3.2x
+// to 3.3x. The budget sits between the two.
+const ERR_BUDGET = 2.7
 const VALID_BUDGET = 1.25
+const errorsRead = () => v.validate(bad[(i++) % 40]).errors.length
+const verdictBad = () => v.isValidObject(bad[(i++) % 40])
+const validRead = () => v.validate(good[(i++) % 40]).valid
+const verdictGood = () => v.isValidObject(good[(i++) % 40])
+for (let w = 0; w < 30; w++) { errorsRead(); verdictBad(); validRead(); verdictGood() }
 require('./_ratio_gate').ratioGate(() => {
-  const errT = [], verdictT = [], validT = []
-  for (let r = 0; r < 5; r++) {
-    errT.push(med(() => v.validate(bad[(i++) % 40]).errors.length, N))
-    verdictT.push(med(() => v.isValidObject(bad[(i++) % 40]), N))
-    validT.push(med(() => v.validate(good[(i++) % 40]).valid, N))
+  const errR = [], validR = []
+  for (let r = 0; r < ROUNDS; r++) {
+    const e = time(errorsRead, N)
+    const vb = time(verdictBad, N)
+    const a = time(validRead, N)
+    const vg = time(verdictGood, N)
+    errR.push(e / vb)
+    validR.push(a / vg)
   }
-  const errRatio = median(errT) / median(verdictT)
-  const validRatio = median(validT) / median(verdictT)
+  const errRatio = median(errR)
+  const validRatio = median(validR)
   const failures = []
   if (errRatio > ERR_BUDGET) failures.push(`FAIL single pass errors: reading errors costs ${errRatio.toFixed(2)}x the verdict, over the ${ERR_BUDGET}x budget; the document is being validated more than once`)
   if (validRatio > VALID_BUDGET) failures.push(`FAIL single pass errors: an accepted document costs ${validRatio.toFixed(2)}x the verdict API, over the ${VALID_BUDGET}x budget; the accepted path was taxed to pay for the error path`)
