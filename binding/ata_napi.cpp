@@ -208,14 +208,6 @@ static std::string napi_type_of(Napi::Value val) {
   return "unknown";
 }
 
-static bool napi_type_matches(Napi::Value val, const std::string& type) {
-  auto actual = napi_type_of(val);
-  if (actual == type) return true;
-  if (type == "number" && (actual == "integer" || actual == "number"))
-    return true;
-  return false;
-}
-
 static uint64_t utf8_codepoint_length(const std::string& s) {
   uint64_t len = 0;
   for (size_t i = 0; i < s.size();) {

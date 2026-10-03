@@ -93,6 +93,12 @@ else()
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC include)
+# Warnings on ata's own sources only; dependencies keep their own flags.
+if(MSVC)
+  target_compile_options(${PROJECT_NAME} PRIVATE /W4)
+else()
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
+endif()
 if(ATA_NO_RE2)
   target_link_libraries(${PROJECT_NAME} PRIVATE simdjson)
   target_compile_definitions(${PROJECT_NAME} PRIVATE ATA_NO_RE2)

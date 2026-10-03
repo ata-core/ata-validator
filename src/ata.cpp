@@ -12,6 +12,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #ifndef ATA_NO_RE2
 #include <re2/re2.h>
@@ -181,11 +183,84 @@ namespace ata {
 
 using namespace simdjson;
 
+// Numbers as JSON.parse reads them, which is what validate() sees: every JSON
+// number is a double, big integers included, and an integer is a number with
+// no fractional part however it is written, so "1.0" and "1e2" are integers.
+// simdjson reports the written form instead (DOUBLE, or BIGINT past 64 bits),
+// and taking that for the JSON Schema type rejected `{"id": 1.0}` against
+// `type: "integer"` on the text paths while validate() accepted it.
+static bool is_number_type(dom::element_type t) {
+  return t == dom::element_type::INT64 || t == dom::element_type::UINT64 ||
+         t == dom::element_type::DOUBLE || t == dom::element_type::BIGINT;
+}
+
+static double to_double(dom::element el) {
+  switch (el.type()) {
+    case dom::element_type::DOUBLE: { double v = 0; (void)el.get(v); return v; }
+    case dom::element_type::INT64:  { int64_t v = 0; (void)el.get(v); return static_cast<double>(v); }
+    case dom::element_type::UINT64: { uint64_t v = 0; (void)el.get(v); return static_cast<double>(v); }
+    case dom::element_type::BIGINT: {
+      std::string_view digits;
+      if (el.get_bigint().get(digits) != SUCCESS) return 0;
+      return std::strtod(std::string(digits).c_str(), nullptr);
+    }
+    default: return 0;
+  }
+}
+
+static bool is_integral(double d) { return std::isfinite(d) && std::floor(d) == d; }
+
+static bool is_integer_value(dom::element el) {
+  switch (el.type()) {
+    case dom::element_type::INT64:
+    case dom::element_type::UINT64:
+    case dom::element_type::BIGINT: return true;
+    case dom::element_type::DOUBLE: return is_integral(to_double(el));
+    default: return false;
+  }
+}
+
+// multipleOf as validate() decides it (multipleOfOk in lib/interpreter.js):
+// the quotient is an integer, or within 1e-9 of one. The engine used an
+// absolute remainder test, which disagreed on large values: 1e308 against
+// multipleOf 0.5 has a remainder of 0, but the quotient overflows to infinity
+// and validate() rejects it.
+static bool multiple_of_ok(double d, double m) {
+  if (m == 0) return false;
+  double q = d / m;
+  if (std::isfinite(q) && std::floor(q) == q) return true;
+  return std::abs(q - std::round(q)) < 1e-9;
+}
+
+// One spelling per numeric value, so enum, const and uniqueItems compare the
+// way JavaScript's === does: 1 and 1.0 are the same, and so are 0 and -0.
+static std::string canonical_number(double d) {
+  if (d == 0) d = 0;
+  char buf[32];
+  int n = std::snprintf(buf, sizeof buf, "%.17g", d);
+  return std::string(buf, n > 0 ? static_cast<size_t>(n) : 0);
+}
+
+// A count keyword (minLength, maxItems and the rest) as JSON.parse reads it.
+// The schema reaches the engine through JSON.stringify, which writes 1e21 and
+// above in exponent form, a DOUBLE that get(uint64_t) refuses, so the keyword
+// was dropped and `minLength: 1e21` accepted every string. Any non-negative
+// integral value is kept, clamped to the largest count.
+static bool read_count(dom::element el, uint64_t& out) {
+  if (!is_number_type(el.type())) return false;
+  uint64_t u;
+  if (el.get(u) == SUCCESS) { out = u; return true; }
+  double d = to_double(el);
+  if (!is_integral(d) || d < 0) return false;
+  out = d >= 18446744073709551615.0 ? UINT64_MAX : static_cast<uint64_t>(d);
+  return true;
+}
+
 // Canonical JSON: sort object keys for semantic equality comparison
 static std::string canonical_json(dom::element el) {
   switch (el.type()) {
     case dom::element_type::OBJECT: {
-      dom::object obj; el.get(obj);
+      dom::object obj; (void)el.get(obj);
       std::vector<std::pair<std::string_view, dom::element>> entries;
       for (auto [k, v] : obj) entries.push_back({k, v});
       std::sort(entries.begin(), entries.end(),
@@ -202,7 +277,7 @@ static std::string canonical_json(dom::element el) {
       return r;
     }
     case dom::element_type::ARRAY: {
-      dom::array arr; el.get(arr);
+      dom::array arr; (void)el.get(arr);
       std::string r = "[";
       bool first = true;
       for (auto v : arr) {
@@ -214,6 +289,7 @@ static std::string canonical_json(dom::element el) {
       return r;
     }
     default:
+      if (is_number_type(el.type())) return canonical_number(to_double(el));
       return std::string(minify(el));
   }
 }
@@ -261,8 +337,18 @@ static uint8_t element_type_mask(dom::element_type t) {
     case dom::element_type::NULL_VALUE: return json_type_bit(json_type::null_value);
     case dom::element_type::ARRAY:      return json_type_bit(json_type::array);
     case dom::element_type::OBJECT:     return json_type_bit(json_type::object);
+    case dom::element_type::BIGINT:     return json_type_bit(json_type::integer) | json_type_bit(json_type::number);
   }
   return 0;
+}
+
+// The type bits of a value rather than of its written form: a double with no
+// fractional part is an integer too.
+static uint8_t value_type_mask(dom::element el) {
+  auto t = el.type();
+  if (t == dom::element_type::DOUBLE && is_integer_value(el))
+    return json_type_bit(json_type::integer) | json_type_bit(json_type::number);
+  return element_type_mask(t);
 }
 
 // Resolve format string to numeric ID at compile time.
@@ -489,12 +575,21 @@ struct compiled_schema {
 
 // Thread-local persistent parsers — reused across all validate calls on the
 // same thread.  Keeps internal buffers hot in cache and avoids re-allocation.
+// Integers past 64 bits are kept as BIGINT elements instead of failing the
+// parse: JSON.parse reads them as doubles, and a document carrying one is not
+// malformed. Without this the native engine called such a document invalid,
+// and a schema with `minimum: 1e20` failed to compile.
+static dom::parser make_dom_parser() {
+  dom::parser p;
+  p.number_as_string(true);
+  return p;
+}
 static dom::parser& tl_dom_parser() {
-  thread_local dom::parser p;
+  thread_local dom::parser p = make_dom_parser();
   return p;
 }
 static dom::parser& tl_dom_key_parser() {
-  thread_local dom::parser p;
+  thread_local dom::parser p = make_dom_parser();
   return p;
 }
 static simdjson::ondemand::parser& tl_od_parser() {
@@ -514,7 +609,7 @@ static schema_node_ptr compile_node(dom::element el,
   // Boolean schema
   if (el.is<bool>()) {
     bool bval;
-    el.get(bval);
+    (void)el.get(bval);
     node->boolean_schema = bval;
     return node;
   }
@@ -524,7 +619,7 @@ static schema_node_ptr compile_node(dom::element el,
   }
 
   dom::object obj;
-  el.get(obj);
+  (void)el.get(obj);
 
   // $ref
   dom::element ref_el;
@@ -598,10 +693,10 @@ static schema_node_ptr compile_node(dom::element el,
   if (obj["type"].get(type_el) == SUCCESS) {
     if (type_el.is<std::string_view>()) {
       std::string_view sv;
-      type_el.get(sv);
+      (void)type_el.get(sv);
       node->type_mask |= json_type_bit(json_type_from_sv(sv));
     } else if (type_el.is<dom::array>()) {
-      dom::array type_arr; type_el.get(type_arr); for (auto t : type_arr) {
+      dom::array type_arr; (void)type_el.get(type_arr); for (auto t : type_arr) {
         std::string_view sv;
         if (t.get(sv) == SUCCESS) {
           node->type_mask |= json_type_bit(json_type_from_sv(sv));
@@ -610,38 +705,35 @@ static schema_node_ptr compile_node(dom::element el,
     }
   }
 
-  // numeric constraints
+  // numeric constraints. A bound past 64 bits is a BIGINT element, which
+  // get(double) refuses; to_double reads every numeric form, so the constraint
+  // is kept rather than dropped.
   dom::element num_el;
-  if (obj["minimum"].get(num_el) == SUCCESS) {
-    double v;
-    if (num_el.get(v) == SUCCESS) node->minimum = v;
+  if (obj["minimum"].get(num_el) == SUCCESS && is_number_type(num_el.type())) {
+    node->minimum = to_double(num_el);
   }
-  if (obj["maximum"].get(num_el) == SUCCESS) {
-    double v;
-    if (num_el.get(v) == SUCCESS) node->maximum = v;
+  if (obj["maximum"].get(num_el) == SUCCESS && is_number_type(num_el.type())) {
+    node->maximum = to_double(num_el);
   }
-  if (obj["exclusiveMinimum"].get(num_el) == SUCCESS) {
-    double v;
-    if (num_el.get(v) == SUCCESS) node->exclusive_minimum = v;
+  if (obj["exclusiveMinimum"].get(num_el) == SUCCESS && is_number_type(num_el.type())) {
+    node->exclusive_minimum = to_double(num_el);
   }
-  if (obj["exclusiveMaximum"].get(num_el) == SUCCESS) {
-    double v;
-    if (num_el.get(v) == SUCCESS) node->exclusive_maximum = v;
+  if (obj["exclusiveMaximum"].get(num_el) == SUCCESS && is_number_type(num_el.type())) {
+    node->exclusive_maximum = to_double(num_el);
   }
-  if (obj["multipleOf"].get(num_el) == SUCCESS) {
-    double v;
-    if (num_el.get(v) == SUCCESS) node->multiple_of = v;
+  if (obj["multipleOf"].get(num_el) == SUCCESS && is_number_type(num_el.type())) {
+    node->multiple_of = to_double(num_el);
   }
 
   // string constraints
   dom::element str_el;
   if (obj["minLength"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->min_length = v;
+    if (read_count(str_el, v)) node->min_length = v;
   }
   if (obj["maxLength"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->max_length = v;
+    if (read_count(str_el, v)) node->max_length = v;
   }
   if (obj["pattern"].get(str_el) == SUCCESS) {
     std::string_view sv;
@@ -662,11 +754,11 @@ static schema_node_ptr compile_node(dom::element el,
   // array constraints
   if (obj["minItems"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->min_items = v;
+    if (read_count(str_el, v)) node->min_items = v;
   }
   if (obj["maxItems"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->max_items = v;
+    if (read_count(str_el, v)) node->max_items = v;
   }
   dom::element ui_el;
   if (obj["uniqueItems"].get(ui_el) == SUCCESS) {
@@ -676,7 +768,7 @@ static schema_node_ptr compile_node(dom::element el,
   // prefixItems (Draft 2020-12)
   dom::element pi_el;
   if (obj["prefixItems"].get(pi_el) == SUCCESS && pi_el.is<dom::array>()) {
-    dom::array pi_arr; pi_el.get(pi_arr); for (auto item : pi_arr) {
+    dom::array pi_arr; (void)pi_el.get(pi_arr); for (auto item : pi_arr) {
       node->prefix_items.push_back(compile_node(item, ctx));
     }
   }
@@ -694,24 +786,24 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element mc_el;
   if (obj["minContains"].get(mc_el) == SUCCESS) {
     uint64_t v;
-    if (mc_el.get(v) == SUCCESS) node->min_contains = v;
+    if (read_count(mc_el, v)) node->min_contains = v;
   }
   if (obj["maxContains"].get(mc_el) == SUCCESS) {
     uint64_t v;
-    if (mc_el.get(v) == SUCCESS) node->max_contains = v;
+    if (read_count(mc_el, v)) node->max_contains = v;
   }
 
   // object constraints
   dom::element props_el;
   if (obj["properties"].get(props_el) == SUCCESS && props_el.is<dom::object>()) {
-    dom::object props_obj; props_el.get(props_obj); for (auto [key, val] : props_obj) {
+    dom::object props_obj; (void)props_el.get(props_obj); for (auto [key, val] : props_obj) {
       node->properties[std::string(key)] = compile_node(val, ctx);
     }
   }
 
   dom::element req_el;
   if (obj["required"].get(req_el) == SUCCESS && req_el.is<dom::array>()) {
-    dom::array req_arr; req_el.get(req_arr); for (auto r : req_arr) {
+    dom::array req_arr; (void)req_el.get(req_arr); for (auto r : req_arr) {
       std::string_view sv;
       if (r.get(sv) == SUCCESS) {
         node->required.emplace_back(sv);
@@ -722,7 +814,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element ap_el;
   if (obj["additionalProperties"].get(ap_el) == SUCCESS) {
     if (ap_el.is<bool>()) {
-      bool ap_bool; ap_el.get(ap_bool); node->additional_properties_bool = ap_bool;
+      bool ap_bool; (void)ap_el.get(ap_bool); node->additional_properties_bool = ap_bool;
     } else {
       node->additional_properties_schema = compile_node(ap_el, ctx);
     }
@@ -730,11 +822,11 @@ static schema_node_ptr compile_node(dom::element el,
 
   if (obj["minProperties"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->min_properties = v;
+    if (read_count(str_el, v)) node->min_properties = v;
   }
   if (obj["maxProperties"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->max_properties = v;
+    if (read_count(str_el, v)) node->max_properties = v;
   }
 
   // propertyNames
@@ -747,10 +839,10 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element dr_el;
   if (obj["dependentRequired"].get(dr_el) == SUCCESS &&
       dr_el.is<dom::object>()) {
-    dom::object dr_obj; dr_el.get(dr_obj); for (auto [key, val] : dr_obj) {
+    dom::object dr_obj; (void)dr_el.get(dr_obj); for (auto [key, val] : dr_obj) {
       std::vector<std::string> deps;
       if (val.is<dom::array>()) {
-        dom::array val_arr; val.get(val_arr); for (auto d : val_arr) {
+        dom::array val_arr; (void)val.get(val_arr); for (auto d : val_arr) {
           std::string_view sv;
           if (d.get(sv) == SUCCESS) deps.emplace_back(sv);
         }
@@ -763,7 +855,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element ds_el;
   if (obj["dependentSchemas"].get(ds_el) == SUCCESS &&
       ds_el.is<dom::object>()) {
-    dom::object ds_obj; ds_el.get(ds_obj); for (auto [key, val] : ds_obj) {
+    dom::object ds_obj; (void)ds_el.get(ds_obj); for (auto [key, val] : ds_obj) {
       node->dependent_schemas[std::string(key)] = compile_node(val, ctx);
     }
   }
@@ -776,7 +868,7 @@ static schema_node_ptr compile_node(dom::element el,
     ctx.compile_error = "patternProperties keyword requires RE2 support (built with ATA_NO_RE2)";
     return node;
 #else
-    dom::object pp_obj; pp_el.get(pp_obj);
+    dom::object pp_obj; (void)pp_el.get(pp_obj);
     for (auto [key, val] : pp_obj) {
       schema_node::pattern_prop pp;
       pp.pattern = std::string(key);
@@ -804,7 +896,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element enum_el;
   if (obj["enum"].get(enum_el) == SUCCESS) {
     if (enum_el.is<dom::array>()) {
-      dom::array enum_arr; enum_el.get(enum_arr); for (auto e : enum_arr) {
+      dom::array enum_arr; (void)enum_el.get(enum_arr); for (auto e : enum_arr) {
         node->enum_values_minified.push_back(canonical_json(e));
       }
     }
@@ -819,19 +911,19 @@ static schema_node_ptr compile_node(dom::element el,
   // composition
   dom::element comp_el;
   if (obj["allOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    dom::array comp_arr; comp_el.get(comp_arr);
+    dom::array comp_arr; (void)comp_el.get(comp_arr);
     for (auto s : comp_arr) {
       node->all_of.push_back(compile_node(s, ctx));
     }
   }
   if (obj["anyOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    dom::array comp_arr2; comp_el.get(comp_arr2);
+    dom::array comp_arr2; (void)comp_el.get(comp_arr2);
     for (auto s : comp_arr2) {
       node->any_of.push_back(compile_node(s, ctx));
     }
   }
   if (obj["oneOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    dom::array comp_arr3; comp_el.get(comp_arr3);
+    dom::array comp_arr3; (void)comp_el.get(comp_arr3);
     for (auto s : comp_arr3) {
       node->one_of.push_back(compile_node(s, ctx));
     }
@@ -858,7 +950,7 @@ static schema_node_ptr compile_node(dom::element el,
   // $defs / definitions
   dom::element defs_el;
   if (obj["$defs"].get(defs_el) == SUCCESS && defs_el.is<dom::object>()) {
-    dom::object defs_obj; defs_el.get(defs_obj); for (auto [key, val] : defs_obj) {
+    dom::object defs_obj; (void)defs_el.get(defs_obj); for (auto [key, val] : defs_obj) {
       std::string def_path = "#/$defs/" + std::string(key);
       auto compiled = compile_node(val, ctx);
       ctx.defs[def_path] = compiled;
@@ -867,7 +959,7 @@ static schema_node_ptr compile_node(dom::element el,
   }
   if (obj["definitions"].get(defs_el) == SUCCESS &&
       defs_el.is<dom::object>()) {
-    dom::object defs_obj; defs_el.get(defs_obj); for (auto [key, val] : defs_obj) {
+    dom::object defs_obj; (void)defs_el.get(defs_obj); for (auto [key, val] : defs_obj) {
       std::string def_path = "#/definitions/" + std::string(key);
       auto compiled = compile_node(val, ctx);
       ctx.defs[def_path] = compiled;
@@ -1086,8 +1178,9 @@ static std::string_view type_of_sv(dom::element el) {
   switch (el.type()) {
     case et::STRING:    return "string";
     case et::INT64:
-    case et::UINT64:    return "integer";
-    case et::DOUBLE:    return "number";
+    case et::UINT64:
+    case et::BIGINT:    return "integer";
+    case et::DOUBLE:    return is_integer_value(el) ? "integer" : "number";
     case et::BOOL:      return "boolean";
     case et::NULL_VALUE:return "null";
     case et::ARRAY:     return "array";
@@ -1099,17 +1192,10 @@ static std::string_view type_of_sv(dom::element el) {
 
 // O(1) type check: test element's type bits against the schema's type_mask.
 static bool type_matches_mask(dom::element el, uint8_t type_mask) {
-  return (element_type_mask(el.type()) & type_mask) != 0;
+  return (value_type_mask(el) & type_mask) != 0;
 }
 
-static double to_double(dom::element el) {
-  switch (el.type()) {
-    case et::DOUBLE:  { double v; el.get(v); return v; }
-    case et::INT64:   { int64_t v; el.get(v); return static_cast<double>(v); }
-    case et::UINT64:  { uint64_t v; el.get(v); return static_cast<double>(v); }
-    default: return 0;
-  }
-}
+
 
 // Count UTF-8 codepoints — branchless: count non-continuation bytes
 static uint64_t utf8_length(std::string_view s) {
@@ -1442,7 +1528,7 @@ static void validate_node(const schema_node_ptr& node,
   ATA_CHECK_EARLY();
   // Numeric validations
   auto vtype = value.type();
-  if (vtype == et::INT64 || vtype == et::UINT64 || vtype == et::DOUBLE) {
+  if (is_number_type(vtype)) {
     double v = to_double(value);
     if (node->minimum.has_value() && v < node->minimum.value()) {
       errors.push_back({error_code::minimum_violation, path,
@@ -1467,10 +1553,7 @@ static void validate_node(const schema_node_ptr& node,
                             std::to_string(node->exclusive_maximum.value())});
     }
     if (node->multiple_of.has_value()) {
-      double divisor = node->multiple_of.value();
-      double rem = std::fmod(v, divisor);
-      // Use relative tolerance for floating point comparison
-      if (std::abs(rem) > 1e-8 && std::abs(rem - divisor) > 1e-8) {
+      if (!multiple_of_ok(v, node->multiple_of.value())) {
         errors.push_back({error_code::multiple_of_violation, path,
                           "value not a multiple of " +
                               std::to_string(node->multiple_of.value())});
@@ -1481,7 +1564,7 @@ static void validate_node(const schema_node_ptr& node,
   // String validations
   if (vtype == et::STRING) {
     std::string_view sv;
-    value.get(sv);
+    (void)value.get(sv);
     uint64_t len = utf8_length(sv);
 
     if (node->min_length.has_value() && len < node->min_length.value()) {
@@ -1517,7 +1600,7 @@ static void validate_node(const schema_node_ptr& node,
 
   // Array validations
   if (vtype == et::ARRAY) {
-    dom::array arr; value.get(arr);
+    dom::array arr; (void)value.get(arr);
     uint64_t arr_size = arr.size();
     if(arr_size == 0xFFFFFF) [[unlikely]]	{
       // Fallback for large arrays where size() saturates — count manually to avoid overflow
@@ -1549,10 +1632,10 @@ static void validate_node(const schema_node_ptr& node,
         if (all_same && first_type == et::STRING) {
           std::set<std::string_view> seen;
           for (auto item : arr) {
-            std::string_view sv; item.get(sv);
+            std::string_view sv; (void)item.get(sv);
             if (!seen.insert(sv).second) { has_dup = true; break; }
           }
-        } else if (all_same && (first_type == et::INT64 || first_type == et::UINT64 || first_type == et::DOUBLE)) {
+        } else if (all_same && is_number_type(first_type)) {
           std::set<double> seen;
           for (auto item : arr) {
             if (!seen.insert(to_double(item)).second) { has_dup = true; break; }
@@ -1608,7 +1691,7 @@ static void validate_node(const schema_node_ptr& node,
 
   // Object validations
   if (vtype == et::OBJECT) {
-    dom::object obj; value.get(obj);
+    dom::object obj; (void)value.get(obj);
 
     if (node->min_properties.has_value() || node->max_properties.has_value()) {
       uint64_t prop_count = 0;
@@ -1881,22 +1964,21 @@ static bool validate_fast(const schema_node_ptr& node,
   auto vtype = value.type();
 
   // Numeric
-  if (vtype == et::INT64 || vtype == et::UINT64 || vtype == et::DOUBLE) {
+  if (is_number_type(vtype)) {
     double v = to_double(value);
     if (node->minimum.has_value() && v < node->minimum.value()) return false;
     if (node->maximum.has_value() && v > node->maximum.value()) return false;
     if (node->exclusive_minimum.has_value() && v <= node->exclusive_minimum.value()) return false;
     if (node->exclusive_maximum.has_value() && v >= node->exclusive_maximum.value()) return false;
     if (node->multiple_of.has_value()) {
-      double rem = std::fmod(v, node->multiple_of.value());
-      if (std::abs(rem) > 1e-8 && std::abs(rem - node->multiple_of.value()) > 1e-8) return false;
+      if (!multiple_of_ok(v, node->multiple_of.value())) return false;
     }
   }
 
   // String
   if (vtype == et::STRING) {
     std::string_view sv;
-    value.get(sv);
+    (void)value.get(sv);
     uint64_t len = utf8_length(sv);
     if (node->min_length.has_value() && len < node->min_length.value()) return false;
     if (node->max_length.has_value() && len > node->max_length.value()) return false;
@@ -1911,7 +1993,7 @@ static bool validate_fast(const schema_node_ptr& node,
 
   // Array
   if (vtype == et::ARRAY) {
-    dom::array arr; value.get(arr);
+    dom::array arr; (void)value.get(arr);
     uint64_t arr_size = arr.size();
     if(arr_size == 0xFFFFFF) [[unlikely]]	{
       // Fallback for large arrays where size() saturates — count manually to avoid overflow
@@ -1930,8 +2012,8 @@ static bool validate_fast(const schema_node_ptr& node,
         for (auto item : arr) { if (item.type() != first_type) { all_same = false; break; } }
         if (all_same && first_type == et::STRING) {
           std::set<std::string_view> seen;
-          for (auto item : arr) { std::string_view sv; item.get(sv); if (!seen.insert(sv).second) return false; }
-        } else if (all_same && (first_type == et::INT64 || first_type == et::UINT64 || first_type == et::DOUBLE)) {
+          for (auto item : arr) { std::string_view sv; (void)item.get(sv); if (!seen.insert(sv).second) return false; }
+        } else if (all_same && is_number_type(first_type)) {
           std::set<double> seen;
           for (auto item : arr) { if (!seen.insert(to_double(item)).second) return false; }
         } else {
@@ -1965,7 +2047,7 @@ static bool validate_fast(const schema_node_ptr& node,
 
   // Object
   if (vtype == et::OBJECT) {
-    dom::object obj; value.get(obj);
+    dom::object obj; (void)value.get(obj);
 
     if (node->min_properties.has_value() || node->max_properties.has_value()) {
       uint64_t n = 0;
@@ -2184,7 +2266,7 @@ static void cg_compile(const schema_node* n, cg::plan& p,
 static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
                      dom::element value, bool* undecidable = nullptr) {
   auto t = value.type();
-  bool t_numeric = (t == et::INT64 || t == et::UINT64 || t == et::DOUBLE);
+  bool t_numeric = is_number_type(t);
   double t_dval = t_numeric ? to_double(value) : 0.0;
   for (size_t i=0; i<code.size(); ++i) {
     auto& c = code[i];
@@ -2194,34 +2276,34 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::EXPECT_ARRAY: if(t!=et::ARRAY) return false; break;
     case cg::op::EXPECT_STRING: if(t!=et::STRING) return false; break;
     case cg::op::EXPECT_NUMBER: if(!t_numeric) return false; break;
-    case cg::op::EXPECT_INTEGER: if(t!=et::INT64&&t!=et::UINT64) return false; break;
+    case cg::op::EXPECT_INTEGER: if(!t_numeric||!is_integral(t_dval)) return false; break;
     case cg::op::EXPECT_BOOLEAN: if(t!=et::BOOL) return false; break;
     case cg::op::EXPECT_NULL: if(t!=et::NULL_VALUE) return false; break;
     case cg::op::EXPECT_TYPE_MULTI: {
-      if(!(element_type_mask(t) & p.type_masks[c.a])) return false; break;
+      if(!(value_type_mask(value) & p.type_masks[c.a])) return false; break;
     }
     case cg::op::CHECK_MINIMUM: if(t_numeric&&t_dval<p.doubles[c.a])return false; break;
     case cg::op::CHECK_MAXIMUM: if(t_numeric&&t_dval>p.doubles[c.a])return false; break;
     case cg::op::CHECK_EX_MINIMUM: if(t_numeric&&t_dval<=p.doubles[c.a])return false; break;
     case cg::op::CHECK_EX_MAXIMUM: if(t_numeric&&t_dval>=p.doubles[c.a])return false; break;
-    case cg::op::CHECK_MULTIPLE_OF: if(t_numeric){double d=p.doubles[c.a],r=std::fmod(t_dval,d);if(std::abs(r)>1e-8&&std::abs(r-d)>1e-8)return false;} break;
-    case cg::op::CHECK_MIN_LENGTH: if(t==et::STRING){std::string_view sv;value.get(sv);if(utf8_length(sv)<c.a)return false;} break;
-    case cg::op::CHECK_MAX_LENGTH: if(t==et::STRING){std::string_view sv;value.get(sv);if(utf8_length(sv)>c.a)return false;} break;
+    case cg::op::CHECK_MULTIPLE_OF: if(t_numeric&&!multiple_of_ok(t_dval,p.doubles[c.a]))return false; break;
+    case cg::op::CHECK_MIN_LENGTH: if(t==et::STRING){std::string_view sv;(void)value.get(sv);if(utf8_length(sv)<c.a)return false;} break;
+    case cg::op::CHECK_MAX_LENGTH: if(t==et::STRING){std::string_view sv;(void)value.get(sv);if(utf8_length(sv)>c.a)return false;} break;
 #ifndef ATA_NO_RE2
-    case cg::op::CHECK_PATTERN: if(t==et::STRING){std::string_view sv;value.get(sv);if(!re2::RE2::PartialMatch(re2::StringPiece(sv.data(),sv.size()),*p.regexes[c.a]))return false;} break;
+    case cg::op::CHECK_PATTERN: if(t==et::STRING){std::string_view sv;(void)value.get(sv);if(!re2::RE2::PartialMatch(re2::StringPiece(sv.data(),sv.size()),*p.regexes[c.a]))return false;} break;
 #else
     case cg::op::CHECK_PATTERN: break;
 #endif
-    case cg::op::CHECK_FORMAT: if(t==et::STRING){std::string_view sv;value.get(sv);if(!check_format_by_id(sv,p.format_ids[c.a]))return false;} break;
-    case cg::op::CHECK_MIN_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s<c.a)return false;} break;
-    case cg::op::CHECK_MAX_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s>c.a)return false;} break;
-    case cg::op::CHECK_UNIQUE_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);std::set<std::string> seen;for(auto x:a)if(!seen.insert(canonical_json(x)).second)return false;} break;
-    case cg::op::ARRAY_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);for(auto x:a)if(!cg_exec(p,p.subs[c.a],x,undecidable))return false;} break;
-    case cg::op::CHECK_REQUIRED: if(t==et::OBJECT){dom::object o;value.get(o);dom::element d;if(o[p.strings[c.a]].get(d)!=SUCCESS)return false;} break;
-    case cg::op::CHECK_MIN_PROPS: if(t==et::OBJECT){dom::object o;value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n<c.a)return false;} break;
-    case cg::op::CHECK_MAX_PROPS: if(t==et::OBJECT){dom::object o;value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n>c.a)return false;} break;
+    case cg::op::CHECK_FORMAT: if(t==et::STRING){std::string_view sv;(void)value.get(sv);if(!check_format_by_id(sv,p.format_ids[c.a]))return false;} break;
+    case cg::op::CHECK_MIN_ITEMS: if(t==et::ARRAY){dom::array a;(void)value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s<c.a)return false;} break;
+    case cg::op::CHECK_MAX_ITEMS: if(t==et::ARRAY){dom::array a;(void)value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s>c.a)return false;} break;
+    case cg::op::CHECK_UNIQUE_ITEMS: if(t==et::ARRAY){dom::array a;(void)value.get(a);std::set<std::string> seen;for(auto x:a)if(!seen.insert(canonical_json(x)).second)return false;} break;
+    case cg::op::ARRAY_ITEMS: if(t==et::ARRAY){dom::array a;(void)value.get(a);for(auto x:a)if(!cg_exec(p,p.subs[c.a],x,undecidable))return false;} break;
+    case cg::op::CHECK_REQUIRED: if(t==et::OBJECT){dom::object o;(void)value.get(o);dom::element d;if(o[p.strings[c.a]].get(d)!=SUCCESS)return false;} break;
+    case cg::op::CHECK_MIN_PROPS: if(t==et::OBJECT){dom::object o;(void)value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n<c.a)return false;} break;
+    case cg::op::CHECK_MAX_PROPS: if(t==et::OBJECT){dom::object o;(void)value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n>c.a)return false;} break;
     case cg::op::OBJ_PROPS_START: if(t==et::OBJECT){
-      dom::object o; value.get(o);
+      dom::object o; (void)value.get(o);
       // collect prop defs
       struct pd{std::string_view nm;uint32_t si;};
       std::vector<pd> props; bool no_add=false;
@@ -2236,18 +2318,18 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
         if(!matched&&no_add)return false;
       }
       i=j; break;
-    } else { /* skip to OBJ_PROPS_END */ size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j); i=j; } break;
+    } else { /* skip to OBJ_PROPS_END */ size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j) {} i=j; } break;
     case cg::op::OBJ_PROP: case cg::op::OBJ_PROPS_END: case cg::op::CHECK_NO_ADDITIONAL: break;
     case cg::op::CHECK_ENUM_STR: {
       auto& es=p.enum_sets[c.a]; bool f=false;
-      if(t==et::STRING){std::string_view sv;value.get(sv);for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
+      if(t==et::STRING){std::string_view sv;(void)value.get(sv);for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
       if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
       if(!f)return false; break;
     }
     case cg::op::CHECK_ENUM: {
       auto& es=p.enum_sets[c.a]; bool f=false;
-      if(t==et::STRING){std::string_view sv;value.get(sv);for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
-      if(!f&&value.is<int64_t>()){int64_t v;value.get(v);auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
+      if(t==et::STRING){std::string_view sv;(void)value.get(sv);for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
+      if(!f&&value.is<int64_t>()){int64_t v;(void)value.get(v);auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
       if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
       if(!f)return false; break;
     }
@@ -2276,10 +2358,15 @@ static json_type od_type(simdjson::ondemand::value& v) {
     case simdjson::ondemand::json_type::number: {
       simdjson::ondemand::number_type nt;
       if (v.get_number_type().get(nt) == SUCCESS &&
-          nt == simdjson::ondemand::number_type::floating_point_number)
+          nt == simdjson::ondemand::number_type::floating_point_number) {
+        // "1.0" and "1e2" are integers to JSON Schema, as to JSON.parse.
+        double d;
+        if (v.get(d) == SUCCESS && is_integral(d)) return json_type::integer;
         return json_type::number;
+      }
       return json_type::integer;
     }
+    default: break;
   }
   return json_type::string;
 }
@@ -2312,14 +2399,13 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::CHECK_MULTIPLE_OF: {
       if (t_numeric) {
         double v;
-        if (t==json_type::integer) { int64_t iv; if(value.get(iv)!=SUCCESS) return false; v=(double)iv; }
-        else { if(value.get(v)!=SUCCESS) return false; }
+        if(value.get(v)!=SUCCESS) return false;
         double d=p.doubles[c.a];
         if(c.o==cg::op::CHECK_MINIMUM && v<d) return false;
         if(c.o==cg::op::CHECK_MAXIMUM && v>d) return false;
         if(c.o==cg::op::CHECK_EX_MINIMUM && v<=d) return false;
         if(c.o==cg::op::CHECK_EX_MAXIMUM && v>=d) return false;
-        if(c.o==cg::op::CHECK_MULTIPLE_OF){double r=std::fmod(v,d);if(std::abs(r)>1e-8&&std::abs(r-d)>1e-8)return false;}
+        if(c.o==cg::op::CHECK_MULTIPLE_OF&&!multiple_of_ok(v,d))return false;
       }
       break;
     }
@@ -2383,7 +2469,7 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
         if(!matched&&no_add) return false;
       }
       i=j; break;
-    } else { size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j); i=j; } break;
+    } else { size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j) {} i=j; } break;
     case cg::op::OBJ_PROP: case cg::op::OBJ_PROPS_END: case cg::op::CHECK_NO_ADDITIONAL: break;
 
     // These require full materialization — bail to DOM path
@@ -2766,8 +2852,10 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
         if ((plan.type_mask & tbits) != tbits) {
           // Schema distinguishes — need to check actual number type
           simdjson::ondemand::number_type nt;
+          double fd;
           if (value.get_number_type().get(nt) == SUCCESS &&
-              nt != simdjson::ondemand::number_type::floating_point_number)
+              (nt != simdjson::ondemand::number_type::floating_point_number ||
+               (value.get(fd) == SUCCESS && is_integral(fd))))
             tbits = json_type_bit(json_type::integer) | json_type_bit(json_type::number);
           else
             tbits = json_type_bit(json_type::number);
@@ -2788,6 +2876,9 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
     if (got_int) {
       v = static_cast<double>(iv);
     } else if (value.get(v) != SUCCESS) {
+      // A number this path cannot read is left to the DOM walker rather than
+      // called invalid.
+      if (io_err) *io_err = true;
       return false;
     }
     uint8_t f = plan.num_flags;
@@ -2796,8 +2887,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
     if ((f & od_plan::HAS_EX_MIN) && v <= plan.num_ex_min) return false;
     if ((f & od_plan::HAS_EX_MAX) && v >= plan.num_ex_max) return false;
     if (f & od_plan::HAS_MUL) {
-      double r = std::fmod(v, plan.num_mul);
-      if (std::abs(r) > 1e-8 && std::abs(r - plan.num_mul) > 1e-8) return false;
+      if (!multiple_of_ok(v, plan.num_mul)) return false;
     }
     if (plan.enum_check) {
       auto& ec = *plan.enum_check;
@@ -2808,8 +2898,9 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
       if (!match) {
         for (auto d : ec.doubles) if (d == v) { match = true; break; }
       }
-      if (!match && got_int) {
-        for (auto d : ec.doubles) if (d == v) { match = true; break; }
+      // A value written "1.0" equals the enum's 1, as it does after JSON.parse.
+      if (!match && !got_int) {
+        for (auto i : ec.integers) if (static_cast<double>(i) == v) { match = true; break; }
       }
       if (!match) return false;
     }
@@ -2881,21 +2972,34 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
             switch (e.fk) {
               case od_plan::fast_kind::INTEGER: {
                 int64_t iv;
-                { auto _e = field.value().get(iv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+                double v;
+                bool got_int = true;
+                {
+                  auto fv = field.value();
+                  auto _e = fv.get(iv);
+                  if (_e == SUCCESS) {
+                    v = static_cast<double>(iv);
+                  } else if (_e == simdjson::INCORRECT_TYPE && fv.get(v) == SUCCESS) {
+                    // "1.0" is an integer; "1.5" is not.
+                    if (!is_integral(v)) return false;
+                    got_int = false;
+                  } else {
+                    if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true;
+                    return false;
+                  }
+                }
                 auto& sub = *e.sub;
                 uint8_t f = sub.num_flags;
-                double v = static_cast<double>(iv);
                 if ((f & od_plan::HAS_MIN) && v < sub.num_min) return false;
                 if ((f & od_plan::HAS_MAX) && v > sub.num_max) return false;
                 if ((f & od_plan::HAS_EX_MIN) && v <= sub.num_ex_min) return false;
                 if ((f & od_plan::HAS_EX_MAX) && v >= sub.num_ex_max) return false;
                 if (f & od_plan::HAS_MUL) {
-                  double r = std::fmod(v, sub.num_mul);
-                  if (std::abs(r) > 1e-8 && std::abs(r - sub.num_mul) > 1e-8) return false;
+                  if (!multiple_of_ok(v, sub.num_mul)) return false;
                 }
                 if (sub.enum_check) {
                   bool em = false;
-                  for (auto i2 : sub.enum_check->integers) if (i2 == iv) { em = true; break; }
+                  for (auto i2 : sub.enum_check->integers) if (got_int ? i2 == iv : static_cast<double>(i2) == v) { em = true; break; }
                   if (!em) for (auto d : sub.enum_check->doubles) if (d == v) { em = true; break; }
                   if (!em) return false;
                 }
@@ -3048,6 +3152,7 @@ schema_ref compile(std::string_view schema_json) {
   ctx->raw_schema = std::string(schema_json);
 
   dom::element doc;
+  ctx->parser.number_as_string(true);
   auto result = ctx->parser.parse(ctx->raw_schema);
   if (result.error()) {
     return schema_ref{nullptr};
