@@ -87,6 +87,40 @@ assert.strictEqual(v.isValidJSON(badTexts[1]), false, 'isValidJSON agrees on the
 }
 console.log('ok: verdicts, errors and frames hold on the text path')
 
+// The regression this file guards, the scan paid on top of the native
+// attempt, is checked by counting rather than timing: once the scanner has
+// said a document is invalid, the native validator must not run on it. A
+// timing ratio against JSON.parse could not hold this on every machine, since
+// it compares C++ with JavaScript: on CI the same code read 2.25x on an AMD
+// EPYC 7763 and 2.88x on an Intel Xeon Platinum 8573C. The count is the same
+// everywhere. It is checked to see the native call at all first, so it cannot
+// pass by counting nothing.
+{
+  const { getNative } = require('../lib/validator-core')._internals
+  const native = getNative()
+  if (!native) {
+    console.log('skip: native scanner witness (no native addon here)')
+  } else {
+    const real = native.rawFastValidate
+    let calls = 0
+    native.rawFastValidate = function () { calls++; return real.apply(this, arguments) }
+    try {
+      const w = new Validator(schema)
+      assert.ok(badTexts[0].length >= 8192, 'the document is past the native threshold')
+      w.validateJSON(badTexts[2])
+      assert.strictEqual(calls, 1, 'before the scanner is built, a large document goes to the native validator')
+      assert.ok(w._ensureScanner(true), 'the scanner builds for this schema')
+      const before = calls
+      for (let k = 0; k < 5; k++) assert.strictEqual(w.validateJSON(badTexts[3 + k]).valid, false)
+      assert.strictEqual(calls, before, 'once the scanner says invalid, the native validator does not run')
+      assert.strictEqual(w.validateJSON(badTexts[9]).errors.length, 1, 'and the errors are still produced')
+    } finally {
+      native.rawFastValidate = real
+    }
+    console.log('ok: a document the scanner rejects skips the native attempt (native calls counted)')
+  }
+}
+
 const median = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1]
 function time (fn, iters) {
   const t = process.hrtime.bigint()
@@ -103,10 +137,12 @@ const N = 5
 const ROUNDS = 25
 let i = 0
 const VALID_BUDGET = 1.35
-// Measured this way an invalid document reads 2.0x to 2.1x on Node 24 and 25
-// and 2.35x on Node 20; with the scan paid in front of the native attempt it
-// reads 2.8x to 3.0x and 3.5x. The budget sits between the two.
-const INVALID_BUDGET = 2.6
+// The invalid ratio compares JavaScript with the C++ JSON.parse, so it moves
+// with the CPU: healthy, 2.0x to 2.4x on most runners and 2.88x on a Xeon
+// Platinum 8573C, while the scan paid twice read 2.8x to 3.5x. No one budget
+// separates those everywhere, so the count above is the guard and this is a
+// backstop for a gross regression, such as the document parsed twice.
+const INVALID_BUDGET = 3.6
 const scan = () => v.isValidJSON(texts[(i++) % 40])
 const valid = () => v.validateJSON(texts[(i++) % 40]).valid
 const parse = () => JSON.parse(texts[(i++) % 40])

@@ -63,29 +63,47 @@ for (const [doc, wantValid, why] of cases) {
 }
 console.log(`ok: additionalProperties answers hold on ${cases.length} shapes, extras named`)
 
-const median = (a) => a.sort((x, y) => x - y)[a.length >> 1]
-function med (fn, iters) {
-  for (let i = 0; i < 1000; i++) fn()
-  const runs = []
-  for (let r = 0; r < 9; r++) {
-    const t = process.hrtime.bigint()
-    for (let i = 0; i < iters; i++) fn()
-    runs.push(Number(process.hrtime.bigint() - t) / iters)
-  }
-  return median(runs)
+const median = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1]
+function time (fn, iters) {
+  const t = process.hrtime.bigint()
+  for (let i = 0; i < iters; i++) fn()
+  return Number(process.hrtime.bigint() - t) / iters
 }
 
 const docs = []
 for (let i = 0; i < 100; i++) docs.push({ a: 'x' + i, b: i, c: true })
 let i = 0
-const BUDGET = 1.9
-require('./_ratio_gate').ratioGate(() => {
-  const A = [], B = []
-  for (let r = 0; r < 5; r++) {
-    A.push(med(() => combined(docs[(i++) % 100]).valid, 5000))
-    B.push(med(() => verdict(docs[(i++) % 100]), 5000))
+// The regression is checked by counting: the keys must not be materialised on
+// an accepted document, so Object.keys is not called at all while the combined
+// function accepts one. It is checked to be called when a key is extra, so the
+// count cannot pass by watching nothing. Timing could not hold this alone: the
+// functions take about ten nanoseconds, and on the same code CI read 0.88x to
+// 1.75x, once 1.90x, while a stand-in for the regression read 1.95x on Node 20.
+{
+  const realKeys = Object.keys
+  let calls = 0
+  Object.keys = function (o) { calls++; return realKeys(o) }
+  try {
+    for (let k = 0; k < 100; k++) assert.strictEqual(combined(docs[k]).valid, true)
+    assert.strictEqual(calls, 0, 'the combined function does not materialise the keys of an accepted document')
+    assert.strictEqual(combined({ a: 'x', b: 1, c: true, extra: 1 }).valid, false)
+    assert.ok(calls > 0, 'and does when a key is extra, to name it')
+  } finally {
+    Object.keys = realKeys
   }
-  const ratio = median(A) / median(B)
+  console.log('ok: accepted documents never call Object.keys (counted)')
+}
+
+// The timing stays as a backstop, in alternating rounds so a runner slowing
+// down for a stretch slows both sides.
+const BUDGET = 2.5
+const combinedValid = () => combined(docs[(i++) % 100]).valid
+const verdictValid = () => verdict(docs[(i++) % 100])
+for (let w = 0; w < 5000; w++) { combinedValid(); verdictValid() }
+require('./_ratio_gate').ratioGate(() => {
+  const R = []
+  for (let r = 0; r < 41; r++) R.push(time(combinedValid, 2000) / time(verdictValid, 2000))
+  const ratio = median(R)
   const failures = ratio > BUDGET ? [`FAIL additionalProperties combined cost: the combined function is ${ratio.toFixed(2)}x the verdict function on a valid document, over the ${BUDGET}x budget; it is materialising the keys when nothing is extra`] : []
   return { failures, ratio }
 }, (r) => `additionalProperties combined cost: ${r.ratio.toFixed(2)}x the verdict function on a valid document (budget ${BUDGET})`)
