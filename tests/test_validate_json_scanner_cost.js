@@ -87,32 +87,43 @@ assert.strictEqual(v.isValidJSON(badTexts[1]), false, 'isValidJSON agrees on the
 }
 console.log('ok: verdicts, errors and frames hold on the text path')
 
-const median = (a) => a.sort((x, y) => x - y)[a.length >> 1]
-function med (fn, iters) {
-  for (let i = 0; i < 20; i++) fn()
-  const runs = []
-  for (let r = 0; r < 9; r++) {
-    const t = process.hrtime.bigint()
-    for (let i = 0; i < iters; i++) fn()
-    runs.push(Number(process.hrtime.bigint() - t) / 1e3 / iters)
-  }
-  return median(runs)
+const median = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1]
+function time (fn, iters) {
+  const t = process.hrtime.bigint()
+  for (let i = 0; i < iters; i++) fn()
+  return Number(process.hrtime.bigint() - t) / iters
 }
 
-const N = 20
+// The four timings are taken in short alternating blocks and each round gives
+// its own ratios, so a runner that slows down for a stretch slows all four and
+// the slowdown divides out; the median over rounds drops the rounds a pause
+// landed in. Timed one after another, a slow stretch landed on one timing and
+// moved the invalid ratio from 2.2x to 3.0x on the same code.
+const N = 5
+const ROUNDS = 25
 let i = 0
 const VALID_BUDGET = 1.35
+// Measured this way an invalid document reads 2.0x to 2.1x on Node 24 and 25
+// and 2.35x on Node 20; with the scan paid in front of the native attempt it
+// reads 2.8x to 3.0x and 3.5x. The budget sits between the two.
 const INVALID_BUDGET = 2.6
+const scan = () => v.isValidJSON(texts[(i++) % 40])
+const valid = () => v.validateJSON(texts[(i++) % 40]).valid
+const parse = () => JSON.parse(texts[(i++) % 40])
+const invalid = () => v.validateJSON(badTexts[(i++) % 40]).valid
+for (let w = 0; w < 20; w++) { scan(); valid(); parse(); invalid() }
 require('./_ratio_gate').ratioGate(() => {
-  const scanT = [], validT = [], parseT = [], invalidT = []
-  for (let r = 0; r < 5; r++) {
-    scanT.push(med(() => v.isValidJSON(texts[(i++) % 40]), N))
-    validT.push(med(() => v.validateJSON(texts[(i++) % 40]).valid, N))
-    parseT.push(med(() => JSON.parse(texts[(i++) % 40]), N))
-    invalidT.push(med(() => v.validateJSON(badTexts[(i++) % 40]).valid, N))
+  const validR = [], invalidR = []
+  for (let r = 0; r < ROUNDS; r++) {
+    const s = time(scan, N)
+    const a = time(valid, N)
+    const p = time(parse, N)
+    const b = time(invalid, N)
+    validR.push(a / s)
+    invalidR.push(b / p)
   }
-  const validRatio = median(validT) / median(scanT)
-  const invalidRatio = median(invalidT) / median(parseT)
+  const validRatio = median(validR)
+  const invalidRatio = median(invalidR)
   const failures = []
   if (validRatio > VALID_BUDGET) failures.push(`FAIL validateJSON scanner cost: a valid document costs ${validRatio.toFixed(2)}x isValidJSON, over the ${VALID_BUDGET}x budget; the verdict is not coming from the scanner`)
   if (invalidRatio > INVALID_BUDGET) failures.push(`FAIL validateJSON scanner cost: an invalid document costs ${invalidRatio.toFixed(2)}x JSON.parse, over the ${INVALID_BUDGET}x budget; the scan is being paid on top of the native attempt`)

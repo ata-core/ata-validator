@@ -105,10 +105,11 @@ function time (fn, iters) {
 const N = 10
 const ROUNDS = 25
 let i = 0
-// Measured this way the single pass reads 2.1x to 2.3x, and the same document
-// validated twice, a verdict pass in front of the combined function, reads 3.2x
-// to 3.3x. The budget sits between the two.
-const ERR_BUDGET = 2.7
+// Measured this way the single pass reads 2.1x to 2.3x on Node 24 and 25 and
+// 2.3x to 2.55x on Node 20. The same document validated twice, a verdict pass in
+// front of the combined function, reads 3.2x to 3.3x on Node 25 and 3.45x to
+// 3.6x on Node 20. The budget sits between the two on every version.
+const ERR_BUDGET = 2.85
 const VALID_BUDGET = 1.25
 const errorsRead = () => v.validate(bad[(i++) % 40]).errors.length
 const verdictBad = () => v.isValidObject(bad[(i++) % 40])
