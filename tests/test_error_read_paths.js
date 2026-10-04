@@ -3,7 +3,9 @@
 // Reading errors takes one of two paths. Until a caller reads an error,
 // validate() answers from the verdict and builds the errors on the first read
 // (a LazyRejection). Once errors are being read, it switches to the combined
-// function, which decides and collects in one pass (a ReadyRejection). Shared
+// function, which decides and collects in one pass (a ReadyRejection), and
+// with richErrors on, from the next read, to the combined function that builds
+// errors enriched where they happen, on read (see makeRich). Shared
 // error literals are copied on the way out, picked by a non-enumerable marker
 // rather than Object.isFrozen. None of that may change what a caller sees:
 // this compares the first read with later reads on every suite schema, in
@@ -31,7 +33,7 @@ for (const dialect of ['draft2020-12', 'draft7']) {
           try {
             first = view(v.validate(t.data))
             const second = v.validate(t.data)
-            if (second.constructor.name === 'ReadyRejection') switched++
+            if (second.constructor.name === 'ReadyRejection' || (second._build && second._build.final === true)) switched++
             later = view(second)
             assert.strictEqual(view(v.validate(t.data)), later)
           } catch (e) {

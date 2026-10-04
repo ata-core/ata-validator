@@ -26,7 +26,10 @@ const esbuild = require('esbuild')
 // validator whose errors are read switches to one-pass validation. Lite gains
 // little of that itself; the markers on its own shared errors are needed for
 // the copy they get.
-const BUDGET = 47550
+// 47591 with the wiring for errors built enriched in generated code (41
+// bytes); the generated-code half lives in lib/enrich-site.js, which lite
+// does not reach.
+const BUDGET = 47650
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
