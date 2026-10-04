@@ -190,6 +190,13 @@ function bothEngines (schema, cases, label) {
     // Prototype-flag names that were read. Names are unique per compile, so a
     // name in the set belongs to exactly one withPlain node.
     'plainUsed',
+    // Branch counts a node's runtime unevaluatedProperties shares with its
+    // anyOf and oneOf, by branch array: the names are declared once for the
+    // whole combined function (hoisted) and read only after a runtime check
+    // that the count was taken for the same object, so an entry is valid for
+    // the whole compile. And whether any collapse went without such a count,
+    // which decides the verdict-first check once for the function.
+    'branchCounts', 'hoisted', 'unguardedCollapse',
   ])
 
   const src = require('node:fs').readFileSync(require.resolve('../lib/js-compiler.js'), 'utf8')

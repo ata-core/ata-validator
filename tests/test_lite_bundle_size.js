@@ -38,7 +38,10 @@ const esbuild = require('esbuild')
 // resolution (normalizeRefs), which lite carries because it carries the
 // interpreter.
 // 47904 with `_ataRaw()` handing out the plain shape (no ordering key).
-const BUDGET = 47950
+// 47984 with the multi-match oneOf error as a function of its own
+// (`__ataMulti`), which generated code builds from a branch count instead of
+// running the branches; lite carries it because it carries the collapse.
+const BUDGET = 48000
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
