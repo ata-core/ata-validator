@@ -29,7 +29,10 @@ const esbuild = require('esbuild')
 // 47591 with the wiring for errors built enriched in generated code (41
 // bytes); the generated-code half lives in lib/enrich-site.js, which lite
 // does not reach.
-const BUDGET = 47650
+// 47697 with the read-path dispatch (which builder serves a validator's
+// errors, and the switch to a generated validate()), which sits in the core
+// both builds share.
+const BUDGET = 47750
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

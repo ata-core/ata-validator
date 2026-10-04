@@ -35,82 +35,39 @@ class TextRejection {
   }
 }
 
-// A rejection whose raw errors the combined function already produced, for a
-// validator whose errors are being read (see _ensureCompiled in
-// lib/validator-core.js). Same own keys as LazyRejection: the raw list sits in
-// `_buildRaw`, and `_build` is the validator's presenter, made once per
-// validator and carrying its root for `_ataRaw`. One class for every
-// validator: a class per validator made every site that reads a rejection
-// see hundreds of shapes, and the suite read slower than before for it. It
-// lives here, with the code generator, because ata-validator/lite never
-// reaches it.
-const { LazyRejection: _LazyRejection, presentErrors: _presentErrors, needsOrdering: _needsOrdering, sortErrorsBySchemaOrder: _sortErrors, attachRelated: _attachRelated } = require('./lib/rejections');
-// The errors the rich combined function built, enriched already where they
-// happened: presenting them is the ordering and the `related` links that
-// presentErrors applies after enriching.
-function _presentFinal(raw, root) {
-  const out = _needsOrdering(raw) ? _sortErrors(root, raw) : raw;
-  if (out.length > 1) _attachRelated(out);
-  return out;
-}
-class ReadyRejection extends _LazyRejection {
-  constructor(raw, data, build) {
-    super(build, data, raw);
+// Errors built enriched where they fail by the rich combined function (see
+// makeRich in lib/enrich-site.js), for a validator whose errors are being read
+// with richErrors on. Presenting them is the ordering and the `related` links
+// presentErrors applies after enriching. Where the rich function does not
+// reject (the data changed under the read), the plain fallback is presented
+// the usual way.
+const { needsOrdering: _needsOrdering, sortErrorsBySchemaOrder: _sortErrors, attachRelated: _attachRelated } = require('./lib/rejections');
+function richBuilder(combRich, root, presentFallback, fallback, plain, enrichOff) {
+  if (plain) {
+    // The runtime-shape combined function writes each error fresh and in the
+    // plain shape, so without enrichment the list is the caller's as it is,
+    // once in schema order.
+    return (data) => {
+      const r = combRich(data);
+      if (r.valid || !r.errors || !r.errors.length) return presentFallback(fallback, data);
+      if (enrichOff) {
+        const errs = r.errors;
+        let plainShape = true;
+        for (let i = 0; i < errs.length; i++) {
+          const e = errs[i];
+          if (e._s === true || e._o !== undefined || e.code !== undefined || e.docUrl !== undefined || e.branchErrors !== undefined) { plainShape = false; break; }
+        }
+        if (plainShape) return _needsOrdering(errs) ? _sortErrors(root, errs) : errs;
+      }
+      return presentFallback(r.errors, data);
+    };
   }
-  _ataRaw() {
-    const raw = this._buildRaw;
-    return _needsOrdering(raw) ? _sortErrors(this._build.root, raw) : raw;
-  }
-}
-// The plain shape of an error the rich combined function built enriched.
-function _plainShape(e) {
-  return { keyword: e.keyword, instancePath: e.instancePath, schemaPath: e.schemaPath, params: e.params, message: e.message };
-}
-// The verdict still answers first: it is cheaper than the combined function on
-// a document that passes, which is most of them, and on one that fails it
-// stops at the first failure. Only a rejection runs the combined function,
-// whose errors the result then holds.
-// `richLater`, when given, builds the rich combined function (see makeRich in
-// lib/enrich-site.js), and is called the first time errors from this path are
-// read, not here: the switch to this path happens on a validator's first read,
-// and building a second generator then would double what a first rejection
-// costs. From the next rejection on, errors arrive enriched and presenting them
-// is ordering and `related`.
-function readyValidate(fast, comb, enrich, root, self, fallback, emptyErrors, richLater) {
-  const build = function (data) {
-    if (richLater !== null) {
-      const later = richLater;
-      richLater = null;
-      const combRich = later();
-      if (combRich) self.validate = richValidate(fast, combRich, root, (raw, data) => _presentErrors(raw, data, null, self, root, enrich), fallback, emptyErrors);
-    }
-    return _presentErrors(this._buildRaw, data, null, self, root, enrich);
-  };
-  build.root = root;
   return (data) => {
-    if (fast(data)) return { valid: true, data, errors: emptyErrors };
-    const r = comb(data);
-    return new ReadyRejection(!r.valid && r.errors && r.errors.length ? r.errors : fallback, data, build);
-  };
-}
-// Errors are built on read, as on a validator's first rejections: a caller
-// that reads only `.valid` pays the verdict and nothing more. Built eagerly,
-// enrichment ran for every rejection whether or not anyone looked.
-function richValidate(fast, combRich, root, presentFallback, fallback, emptyErrors) {
-  const errorsOf = (data) => {
     const r = combRich(data);
-    if (!r.valid && r.errors && r.errors.length) return _presentFinal(r.errors, root);
-    return presentFallback(fallback, data);
-  };
-  errorsOf.final = true;
-  const rawOf = (data) => {
-    const r = combRich(data);
-    const raw = !r.valid && r.errors && r.errors.length ? r.errors.map(_plainShape) : fallback;
-    return _needsOrdering(raw) ? _sortErrors(root, raw) : raw;
-  };
-  return (data) => {
-    if (fast(data)) return { valid: true, data, errors: emptyErrors };
-    return new _LazyRejection(errorsOf, data, rawOf);
+    if (r.valid || !r.errors || !r.errors.length) return presentFallback(fallback, data);
+    const out = _needsOrdering(r.errors) ? _sortErrors(root, r.errors) : r.errors;
+    if (out.length > 1) _attachRelated(out);
+    return out;
   };
 }
 
@@ -327,9 +284,17 @@ function installCodegenPaths (ctx) {
     // and used to call validate() to get the errors, which ran the verdict a
     // second time and built a second rejection around it.
     if (!preprocess) ctx.rejectBase = onReject;
-    // The combined function on its own, for a validator whose errors are being
-    // read: one pass that decides and collects. See _ensureCompiled.
-    if (!preprocess) { ctx.oneShot = combinedIfSafe; ctx.readyRejection = readyValidate; ctx.oneShotRich = ctx.buildRich ? richIfSafe : null; }
+    // The rich combined function, for a validator whose errors are being read
+    // with richErrors on. See _ensureCompiled.
+    if (!preprocess) {
+      ctx.richBuilder = richBuilder;
+      // The plain combined function stands in where no rich one is built
+      // (richErrors off, or a schema source to frame errors from): its errors
+      // are presented, and enriched when asked, the usual way, without the
+      // rejection layers between.
+      ctx.oneShotRich = ctx.buildRich ? richIfSafe : combinedIfSafe;
+      ctx.oneShotPlain = !ctx.buildRich;
+    }
   } else {
     // No hybrid factory, so the assembly needs the function itself rather
     // than a reference it can call later: build it now.
@@ -339,7 +304,6 @@ function installCodegenPaths (ctx) {
         ? (data) => { preprocess(data); return safeCombinedFn(data); }
         : safeCombinedFn;
       if (!preprocess) ctx.rejectBase = (data) => _mustReject(safeCombinedFn(data));
-      if (!preprocess) { ctx.oneShot = () => safeCombinedFn; ctx.readyRejection = readyValidate; }
     } else {
       this.validate = preprocess
         ? (data) => {
@@ -360,7 +324,7 @@ function installCodegenPaths (ctx) {
     // The verbose fields are added here, so a path around this layer would
     // miss them.
     ctx.rejectBase = null;
-    ctx.oneShot = null;
+    ctx.oneShotRich = null;
     this.validate = _verboseWrap(this.validate, this._schemaObj);
   }
   // The verdict methods answer validate()'s question without building the

@@ -1,11 +1,9 @@
 'use strict'
 
-// Reading errors takes one of two paths. Until a caller reads an error,
-// validate() answers from the verdict and builds the errors on the first read
-// (a LazyRejection). Once errors are being read, it switches to the combined
-// function, which decides and collects in one pass (a ReadyRejection), and
-// with richErrors on, from the next read, to the combined function that builds
-// errors enriched where they happen, on read (see makeRich). Shared
+// Reading errors takes one of two paths. validate() answers from the verdict
+// and builds the errors on read; with richErrors on, from a validator's third
+// read on they are built enriched where they fail by the rich combined
+// function (see makeRich) instead of plain and enriched afterwards. Shared
 // error literals are copied on the way out, picked by a non-enumerable marker
 // rather than Object.isFrozen. None of that may change what a caller sees:
 // this compares the first read with later reads on every suite schema, in
@@ -32,9 +30,10 @@ for (const dialect of ['draft2020-12', 'draft7']) {
           let first, later
           try {
             first = view(v.validate(t.data))
+            v.validate(t.data).errors
             const second = v.validate(t.data)
-            if (second.constructor.name === 'ReadyRejection' || (second._build && second._build.final === true)) switched++
             later = view(second)
+            if (second._build && second._build.final === true) switched++
             assert.strictEqual(view(v.validate(t.data)), later)
           } catch (e) {
             if (e instanceof assert.AssertionError) throw e
@@ -61,6 +60,6 @@ for (const dialect of ['draft2020-12', 'draft7']) {
 }
 
 assert.ok(compared >= 4000, `too few comparisons: ${compared}`)
-assert.ok(switched >= 1000, `too few results came from the one-pass path: ${switched}`)
+assert.ok(switched >= 500, `too few results came from the rich generated path: ${switched}`)
 assert.ok(ownObjects >= 2000, `too few errors checked for ownership: ${ownObjects}`)
-console.log(`ok: both read paths give the same result (${compared} comparisons, ${switched} from the one-pass path, ${ownObjects} errors checked as the caller's own)`)
+console.log(`ok: both read paths give the same result (${compared} comparisons, ${switched} from the rich generated path, ${ownObjects} errors checked as the caller's own)`)
