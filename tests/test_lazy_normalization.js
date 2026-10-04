@@ -73,7 +73,9 @@ const shape = {
   assert.strictEqual(new Validator(b), vb, 'identity cache after the verdict-only compile');
   const k = new Validator(plain, { keywords: { even: (s, d) => !s || d % 2 === 0 } });
   assert.strictEqual(k.validate({ a: 3 }).valid, false);
-  assert.strictEqual(k.engine(), 'interpreter');
+  // Custom keywords compile into the verdict function now; the plain
+  // validator above, for the same schema object, is not handed out for it.
+  assert.strictEqual(k.engine(), 'codegen');
 }
 
 console.log('ok: construction does not walk the schema');

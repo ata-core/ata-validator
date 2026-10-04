@@ -395,8 +395,9 @@ installCodegenPaths.compileVerdict = function compileVerdict () {
     return;
   }
   const uf = this._userFormats;
-  const _cg = compileToJSCodegen(this._schemaObj, sm, uf);
-  const jsFn = _cg || compileToJS(this._schemaObj, null, sm);
+  // Custom keywords: see the note on the same call in lib/validator-core.js.
+  const _cg = compileToJSCodegen(this._schemaObj, sm, uf, this._keywords ? { keywords: this._keywords } : undefined);
+  const jsFn = _cg || (this._usesKeywords ? null : compileToJS(this._schemaObj, null, sm));
   this._jsFn = jsFn;
   if (jsFn) {
     _bindVerdict(this, jsFn);
@@ -408,7 +409,7 @@ installCodegenPaths.compileVerdict = function compileVerdict () {
     // is the bug this cache had once already. `isCodegen` rides along so a
     // validator that later reuses this entry reports the same engine it
     // would have compiled to.
-    if (!uf) {
+    if (!uf && !this._keywords) {
       if (!cached) _compileCache.set(mapKey, { jsFn, combined: undefined, errFn: undefined, isCodegen: !!_cg, full: false });
       else cached.jsFn = jsFn;
     }
@@ -433,6 +434,9 @@ installCodegenPaths.installScanner = function installScanner (schemaObj, options
   // builds it now, which is how the differential test reaches it.
   this._ensureScanner = (now) => {
     if (self._scanner === undefined) {
+      // The scanner reads the schema's own keywords from the text and knows
+      // nothing of custom ones, so it would accept what they reject.
+      if (self._usesKeywords) { self._scanner = null; return null; }
       if (!now && ++calls < SCAN_AFTER) return undefined;
       const built = require('./lib/scan-compiler').compileScanner(schemaObj, { userFormats: self._userFormats });
       self._scanner = built ? built.scan : null;

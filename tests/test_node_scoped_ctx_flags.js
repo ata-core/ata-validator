@@ -156,6 +156,10 @@ function bothEngines (schema, cases, label) {
     'plainOf',
     // The removeAdditional node set, fixed for the whole compile.
     'removeNodes',
+    // The custom keyword registry, fixed for the whole compile, and the set of
+    // schema nodes whose keyword checks were written, read once at the end to
+    // decline a schema where any node was missed.
+    'keywords', 'kwEmitted',
     // Hoisted oneOf/anyOf branch functions by schema or reference. A hoisted
     // branch reads only module-level names, so it is valid for the whole
     // compile wherever the same branch recurs.

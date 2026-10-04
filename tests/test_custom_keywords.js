@@ -158,10 +158,14 @@ test('verdict paths agree with validate()', () => {
   assert(v.validateJSON('{"a":3}').valid === false);
 });
 
-test('schemas with custom keywords run on the interpreted engine', () => {
+test('schemas with custom keywords compile, and a macro keeps the interpreted engine', () => {
   const v = new Validator({ properties: { a: { even: true } } }, { keywords: { even } });
   v.validate({ a: 2 });
-  assert(v.engine() === 'interpreter', 'engine is ' + v.engine());
+  assert(v.engine() === 'codegen', 'engine is ' + v.engine());
+  assert(v.validate({ a: 3 }).valid === false && v.validate({ a: 2 }).valid === true);
+  const m = new Validator({ type: 'object', few: 1 }, { keywords: { few: { macro: (n) => ({ maxProperties: n }) } } });
+  m.validate({});
+  assert(m.engine() === 'interpreter', 'macro engine is ' + m.engine());
 });
 
 test('a schema that does not use any registered keyword is unaffected', () => {
