@@ -37,7 +37,8 @@ const esbuild = require('esbuild')
 // 47881 with the interpreter's resolver exported for compile-time reference
 // resolution (normalizeRefs), which lite carries because it carries the
 // interpreter.
-const BUDGET = 47900
+// 47904 with `_ataRaw()` handing out the plain shape (no ordering key).
+const BUDGET = 47950
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

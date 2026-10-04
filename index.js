@@ -322,6 +322,7 @@ function installCodegenPaths (ctx) {
       ctx.oneShotRich = ctx.buildRich ? richIfSafe : () => combinedIfSafe() || errFnIfSafe();
       ctx.oneShotPlain = !ctx.buildRich;
       ctx.isCleanShape = (fn) => fn !== null && fn === _safeCombined && fn._collapses !== true;
+      ctx.isCombined = (fn) => fn !== null && fn === _safeCombined;
       // validate() as the combined function in its result shape: built and
       // probed here, null when it declines or throws on the probe.
       ctx.onePassOf = (empty, fallback) => {
