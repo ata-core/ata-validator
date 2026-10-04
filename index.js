@@ -35,6 +35,37 @@ class TextRejection {
   }
 }
 
+// A rejection whose raw errors the combined function already produced, for a
+// validator whose errors are being read (see _ensureCompiled in
+// lib/validator-core.js). Same own keys as LazyRejection: the raw list sits in
+// `_buildRaw`, and `_build` is the validator's presenter, made once per
+// validator and carrying its root for `_ataRaw`. One class for every
+// validator: a class per validator made every site that reads a rejection
+// see hundreds of shapes, and the suite read slower than before for it. It
+// lives here, with the code generator, because ata-validator/lite never
+// reaches it.
+const { LazyRejection: _LazyRejection, presentErrors: _presentErrors, needsOrdering: _needsOrdering, sortErrorsBySchemaOrder: _sortErrors } = require('./lib/rejections');
+class ReadyRejection extends _LazyRejection {
+  constructor(raw, data, build) {
+    super(build, data, raw);
+  }
+  _ataRaw() {
+    const raw = this._buildRaw;
+    return _needsOrdering(raw) ? _sortErrors(this._build.root, raw) : raw;
+  }
+}
+function readyValidate(comb, enrich, root, self, fallback, emptyErrors) {
+  const build = function (data) {
+    return _presentErrors(this._buildRaw, data, null, self, root, enrich);
+  };
+  build.root = root;
+  return (data) => {
+    const r = comb(data);
+    if (r.valid) return { valid: true, data, errors: emptyErrors };
+    return new ReadyRejection(r.errors && r.errors.length ? r.errors : fallback, data, build);
+  };
+}
+
 function installCodegenPaths (ctx) {
   const { ABORT_EARLY_RESULT, HYBRID_TIER_CALLS, SIMDJSON_THRESHOLD, VALID_RESULT, _bindVerdict, _jsonSyntaxRejection, _mustReject, _verboseWrap, getNative, isV1Dialect, resolveSchemaByPath } = core._internals;
   const { jsFn, _isCodegen, preprocess, fusedRemove, options, schemaObj, useSimdjsonForLarge, _buildCombined, _buildErr } = ctx;
@@ -227,6 +258,9 @@ function installCodegenPaths (ctx) {
     // and used to call validate() to get the errors, which ran the verdict a
     // second time and built a second rejection around it.
     if (!preprocess) ctx.rejectBase = onReject;
+    // The combined function on its own, for a validator whose errors are being
+    // read: one pass that decides and collects. See _ensureCompiled.
+    if (!preprocess) { ctx.oneShot = combinedIfSafe; ctx.readyRejection = readyValidate; }
   } else {
     // No hybrid factory, so the assembly needs the function itself rather
     // than a reference it can call later: build it now.
@@ -236,6 +270,7 @@ function installCodegenPaths (ctx) {
         ? (data) => { preprocess(data); return safeCombinedFn(data); }
         : safeCombinedFn;
       if (!preprocess) ctx.rejectBase = (data) => _mustReject(safeCombinedFn(data));
+      if (!preprocess) { ctx.oneShot = () => safeCombinedFn; ctx.readyRejection = readyValidate; }
     } else {
       this.validate = preprocess
         ? (data) => {
@@ -256,6 +291,7 @@ function installCodegenPaths (ctx) {
     // The verbose fields are added here, so a path around this layer would
     // miss them.
     ctx.rejectBase = null;
+    ctx.oneShot = null;
     this.validate = _verboseWrap(this.validate, this._schemaObj);
   }
   // The verdict methods answer validate()'s question without building the

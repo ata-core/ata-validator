@@ -20,8 +20,13 @@ const esbuild = require('esbuild')
 // 47059 once `verbose` moved into the core: lite, which is the interpreted
 // engine only, ignored the option before. 47159 on CI (47138 here) once
 // normalization decodes percent-encoded `$ref` fragments, which the interpreter
-// in lite resolved already but the other engines did not.
-const BUDGET = 47250
+// in lite resolved already but the other engines did not. 47457 once reading
+// errors got faster: shared error literals are marked rather than found with
+// Object.isFrozen, enrichment keeps the fields fixed per literal, and a
+// validator whose errors are read switches to one-pass validation. Lite gains
+// little of that itself; the markers on its own shared errors are needed for
+// the copy they get.
+const BUDGET = 47550
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
