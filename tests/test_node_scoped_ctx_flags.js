@@ -169,6 +169,9 @@ function bothEngines (schema, cases, label) {
     // Annotation functions for runtime unevaluatedProperties, one per
     // subschema object for the whole compile (emitAnnot).
     'annFns',
+    // Depth of the branch functions being written (emitBranchCollapse),
+    // raised and restored around each like nestedBoolean.
+    'inBranchFn',
     // Hoisted oneOf/anyOf branch functions by schema or reference. A hoisted
     // branch reads only module-level names, so it is valid for the whole
     // compile wherever the same branch recurs.
