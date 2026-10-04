@@ -41,7 +41,7 @@ class TextRejection {
 // presentErrors applies after enriching. Where the rich function does not
 // reject (the data changed under the read), the plain fallback is presented
 // the usual way.
-const { needsOrdering: _needsOrdering, sortErrorsBySchemaOrder: _sortErrors, attachRelated: _attachRelated } = require('./lib/rejections');
+const { needsOrdering: _needsOrdering, sortErrorsBySchemaOrder: _sortErrors, attachRelated: _attachRelated, stripOrdinal: _stripOrdinal } = require('./lib/rejections');
 function richBuilder(combRich, root, presentFallback, fallback, plain, cleanPlain) {
   if (plain) {
     // The runtime-shape combined function writes each error fresh and in the
@@ -321,13 +321,21 @@ function installCodegenPaths (ctx) {
       // function's are already in their final plain shape (isCleanShape).
       ctx.oneShotRich = ctx.buildRich ? richIfSafe : () => combinedIfSafe() || errFnIfSafe();
       ctx.oneShotPlain = !ctx.buildRich;
-      ctx.isCleanShape = (fn) => fn !== null && fn === _safeCombined;
+      ctx.isCleanShape = (fn) => fn !== null && fn === _safeCombined && fn._collapses !== true;
       // validate() as the combined function in its result shape: built and
       // probed here, null when it declines or throws on the probe.
-      ctx.onePassOf = (empty) => {
-        const sort = (errs) => (_needsOrdering(errs) ? _sortErrors(schemaObj, errs) : errs);
+      ctx.onePassOf = (empty, fallback) => {
+        // Collapsed branches carry an ordinal and their branch errors raw;
+        // they are presented as presentErrors presents them without
+        // enrichment: ordered, then reduced to the plain shape.
+        let collapses = false;
+        const sort = (errs) => {
+          const out = _needsOrdering(errs) ? _sortErrors(schemaObj, errs) : errs;
+          return collapses ? out.map(_stripOrdinal) : out;
+        };
         try {
-          const fn = jsCompiler.compileToJSCombined(schemaObj, VALID_RESULT, this._schemaMap.size > 0 ? this._schemaMap : null, this._userFormats, { runtimeShape: true, resultShape: { Rejection: EagerRejection, empty, sort } });
+          const fn = jsCompiler.compileToJSCombined(schemaObj, VALID_RESULT, this._schemaMap.size > 0 ? this._schemaMap : null, this._userFormats, { runtimeShape: true, resultShape: { Rejection: EagerRejection, empty, sort, fallback } });
+          if (fn && fn._collapses === true) collapses = true;
           if (!fn) return null;
           fn({}); fn(null); fn(0);
           return fn;

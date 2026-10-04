@@ -163,6 +163,9 @@ function bothEngines (schema, cases, label) {
     // Whether the combined generator builds errors enriched (fixed for the
     // compile), and whether it has bound makeRich as a closure value yet.
     'rich', 'richMk',
+    // Set on the combined generator's context, for emitters it shares with
+    // the error generator (emitBranchCollapse).
+    'inCombined',
     // Hoisted oneOf/anyOf branch functions by schema or reference. A hoisted
     // branch reads only module-level names, so it is valid for the whole
     // compile wherever the same branch recurs.
