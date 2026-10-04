@@ -2,6 +2,27 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.41.0 - 2026-10-04
+
+### Changed
+
+- Custom keywords (the `keywords` option, and `addKeyword` in the Ajv-compatible layer) compile into the generated verdict function as calls to your functions. Before, a schema using one ran on the interpreted engine. On a strict request body with one custom keyword, accepting a document went from 118.7 to 24.0 ns, and the first call from 2.59 to 2.24 ms; in a one-keyword microbenchmark, 56.3 to 7.2 ns. Reading the errors of a rejected document is unchanged (662 to 642 ns): errors still come from the interpreted engine, which now loads at the first rejection instead of at the first call, so that first rejection takes about 1.7 ms longer, once. Macro keywords stay on the interpreted engine, and `ata build` still refuses custom keywords. Measured on an Apple M4 Pro with Node 25, interleaved. `tests/test_custom_keyword_codegen.js` holds the compiled form to the interpreted engine on random schemas with keywords in every applicator and behind `$ref`: 68880 answers across `validate()`, `isValidObject()`, `validateJSON()`, `isValidJSON()` and the buffer path, none different.
+
+### Fixed
+
+- A custom keyword used only in a schema reached through `$ref` (from `schemas` or `addSchema`) was not applied by the compiled paths, so a document it should reject was accepted. Whether keywords are in use was decided from the root schema alone. Affected: 1.16.0 to 1.40.1.
+- A percent-encoded `$ref` fragment, as ts-json-schema-generator writes for generic type names (`#/definitions/Node%3CRow%3E`), sent the whole schema to the interpreted engine, and `ata compile` refused it as too complex. It now resolves on every engine.
+- The native engine read numbers by how they are written rather than as JSON.parse reads them. On the buffer APIs, and in `validateJSON` past the native threshold:
+  - `{"id": 1.0}` was rejected against `type: "integer"`;
+  - an integer past 64 bits made the document invalid, with a generic error;
+  - a schema with such a bound, such as `minimum: 1e20`, made `isValid()` throw;
+  - `minLength` and the other count keywords at 1e21 and above were ignored;
+  - `multipleOf` disagreed with `validate()` on very large values.
+
+  `tests/test_number_text_parity.js` checks every text path against `validate()` on 2352 number spellings. One gap remains, in simdjson: a 20-digit integer at or past 2^64 fails to parse where the document reaches the DOM parser.
+- A module from `ata build` and the other emitters inlined in a `<script>` element could be cut short by a schema string holding `</script>`. Emitted modules now write the `<` of `</script` and `<!--` as `\x3C`; output for other schemas is byte for byte the same.
+- The glob fallback `ata build` uses on Node 18 to 21 matched with a regular expression that ran in polynomial time on long patterns. It splits by index now.
+
 ## 1.40.1 - 2026-09-30
 
 ### Security
