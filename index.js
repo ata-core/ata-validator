@@ -42,6 +42,11 @@ class TextRejection {
 // reject (the data changed under the read), the plain fallback is presented
 // the usual way.
 const { needsOrdering: _needsOrdering, sortErrorsBySchemaOrder: _sortErrors, attachRelated: _attachRelated } = require('./lib/rejections');
+let _enrichFnIdx = null;
+function _enrichOne(e, data) {
+  if (_enrichFnIdx === null) _enrichFnIdx = require('./lib/enrich-error').enrich;
+  return _enrichFnIdx(e, data !== undefined ? { data } : null);
+}
 function richBuilder(combRich, root, presentFallback, fallback, plain, cleanPlain) {
   if (plain) {
     // The runtime-shape combined function writes each error fresh and in the
@@ -63,6 +68,11 @@ function richBuilder(combRich, root, presentFallback, fallback, plain, cleanPlai
     const r = combRich(data);
     if (r.valid || !r.errors || !r.errors.length) return presentFallback(fallback, data);
     const out = _needsOrdering(r.errors) ? _sortErrors(root, r.errors) : r.errors;
+    // A collapsed oneOf or anyOf comes out plain (no docUrl) and is enriched
+    // here, its branch errors with it, as presentErrors would.
+    for (let i = 0; i < out.length; i++) {
+      if (out[i].docUrl === undefined) out[i] = _enrichOne(out[i], data);
+    }
     if (out.length > 1) _attachRelated(out);
     return out;
   };

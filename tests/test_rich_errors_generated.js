@@ -35,7 +35,10 @@ function compareDirect (schema, docs, where) {
     assert.strictEqual(a.valid, b.valid, `${where}: verdicts differ on ${json(d)}`)
     if (a.valid) continue
     direct++
-    assert.strictEqual(json(b.errors), json(a.errors.map((e) => enrich(e, { data: d }))), `${where}: ${json(schema)} on ${json(d)}`)
+    // A collapsed oneOf or anyOf comes out of the rich function plain and is
+    // enriched when presented (richBuilder in index.js); the same here.
+    const got = b.errors.map((e) => (e.docUrl === undefined ? enrich(e, { data: d }) : e))
+    assert.strictEqual(json(got), json(a.errors.map((e) => enrich(e, { data: d }))), `${where}: ${json(schema)} on ${json(d)}`)
   }
 }
 
