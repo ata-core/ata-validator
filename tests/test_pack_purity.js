@@ -39,7 +39,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // until 1.39.0, when three silent-accept fixes, engine-independent error lists
 // and the same-value $ref cycle gate took the package past it after comments
 // had been trimmed twice to stay under; the same release strips the native
-// binaries, which takes 250-300 KB off every install with an addon.
-assert.ok(manifest.size < 320 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// binaries, which takes 250-300 KB off every install with an addon. 320 KB
+// until 1.42.0 (319.7 KB at 1.41.0, 328.8 KB after): errors built enriched in
+// generated code, one-pass validation once errors are read, and references
+// resolved at compile time, each of which moves schemas or reads off a slower
+// path.
+assert.ok(manifest.size < 336 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

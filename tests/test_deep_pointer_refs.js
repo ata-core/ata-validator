@@ -8,9 +8,9 @@
 // to the interpreter on fixed shapes and on random schemas: escaped keys,
 // array indexes, a pointer to an ancestor (a cycle), draft 7's `definitions`
 // (renamed to `$defs` before the generators see it), `$ref` beside other
-// keywords. A pointer through a subschema with its own `$id` must stay on the
-// interpreter. It counts the schemas that compiled, so it cannot pass by
-// declining them all.
+// keywords, and references through `$id`s and URNs, which normalizeRefs
+// resolves with the interpreter's resolver. It counts the schemas that
+// compiled, so it cannot pass by declining them all.
 
 const assert = require('node:assert')
 const { Validator } = require('..')
@@ -46,8 +46,12 @@ check({ properties: { kids: { type: 'array', items: { $ref: '#/properties/kids' 
 check({ $defs: { node: { type: 'object', properties: { next: { $ref: '#/$defs/node/properties/next' }, v: { type: 'integer' } } } }, $ref: '#/$defs/node' }, [{ v: 1 }, { v: 'x' }, { next: { v: 1 } }], undefined)
 check({ properties: { a: { type: 'string' }, b: { $ref: '#/properties/a', maxLength: 2 } } }, [{ b: 'ab' }, { b: 'abc' }, { b: 1 }], undefined)
 check({ properties: { e: { enum: [{ $ref: '#/nope' }] } } }, [{ e: { $ref: '#/nope' } }, { e: 1 }], true)
-// A pointer through a subschema with its own base stays on the interpreter.
-check({ $defs: { r: { $id: 'http://example.com/r', properties: { x: { type: 'string' } } } }, properties: { a: { $ref: '#/$defs/r/properties/x' } } }, [{ a: 'x' }, { a: 1 }], false)
+// A pointer through a subschema with its own base: resolved by the
+// interpreter's resolver at compile time (normalizeRefs), so it compiles too.
+check({ $defs: { r: { $id: 'http://example.com/r', properties: { x: { type: 'string' } } } }, properties: { a: { $ref: '#/$defs/r/properties/x' } } }, [{ a: 'x' }, { a: 1 }], true)
+check({ $id: 'urn:uuid:deadbeef-1234-ffff-ffff-4321feebdaed', properties: { foo: { $ref: 'urn:uuid:deadbeef-1234-ffff-ffff-4321feebdaed#/$defs/bar' } }, $defs: { bar: { type: 'string' } } }, [{ foo: 'x' }, { foo: 12 }], true)
+check({ $id: 'http://example.com/root.json', $defs: { A: { $id: 'nested.json', $defs: { B: { $id: '#foo', type: 'integer' } }, properties: { n: { $ref: '#foo' } } } }, properties: { x: { $ref: 'nested.json' } } }, [{ x: { n: 1 } }, { x: { n: 'a' } }], undefined)
+check({ $id: 'http://example.com/tree', type: 'object', properties: { kids: { type: 'array', items: { $ref: 'http://example.com/tree' } }, v: { type: 'integer' } } }, [{ kids: [{ v: 1 }, { kids: [{ v: 'x' }] }] }, { v: 2 }], undefined)
 
 // Random schemas with deep pointers into themselves.
 let seed = Number(process.env.SEED) || 4242

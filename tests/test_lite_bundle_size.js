@@ -34,7 +34,10 @@ const esbuild = require('esbuild')
 // both builds share.
 // 47837 once the switch to one-pass validation after errors are read joined
 // that dispatch; the one-pass function itself is built in index.js.
-const BUDGET = 47850
+// 47881 with the interpreter's resolver exported for compile-time reference
+// resolution (normalizeRefs), which lite carries because it carries the
+// interpreter.
+const BUDGET = 47900
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
