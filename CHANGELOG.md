@@ -2,6 +2,25 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.42.0 - 2026-10-04
+
+### Changed
+
+- Reading the errors of a rejected document is faster. On the official test suite, validating every case and reading every error of each rejection, a run takes 1.4 times less time on Draft 2020-12 and 1.5 times less on draft 7 with the default errors, and 1.75 and 2.1 times less with `richErrors: false`. Measured against 1.41.0 in one harness, on an Apple M4 Pro with Node 25. Where it comes from:
+  - Once a validator's errors are being read, `validate()` with `richErrors: false` decides and collects in one pass, and with `richErrors: true` each error is built enriched where it fails rather than plain and enriched afterwards. A validator whose errors are never read is unaffected, and reading only `.valid` still costs the verdict alone.
+  - Past its first calls, `validate()` is a function generated for the schema rather than shared wrappers around the generated checks.
+  - `oneOf` and `anyOf` (with the collapsed `ATA4001` to `ATA4003` error), `additionalProperties` as a schema, and `unevaluatedProperties` whose evaluated set depends on which branches pass now compile into the function that collects errors.
+  - A `uniqueItems` error, a collapsed `oneOf` or `anyOf` error, and a `const` error on an object or array value cost a fraction of what they did.
+- More schemas run on generated code instead of the interpreted engine. Every `$ref` the interpreted engine can resolve (a pointer deeper than a top-level definition, an `$id`-relative or absolute URI, a URN, an anchor) is resolved at compile time by that engine's own resolver, and `unevaluatedProperties` that depends on which branches pass is evaluated at run time in generated code. Of the 980 SchemaStore schemas, 838 compile where 797 did, tsconfig.json and jsconfig.json among them. On the official suite, 326 of 384 Draft 2020-12 groups compile where 305 did, and 238 of 258 draft 7 groups where 219 did.
+- Cost of the above: the browser runtime bundle is 108.9 KB gzipped, up from 102.9 KB, and loading the package takes about 0.2 ms longer, both from the larger code generator. Modules from `ata build` are byte for byte the same size. A Fastify app with 10 routes reaches its first validated request 4% sooner.
+
+### Fixed
+
+- `validateJSON()` returned a bare `false` instead of a result for an invalid document when any string in the schema contained the word `function`, such as a property named `function`. Code that checks `if (!result.valid)` behaved correctly, but reading `result.errors` threw, and a check written as `result.valid === false` let the document through. The generated code is rewritten as text to build that path, and the rewrite read the word inside a string as the start of a function. Strings are now skipped. Affected: 1.23.0 to 1.41.0. `validate()`, `isValidObject()` and `isValidJSON()` were not affected. `tests/test_generated_returns_rewrite.js` puts the words and characters that rewrite looks for into property names, enum values and patterns, and checks every entry point against the interpreted engine.
+- A `uniqueItems` error named a different duplicate pair depending on the engine that answered. Every engine now reports the first item that has a later equal, and its first later equal (`params: { i, j }`), as the interpreted engine did. The message for a document checked by generated code can name a different pair than before.
+- Generated code and the interpreted engine gave different error lists for the same document in a few shapes; what is accepted did not differ. A value of the wrong type is now also checked against the keywords that apply to its own type (`minimum` for `2.5` against `type: "integer"`, `allOf` and `if` for `null` against `type: "object"`), a collapsed `oneOf` or `anyOf` under a pattern sorts in schema order, and `type` written as a one-element array is reported as an array. The SchemaStore sample documents, 31080 of them with mutated copies, now get identical error lists from both engines; three differed before.
+- An `isValidObject` taken before the validator's first call, as in `const check = v.isValidObject`, classified the schema again on every call, about ten times the cost of the check. It now hands straight to the compiled check.
+
 ## 1.41.0 - 2026-10-04
 
 ### Changed
