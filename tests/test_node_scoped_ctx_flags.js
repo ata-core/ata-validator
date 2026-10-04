@@ -166,6 +166,9 @@ function bothEngines (schema, cases, label) {
     // Set on the combined generator's context, for emitters it shares with
     // the error generator (emitBranchCollapse).
     'inCombined',
+    // Annotation functions for runtime unevaluatedProperties, one per
+    // subschema object for the whole compile (emitAnnot).
+    'annFns',
     // Hoisted oneOf/anyOf branch functions by schema or reference. A hoisted
     // branch reads only module-level names, so it is valid for the whole
     // compile wherever the same branch recurs.
