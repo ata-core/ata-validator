@@ -32,7 +32,9 @@ const esbuild = require('esbuild')
 // 47697 with the read-path dispatch (which builder serves a validator's
 // errors, and the switch to a generated validate()), which sits in the core
 // both builds share.
-const BUDGET = 47750
+// 47837 once the switch to one-pass validation after errors are read joined
+// that dispatch; the one-pass function itself is built in index.js.
+const BUDGET = 47850
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

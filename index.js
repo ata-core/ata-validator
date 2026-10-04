@@ -42,23 +42,20 @@ class TextRejection {
 // reject (the data changed under the read), the plain fallback is presented
 // the usual way.
 const { needsOrdering: _needsOrdering, sortErrorsBySchemaOrder: _sortErrors, attachRelated: _attachRelated } = require('./lib/rejections');
-function richBuilder(combRich, root, presentFallback, fallback, plain, enrichOff) {
+function richBuilder(combRich, root, presentFallback, fallback, plain, cleanPlain) {
   if (plain) {
     // The runtime-shape combined function writes each error fresh and in the
-    // plain shape, so without enrichment the list is the caller's as it is,
-    // once in schema order.
+    // plain shape: no shared literal, no ordinal, no code or docUrl, no
+    // collapsed branches (lib/js-compiler.js, compileToJSCombined with
+    // runtimeShape). So without enrichment the list is the caller's as it is,
+    // once in schema order. Checking each error for those fields instead cost
+    // a megamorphic load per field per error across many schemas.
+    // tests/test_error_read_paths.js holds every error handed out to being
+    // the caller's own.
     return (data) => {
       const r = combRich(data);
       if (r.valid || !r.errors || !r.errors.length) return presentFallback(fallback, data);
-      if (enrichOff) {
-        const errs = r.errors;
-        let plainShape = true;
-        for (let i = 0; i < errs.length; i++) {
-          const e = errs[i];
-          if (e._s === true || e._o !== undefined || e.code !== undefined || e.docUrl !== undefined || e.branchErrors !== undefined) { plainShape = false; break; }
-        }
-        if (plainShape) return _needsOrdering(errs) ? _sortErrors(root, errs) : errs;
-      }
+      if (cleanPlain) return _needsOrdering(r.errors) ? _sortErrors(root, r.errors) : r.errors;
       return presentFallback(r.errors, data);
     };
   }
@@ -69,6 +66,22 @@ function richBuilder(combRich, root, presentFallback, fallback, plain, enrichOff
     if (out.length > 1) _attachRelated(out);
     return out;
   };
+}
+
+// The rejection validate() returns once it is the one-pass combined function
+// (resultShape in compileToJSCombined): the errors are already built, plain,
+// fresh and in schema order. Serialises as the lazy rejection does.
+class EagerRejection {
+  constructor(errors) {
+    this.valid = false;
+    this.errors = errors;
+  }
+  toJSON() {
+    return { valid: false, errors: this.errors };
+  }
+  _ataRaw() {
+    return this.errors;
+  }
 }
 
 function installCodegenPaths (ctx) {
@@ -165,6 +178,15 @@ function installCodegenPaths (ctx) {
       } catch {}
     }
     return _safeCombined;
+  };
+
+  // The error function on its own, probed the way errOnly probes it, or null.
+  const errFnIfSafe = () => {
+    _buildErr();
+    const efn = ctx.err();
+    if (!efn) return null;
+    try { efn({}, true); } catch { return null; }
+    return (x) => efn(x, true);
   };
 
   // The rich combined function, built and probed the way the plain one is,
@@ -292,8 +314,25 @@ function installCodegenPaths (ctx) {
       // (richErrors off, or a schema source to frame errors from): its errors
       // are presented, and enriched when asked, the usual way, without the
       // rejection layers between.
-      ctx.oneShotRich = ctx.buildRich ? richIfSafe : combinedIfSafe;
+      // Where the plain combined function declines (oneOf, anyOf, an
+      // additionalProperties schema), the error function stands in, called
+      // directly rather than through the rejection layers. Its errors can be
+      // collapsed branches that still need presenting; only the combined
+      // function's are already in their final plain shape (isCleanShape).
+      ctx.oneShotRich = ctx.buildRich ? richIfSafe : () => combinedIfSafe() || errFnIfSafe();
       ctx.oneShotPlain = !ctx.buildRich;
+      ctx.isCleanShape = (fn) => fn !== null && fn === _safeCombined;
+      // validate() as the combined function in its result shape: built and
+      // probed here, null when it declines or throws on the probe.
+      ctx.onePassOf = (empty) => {
+        const sort = (errs) => (_needsOrdering(errs) ? _sortErrors(schemaObj, errs) : errs);
+        try {
+          const fn = jsCompiler.compileToJSCombined(schemaObj, VALID_RESULT, this._schemaMap.size > 0 ? this._schemaMap : null, this._userFormats, { runtimeShape: true, resultShape: { Rejection: EagerRejection, empty, sort } });
+          if (!fn) return null;
+          fn({}); fn(null); fn(0);
+          return fn;
+        } catch { return null; }
+      };
     }
   } else {
     // No hybrid factory, so the assembly needs the function itself rather
