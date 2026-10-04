@@ -331,7 +331,7 @@ function installCodegenPaths (ctx) {
         // in order with the rest.
         const sort = (errs) => (_needsOrdering(errs) ? _sortErrors(schemaObj, errs) : errs);
         try {
-          const fn = jsCompiler.compileToJSCombined(schemaObj, VALID_RESULT, this._schemaMap.size > 0 ? this._schemaMap : null, this._userFormats, { runtimeShape: true, resultShape: { Rejection: EagerRejection, empty, sort, fallback } });
+          const fn = jsCompiler.compileToJSCombined(schemaObj, VALID_RESULT, this._schemaMap.size > 0 ? this._schemaMap : null, this._userFormats, { runtimeShape: true, resultShape: { Rejection: EagerRejection, empty, sort, fallback, verdict: jsFn } });
           if (!fn) return null;
           fn({}); fn(null); fn(0);
           return fn;
