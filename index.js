@@ -54,15 +54,19 @@ class ReadyRejection extends _LazyRejection {
     return _needsOrdering(raw) ? _sortErrors(this._build.root, raw) : raw;
   }
 }
-function readyValidate(comb, enrich, root, self, fallback, emptyErrors) {
+// The verdict still answers first: it is cheaper than the combined function on
+// a document that passes, which is most of them, and on one that fails it
+// stops at the first failure. Only a rejection runs the combined function,
+// whose errors the result then holds.
+function readyValidate(fast, comb, enrich, root, self, fallback, emptyErrors) {
   const build = function (data) {
     return _presentErrors(this._buildRaw, data, null, self, root, enrich);
   };
   build.root = root;
   return (data) => {
+    if (fast(data)) return { valid: true, data, errors: emptyErrors };
     const r = comb(data);
-    if (r.valid) return { valid: true, data, errors: emptyErrors };
-    return new ReadyRejection(r.errors && r.errors.length ? r.errors : fallback, data, build);
+    return new ReadyRejection(!r.valid && r.errors && r.errors.length ? r.errors : fallback, data, build);
   };
 }
 
