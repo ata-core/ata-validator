@@ -612,7 +612,7 @@ static schema_node_ptr compile_node(dom::element el,
 
   // Boolean schema
   if (el.is<bool>()) {
-    bool bval;
+    bool bval = false;
     type_checked(el.get(bval));
     node->boolean_schema = bval;
     return node;
@@ -818,7 +818,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element ap_el;
   if (obj["additionalProperties"].get(ap_el) == SUCCESS) {
     if (ap_el.is<bool>()) {
-      bool ap_bool; type_checked(ap_el.get(ap_bool)); node->additional_properties_bool = ap_bool;
+      bool ap_bool = false; type_checked(ap_el.get(ap_bool)); node->additional_properties_bool = ap_bool;
     } else {
       node->additional_properties_schema = compile_node(ap_el, ctx);
     }
@@ -2335,7 +2335,7 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::CHECK_ENUM: {
       auto& es=p.enum_sets[c.a]; bool f=false;
       if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
-      if(!f&&value.is<int64_t>()){int64_t v;type_checked(value.get(v));auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
+      if(!f&&value.is<int64_t>()){int64_t v=0;type_checked(value.get(v));auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
       if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
       if(!f)return false;
       break;
@@ -2879,7 +2879,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
     bool need_value = plan.num_flags || plan.enum_check;
     if (!need_value) break;
     double v;
-    int64_t iv;
+    int64_t iv = 0;
     bool got_int = (value.get(iv) == SUCCESS);
     if (got_int) {
       v = static_cast<double>(iv);
@@ -2979,7 +2979,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
             // for primitive sub-plans. Mirrors the constraint code in od_exec_plan.
             switch (e.fk) {
               case od_plan::fast_kind::INTEGER: {
-                int64_t iv;
+                int64_t iv = 0;
                 double v;
                 bool got_int = true;
                 {
