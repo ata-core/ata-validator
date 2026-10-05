@@ -240,12 +240,14 @@ test('propertyNames: false', () => {
   assert(fn({ a: 1 }) === false, 'any name is rejected')
 })
 
-test('propertyNames: bail on unsupported keyword', () => {
+test('propertyNames: any subschema checks each key as a value', () => {
   const fn = compileToJSCodegen({
     type: 'object',
     propertyNames: { type: 'string', format: 'email' }
   })
-  assert(fn === null, 'should bail for unsupported keyword in propertyNames')
+  assert(fn !== null, 'compiles')
+  assert(fn({ 'a@b.co': 1 }) === true, 'an email key passes')
+  assert(fn({ 'a@b.co': 1, nope: 2 }) === false, 'a key that is not an email fails')
 })
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`)

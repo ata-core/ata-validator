@@ -6,8 +6,8 @@
 // local reference is now replaced by what it names, through aliases, and
 // `type: 'string'` is dropped since every property name is a string. What is
 // left must be keywords the generators express; anything else still declines.
-// Every shape must answer as the interpreted engine does, errors and their
-// paths included.
+// Any other subschema is applied to each key as a value. Every shape must
+// answer as the interpreted engine does, errors and their paths included.
 
 const assert = require('assert')
 const { Validator } = require('..')
@@ -21,11 +21,13 @@ const compiles = {
   nested: { definitions: { Key }, type: 'object', properties: { m: { type: 'object', propertyNames: { $ref: '#/definitions/Key' }, additionalProperties: { type: 'integer' } } } },
   inDef: { definitions: { Key, Map: { type: 'object', propertyNames: { $ref: '#/definitions/Key' } } }, type: 'array', items: { $ref: '#/definitions/Map' } },
   enumKeys: { definitions: { K: { type: 'string', enum: ['aa', 'bb'] } }, type: 'object', propertyNames: { $ref: '#/definitions/K' } },
-}
-const declines = {
+  // Not reducible to key checks: each key is checked as a value of its own
+  // (tests/test_property_names_subschema.js).
   integerType: { type: 'object', propertyNames: { type: 'integer' } },
   validatingSibling: { definitions: { Key }, type: 'object', propertyNames: { $ref: '#/definitions/Key', minLength: 4 } },
-  unsupported: { definitions: { K: { type: 'string', format: 'email' } }, type: 'object', propertyNames: { $ref: '#/definitions/K' } },
+  format: { definitions: { K: { type: 'string', format: 'email' } }, type: 'object', propertyNames: { $ref: '#/definitions/K' } },
+}
+const declines = {
   loop: { definitions: { A: { $ref: '#/definitions/B' }, B: { $ref: '#/definitions/A' } }, type: 'object', propertyNames: { $ref: '#/definitions/A' } },
 }
 const docs = [
