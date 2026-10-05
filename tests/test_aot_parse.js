@@ -315,17 +315,26 @@ const compile = (schema) => {
   check('cyclic ref decline warns', warned.length === 1 && /parse/.test(warned[0]))
 }
 
-// 14. a $ref with a non-annotation sibling stays un-inlined. That shape is
-// interpreter-only today, so the whole module is declined (null), which the
-// build layer already reports; there is no quiet module missing its parse.
+// 14. a $ref with a non-annotation sibling stays un-inlined. The verdict
+// generator compiles the sibling after the reference, so a module is emitted
+// and its verdict applies both; parse is declined, and loudly, so there is no
+// quiet module missing its parse.
 {
   const schema = {
     type: 'object',
     $defs: { a: { type: 'object', properties: { v: { type: 'number' } } } },
     properties: { p: { $ref: '#/$defs/a', minProperties: 1 } },
   }
-  const src = toStandaloneModule(new Validator(schema), { format: 'cjs', parse: true })
-  check('constraining sibling of $ref declines the module, not just parse', src === null)
+  const warned = []
+  const src = toStandaloneModule(new Validator(schema), { format: 'cjs', parse: true, onWarning: (w) => warned.push(w) })
+  check('constraining sibling of $ref emits a module', typeof src === 'string')
+  check('constraining sibling of $ref gets no parse', typeof src === 'string' && !/_ataParse/.test(src))
+  check('constraining sibling of $ref warns about parse', warned.some((w) => /parse/.test(w)))
+  if (typeof src === 'string') {
+    const m = { exports: {} }
+    new Function('module', 'exports', 'require', src)(m, m.exports, require)
+    check('the sibling is applied beside the reference', m.exports.isValid({ p: {} }) === false && m.exports.isValid({ p: { v: 1 } }) === true && m.exports.isValid({ p: { v: 'x' } }) === false)
+  }
 }
 
 // 15. the declines that already existed are loud now too

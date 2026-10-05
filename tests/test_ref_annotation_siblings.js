@@ -39,9 +39,13 @@ for (const [k, v] of Object.entries(ANNOTATIONS)) {
 compare({ $defs: { t: target }, type: 'object', properties: { n: { $ref: '#/$defs/t', ...ANNOTATIONS } } }, 'codegen')
 for (const [k, v] of Object.entries(VALIDATING)) {
   const schema = { $defs: { t: target }, type: 'object', properties: { n: { $ref: '#/$defs/t', description: 'd', [k]: v } } }
+  // A validating sibling is compiled after the reference (2020-12 applies
+  // both), not dropped: it once took a $ref-only path that accepted what the
+  // sibling rejects, which is why such a node declined until it was compiled.
+  compare(schema, 'codegen')
   const fast = new Validator(schema)
-  assert.notStrictEqual(fast.engine(), 'codegen', `a validating sibling ${k} must not take the $ref-only path`)
+  for (let r = 0; r < 80; r++) for (const d of docs) { const x = fast.validate(structuredClone(d)); if (!x.valid) void x.errors }
   const interp = new Validator(schema, { engine: 'interpreter' })
-  for (const d of docs) { assert.strictEqual(shape(fast.validate(structuredClone(d))), shape(interp.validate(structuredClone(d))), `${k} on ${JSON.stringify(d)}`); compared++ }
+  for (const d of docs) { assert.strictEqual(shape(fast.validate(structuredClone(d))), shape(interp.validate(structuredClone(d))), `${k} on ${JSON.stringify(d)}, one pass`); compared++ }
 }
-console.log(`ok: $ref with annotation siblings compiles and agrees with the interpreter; validating siblings still decline (${compared} comparisons)`)
+console.log(`ok: $ref with annotation or validating siblings compiles and agrees with the interpreter (${compared} comparisons)`)

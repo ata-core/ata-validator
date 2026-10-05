@@ -31,12 +31,20 @@ check('typical request schemas take the generated path', () => {
 })
 
 check('shapes the generator declines report the engine that answers', () => {
-  // A $ref with a validating keyword beside it: the generators emit the $ref
-  // and skip the rest of the node, so the gate sends it elsewhere.
-  const v = new Validator({ $defs: { n: { type: 'integer' } }, type: 'object', properties: { a: { $ref: '#/$defs/n', minimum: 5 } } })
+  // A pattern with a Unicode property escape needs the unicode flag, which
+  // the generated checks do not set, so the gate sends it elsewhere.
+  const v = new Validator({ type: 'object', properties: { a: { type: 'string', pattern: '^\\p{L}+$' } } })
   assert.ok(['interpreter', 'closure', 'native'].includes(v.engine()))
+  assert.strictEqual(v.validate({ a: 'abc' }).valid, true)
+  assert.strictEqual(v.validate({ a: '123' }).valid, false)
+})
+
+check('a $ref with a validating keyword beside it is generated and applies both', () => {
+  const v = new Validator({ $defs: { n: { type: 'integer' } }, type: 'object', properties: { a: { $ref: '#/$defs/n', minimum: 5 } } })
+  assert.strictEqual(v.engine(), 'codegen')
   assert.strictEqual(v.validate({ a: 7 }).valid, true)
   assert.strictEqual(v.validate({ a: 2 }).valid, false)
+  assert.strictEqual(v.validate({ a: 7.5 }).valid, false)
 })
 
 check('the type is one of four names', () => {
