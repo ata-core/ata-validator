@@ -58,6 +58,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // within 1.46.0: $dynamicRef unrolled by scope, the run-time
 // unevaluatedProperties verdict read from the annotation counts, and finite
 // repeats of a group handed to the platform RegExp.
-assert.ok(manifest.size < 360 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 376 KB within 1.46.0: the one-pass function's subtree guards, its shared
+// run-time module (lib/combined-runtime.js) and run-time unevaluatedProperties
+// written as straight-line code with a bitmask (inlineUnevalBlock).
+assert.ok(manifest.size < 376 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
