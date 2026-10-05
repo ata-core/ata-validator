@@ -54,7 +54,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // validateJSON errors kept in validate()'s order and shape on every engine,
 // and the schema copies that dropped a name "__proto__" (silent accepts).
 // 348 KB until 1.46.0: `ata migrate` (lib/migrate.js), the report of what a
-// switch from ajv would change, is about 11 KB of source in the CLI.
-assert.ok(manifest.size < 352 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// switch from ajv would change, is about 11 KB of source in the CLI. 352 KB
+// within 1.46.0: $dynamicRef unrolled by scope, the run-time
+// unevaluatedProperties verdict read from the annotation counts, and finite
+// repeats of a group handed to the platform RegExp.
+assert.ok(manifest.size < 360 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

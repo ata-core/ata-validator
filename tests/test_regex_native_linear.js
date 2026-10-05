@@ -21,6 +21,11 @@ const patterns = new Set([
   '^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$', '^\\d{3}-\\d{4}$', '^[A-Z]{2}\\d?$',
   '^#[0-9a-fA-F]{6}$', '^[a-z0-9-]+$', '^v?\\d+$', '^\\+?[1-9]\\d{1,14}$', '^[^/]+$', 'ab|cd',
   '^(ab|cd)$', '\\.json$', '^\\w+@\\w{2,8}$', '^[\\u00c0-\\u00ff]+$', '^\\x41\\x42*$', '^-?\\d$',
+  // Finite repeats of a group, which the rule accepts when the group holds no
+  // unbounded quantifier (a SHA-256 fingerprint, a dotted quad, a tag list).
+  '^(?:[A-F0-9]{2}:){31}[A-F0-9]{2}$', '^(?:\\d{1,3}\\.){3}\\d{1,3}$', '^([a-z]{2}-){1,3}[a-z]{2}$', '^(?:(ab)?c){2}$',
+  // Still declined: an unbounded quantifier over a group, and nesting.
+  '^([A-Za-z]{1}[A-Za-z\\d_]*\\.)+[A-Za-z][A-Za-z\\d_]*$', '^(a+)+$', '^(?:ab)*$',
 ])
 function collect (node) {
   if (!node || typeof node !== 'object') return
