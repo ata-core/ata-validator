@@ -41,7 +41,10 @@ const esbuild = require('esbuild')
 // 47984 with the multi-match oneOf error as a function of its own
 // (`__ataMulti`), which generated code builds from a branch count instead of
 // running the branches; lite carries it because it carries the collapse.
-const BUDGET = 48000
+// 48090 with the compile and preprocess caches bounded (_boundedSet in
+// lib/validator-core.js): unbounded, they kept 1.2 GB after compiling each
+// SchemaStore schema once.
+const BUDGET = 48100
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

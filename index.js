@@ -503,7 +503,7 @@ function installCodegenPaths (ctx) {
 // The verdict function alone, for isValidObject() before a full compile: the
 // error and combined generators are left for the first rejection.
 installCodegenPaths.compileVerdict = function compileVerdict () {
-  const { compileCacheKey, _compileCache, _bindVerdict, _rememberInstance } = core._internals;
+  const { compileCacheKey, _compileCache, _compileCacheSet, _bindVerdict, _rememberInstance } = core._internals;
   if (!this._schemaStr) this._schemaStr = JSON.stringify(this._schemaObj);
   const sm = this._schemaMap.size > 0 ? this._schemaMap : null;
   const mapKey = compileCacheKey(this._schemaStr, this._schemaMap);
@@ -532,7 +532,7 @@ installCodegenPaths.compileVerdict = function compileVerdict () {
     // validator that later reuses this entry reports the same engine it
     // would have compiled to.
     if (!uf && !this._keywords) {
-      if (!cached) _compileCache.set(mapKey, { jsFn, combined: undefined, errFn: undefined, isCodegen: !!_cg, full: false });
+      if (!cached) _compileCacheSet(mapKey, { jsFn, combined: undefined, errFn: undefined, isCodegen: !!_cg, full: false });
       else cached.jsFn = jsFn;
     }
   }
