@@ -2,6 +2,36 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.44.0 - 2026-10-05
+
+### Fixed
+
+- A schema that names something `"__proto__"` could accept documents it rejects. Several places copied a schema, or a map keyed by property names, by assignment, and assigning the key `"__proto__"` sets the copy's prototype instead of creating the property, so the constraint on it was gone from the copy. It happened for a property named `"__proto__"` next to a `$ref` that is resolved at compile time (one relative to a nested `$id`, for example), for a `$ref` pointing at such a property, and for draft-07 `dependencies` on such a property, which affected every engine. For example `{"$id": "http://e.x/root", "$defs": {"S": {"$id": "s", "type": "string"}}, "properties": {"__proto__": {"type": "number"}, "r": {"$ref": "s"}}}` accepted `{"__proto__": "s"}`. A schema that lists `"__proto__": false` to keep that key out of documents was affected the same way. Affected: measured on 1.40.1, 1.41.0 and 1.43.0; earlier versions were not checked. Every copy now writes such a key as an own property. `tests/test_proto_name_rename_invariance.js` checks that a schema and a document using the name answer exactly as the same pair with the name renamed, on every engine and every read, ahead-of-time modules included: 3328 documents, none different.
+- `validateJSON()` with `richErrors: false` returned the errors of a rejected document in the order generated code found them, where `validate()` returns them in schema order, so one document could list its errors in two orders. Both now give the same list. Reading those errors costs about 50 ns more per rejection on a small schema.
+- A typo hint for a missing required property could name an unrelated key: a missing `c` was matched to a present `a`, and a missing `name` to a present `age`, because any key within two edits counted. The allowance now scales with the name (none under three characters, one edit under five, two from five), and the hint names the one nearest key, or nothing when two are equally near.
+
+### Changed
+
+- Faster from process start to the first answer. Measured on 20 SchemaStore schemas as API routes and on the SARIF schema as a command line tool, each run in a fresh process, median of 11, against 1.43.0 (milliseconds, an empty Node process included):
+
+  | | 1.43.0 | 1.44.0 |
+  |---|---|---|
+  | 20 routes, first valid requests | 47.9 | 40.7 |
+  | 20 routes, first errors read | 67.7 | 60.2 |
+  | SARIF, one rejection with its errors read | 90.9 | 33.4 |
+  | 5 MB SARIF log through `validateJSON()`, valid | 89.1 | 57.5 |
+  | 5 MB SARIF log through `validateJSON()`, invalid, errors read | 135.8 | 82.4 |
+
+  Where it comes from:
+  - The first 64 calls of a large schema (over about 16K characters with its references followed) are answered by the interpreted engine, which the test suite holds to the same answers and errors, and the schema is compiled if the validator is still in use after that. A short-lived process never pays to generate and compile the code for it.
+  - A schema that would expand past about 400K characters gets its verdict function with shared definitions from the start, instead of expanded first and thrown away.
+  - The vendored meta-schemas load only for a schema that references one, not for every schema that names its dialect in `$schema`, which made each compile's cache key a 30 KB string.
+  - The errorMessage module loads only for a schema that uses the keyword.
+  - `validateJSON()` parses the text once when its errors are read, and on a large ASCII document finds the positions of the failing values through the native addon (simdjson), 3.1 ms instead of 8.3 on 5 MB. Without the addon, or with an older one, it works as before.
+- More schemas run on generated code: `propertyNames` with any subschema (each key is checked as a value), a property named `$ref`, and properties named after `Object.prototype` members such as `constructor` and `__proto__`. Of the 980 SchemaStore schemas, 869 run on generated code where 840 did.
+- Reading errors is a little faster. On the official test suite, validating every case and reading every error, a run takes 1.04 times less time on Draft 2020-12 and on draft 7 with the default errors, and 1.03 and 1.08 times less with `richErrors: false`. On the negative sample documents of the 66 SchemaStore schemas with a `oneOf` or `anyOf` over references and samples, reading the default errors takes 9% less in total, mostly from the edit distance behind typo hints, which now computes only the cells within its bound.
+- Cost: the browser runtime bundle is 115.8 KB gzipped, up from 114.1 KB. Requiring the package, compiling a schema and validating once takes the same time within noise. Modules from `ata build` are byte for byte the same size.
+
 ## 1.43.0 - 2026-10-05
 
 ### Fixed
