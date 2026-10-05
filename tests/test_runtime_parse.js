@@ -108,6 +108,19 @@ for (let i = 0; i < 600; i++) {
   try { v.parse(input); } catch (err) { e = err; }
   assert.ok(e && e.name === 'AtaValidationError' && Array.isArray(e.errors) && e.errors.some((x) => x.keyword === 'type'), 'rejection carries errors');
   assert.deepStrictEqual(input, { a: 'no' }, 'the input is not modified on rejection');
+  // The list is worked out when first read, and behaves as a plain property:
+  // enumerable, serialised, copied by spread, the same array on every read,
+  // replaceable, and equal to what validate() reports.
+  const fresh = () => { try { v.parse({ a: 'no' }) } catch (x) { return x } }
+  const e1 = fresh()
+  assert.ok(Object.keys(e1).includes('errors'), 'errors is an own enumerable key')
+  assert.strictEqual(JSON.parse(JSON.stringify(e1)).errors.length, e1.errors.length, 'errors is serialised')
+  assert.strictEqual({ ...fresh() }.errors.length, v.validate({ a: 'no' }).errors.length, 'spread copies the list')
+  assert.strictEqual(e1.errors, e1.errors, 'the same array on every read')
+  assert.deepStrictEqual(e1.errors, v.validate({ a: 'no' }).errors, 'the errors validate() reports')
+  const e2 = fresh()
+  e2.errors = []
+  assert.deepStrictEqual(e2.errors, [], 'errors can be replaced before it was read')
   const ok = { a: 1 };
   assert.deepStrictEqual(v.parse(ok), { a: 1, b: 'x' });
   assert.deepStrictEqual(ok, { a: 1 }, 'the input is not modified on success');
