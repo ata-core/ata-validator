@@ -243,13 +243,12 @@ function installCodegenPaths (ctx) {
     this.validate = preprocess
       ? (data) => { preprocess(data); return _fn(data) ? VALID_RESULT : ABORT_EARLY_RESULT; }
       : (data) => (_fn(data) ? VALID_RESULT : ABORT_EARLY_RESULT);
-  } else if (hasDynRef && _isCodegen && jsFn && !jsFn._hybridFactory) {
-    // $dynamicRef on generated code without a hybrid: the direct path. A
-    // schema the generators unroll by scope (expandDynamicScopes) has a
-    // hybrid like any other and takes the assembly below, with the one-pass
-    // function once its errors are read; this path kept it on a verdict and
-    // the error function for every rejection, 392 ns where the one-pass
-    // function answers in a fraction of that.
+  } else if (hasDynRef && _isCodegen && jsFn) {
+    // $dynamicRef with JS codegen: direct path, no wrapper layers. Tried
+    // routing these through the assembly below once they are unrolled by
+    // scope: the one-pass function measured slower on the suite's recursive
+    // dynamicRef cases (268 against 184 ns per case over the default
+    // validator), so the direct path stays.
     const _fn = jsFn, _efn = errOnly, _R = VALID_RESULT;
     this.validate = preprocess
       ? (data) => { preprocess(data); return _fn(data) ? _R : _efn(data); }
