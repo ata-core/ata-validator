@@ -203,6 +203,9 @@ function bothEngines (schema, cases, label) {
     // The root the combined generator calls for `$ref: "#"`, and its
     // functions that go through the cycle guard, for the whole compile.
     'rootC', 'cycFnsC',
+    // Item annotation functions for runtime unevaluatedItems, one per
+    // subschema for the whole compile, and whether their helpers are written.
+    'annFnsI', 'annItemHelpers',
     // Whether the verdict generator writes shared definitions as functions,
     // fixed per attempt, and the functions it wrote, for the whole compile.
     'shareDefs', 'sharedDefFns',
