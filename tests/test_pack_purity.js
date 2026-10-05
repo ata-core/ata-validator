@@ -49,7 +49,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // and anyOf counted by branch verdicts; and recursive schemas given one-pass
 // validation instead of declining it. 340 KB until 1.44.0: an interpreted
 // twin answers a large schema's first calls, which took a command line run
-// on SARIF from 87 to 31 ms from process start.
-assert.ok(manifest.size < 344 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// on SARIF from 87 to 31 ms from process start. 344 KB within 1.44.0: the
+// simdjson position locator, propertyNames with any subschema generated, and
+// validateJSON errors kept in validate()'s order and shape on every engine.
+assert.ok(manifest.size < 348 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
