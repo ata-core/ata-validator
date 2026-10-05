@@ -223,6 +223,7 @@ const FILES = [
   "tests/test_combined_recursive_definition.js",
   "tests/test_migrate.js",
   "tests/test_dynamic_scopes.js",
+  "tests/test_uneval_verdict_counts.js",
   "tests/test_cli_validate.js",
   "tests/test_cli_version.js",
   "tests/test_collect_evaluated.js",
