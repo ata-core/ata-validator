@@ -290,7 +290,11 @@ function installCodegenPaths (ctx) {
     let impl = null;
     const onReject = (data) => {
       const combined = combinedIfSafe();
-      if (combined) { impl = combined; return _mustReject(combined(data)); }
+      // The method itself, where nothing wraps it, so a call does not go
+      // through `run` to reach it: one layer fewer, which the first
+      // thousands of calls, before the optimizing compiler has inlined the
+      // layers, pay for in full.
+      if (combined) { impl = combined; if (this.validate === run) this.validate = combined; return _mustReject(combined(data)); }
       return errOnly(data);
     };
     // Tiered: the first calls go through the verdict function and the

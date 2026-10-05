@@ -160,6 +160,8 @@ function bothEngines (schema, cases, label) {
     // have added (a budget for the compile) and how many enclose the node
     // being written (raised and lowered in a finally, like nestedBoolean).
     'guardChars', 'guardDepth', 'guardDefFns',
+    // Raised while a shared definition's function is written, lowered in a finally.
+    'inDefC',
     // The custom keyword registry, fixed for the whole compile, and the set of
     // schema nodes whose keyword checks were written, read once at the end to
     // decline a schema where any node was missed.
