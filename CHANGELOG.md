@@ -2,6 +2,24 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.45.0 - 2026-10-05
+
+### Changed
+
+- The interpreted engine is faster. It answers where code generation is blocked (a Content Security Policy without `unsafe-eval`, some edge runtimes), it is the engine of `ata-validator/lite`, and it answers the first calls of a large schema. Measured against 1.44.0 on SchemaStore schemas and their sample documents:
+  - with code generation blocked, validating and reading the errors takes 4.7 µs per tsconfig.json sample where it took 8.5, and 427 µs per SARIF log where it took 568; the other schemas measured are unchanged;
+  - on the valid samples of five popular schemas, a verdict takes 9.9 µs where it took 16.2, and a validation that collects errors 16.0 µs where it took 23.4.
+
+  Where it comes from:
+  - `enum` membership is a Set lookup for primitive values instead of a deep comparison with every allowed value;
+  - `uniqueItems` keys items by value, or by a structural hash for objects, instead of comparing every pair;
+  - the `uri` format checks its characters through a table;
+  - while collecting errors, a child schema with no subschemas of its own is asked for its verdict first, and the paths of its errors are built only when it fails.
+- `uniqueItems` over arrays of objects is faster in generated code too: each item is hashed instead of turned into a canonical string, in one implementation both engines now run. A verdict on SchemaStore's SARIF samples takes 57.5 µs where it took 71.8.
+- Reading the errors of a rejected document is a little faster: the error list is created with its first error instead of grown from an empty array, and a schema that reaches its root again through a definition used once (a tree whose nodes hold trees) now gets the one-pass function that validates and collects together. On the official test suite, validating every case and reading every error, a run takes 1.05 times less time on Draft 2020-12 with the default errors and 1.05 times less on draft 7, and 1.05 and 1.11 times less with `richErrors: false`.
+- The interpreted engine compares values for `enum`, `const` and `uniqueItems` by own properties, as generated code does. The two differed only for objects with inherited enumerable properties, which JSON never produces.
+- Cost: the browser runtime bundle is 116.4 KB gzipped, up from 115.8 KB. Startup and accepting documents are unchanged within noise. Modules from `ata build` are byte for byte the same size.
+
 ## 1.44.0 - 2026-10-05
 
 ### Fixed
