@@ -59,12 +59,17 @@ for (const [label, schema, invalid, valid] of cases) {
   }
 }
 
-// The generators themselves: the combined one declines the root reference
-// instead of emitting an empty function, and neither error-collecting
-// generator hands back a function that throws.
+// The generators themselves: the combined one used to emit an empty function
+// for the root reference and now, with the dynamic scope unrolled into a
+// plain `$ref: '#'`, emits one that checks it (held to the case list above);
+// and neither error-collecting generator hands back a function that throws.
 {
   const root = { $dynamicAnchor: 'node', type: 'object', properties: { child: { $dynamicRef: '#node' } } };
-  assert.strictEqual(jc.compileToJSCombined(root, VALID, null, undefined), null, 'combined declines a $dynamicRef to the root');
+  const comb = jc.compileToJSCombined(root, VALID, null, undefined);
+  assert.strictEqual(typeof comb, 'function', 'the combined function exists for a $dynamicRef to the root');
+  const [, , invalids, valids] = cases.find(([label]) => label === '$dynamicRef to the root');
+  for (const d of valids) assert.strictEqual(comb(clone(d)).valid, true, `combined accepts ${JSON.stringify(d)}`);
+  for (const d of invalids) assert.strictEqual(comb(clone(d)).valid, false, `combined rejects ${JSON.stringify(d)}`);
   for (const [label, schema, , ] of cases) {
     for (const [name, fn] of [['combined', jc.compileToJSCombined(clone(schema), VALID, null, undefined)], ['errors', jc.compileToJSCodegenWithErrors(clone(schema), null, undefined)]]) {
       if (fn === null) continue;
