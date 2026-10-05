@@ -52,7 +52,9 @@ const esbuild = require('esbuild')
 // SchemaStore's negative samples 8% cheaper where typo hints run.
 // 48500 with validateJSON errors in validate()'s order without enrichment, and
 // draft-07 dependencies on a property named "__proto__" kept (a silent accept).
-const BUDGET = 48500
+// 48800 with enum membership and uniqueItems by Set and Map in the interpreted
+// engine, which is lite's engine: SchemaStore's valid samples check 36% faster.
+const BUDGET = 48800
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
