@@ -2,6 +2,37 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.43.0 - 2026-10-05
+
+### Fixed
+
+- `validateJSON()` and `isValidJSON()` could abort the whole Node process on large schemas with many references to the same definitions, such as SchemaStore's traefik and detekt. The text scanner generated for such a schema came to 0.5 to 1 MB of source in one function, and V8's Maglev compiler aborted the process (`raw_hash_map<>::at`) while optimizing it, after about a hundred calls, in plain JavaScript on Node 24 and 25. It was intermittent, about half of the runs on those schemas. Affected: 1.30.0 to 1.42.0, measured on the published versions. The scanner is now emitted as one function where it fits in 64 KB and otherwise split into functions of bounded size, with large definitions and members called rather than repeated; the largest scanner function on SchemaStore went from 1 MB to 64 KB. Every one of the 980 SchemaStore schemas was run in its own process, with and without the native addon, with no failure. On traefik-v2 the split scanner is 1.47 times slower than parsing the text would be; on the six other schemas that split it is 1.0 to 2.3 times faster.
+- The compile cache and the preprocess cache were unbounded. They kept every schema's text and generated functions for the life of the process: after compiling each of the 975 SchemaStore schemas once and dropping the validators, 1247 MB stayed on the heap. Both caches now keep at most 128 entries, oldest out first, and the same run keeps 572 MB. A schema compiled again after its entry was dropped is compiled again.
+- With both `$defs` and `definitions` at the root and the same name in both, generated code read `#/definitions/x` as `$defs/x`, so a document the schema accepts was rejected and one it rejects was accepted. Such a schema now runs on the interpreted engine, which resolves each pointer as written. Affected: every version from 0.6.0 to 1.42.0. None of the 980 SchemaStore schemas has both containers.
+- A property name holding a control character, such as a line break, broke the source of the function that validates and collects errors in one pass. Answers were right, but such a schema validated a rejected document twice every time its errors were read.
+
+### Changed
+
+- Reading the errors of a rejected document is faster again. On the official test suite, validating every case and reading every error, a run takes 1.12 times less time on Draft 2020-12 and 1.05 times less on draft 7 with the default errors, and 1.18 and 1.05 times less with `richErrors: false`. Measured against 1.42.0 in one harness on an Apple M4 Pro with Node 25. Where it comes from:
+  - `oneOf` and `anyOf` count their passing branches with verdict functions and run the branches that collect errors only when none passes; a `oneOf` matched by more than one branch builds its `ATA4002` error from that count.
+  - Where `unevaluatedProperties` is worked out at run time, its branch counts are reused by `oneOf` and `anyOf`, and each branch's validity is worked out once, bottom up.
+- More schemas get one-pass validation, or generated code at all:
+  - recursive schemas, through `$ref: "#"` or definitions on a reference cycle;
+  - `unevaluatedItems` whose evaluated positions depend on which branches pass;
+  - a `$ref` beside keywords that validate, such as `{ "$ref": "#/$defs/n", "minimum": 5 }`, which Draft 2020-12 applies together; it used to send the whole schema to the interpreted engine;
+  - patterns with Unicode property escapes such as `\p{L}`, compiled with the unicode flag as the interpreted engine compiles them; they used to send the whole schema to the interpreted engine.
+
+  Of the 980 SchemaStore schemas, 840 run on generated code where 838 did.
+- A definition referenced from several places is written once as a function and called at each reference, in the function that collects errors, and in the verdict function when its source would pass 64 KB. The first rejection with its errors read (16 calls, compiling included, plain JavaScript) takes 85 ms on SchemaStore's SARIF schema where it took 128 ms, 33 ms on cloud-run where it took 92 ms, and 40 ms on putout where it took 150 ms.
+- The text scanner behind `validateJSON()` and `isValidJSON()` covers 85 of the 980 SchemaStore schemas, up from 62, now that it reads draft 7 `definitions`, and finds long property names with `indexOf`. Over the 48 of those schemas with sample documents, each in its own process, `validateJSON()` takes 0.88 of the time it took, as a geometric mean.
+- `ata build` used to refuse a schema with a `$ref` beside a validating keyword. It now emits a module whose verdict applies both, without `parse` and with the single `ATA9000` abort-early error in place of detailed errors, and says so for each through `onWarning`.
+- Cost of the above:
+  - the browser runtime bundle is 114.1 KB gzipped, up from 108.9 KB;
+  - requiring the package, compiling a schema and validating once takes about 0.35 ms longer (8.07 ms where it took 7.70, plain JavaScript), from the larger code generator;
+  - a schema that now gets the one-pass function compiles it at its first rejections: on SchemaStore, partial-eslint-plugins takes 195 ms over its first 16 calls where it took 145, and apollo-router 120 ms where it took 109.
+
+  Validating an accepted or rejected document, warm, is unchanged within noise. Modules from `ata build` are byte for byte the same size.
+
 ## 1.42.0 - 2026-10-04
 
 ### Changed
