@@ -164,6 +164,8 @@ function bothEngines (schema, cases, label) {
     'inDefC',
     // Whether the program takes its helpers from lib/combined-runtime.js, fixed for the whole compile.
     'sharedRuntime',
+    // The value whose prototype flag nested nodes may reuse; set and restored by inlineUnevalBlock.
+    'plainReuse',
     // The custom keyword registry, fixed for the whole compile, and the set of
     // schema nodes whose keyword checks were written, read once at the end to
     // decline a schema where any node was missed.
