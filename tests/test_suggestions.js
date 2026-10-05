@@ -30,6 +30,37 @@ const cases = [
     data: { foo: 'bar' },
     expect: null,
   },
+  // a short name is not a typo of another short name
+  {
+    err: { keyword: 'required', path: '', params: { missingProperty: 'c' } },
+    data: { a: 1, b: true },
+    expect: null,
+  },
+  // two edits is not a typo of a four-letter name
+  {
+    err: { keyword: 'required', path: '', params: { missingProperty: 'name' } },
+    data: { age: 30 },
+    expect: null,
+  },
+  // the nearest key wins, not the first one within reach
+  {
+    err: { keyword: 'required', path: '', params: { missingProperty: 'address' } },
+    data: { adres: 'x', adress: 'y' },
+    expectKind: 'similar-key',
+    expectTextIncludes: '`adress`',
+  },
+  // two keys equally near say nothing
+  {
+    err: { keyword: 'required', path: '', params: { missingProperty: 'color' } },
+    data: { colr: 1, colour: 2 },
+    expect: null,
+  },
+  // enum: one letter off a two-letter value is not a typo
+  {
+    err: { keyword: 'enum', received: '"ox"', params: { allowedValues: ['on', 'up'] } },
+    data: null,
+    expect: null,
+  },
   // format email no @
   {
     err: { keyword: 'format', received: '"nope"', params: { format: 'email' } },
