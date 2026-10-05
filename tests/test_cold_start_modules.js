@@ -6,6 +6,8 @@
 // included, so one that joins it should be a decision, not a side effect.
 // lib/defaults.js joined it unnoticed and cost 0.07 ms of every start; it
 // now loads only for a schema with defaults, which the second half checks.
+// lib/error-messages.js loads only for a schema with `errorMessage`, which
+// the third half checks; loading it to ask cost 0.1 ms of a ten-route boot.
 //
 // When this fails because a module was added on purpose, measure the cold
 // start against the previous tag and update the list.
@@ -22,7 +24,6 @@ const EXPECTED = [
   'lib/draft7.js',
   'lib/enrich-error.js',
   'lib/error-codes.js',
-  'lib/error-messages.js',
   'lib/formats-source.js',
   'lib/formats.js',
   'lib/js-compiler.js',
@@ -71,5 +72,12 @@ const withDefaults = loadedBy(`
   if (d.page !== 1) throw new Error('default not applied: ' + JSON.stringify(d))
 `)
 assert.ok(withDefaults.includes('lib/defaults.js'), 'a schema with defaults on the interpreter loads the defaults pass')
+
+const withMessages = loadedBy(`
+  const v = new Validator({ type: 'object', properties: { n: { type: 'integer', errorMessage: 'n must be a whole number' } } })
+  const r = v.validate({ n: 'x' })
+  if (r.errors[0].message !== 'n must be a whole number') throw new Error('errorMessage not applied: ' + r.errors[0].message)
+`)
+assert.ok(withMessages.includes('lib/error-messages.js'), 'a schema with errorMessage loads its module and applies the message')
 
 console.log(`ok: an ordinary schema's first answers load the ${EXPECTED.length} expected modules and no others`)

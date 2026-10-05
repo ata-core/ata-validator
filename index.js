@@ -901,13 +901,25 @@ function buildParse (self, decline, extended) {
 // carry. Returns the twin to answer this call, or null to compile.
 const COLD_CALLS = 64;
 const COLD_MIN = 16 * 1024;
+// Whether the schema may expand past `limit`, answered from its text where
+// that settles it. Without a `$ref` nothing expands, and expandedChars counts
+// at most 8 for each character of the text, so a short schema is decided
+// without walking it. The text is the one _ensureCompiled needs anyway. Walking
+// every small route schema here cost a Fastify boot of ten routes 0.15 ms.
+function mayExpandPast (self, limit) {
+  const str = self._schemaStr || (self._schemaStr = JSON.stringify(self._schemaObj));
+  if (str === undefined) return false;
+  if (str.length * 8 <= limit && !str.includes('"$ref"')) return false;
+  return jsCompiler.expandedChars(self._schemaObj, limit) > limit;
+}
+
 function coldTwin (self, Validator) {
   const n = self._coldCalls === undefined ? 0 : self._coldCalls;
   if (n >= COLD_CALLS || self._validateTail !== null || self._verdictTail !== null) return null;
   let t = self._twin;
   if (t === undefined) {
     t = null;
-    if (!self._interpretOnly && !self._initialized && jsCompiler.expandedChars(self._schemaObj, COLD_MIN) > COLD_MIN) {
+    if (!self._interpretOnly && !self._initialized && mayExpandPast(self, COLD_MIN)) {
       try { t = new Validator(self._rawSchema, Object.assign({}, self._options, { engine: 'interpreter' })); } catch { t = null; }
     }
     self._twin = t;
