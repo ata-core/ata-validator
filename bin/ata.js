@@ -11,6 +11,7 @@ Usage:
   ata compile  <schema-file> [options]  Compile one schema to a standalone module.
   ata build    <glob>...     [options]  Compile a project's schemas (glob pattern) per file.
   ata validate <schema> <data> [options] Validate a JSON data file against a schema.
+  ata migrate  [dir]         [options]  Report what switching from ajv would change; --write applies it.
 
 Validate options:
   --pretty                Render errors with source frames (default on TTY)
@@ -28,6 +29,11 @@ Compile options:
   --abort-early           Use stub errors (smallest bundle)
   --source                Embed schema source map (default in development)
   --no-source             Omit source map (default in production, NODE_ENV=production)
+
+Migrate options:
+  --write                 Apply the mechanical changes (import specifiers, addFormats calls).
+                          Without it the command only reports. Exit code 1 when a site
+                          needs a reader, so it can run as a readiness check in CI.
 
 Build options:
   --out-dir <dir>         Write outputs into this directory instead of alongside sources
@@ -98,6 +104,7 @@ function parseArgs(argv) {
       continue;
     }
     if (a === '--watch') { out.opts.watch = true; continue; }
+    if (a === '--write') { out.opts.write = true; continue; }
     if (a === '--source') { out.opts.source = true; continue; }
     if (a === '--no-source') { out.opts.source = false; continue; }
     if (a === '--dual') { out.opts.dual = true; continue; }
@@ -449,6 +456,15 @@ function main() {
   if (cmd === 'validate') {
     cmdValidate(args);
     return;
+  }
+
+  if (cmd === 'migrate') {
+    const { migrate, formatReport } = require('../lib/migrate');
+    const result = migrate(args._[0] || '.', { write: !!args.opts.write });
+    process.stdout.write(formatReport(result, { write: !!args.opts.write }) + '\n');
+    // Non-zero when something needs a reader, so the command works as a
+    // readiness check in CI.
+    process.exit(result.flagged > 0 ? 1 : 0);
   }
 
   process.stderr.write(`error: unknown command "${cmd}"\n\n`);

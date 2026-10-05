@@ -53,6 +53,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // simdjson position locator, propertyNames with any subschema generated,
 // validateJSON errors kept in validate()'s order and shape on every engine,
 // and the schema copies that dropped a name "__proto__" (silent accepts).
-assert.ok(manifest.size < 348 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 348 KB until 1.46.0: `ata migrate` (lib/migrate.js), the report of what a
+// switch from ajv would change, is about 11 KB of source in the CLI.
+assert.ok(manifest.size < 352 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

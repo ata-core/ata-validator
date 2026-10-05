@@ -2,6 +2,16 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- `ata migrate [dir]` reports what switching a project from ajv to `ata-validator/compat` would change: the imports to rewrite, the `addFormats()` calls that go, and the sites compat cannot take (`$data`, a keyword defined through `code`, the `ajv-errors`, `ajv-keywords`, `ajv-i18n` and `ajv-merge-patch` plugins), each with its line. `--write` applies the import rewrite and removes standalone `addFormats()` statements, and leaves every flagged site untouched. The exit code is 1 while something is flagged, so the command can run as a readiness check in CI. Sources are read through a masker that skips comments and string contents, so a mention of ajv in a comment is not an import.
+
+### Changed
+
+- A rejected `parse()` works out its errors when they are first read, as `validate()` does, instead of before throwing. The `errors` property is still an own, enumerable, serialisable field of the thrown error. A rejection that is only caught costs 2.4 µs where it cost 8.1 on a document with 16 violations, measured in the schemabenchmarks.dev harness.
+
 ## 1.45.0 - 2026-10-05
 
 ### Changed

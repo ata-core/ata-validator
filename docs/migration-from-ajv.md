@@ -20,6 +20,19 @@ npm install ata-validator
 
 The native addon is optional. Pure JS codegen works without it, and so do the buffer APIs (`isValid(buffer)`, `countValid(ndjson)`), which answer through the JS engine when no addon is loaded. The platform-specific `@ata-validator/native-*` package makes them faster with simdjson. It is listed as an optional dependency and npm installs the correct one automatically on supported platforms; on others, ata uses the JS engine.
 
+## One command first
+
+Before changing anything, ask what the switch would touch:
+
+```bash
+npx ata migrate            # report only, nothing is written
+npx ata migrate --write    # apply the mechanical part
+```
+
+The report lists, per file, the ajv imports that become `ata-validator/compat`, the `addFormats()` calls that go (those formats are built in, and compat refuses the call on purpose), and the sites it cannot translate: `$data` references, a keyword defined only through `code`, and the `ajv-errors`, `ajv-keywords`, `ajv-i18n` and `ajv-merge-patch` plugins, each with the section of this page that explains it. The `ajv/dist/2020` entry is rewritten with a note: compat reads a schema with no `$schema` as draft-07, as the default ajv class does, where that entry read it as Draft 2020-12.
+
+`--write` changes only the import specifier and a standalone `addFormats()` statement, and leaves every flagged site as it is. The command exits with 1 while something is flagged, so it doubles as a readiness check in CI. It does not run your tests; do that next.
+
 ## The core switch
 
 ### Before (ajv)

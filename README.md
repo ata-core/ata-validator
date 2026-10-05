@@ -278,7 +278,7 @@ const v = new Validator(schema)
 const result = v.validate(data)
 ```
 
-The runtime API is unchanged from previous releases. Code written against the default validator's class keeps working through `ata-validator/compat`, which covers `compile`, `addSchema`, `addFormat`, `addKeyword`, `errorsText` and the rest of that surface, and reports errors in the same shape and order. See [docs/migration-from-ajv.md](docs/migration-from-ajv.md).
+The runtime API is unchanged from previous releases. Code written against the default validator's class keeps working through `ata-validator/compat`, which covers `compile`, `addSchema`, `addFormat`, `addKeyword`, `errorsText` and the rest of that surface, and reports errors in the same shape and order. `npx ata migrate` reports what the switch would change in a project, and what it cannot translate, before anything is written. See [docs/migration-from-ajv.md](docs/migration-from-ajv.md).
 
 ## Usage
 
