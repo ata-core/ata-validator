@@ -200,6 +200,9 @@ function bothEngines (schema, cases, label) {
     // Shared definitions the combined generator wrote as functions, by name,
     // for the whole compile (emitSharedDefC).
     'defFnsC',
+    // The root the combined generator calls for `$ref: "#"`, and its
+    // functions that go through the cycle guard, for the whole compile.
+    'rootC', 'cycFnsC',
     // Whether the verdict generator writes shared definitions as functions,
     // fixed per attempt, and the functions it wrote, for the whole compile.
     'shareDefs', 'sharedDefFns',

@@ -109,3 +109,42 @@ console.log(`ok: shared definitions in the verdict and combined functions answer
   }
   console.log('ok: a cyclic definition behind a branch answers as the interpreter does under the guard')
 }
+
+// Recursive schemas get a combined function: `$ref: "#"` calls the root as a
+// function, a definition on a cycle calls itself, both under the cycle guard.
+// These declined before and validated twice per read error.
+{
+  const rec = [
+    { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object', required: ['a'], properties: { a: { type: 'integer' }, child: { $ref: '#' } } },
+    { $schema: 'http://json-schema.org/draft-07/schema#', $ref: '#/definitions/node', definitions: { node: { type: 'object', properties: { v: { type: 'integer' }, kids: { type: 'array', items: { $ref: '#/definitions/node' } } }, required: ['v'] } } },
+  ]
+  let deep = { a: 1 }; for (let i = 0; i < 40; i++) deep = { a: i, child: deep }
+  let deepBad = { a: 'x' }; for (let i = 0; i < 40; i++) deepBad = { a: i, child: deepBad }
+  const docs = [[{ a: 1 }, { a: 1, child: { a: 2, child: {} } }, { a: 1, child: { a: 'z' } }, {}, deep, deepBad, []],
+    [{ v: 1 }, { v: 1, kids: [{ v: 2, kids: [{ v: 'x' }] }] }, { kids: [{}] }, { v: 'a', kids: [{ v: 'b' }, 3] }, 'no']]
+  const sources = []
+  const F = globalThis.Function
+  globalThis.Function = new Proxy(F, {
+    construct (t, a) { sources.push(String(a[a.length - 1])); return Reflect.construct(t, a) },
+    apply (t, th, a) { sources.push(String(a[a.length - 1])); return Reflect.apply(t, th, a) },
+  })
+  try {
+    rec.forEach((schema, i) => {
+      for (const richErrors of [false, true]) {
+        const a = new Validator(schema, { richErrors })
+        const b = new Validator(schema, { richErrors, engine: 'interpreter' })
+        for (const doc of docs[i]) {
+          for (let r = 0; r < 80; r++) { const x = a.validate(doc); if (!x.valid) void x.errors }
+          const ra = a.validate(doc), rb = b.validate(doc)
+          assert.strictEqual(ra.valid, rb.valid, `recursive verdict ${i}`)
+          assert.strictEqual(plain(ra), plain(rb), `recursive errors ${i}, richErrors ${richErrors}, ${JSON.stringify(doc).slice(0, 80)}`)
+        }
+      }
+    })
+  } finally {
+    globalThis.Function = F
+  }
+  assert.ok(sources.some((x) => /function _defC\d+_root_b\(/.test(x)), 'expected `$ref: "#"` as a guarded root function')
+  assert.ok(sources.some((x) => /function _defC\d+_node_b\(/.test(x)), 'expected the cyclic definition as a guarded function')
+  console.log('ok: recursive schemas answer as the interpreter does through the combined function')
+}
