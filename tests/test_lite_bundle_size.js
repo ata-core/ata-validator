@@ -43,8 +43,10 @@ const esbuild = require('esbuild')
 // running the branches; lite carries it because it carries the collapse.
 // 48090 with the compile and preprocess caches bounded (_boundedSet in
 // lib/validator-core.js): unbounded, they kept 1.2 GB after compiling each
-// SchemaStore schema once.
-const BUDGET = 48100
+// SchemaStore schema once. 48200 because the same tree measures 48090 bytes
+// on an Apple M4 Pro and 48109 on the CI runners (Node 20 and 22), and the
+// budget is for weight added, not for the toolchain's rounding.
+const BUDGET = 48200
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
