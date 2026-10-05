@@ -878,8 +878,44 @@ function buildParse (self, decline, extended) {
 // preprocess pass, the JSON-text scanner, the parse() copy and the
 // ahead-of-time bundle methods. parse() and the bundle methods load on first
 // use.
+// Cold start. A validator's first COLD_CALLS calls are answered by an
+// interpreted twin, built from the same schema and options with
+// `engine: 'interpreter'`, which the test suite holds to the same answers and
+// errors as the generated code. Generating code and having V8 compile it is
+// the largest part of a first call on a large schema: from process start to
+// one rejection with its error read, SchemaStore's SARIF schema took 87 ms
+// with code generated at the first call and 31 ms with the twin answering.
+// A validator still in use after that compiles as before, so a server reaches
+// the generated code's speed within its first requests, and a command line
+// tool or a short-lived function never pays to compile. Only where compiling
+// costs enough to matter: a schema whose size with its references followed
+// passes COLD_MIN characters (expandedChars in lib/js-compiler.js). A small
+// schema compiles in about a millisecond and is generated at its first call
+// as before, which also keeps every test that compares the generated code
+// with the interpreter comparing the generated code. Not for a validator with
+// an extension (_extendValidate, _extendChecks), which the twin would not
+// carry. Returns the twin to answer this call, or null to compile.
+const COLD_CALLS = 64;
+const COLD_MIN = 16 * 1024;
+function coldTwin (self, Validator) {
+  const n = self._coldCalls === undefined ? 0 : self._coldCalls;
+  if (n >= COLD_CALLS || self._validateTail !== null || self._verdictTail !== null) return null;
+  let t = self._twin;
+  if (t === undefined) {
+    t = null;
+    if (!self._interpretOnly && !self._initialized && jsCompiler.expandedChars(self._schemaObj, COLD_MIN) > COLD_MIN) {
+      try { t = new Validator(self._rawSchema, Object.assign({}, self._options, { engine: 'interpreter' })); } catch { t = null; }
+    }
+    self._twin = t;
+  }
+  if (t === null) return null;
+  self._coldCalls = n + 1;
+  return t;
+}
+
 core._registerCodegen({
   jsCompiler,
+  coldTwin,
   installPaths: installCodegenPaths,
   compileVerdict: installCodegenPaths.compileVerdict,
   installScanner: installCodegenPaths.installScanner,
