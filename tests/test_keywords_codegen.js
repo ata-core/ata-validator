@@ -105,12 +105,13 @@ test('patternProperties: boolean sub-schema', () => {
   assert(fn({ x1: 1 }) === false, 'a key the pattern matches meets false')
 })
 
-test('patternProperties: bail on unicode property escape in pattern', () => {
+test('patternProperties: unicode property escape compiles with the unicode flag', () => {
   const fn = compileToJSCodegen({
     type: 'object',
     patternProperties: { '\\p{L}+': { type: 'string' } }
   })
-  assert(fn === null, 'should bail for unicode property escape')
+  assert(typeof fn === 'function', 'should compile a unicode property escape')
+  assert(fn({ 'çğ': 'x' }) === true && fn({ 'çğ': 1 }) === false && fn({ '12': 1 }) === true, 'should read \\p{L} as letters')
 })
 
 console.log('\n--- dependentSchemas codegen ---\n')

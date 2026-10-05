@@ -31,12 +31,12 @@ check('typical request schemas take the generated path', () => {
 })
 
 check('shapes the generator declines report the engine that answers', () => {
-  // A pattern with a Unicode property escape needs the unicode flag, which
-  // the generated checks do not set, so the gate sends it elsewhere.
-  const v = new Validator({ type: 'object', properties: { a: { type: 'string', pattern: '^\\p{L}+$' } } })
+  // A property named __proto__: the generated property access would read the
+  // prototype, so the gate sends it elsewhere.
+  const v = new Validator(JSON.parse('{"type":"object","properties":{"__proto__":{"type":"number"}},"required":["__proto__"]}'))
   assert.ok(['interpreter', 'closure', 'native'].includes(v.engine()))
-  assert.strictEqual(v.validate({ a: 'abc' }).valid, true)
-  assert.strictEqual(v.validate({ a: '123' }).valid, false)
+  assert.strictEqual(v.validate(JSON.parse('{"__proto__":1}')).valid, true)
+  assert.strictEqual(v.validate(JSON.parse('{"__proto__":"x"}')).valid, false)
 })
 
 check('a $ref with a validating keyword beside it is generated and applies both', () => {
