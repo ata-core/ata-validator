@@ -50,7 +50,8 @@ const esbuild = require('esbuild')
 // so reading the errors does not parse the text again.
 // 48400 with the banded edit distance, which made reading the errors of
 // SchemaStore's negative samples 8% cheaper where typo hints run.
-// 48500 with validateJSON errors in validate()'s order without enrichment.
+// 48500 with validateJSON errors in validate()'s order without enrichment, and
+// draft-07 dependencies on a property named "__proto__" kept (a silent accept).
 const BUDGET = 48500
 
 const result = esbuild.buildSync({

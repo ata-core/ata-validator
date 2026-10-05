@@ -486,19 +486,22 @@ const compile = (schema) => {
 }
 
 // 18. prototype-named keys and parse(). A schema that declares a property
-// with an Object.prototype name (constructor, toString) routes to the
-// interpreter and gets no standalone module at all, so those names cannot
-// reach the emitted clone; the emitter still writes them defensively with
-// computed keys, Object.hasOwn and defineProperty in case that routing ever
-// narrows. What IS reachable is a record: the keys come from the input, and
-// JSON.parse can hand the loop an own key named "__proto__". Assignment
-// would rewrite the output's prototype instead of creating the property.
+// with an Object.prototype name (constructor, toString, __proto__) is
+// generated, and the emitted clone writes those names with computed keys,
+// Object.hasOwn and defineProperty: assignment to "__proto__" would rewrite
+// the output's prototype instead of creating the property. A record is the
+// other way such a key reaches the clone: JSON.parse can hand its loop an own
+// key named "__proto__".
 {
-  const named = toStandaloneModule(
-    new Validator({ type: 'object', properties: { a: { type: 'number' }, toString: { type: 'string' } }, required: ['a'] }),
-    { format: 'cjs', parse: true },
-  )
-  check('a prototype-named property routes off codegen, no module', named === null)
+  const named = compile(JSON.parse('{"type":"object","properties":{"a":{"type":"number"},"toString":{"type":"string"},"__proto__":{"type":"object","properties":{"k":{"type":"integer"}}}},"required":["a"]}'))
+  if (named && typeof named.parse === 'function') {
+    const out = named.parse(JSON.parse('{"a":1,"toString":"t","__proto__":{"k":2},"extra":3}'))
+    check('prototype-named properties are copied as own keys', Object.hasOwn(out, 'toString') && out.toString === 't' && Object.hasOwn(out, '__proto__') && out['__proto__'].k === 2)
+    check('prototype-named parse output keeps its prototype', Object.getPrototypeOf(out) === Object.prototype && !Object.hasOwn(Object.prototype, 'k'))
+    check('prototype-named verdicts agree with the runtime', named.isValid(JSON.parse('{"a":1,"toString":2}')) === false && named.isValid(JSON.parse('{"a":1,"__proto__":{"k":"x"}}')) === false && named.isValid(JSON.parse('{"a":1}')) === true)
+  } else {
+    check('a module with prototype-named properties exists', false)
+  }
 
   const schema = {
     type: 'object',
