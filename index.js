@@ -243,8 +243,13 @@ function installCodegenPaths (ctx) {
     this.validate = preprocess
       ? (data) => { preprocess(data); return _fn(data) ? VALID_RESULT : ABORT_EARLY_RESULT; }
       : (data) => (_fn(data) ? VALID_RESULT : ABORT_EARLY_RESULT);
-  } else if (hasDynRef && _isCodegen && jsFn) {
-    // $dynamicRef with JS codegen: direct path, no wrapper layers
+  } else if (hasDynRef && _isCodegen && jsFn && !jsFn._hybridFactory) {
+    // $dynamicRef on generated code without a hybrid: the direct path. A
+    // schema the generators unroll by scope (expandDynamicScopes) has a
+    // hybrid like any other and takes the assembly below, with the one-pass
+    // function once its errors are read; this path kept it on a verdict and
+    // the error function for every rejection, 392 ns where the one-pass
+    // function answers in a fraction of that.
     const _fn = jsFn, _efn = errOnly, _R = VALID_RESULT;
     this.validate = preprocess
       ? (data) => { preprocess(data); return _fn(data) ? _R : _efn(data); }
