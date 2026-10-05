@@ -54,7 +54,9 @@ const esbuild = require('esbuild')
 // draft-07 dependencies on a property named "__proto__" kept (a silent accept).
 // 48800 with enum membership and uniqueItems by Set and Map in the interpreted
 // engine, which is lite's engine: SchemaStore's valid samples check 36% faster.
-const BUDGET = 48800
+// 49200 with uniqueItems through a structural hash shared with generated code
+// (lib/unique-items.js), in place of a canonical string per item.
+const BUDGET = 49200
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
