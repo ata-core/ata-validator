@@ -48,7 +48,9 @@ const esbuild = require('esbuild')
 // budget is for weight added, not for the toolchain's rounding.
 // 48300 with validateJSON handing the document it parsed to its rejection,
 // so reading the errors does not parse the text again.
-const BUDGET = 48300
+// 48400 with the banded edit distance, which made reading the errors of
+// SchemaStore's negative samples 8% cheaper where typo hints run.
+const BUDGET = 48400
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
