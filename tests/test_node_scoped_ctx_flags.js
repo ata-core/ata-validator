@@ -162,6 +162,8 @@ function bothEngines (schema, cases, label) {
     'guardChars', 'guardDepth', 'guardDefFns',
     // Raised while a shared definition's function is written, lowered in a finally.
     'inDefC',
+    // Whether the program takes its helpers from lib/combined-runtime.js, fixed for the whole compile.
+    'sharedRuntime',
     // The custom keyword registry, fixed for the whole compile, and the set of
     // schema nodes whose keyword checks were written, read once at the end to
     // decline a schema where any node was missed.

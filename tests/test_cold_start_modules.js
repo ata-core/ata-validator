@@ -19,6 +19,7 @@ const { spawnSync } = require('child_process')
 const root = path.resolve(__dirname, '..')
 const EXPECTED = [
   'index.js',
+  'lib/combined-runtime.js',
   'lib/diagnostic-source.js',
   'lib/dialect.js',
   'lib/draft7.js',
