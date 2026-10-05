@@ -197,6 +197,12 @@ function bothEngines (schema, cases, label) {
     // the whole compile. And whether any collapse went without such a count,
     // which decides the verdict-first check once for the function.
     'branchCounts', 'hoisted', 'unguardedCollapse',
+    // Shared definitions the combined generator wrote as functions, by name,
+    // for the whole compile (emitSharedDefC).
+    'defFnsC',
+    // Whether the verdict generator writes shared definitions as functions,
+    // fixed per attempt, and the functions it wrote, for the whole compile.
+    'shareDefs', 'sharedDefFns',
   ])
 
   const src = require('node:fs').readFileSync(require.resolve('../lib/js-compiler.js'), 'utf8')
