@@ -220,6 +220,7 @@ const FILES = [
   "tests/test_suggestions.js",
   "tests/test_levenshtein_banded.js",
   "tests/test_interpreter_enum_unique.js",
+  "tests/test_combined_recursive_definition.js",
   "tests/test_cli_validate.js",
   "tests/test_cli_version.js",
   "tests/test_collect_evaluated.js",
