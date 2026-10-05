@@ -290,11 +290,7 @@ function installCodegenPaths (ctx) {
     let impl = null;
     const onReject = (data) => {
       const combined = combinedIfSafe();
-      // The method itself, where nothing wraps it, so a call does not go
-      // through `run` to reach it: one layer fewer, which the first
-      // thousands of calls, before the optimizing compiler has inlined the
-      // layers, pay for in full.
-      if (combined) { impl = combined; if (this.validate === run) this.validate = combined; return _mustReject(combined(data)); }
+      if (combined) { impl = combined; return _mustReject(combined(data)); }
       return errOnly(data);
     };
     // Tiered: the first calls go through the verdict function and the
@@ -549,7 +545,8 @@ installCodegenPaths.compileVerdict = function compileVerdict () {
 // validateJSON and isValidJSON over a schema-directed scanner, which answers
 // from the JSON text without building the document.
 installCodegenPaths.installScanner = function installScanner (schemaObj, options) {
-  const { ABORT_EARLY_RESULT, VALID_RESULT, _bindEntry } = core._internals;
+  const { ABORT_EARLY_RESULT, VALID_RESULT, _bindEntry, _jsonSyntaxRejection } = core._internals;
+  let textRejects = 0;
   const self = this;
   // Generating a scanner costs about 20 microseconds, measured, and it
   // saves from around 85 nanoseconds on a small accepted document to
@@ -623,16 +620,58 @@ installCodegenPaths.installScanner = function installScanner (schemaObj, options
   {
     const validateByParsing = this.validateJSON;
     const abortEarly = !!options.abortEarly;
+      // A validator whose errors are being read answers validate() with
+      // the one-pass function (the switch in lib/validator-core.js), and
+      // without richErrors nothing it hands out depends on the text. A
+      // rejected text is then parsed and given to that function directly,
+      // instead of to the layers below, which parsed it, decided again and
+      // wrapped a rejection whose errors are built on first read: a 1.7 KB
+      // rejected body took 9.2 microseconds through those layers.
+      // The scanner itself is the other half of that cost on a rejected
+      // text (2.7 of the 9.2 on that body) and all the saving on an accepted
+      // one, which it answers without parsing. So the scan runs while the
+      // texts a validator sees are mostly accepted, and is skipped while
+      // they are mostly rejected: `bias` counts rejections against
+      // acceptances, from either path, and the mode follows its sign with
+      // some room, so a mixed stream does not flip on every document.
+      const onePassText = (text) => {
+        let op = self._onePass;
+        // A validator rejecting text only never reads through the object
+        // path's switch; the second rejected text makes it.
+        if (op === undefined && self._tierOnePass !== undefined && ++textRejects >= 2) { op = self._tierOnePass() || undefined; if (op === undefined) self._tierOnePass = undefined; }
+        if (op === undefined) return undefined;
+        let obj;
+        try { obj = JSON.parse(text); } catch (e) { if (!(e instanceof SyntaxError)) throw e; return _jsonSyntaxRejection(e); }
+        return op(obj);
+      };
     this.validateJSON = (jsonStr) => {
       const scan = self._ensureScanner();
       if (scan === undefined) return validateByParsing(jsonStr);
-      if (scan === null) { _bindEntry(self, 'validateJSON', validateByParsing); return validateByParsing(jsonStr); }
+      if (scan === null) {
+        // No scanner for this schema: the one-pass function still answers a
+        // lean validator's texts directly once it is installed.
+        _bindEntry(self, 'validateJSON', self._richErrors ? validateByParsing : (text) => {
+          if (typeof text === 'string') { const o = onePassText(text); if (o !== undefined) return o; }
+          return validateByParsing(text);
+        });
+        return self.validateJSON(jsonStr);
+      }
+      let bias = 0;
       _bindEntry(self, 'validateJSON', (text) => {
         if (typeof text === 'string') {
+          if (bias > 16 && !self._richErrors && self._onePass !== undefined) {
+            const r = onePassText(text);
+            if (r !== undefined) { if (r.valid) { if (--bias < -32) bias = -32; } else if (bias < 64) bias++; return r; }
+          }
           const r = scan(text);
-          if (r === 1) return VALID_RESULT;
+          if (r === 1) { if (--bias < -32) bias = -32; return VALID_RESULT; }
           if (r === 0) {
+            if (bias < 64) bias++;
             if (abortEarly) return ABORT_EARLY_RESULT;
+            if (!self._richErrors) {
+              const o = onePassText(text);
+              if (o !== undefined) return o;
+            }
             self._skipNativeFast = true;
             try {
               return validateByParsing(text);
@@ -641,6 +680,9 @@ installCodegenPaths.installScanner = function installScanner (schemaObj, options
             }
           }
         }
+        // The scanner could not decide (a shape it does not read): the
+        // one-pass function answers a lean validator here too.
+        if (!self._richErrors && typeof text === 'string') { const o = onePassText(text); if (o !== undefined) return o; }
         return validateByParsing(text);
       });
       return self.validateJSON(jsonStr);
