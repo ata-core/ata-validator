@@ -434,6 +434,9 @@ function installCodegenPaths (ctx) {
     }
     return nativeText ? getNative().rawFastValidate(this._fastSlot, Buffer.from(jsonStr)) : undefined;
   };
+  // The parsed document is left on `_lastParsed` for the rich layer around
+  // validateJSON, which hands it to the rejection so reading the errors does
+  // not parse the text again (see LazyJsonRejection).
   const validateText = (jsonStr) => {
     let obj;
     try {
@@ -442,6 +445,7 @@ function installCodegenPaths (ctx) {
       if (!(e instanceof SyntaxError)) throw e;
       return _jsonSyntaxRejection(e);
     }
+    this._lastParsed = obj;
     return jsonValidateFn(obj);
   };
   this.validateJSON = useSimdjsonForLarge && !preprocess
@@ -916,6 +920,8 @@ function coldTwin (self, Validator) {
 core._registerCodegen({
   jsCompiler,
   coldTwin,
+  // The native locator for error frames, loaded with the first frame.
+  nativePositions: () => require('./lib/native-positions').nativeTargeted,
   installPaths: installCodegenPaths,
   compileVerdict: installCodegenPaths.compileVerdict,
   installScanner: installCodegenPaths.installScanner,

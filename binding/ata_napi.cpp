@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "ata.h"
+#include "simdjson.h"
 
 // ============================================================================
 // V8 Direct Object Traversal Engine
@@ -984,6 +985,66 @@ Napi::Value ValidateOneShot(const Napi::CallbackInfo& info) {
   return make_result(env, result);
 }
 
+// Byte offsets of JSON pointers in a document, for the error frames
+// validateJSON() attaches: locatePointers(text, pointers) returns a
+// Float64Array of [offset, length] per pointer, -1 where the pointer names
+// nothing. simdjson's first stage indexes every structural character of the
+// text at once, and at_pointer walks that index, so the cost of finding a
+// value near the end of a 5 MB document is the index, not a walk through the
+// document in script. Offsets are UTF-8 byte offsets; the caller only uses
+// them where the text is ASCII and they equal string indexes.
+Napi::Value LocatePointers(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() < 2 || !info[0].IsString() || !info[1].IsArray()) {
+    Napi::TypeError::New(env, "locatePointers(text, pointers)").ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+  // The text goes once into a reused, padded buffer, which is what simdjson
+  // reads: a copy into a std::string and another into a padded_string cost
+  // about a millisecond of the 3.4 on a 5 MB document.
+  thread_local std::string buf;
+  size_t len = 0;
+  napi_get_value_string_utf8(env, info[0], nullptr, 0, &len);
+  const size_t needed = len + 1 + simdjson::SIMDJSON_PADDING;
+  // A one-off large document does not keep its buffer once smaller ones
+  // follow, as extract_string does.
+  if (buf.size() > (1u << 20) && needed < (1u << 19)) { buf.clear(); buf.shrink_to_fit(); }
+  if (buf.size() < needed) buf.resize(needed);
+  napi_get_value_string_utf8(env, info[0], buf.data(), len + 1, &len);
+  Napi::Array ptrs = info[1].As<Napi::Array>();
+  const uint32_t count = ptrs.Length();
+  Napi::Float64Array out = Napi::Float64Array::New(env, static_cast<size_t>(count) * 2);
+  for (uint32_t k = 0; k < count * 2; k++) out[k] = -1;
+  static thread_local simdjson::ondemand::parser parser;
+  simdjson::ondemand::document doc;
+  if (parser.iterate(buf.data(), len, buf.size()).get(doc) != simdjson::SUCCESS) return out;
+  const char* base = buf.data();
+  for (uint32_t k = 0; k < count; k++) {
+    Napi::Value pv = ptrs[k];
+    if (!pv.IsString()) continue;
+    std::string ptr = pv.As<Napi::String>().Utf8Value();
+    doc.rewind();
+    simdjson::ondemand::value v;
+    if (ptr.empty()) {
+      std::string_view raw;
+      if (doc.raw_json().get(raw) != simdjson::SUCCESS) continue;
+      size_t len = raw.size();
+      while (len > 0 && (raw[len - 1] == ' ' || raw[len - 1] == '\n' || raw[len - 1] == '\r' || raw[len - 1] == '\t')) len--;
+      out[k * 2] = static_cast<double>(raw.data() - base);
+      out[k * 2 + 1] = static_cast<double>(len);
+      continue;
+    }
+    if (doc.at_pointer(ptr).get(v) != simdjson::SUCCESS) continue;
+    std::string_view raw;
+    if (v.raw_json().get(raw) != simdjson::SUCCESS) continue;
+    size_t len = raw.size();
+    while (len > 0 && (raw[len - 1] == ' ' || raw[len - 1] == '\n' || raw[len - 1] == '\r' || raw[len - 1] == '\t')) len--;
+    out[k * 2] = static_cast<double>(raw.data() - base);
+    out[k * 2 + 1] = static_cast<double>(len);
+  }
+  return out;
+}
+
 Napi::Value GetVersion(const Napi::CallbackInfo& info) {
   return Napi::String::New(info.Env(), std::string(ata::version()));
 }
@@ -1537,6 +1598,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
   CompiledSchema::Init(env, exports);
   exports.Set("validate", Napi::Function::New(env, ValidateOneShot));
   exports.Set("version", Napi::Function::New(env, GetVersion));
+  exports.Set("locatePointers", Napi::Function::New(env, LocatePointers));
   exports.Set("fastRegister", Napi::Function::New(env, FastRegister));
   exports.Set("fastValidate", Napi::Function::New(env, FastValidateSlow));
 

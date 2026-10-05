@@ -46,7 +46,9 @@ const esbuild = require('esbuild')
 // SchemaStore schema once. 48200 because the same tree measures 48090 bytes
 // on an Apple M4 Pro and 48109 on the CI runners (Node 20 and 22), and the
 // budget is for weight added, not for the toolchain's rounding.
-const BUDGET = 48200
+// 48300 with validateJSON handing the document it parsed to its rejection,
+// so reading the errors does not parse the text again.
+const BUDGET = 48300
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
