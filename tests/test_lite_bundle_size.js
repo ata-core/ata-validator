@@ -56,7 +56,9 @@ const esbuild = require('esbuild')
 // engine, which is lite's engine: SchemaStore's valid samples check 36% faster.
 // 49200 with uniqueItems through a structural hash shared with generated code
 // (lib/unique-items.js), in place of a canonical string per item.
-const BUDGET = 49200
+// 49300 with the interpreter asking a leaf child for its verdict before
+// building the paths for its errors: tsconfig's samples collect 42% faster.
+const BUDGET = 49300
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
