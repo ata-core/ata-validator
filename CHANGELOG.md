@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.46.1 - 2026-10-06
+
+### Fixed
+
+- Once a validator's errors had been read, `validate()` accepted some documents the verdict and the interpreted engine rejected: a oneOf or anyOf branch under run-time `unevaluatedProperties` or `unevaluatedItems` that carried `additionalProperties` (a schema or `false`) or `items` at the root lost that check, so the branch read as holding for every object and the properties it evaluated were never reported as unevaluated. `{ anyOf: [{}, { additionalProperties: { const: true } }], unevaluatedProperties: false }` accepted `{ "c": null }` through `validate()` after three reads, and rejected it through `isValidObject()`. The verdict generator deferred a root-level check to the end of the function, where the subschema verdict written inside a block had nothing to flush it into. Since 1.46.0, through the one-pass function. `tests/test_nested_verdict_deferred_checks.js` holds it on every entry point.
+
 ## 1.46.0 - 2026-10-06
 
 Reading the errors of a rejected document is what this release is about. Once a validator's errors have been read, `validate()` is one function that checks and collects in a single pass, and the parts of that pass that were slow are rewritten below: run-time `unevaluatedProperties` and `unevaluatedItems` as straight-line code, oneOf and anyOf branches scored with counting copies instead of run twice, error order kept beside the list instead of sorted afterwards, `$dynamicRef` schemas on generated code, `$ref` schemas on the one-pass function where they were handed back.
