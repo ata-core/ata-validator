@@ -145,6 +145,8 @@ function bothEngines (schema, cases, label) {
   const ALLOWED = new Set([
     // The error sites of one program and their keys in the reader's order (apOrd, assignOrdKeys).
     'ordSites',
+    // The prepared root of the error generator, the body of the `$ref: "#"` helper (genCodeENode).
+    'rootE',
     'anchors', 'closureVals', 'closureVars', 'condDepth', 'cyclicDefs', 'defFns',
     'deferredChecks', 'helperCode', 'helpers', 'preamble', 'refStack', 'regExpMap',
     'rootDefs', 'rootSchema', 'schemaMap', 'shared', 'sourceMap', 'userFormats',

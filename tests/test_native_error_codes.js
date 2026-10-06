@@ -108,13 +108,20 @@ ok('a recursive schema reports the same code on every engine', () => {
   }
 })
 
-ok('the error generator declines a self-reference rather than accepting it', () => {
+ok('the error generator answers a self-reference rather than accepting it', () => {
   const { compileToJSCodegenWithErrors } = require('../lib/js-compiler')
   // Behind `$ref: "#"` this schema forbids unknown keys at every level. The
-  // generator has no path-relative recursive entry, and used to emit nothing
-  // for the reference, which accepted every nested document.
+  // generator once emitted nothing for the reference, which accepted every
+  // nested document; then it declined; now the reference is a call to a
+  // helper over the root that takes the path, and the error names the nested
+  // value that failed.
   const schema = { properties: { foo: { $ref: '#' } }, additionalProperties: false }
-  assert.strictEqual(compileToJSCodegenWithErrors(schema, new Map(), null), null)
+  const fn = compileToJSCodegenWithErrors(schema, new Map(), null)
+  assert.notStrictEqual(fn, null)
+  const r = fn({ foo: { foo: { bar: 1 } } }, true)
+  assert.strictEqual(r.valid, false)
+  assert.deepStrictEqual(r.errors.map((e) => [e.keyword, e.instancePath, e.schemaPath]), [['additionalProperties', '/foo/foo', '#/properties/foo/properties/foo/additionalProperties']])
+  assert.strictEqual(fn({ foo: { foo: { foo: {} } } }, true).valid, true)
 
   const { Validator } = require('../index.js')
   const v = new Validator(schema)
