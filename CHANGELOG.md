@@ -4,13 +4,15 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
-### Fixed
-
-- Once a validator's errors had been read, `validate()` accepted some documents the verdict and the interpreted engine rejected: a oneOf or anyOf branch under run-time `unevaluatedProperties` or `unevaluatedItems` that carried `additionalProperties` (a schema or `false`) or `items` at the root lost that check, so the branch read as holding for every object and the properties it evaluated were never reported as unevaluated. `{ anyOf: [{}, { additionalProperties: { const: true } }], unevaluatedProperties: false }` accepted `{ "c": null }` through `validate()` after three reads, and rejected it through `isValidObject()`. The verdict generator deferred a root-level check to the end of the function, where the subschema verdict written inside a block had nothing to flush it into. Since 1.46.0, through the one-pass function; a standalone module built on this release's one-pass path would have carried it too. `tests/test_nested_verdict_deferred_checks.js` holds it on every entry point.
-
 ### Changed
 
 - Standalone modules can report errors with the runtime's one-pass function: `toStandaloneModule(schema, { onePass: true })` or `ata compile --one-pass`. The one-pass function is what `validate()` runs once a validator's errors have been read, one walk that checks and collects with a verdict per subtree, written into the module with its closure values as declarations. The older collector walked everything and built every path: on a 175 KB SchemaStore schema and a 15 KB document with two errors, the module's `validate()` on the rejected document takes 39 µs with the one-pass function where the older collector took 89 (a report from a config validator measured 2 to 2.7x against the default validator on 84 to 234 KB schemas and guessed at the position pass, which costs 11 of those). Not the default: the one-pass module is 1.3 to 1.7 times the older one, gzipped, since it carries a verdict per subtree and a counting copy per branch. Where the older collector declines a schema (`unevaluated*` next to a `$ref`), the one-pass function is taken without asking: 83 more schemas of the official suite get a module with real errors where they got the stub. Errors carry the same fields as before (code, keyword, instancePath, schemaPath, params, message, docUrl) and come in schema order, as the runtime's do. A module built with `--source` frames, or from a validator with a custom format, keeps the older collector.
+
+## 1.46.1 - 2026-10-06
+
+### Fixed
+
+- Once a validator's errors had been read, `validate()` accepted some documents the verdict and the interpreted engine rejected: a oneOf or anyOf branch under run-time `unevaluatedProperties` or `unevaluatedItems` that carried `additionalProperties` (a schema or `false`) or `items` at the root lost that check, so the branch read as holding for every object and the properties it evaluated were never reported as unevaluated. `{ anyOf: [{}, { additionalProperties: { const: true } }], unevaluatedProperties: false }` accepted `{ "c": null }` through `validate()` after three reads, and rejected it through `isValidObject()`. The verdict generator deferred a root-level check to the end of the function, where the subschema verdict written inside a block had nothing to flush it into. Since 1.46.0, through the one-pass function. `tests/test_nested_verdict_deferred_checks.js` holds it on every entry point.
 
 ## 1.46.0 - 2026-10-06
 
