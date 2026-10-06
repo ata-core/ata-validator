@@ -64,9 +64,20 @@ const schema = {
     if (e.keyword === 'oneOf' || e.keyword === 'anyOf') continue;
     assert.deepStrictEqual(Object.keys(e), ['keyword', 'instancePath', 'schemaPath', 'params', 'message'], 'a generated error in the legacy shape: ' + JSON.stringify(e));
   }
-  const src = require('../build').toStandaloneModule(schema, { format: 'cjs' });
-  assert.ok(/_o:\d/.test(src), 'standalone modules keep the ordinal in their literals');
   const keys = raw.map((e) => e.keyword + '@' + e.instancePath);
+  // A standalone module carries the one-pass function, whose list comes out
+  // in schema order by the keys it collects beside the errors, with no
+  // ordinal in the literals: the same order as the runtime's read.
+  {
+    const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+    const src = require('../build').toStandaloneModule(schema, { format: 'cjs', onePass: true });
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ata-ord-')), 'm.cjs');
+    fs.writeFileSync(file, src);
+    const mod = require(file);
+    const got = mod.validate({ id: 'x', title: '', tags: ['ok', ''], images: [{ url: 1 }], discount: 0 }).errors.map((e) => e.keyword + '@' + e.instancePath);
+    assert.deepStrictEqual(got, keys, 'a standalone module reports in the runtime\'s order');
+    fs.rmSync(path.dirname(file), { recursive: true, force: true });
+  }
   // Errors under a $ref target carry the referencing site's path. They sort
   // at the `$ref` and, among themselves, in the target's declaration order:
   // `properties` before `required`, as they would inline. They used to keep

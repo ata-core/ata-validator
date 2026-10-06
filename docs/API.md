@@ -249,10 +249,21 @@ Error detail carries the same guarantee wherever the module ships it; a
 module that cannot carry error detail says so (below) and still keeps the
 verdict contract.
 
-When error detail is requested (the default) but the error generator declines
-the schema (`unevaluated*` next to a `$ref` or `patternProperties` is the
-usual case; provably local `unevaluated*` compiles since 1.25.0), the module
-still
+Error detail comes from one of two generators. The default is the collector
+modules have always carried. `toStandaloneModule(schema, { onePass: true })`
+(`ata compile --one-pass`) writes the runtime's one-pass function instead,
+the program `validate()` runs once a validator's errors have been read: one
+walk that checks and collects, with a verdict per subtree, written into the
+module with its closure values as declarations. It rejects faster (on a
+175 KB schema and a 15 KB document, 39 µs against 89) and its module is 1.3
+to 1.7 times the older one, gzipped, which is why it is asked for rather than
+assumed. Where the older collector declines a schema (`unevaluated*` next to
+a `$ref` is the usual case) the one-pass function is taken without asking,
+since the alternative was one stub error. A module built with `source`
+frames, or from a validator with a custom format, keeps the older collector.
+
+When error detail is requested (the default) but neither generator takes the
+schema, the module still
 ships with an exact verdict, reports every failure as the single ATA9000
 abort-early error, says so in its header comment, and reports the degradation
 through `onWarning: (message) => ...` if you pass one. `ata compile` prints

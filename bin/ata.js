@@ -27,6 +27,8 @@ Compile options:
   --name <TypeName>       Name of the top-level type in .d.ts. Default: inferred from filename
   --no-types              Skip .d.ts generation
   --abort-early           Use stub errors (smallest bundle)
+  --one-pass              Report errors with the runtime's one-pass function: faster on
+                          rejected documents, a module 1.3 to 1.7x the size
   --source                Embed schema source map (default in development)
   --no-source             Omit source map (default in production, NODE_ENV=production)
 
@@ -40,6 +42,8 @@ Build options:
   --suffix <str>          Output filename suffix (default: ".compiled")
   -f, --format <fmt>      Module format: esm | cjs. Default: esm
   --abort-early           Use stub errors (smallest bundle)
+  --one-pass              Report errors with the runtime's one-pass function: faster on
+                          rejected documents, a module 1.3 to 1.7x the size
   --check                 Check (don't write); exit 1 if any output is stale
   --cache-file <path>     Cache file for incremental builds (default: cache disabled)
   --max-size <bytes>      Fail build if any compiled module exceeds this gzipped size
@@ -88,6 +92,7 @@ function parseArgs(argv) {
     if (a === '--name') { out.opts.name = argv[++i]; continue; }
     if (a === '--no-types') { out.opts.types = false; continue; }
     if (a === '--abort-early') { out.opts.abortEarly = true; continue; }
+    if (a === '--one-pass') { out.opts.onePass = true; continue; }
     if (a === '--check') { out.opts.check = true; continue; }
     if (a === '--strict') { out.opts.strict = true; continue; }
     if (a === '--strict-schema') { out.opts.strictSchema = true; continue; }
@@ -232,7 +237,7 @@ function cmdCompile(args) {
   }
   const schemaFile = path.relative(process.cwd(), input) || input;
   const compileWarnings = [];
-  const src = aot.toStandaloneModule(v, { format, abortEarly, source, sourceMap, schemaFile, onWarning: (w) => compileWarnings.push(w) });
+  const src = aot.toStandaloneModule(v, { format, abortEarly, source, sourceMap, schemaFile, onePass: args.opts.onePass === true ? true : undefined, onWarning: (w) => compileWarnings.push(w) });
   if (compileWarnings.length > 0) {
     if (args.opts.strict) {
       for (const w of compileWarnings) reportCompileError(input, w);
@@ -289,6 +294,7 @@ function cmdBuild(args) {
     outDir: args.opts.outDir,
     suffix: args.opts.suffix,
     abortEarly: !!args.opts.abortEarly,
+    onePass: args.opts.onePass === true ? true : undefined,
     check: !!args.opts.check,
     maxSize: args.opts.maxSize,
     strict: !!args.opts.strict,

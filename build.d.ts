@@ -96,13 +96,26 @@ export interface ToStandaloneModuleOptions {
    */
   strictSchema?: boolean;
   /**
-   * Called when the module ships degraded: error detail was requested but the
-   * error generator declined this schema, so failures report the single
+   * Called when the module ships degraded: error detail was requested but
+   * neither error path takes this schema, so failures report the single
    * ATA9000 abort-early error while the verdict stays exact.
    */
   onWarning?: (message: string) => void;
   format?: 'cjs' | 'esm';
   abortEarly?: boolean;
+  /**
+   * Report errors with the runtime's one-pass function, the program
+   * `validate()` runs once a validator's errors have been read: one walk that
+   * checks and collects, with a verdict per subtree. On a 175 KB schema and a
+   * 15 KB document it rejects in 39 µs where the older collector took 89. Its
+   * module is 1.3 to 1.7 times the older one, gzipped, so it is not the
+   * default; `true` asks for it, `false` refuses it. Without the option the
+   * one-pass function is taken only where the older collector declines the
+   * schema, which reported one stub error before. A module built with
+   * `source` frames, or from a validator with a custom format, keeps the
+   * older collector either way.
+   */
+  onePass?: boolean;
   source?: boolean;
   sourceMap?: unknown;
   schemaFile?: string;

@@ -157,9 +157,12 @@ const MISTYPED = { type: 'object', properties: { a: { type: 'string', maxLenght:
   // unevaluated* next to a $ref is genuinely undecidable for the generator:
   // the referenced schema's annotations cannot be proven local, so this shape
   // stays degraded even now that provably-local unevaluated* compiles.
-  const degraded = { $defs: { base: { properties: { on: { type: 'boolean' } } } }, type: 'object', allOf: [{ $ref: '#/$defs/base' }], unevaluatedProperties: false };
+  // The one-pass function covers this shape now (test_aot_one_pass.js); a
+  // custom format keeps a module on the older collector, which still declines
+  // it, so that is the module that degrades here.
+  const degraded = { $defs: { base: { properties: { on: { type: 'boolean' }, id: { type: 'string', format: 'odd' } } } }, type: 'object', allOf: [{ $ref: '#/$defs/base' }], unevaluatedProperties: false };
   const seen = [];
-  const src = toStandaloneModule(degraded, { abortEarly: false, onWarning: (w) => seen.push(w) });
+  const src = toStandaloneModule(new Validator(degraded, { formats: { odd: (x) => x.length % 2 === 1 } }), { abortEarly: false, onWarning: (w) => seen.push(w) });
   assert.ok(typeof src === 'string' && src.length > 0, 'the module still ships');
   assert.strictEqual(seen.length, 1, 'and the degradation is reported once');
   assert.ok(seen[0].includes('error detail could not be generated'));
