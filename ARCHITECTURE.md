@@ -109,11 +109,17 @@ flowchart TD
 
 - **Tier 0** (`lib/tier0.js`): a small interpreter for trivial shapes, built
   lazily on the first `isValidObject` call so cold start stays cheap.
-- **JS codegen** (`lib/js-compiler.js`): the core. Emits specialized functions:
-  - `compileToJSCodegen` — boolean fast path
-  - `compileToJSCombined` — returns the `{ valid, data, errors }` result shape
-  - `compileToJSCodegenWithErrors` — error-collecting path
+- **JS codegen** (`lib/js-compiler.js` and `lib/js-compiler-errors.js`): the
+  core. Emits specialized functions:
+  - `compileToJSCodegen` — boolean fast path (`js-compiler.js`)
+  - `compileToJSCombined` — the one-pass function, returns the `{ valid, data, errors }` result shape (`js-compiler-errors.js`)
+  - `compileToJSCodegenWithErrors` — error-collecting path (`js-compiler-errors.js`)
   - `compileToJS` — closure-array fallback when codegen cannot represent a shape
+  - The two error generators live in their own module, read on the first call
+    that compiles a validator's errors, so a process that only answers verdicts
+    never parses them. They reach the verdict generator's helpers through
+    `module.exports._internal` of `js-compiler.js`, which is not part of the
+    package's interface.
   - `lib/branch-collapse.js` folds redundant conditionals; `lib/safe-regex.js`
     routes `pattern`/`patternProperties`/`propertyNames` and built-in formats
     through a linear-time engine (ReDoS-safe).
@@ -364,7 +370,8 @@ runs the JS path.
 
 | Module | Responsibility |
 | --- | --- |
-| `lib/js-compiler.js` | Core schema to JavaScript codegen (all variants). |
+| `lib/js-compiler.js` | Core schema to JavaScript codegen: the verdict generator, the closure compiler, the shared helpers. |
+| `lib/js-compiler-errors.js` | The error-collecting generator and the one-pass generator, read on the first error compile. |
 | `lib/aot-build.js` | AOT build orchestration: globbing, parsing, caching, reporting. |
 | `lib/draft7.js` | Draft-07 normalization and OpenAPI `nullable` handling. |
 | `lib/shape-classifier.js` | Classifies a schema to pick the execution strategy. |
