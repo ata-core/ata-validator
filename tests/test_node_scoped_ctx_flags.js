@@ -143,6 +143,8 @@ function bothEngines (schema, cases, label) {
 // listed as allowed.
 {
   const ALLOWED = new Set([
+    // The error sites of one program and their keys in the reader's order (apOrd, assignOrdKeys).
+    'ordSites',
     'anchors', 'closureVals', 'closureVars', 'condDepth', 'cyclicDefs', 'defFns',
     'deferredChecks', 'helperCode', 'helpers', 'preamble', 'refStack', 'regExpMap',
     'rootDefs', 'rootSchema', 'schemaMap', 'shared', 'sourceMap', 'userFormats',
