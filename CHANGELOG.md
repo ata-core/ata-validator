@@ -4,6 +4,11 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Fixed
+
+- The code generators decline a subschema that constrains something and produced no code for it, instead of reading "no lines" as "holds". Every place that turns a subschema into lines (a nested verdict, a branch verdict, the inline annotation verdicts of run-time `unevaluatedProperties` and `unevaluatedItems`, the three entry points) now checks that a schema with a validating keyword produced at least one line; a schema that trips it runs on the interpreted engine. This is the shape of the silent acceptances the generator has produced through `$ref` handling, and of the simplest form of the 1.46.0 one (with that fix removed, the check alone keeps `{ anyOf: [{}, { additionalProperties: { const: true } }] }` rejecting). It cannot see a check dropped from a subschema that produced other lines; the differential test below is what catches those. `format` and an already-known `type` are not counted, and unknown keywords are not either. No schema of the official suite, the SchemaStore corpus or the differential tests changed engine.
+- The unevaluated differential test now compares `validate()` after enough reads that it is the one-pass function, runs every third schema through a standalone module (with and without the one-pass error path), and generates branches that are empty or carry `additionalProperties` at their root. With the 1.46.0 fix removed and the generator check disabled, it reports the acceptance.
+
 ### Changed
 
 - The error generator and the one-pass generator moved out of `lib/js-compiler.js` into `lib/js-compiler-errors.js`, read on the first call that compiles a validator's errors. They were 45 percent of the generator's source, parsed by every process at require; a verdict-only process never reads them now, and one that reads errors parses them when it does. The two files share the generator's helpers through an internal object; nothing in the package's interface changes.

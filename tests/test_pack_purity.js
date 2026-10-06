@@ -61,6 +61,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 376 KB within 1.46.0: the one-pass function's subtree guards, its shared
 // run-time module (lib/combined-runtime.js) and run-time unevaluatedProperties
 // written as straight-line code with a bitmask (inlineUnevalBlock).
-assert.ok(manifest.size < 376 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 392 KB within 1.47.0: the one-pass error path for standalone modules
+// (onePassCore and its closure serializer in lib/aot-impl.js), the generator's
+// vacuous-emission check, and the split of lib/js-compiler.js (the two files
+// carry the shared-helper lists). Measured 386 KB at the time.
+assert.ok(manifest.size < 392 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

@@ -18,8 +18,8 @@ const { toStandaloneModule } = require('../build')
 
 // A standalone module, loaded the way a CommonJS consumer would, or null
 // where the schema does not compile to one.
-function loadModule (schema) {
-  const src = toStandaloneModule(schema, { format: 'cjs' })
+function loadModule (schema, onePass) {
+  const src = toStandaloneModule(schema, { format: 'cjs', onePass })
   if (src === null) return null
   const m = { exports: {} }
   new Function('module', 'exports', src)(m, m.exports)
@@ -54,8 +54,13 @@ function sub (depth, flat) {
   if (r >= 3 && r < 6) s.patternProperties = { ['^' + pick(NAMES).slice(0, 1)]: leaf() }
   if (rnd(4) === 0) s.required = [pick(NAMES)]
   if (depth < 2 && rnd(5) === 0) s.allOf = [sub(depth + 1)]
-  if (depth < 2 && rnd(6) === 0) s[pick(['anyOf', 'oneOf'])] = [sub(depth + 1), sub(depth + 1)]
-  if (depth < 1 && rnd(8) === 0) s.additionalProperties = leaf()
+  // A branch may be empty next to one that constrains, and a branch may
+  // carry additionalProperties at its root: a schema or false. In 1.46.0 a
+  // oneOf or anyOf branch with `additionalProperties: { const: true }` lost
+  // that check inside the run-time unevaluatedProperties verdict and read as
+  // holding for every object (tests/test_nested_verdict_deferred_checks.js).
+  if (depth < 2 && rnd(6) === 0) s[pick(['anyOf', 'oneOf'])] = rnd(3) === 0 ? [{}, sub(depth + 1)] : [sub(depth + 1), sub(depth + 1)]
+  if (rnd(5) === 0) s.additionalProperties = pick([false, leaf(), { const: pick(VALUES) }])
   return s
 }
 function root () {
@@ -118,9 +123,14 @@ for (let i = 0; i < SCHEMAS; i++) {
   try { efn = compileToJSCodegenWithErrors(schema) } catch { efn = null }
   const ref = new Validator(schema, { engine: 'interpreter' })
   const full = new Validator(schema)
-  // Every tenth schema also goes through a standalone module, the path a
-  // build step ships.
-  const mod = i % 10 === 0 ? loadModule(schema) : null
+  // Once a validator's errors have been read a few times, validate() is the
+  // one-pass function (compileToJSCombined), a program of its own; its
+  // verdicts are compared too. Warmed here on three documents, so the loop
+  // below sees that function. The 1.46.0 acceptance above lived in it alone.
+  for (let w = 0; w < 4; w++) for (let j = 0; j < 3; j++) void full.validate(doc()).errors
+  // Every third schema also goes through a standalone module, the path a
+  // build step ships, with the older collector and with the one-pass program.
+  const mod = i % 3 === 0 ? loadModule(schema, i % 6 === 0) : null
   if (mod) modules++
   if (fn) generated++
   for (let j = 0; j < 12; j++) {
