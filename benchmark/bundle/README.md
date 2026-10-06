@@ -19,17 +19,17 @@ bun run startup    # time to a listening server, and RSS at that moment
 ## What was measured
 
 Bun 1.4.0, Hono 4.13.7, Apple M4 Pro, `bun build --minify --target=bun`, gzip -9, best of
-seven for the timings. ata 1.45.0, Zod 4.6.5, Valibot 1.5.0, TypeBox 0.34.52. Remeasured
-2026-10-05, three rounds, the median of each row shown.
+seven for the timings. ata 1.46.0, Zod 4.6.5, Valibot 1.5.0, TypeBox 0.34.52. Remeasured
+2026-10-06, three rounds, the median of each row shown.
 
 | Combo | bundle | gzip | startup | RSS |
 |---|---|---|---|---|
-| Hono, no validation | 18.4 KB | 7.6 KB | 3.7 ms | 20 MB |
-| Hono + ata, precompiled | **21.7 KB** | 8.8 KB | 3.5 ms | 21 MB |
-| Hono + Valibot | 23.8 KB | 9.2 KB | 4.9 ms | 22 MB |
-| Hono + TypeBox, with its compiler | 110.6 KB | 29.9 KB | 13.0 ms | 34 MB |
-| Hono + ata, runtime API | 448.2 KB | 127.3 KB | 8.5 ms | 24 MB |
-| Hono + Zod | 469.0 KB | 98.1 KB | 11.2 ms | 34 MB |
+| Hono, no validation | 18.9 KB | 7.8 KB | 3.5 ms | 21 MB |
+| Hono + ata, precompiled | **22.2 KB** | 9.0 KB | 3.5 ms | 20 MB |
+| Hono + Valibot | 24.3 KB | 9.4 KB | 4.7 ms | 21 MB |
+| Hono + TypeBox, with its compiler | 113.3 KB | 30.6 KB | 12.7 ms | 34 MB |
+| Hono + ata, runtime API | 488.0 KB | 138.6 KB | 8.8 ms | 24 MB |
+| Hono + Zod | 480.2 KB | 100.0 KB | 10.7 ms | 34 MB |
 
 Precompiled ata is the smallest row that validates, 3.3 KB over an app that validates
 nothing, and starts as fast. The runtime row is the other end of the same

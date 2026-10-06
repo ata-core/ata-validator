@@ -103,18 +103,18 @@ file.
 
 | Dimension | Schema | ata-AOT | runtime validator | Difference |
 |---|---|---|---|---|
-| Bundle (gzipped) | simple | 1.3 KB | 58.1 KB | 43.9x smaller |
-| Bundle (gzipped) | complex | 7.8 KB | 58.1 KB | 7.4x smaller |
-| Bundle (gzipped) | nested | 4.5 KB | 58.1 KB | 12.9x smaller |
-| Cold start | simple | 22 ms | 40 ms | 1.8x faster |
-| Throughput (1M ops) | simple | 269 Mops/s | 116 Mops/s | 2.3x faster |
-| Compile time | simple | 19 µs | 1.63 ms | 85x faster |
+| Bundle (gzipped) | simple | 1.4 KB | 52.7 KB | 38.4x smaller |
+| Bundle (gzipped) | complex | 3.0 KB | 52.7 KB | 17.5x smaller |
+| Bundle (gzipped) | nested | 4.5 KB | 52.7 KB | 11.6x smaller |
+| Cold start | simple | 20 ms | 37 ms | 1.9x faster |
+| Throughput (1M ops) | simple | 289 Mops/s | 96 Mops/s | 3.0x faster |
+| Compile time | simple | 18 µs | 1.56 ms | 85x faster |
 
 The runtime column is the default validator most frameworks ship. Reproduce on your machine
-with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-09-28,
-on ata-validator 1.36.0. Across four runs throughput moved between 213 and 269 Mops/s against
-94 to 116, cold start between 21 and 22 ms against 40 to 42, and the compile ratio between 79x
-and 90x. The throughput row times a single one-million-call
+with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-10-06,
+on ata-validator 1.46.0. Across four runs throughput moved between 288 and 329 Mops/s against
+96 to 116, cold start between 19 and 20 ms against 37 to 39, and the compile ratio between 77x
+and 85x. The throughput row times a single one-million-call
 loop of a few milliseconds, so it moves the most from run to run; treat the last three rows as
 an order of magnitude rather than a constant.
 
@@ -244,15 +244,15 @@ is the most common way to get a misleading number out of this library.
 
 | | compiled with `ata build` | runtime `new Validator(schema)` |
 |---|---|---|
-| In a bundle, gzipped | **2.1 KB** | 113.3 KB |
-| Time to a served request | **3.5 ms** | 8.5 ms |
+| In a bundle, gzipped | **2.0 KB** | 124.4 KB |
+| Time to a served request | **3.5 ms** | 8.8 ms |
 | Schema known when | build time | any time |
 
 The bundle row is the ten-field user schema in
 `tests/fixtures/error-dx/user.schema.json`, every export of the compiled module against
-`new Validator(schema)`, built with `bun build --minify --target=browser` on ata 1.45.0.
+`new Validator(schema)`, built with `bun build --minify --target=browser` on ata 1.46.0.
 The startup row is a Hono route on Bun 1.4, the median of three rounds of best-of-seven, from
-`benchmark/bundle`, against 3.7 ms for the same app doing no validation at all, so the
+`benchmark/bundle`, against 3.5 ms for the same app doing no validation at all, so the
 compiled path costs nothing measurable to start. The runtime figure is what it is because
 a schema that arrives at run time can use any keyword, so the whole engine has to be
 there. The compiled module imports nothing and contains only the checks your schema asks
