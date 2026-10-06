@@ -2,7 +2,17 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.46.0 - 2026-10-06
+
+Reading the errors of a rejected document is what this release is about. Once a validator's errors have been read, `validate()` is one function that checks and collects in a single pass, and the parts of that pass that were slow are rewritten below: run-time `unevaluatedProperties` and `unevaluatedItems` as straight-line code, oneOf and anyOf branches scored with counting copies instead of run twice, error order kept beside the list instead of sorted afterwards, `$dynamicRef` schemas on generated code, `$ref` schemas on the one-pass function where they were handed back.
+
+Measured against 1.45.0 on an Apple M4 Pro, Node 25.2.1, pure JS. Twenty SchemaStore API schemas, each with an accepted body, a rejected body and a realistic rejected body (one wrong type deep inside), both builds in one process with the rounds alternating, medians of eleven, summed over the twenty:
+- `validate()` on an accepted body: 37 percent less time; the verdict alone 39 percent less;
+- a rejected body with every error read: 47 percent less; the realistic one 52 percent less, and its verdict 59 percent less.
+
+The official test suite harness, every error read, draft 2020-12: 70 to 49 µs per round; draft 7: 30 to 29. With the default rich errors: 160 to 142 on 2020-12, 78 to 81 on draft 7.
+
+Costs: cold start (require, compile, first validate) 8.0 to 8.4 ms; the browser runtime bundle 116.4 to 125.2 KB gzipped. Modules from `ata build` are byte for byte the same size, except for a schema with `$ref: "#"`, whose module now carries its error function instead of a stub. A served request's cost is unchanged within three percent.
 
 ### Added
 
