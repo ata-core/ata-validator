@@ -345,7 +345,29 @@ function installCodegenPaths (ctx) {
           const fn = jsCompiler.compileToJSCombined(schemaObj, VALID_RESULT, this._schemaMap.size > 0 ? this._schemaMap : null, this._userFormats, { runtimeShape: true, resultShape: { Rejection: EagerRejection, empty, sort, fallback, verdict: jsFn } });
           if (!fn) return null;
           fn({}); fn(null); fn(0);
-          return fn;
+          // Collecting on an accepted document costs more than its verdict
+          // (paths are built for every key the schema does not name, a
+          // definition's function is entered per value): 95 against 35 ns on
+          // a SchemaStore task schema. On a rejected one a verdict asked first
+          // is paid for nothing, 20 to 70 ns on the same twenty schemas. So
+          // every 32 calls the share accepted decides whether the verdict goes
+          // first: a quarter or more and it does. It starts on, since a
+          // service mostly sees accepted bodies; a stream of rejected
+          // documents turns it off within its first window. Kept out of the
+          // generated function: the verdict inlined there cost the rest of it
+          // its inlining.
+          let vf = true, n = 0, nv = 0;
+          return (d) => {
+            if (vf && jsFn(d)) {
+              nv++;
+              if ((++n & 31) === 0) { vf = nv >= 8; nv = 0; }
+              return { valid: true, data: d, errors: empty };
+            }
+            const r = fn(d);
+            if (r.valid) nv++;
+            if ((++n & 31) === 0) { vf = nv >= 8; nv = 0; }
+            return r;
+          };
         } catch { return null; }
       };
     }
