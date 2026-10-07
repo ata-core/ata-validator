@@ -64,12 +64,12 @@ jobs:
           echo "VCPKG_TARGET_TRIPLET=x64-windows-static" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build native addon
         run: npm run build
 
-      # npm install brings the published per-platform engine of the same
+      # npm ci brings the published per-platform engine of the same
       # version, which the loader prefers over the build above; remove it so
       # the tests run the engine built from this commit.
       - name: Use the engine built from this commit
@@ -117,12 +117,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libre2-dev libabsl-dev
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build native addon
         run: npm run build
 
-      # npm install brings the published per-platform engine of the same
+      # npm ci brings the published per-platform engine of the same
       # version, which the loader prefers over the build above; remove it so
       # the tests run the engine built from this commit.
       - name: Use the engine built from this commit
@@ -147,12 +147,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libre2-dev libabsl-dev
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build native addon
         run: npm run build
 
-      # npm install brings the published per-platform engine of the same
+      # npm ci brings the published per-platform engine of the same
       # version, which the loader prefers over the build above; remove it so
       # the tests run the engine built from this commit.
       - name: Use the engine built from this commit

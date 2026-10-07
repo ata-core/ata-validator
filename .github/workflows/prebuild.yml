@@ -75,7 +75,7 @@ jobs:
 
       - name: Install dependencies
         if: runner.os != 'Linux'
-        run: npm install
+        run: npm ci
 
       - name: Build native addon
         if: runner.os != 'Linux'
@@ -155,7 +155,7 @@ jobs:
               node:22-alpine sh -c "
                 rm -rf node_modules build &&
                 apk add --no-cache git python3 make g++ cmake re2-dev abseil-cpp-dev linux-headers &&
-                npm install &&
+                npm ci &&
                 npx cmake-js build --target ata &&
                 strip --strip-unneeded build/Release/ata.node &&
                 ls -l build/Release/ata.node &&
@@ -194,11 +194,13 @@ jobs:
           node-version: 22
 
       # npm trusted publishing (OIDC) needs npm 11.5.1+; Node 22 ships npm 10.
+      # Pinned to a version, so the publish does not run whatever npm shipped
+      # that morning.
       - name: Update npm for trusted publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@12.2.0
 
       - name: Install dependencies
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Download native packages
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0

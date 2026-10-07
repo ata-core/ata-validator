@@ -43,4 +43,14 @@ assert.strictEqual(
   `include/ata.h VERSION_* constants (${triple}) are out of sync with package.json (${pkg.version}).`,
 );
 
+// The lockfile is what CI and the publish install from (npm ci); a bump that
+// leaves it behind pins the previous natives.
+{
+  const lock = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package-lock.json'), 'utf8'));
+  assert.strictEqual(lock.version, pkg.version, `package-lock.json version (${lock.version}) is out of sync with package.json (${pkg.version}); run npm install --package-lock-only`);
+  for (const [name, entry] of Object.entries(lock.packages)) {
+    if (!name.includes('@ata-validator/native-')) continue;
+    assert.strictEqual(entry.version, pkg.version, `${name} in package-lock.json is ${entry.version}, package.json is ${pkg.version}; run npm install --package-lock-only`);
+  }
+}
 console.log(`ok: lib/version.js and include/ata.h match package.json (${libVersion})`);

@@ -18,7 +18,7 @@ NODE_VERSION=v22.20.0
 curl -fsSL "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-$NODE_ARCH.tar.xz" | tar -xJ -C /opt
 export PATH="/opt/node-$NODE_VERSION-linux-$NODE_ARCH/bin:$PATH"
 
-npm install --ignore-scripts
+npm ci --ignore-scripts
 npx cmake-js build --target ata
 strip --strip-unneeded build/Release/ata.node
 ls -l build/Release/ata.node

@@ -4,8 +4,10 @@ node_modules/
 benchmark/node_modules/
 benchmark/package.json
 benchmark/package-lock.json
+# Nested lockfiles stay out; the package's own is tracked so CI installs with npm ci.
+**/package-lock.json
+!/package-lock.json
 *.node
-package-lock.json
 build_cmake/
 *.trace
 .cache/
