@@ -495,6 +495,36 @@ server.registerTool('greet', {
 `'draft-07'`; a schema without `$schema` is 2020-12. Any other target throws a
 `TypeError`; ata does not convert between dialects.
 
+#### OpenAPI documents from the same schema, with hono-openapi
+
+[hono-openapi](https://www.npmjs.com/package/hono-openapi) builds a Hono
+app's OpenAPI document from the validators on its routes. It finds a
+validator's JSON Schema through `@standard-community/standard-json`, which
+knows a fixed list of libraries by vendor name; ata is not on it yet, so
+register the Standard JSON Schema ata already carries, once, before the
+routes:
+
+```javascript
+import { describeRoute, generateSpecs, resolver, validator } from 'hono-openapi'
+import { loadVendor } from '@standard-community/standard-json'
+import { Validator } from 'ata-validator'
+
+loadVendor('ata-validator', (v) => v['~standard'].jsonSchema.input({ target: 'draft-2020-12' }))
+
+const user = new Validator({
+  type: 'object',
+  required: ['name', 'age'],
+  properties: { name: { type: 'string', minLength: 1, description: 'Display name' }, age: { type: 'integer', minimum: 13 } },
+})
+app.post('/users', describeRoute({ description: 'Create a user' }), validator('json', user), (c) => c.json({ ok: true }, 201))
+const spec = await generateSpecs(app, { documentation: { info: { title: 'users', version: '1' } } })
+```
+
+The request body in `spec` is the schema as written, `description`, `format`
+and `minLength` included, since JSON Schema is what OpenAPI 3.1 takes; nothing
+is converted. `validator('json', user)` validates the request as the ata
+middleware does. Measured with hono-openapi 1.3.5 and standard-json 0.3.6.
+
 ## Utility Functions
 
 ### validate(schema, data)
