@@ -30,3 +30,6 @@ traces/
 
 # npm pack artifacts
 *.tgz
+
+# Deno writes a lock next to whatever it runs; the Deno job in CI needs none.
+deno.lock
