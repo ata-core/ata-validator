@@ -26,6 +26,7 @@ const EXPECTED = [
   'lib/enrich-error.js',
   'lib/error-codes.js',
   'lib/formats.js',
+  'lib/compile-fn.js',
   'lib/js-compiler.js',
   'lib/js-compiler-errors.js',
   'lib/keywords.js',

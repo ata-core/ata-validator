@@ -1,4 +1,5 @@
 'use strict';
+const { compileFunction } = require('./lib/compile-fn')
 
 // The full package: the validator core with the code generator registered,
 // plus the tools no Validator calls (TypeScript generation, renderers, output
@@ -878,7 +879,7 @@ function buildPreprocessCodegen(schema, options) {
   let fn = _preprocessBySource.get(src);
   if (fn === undefined) {
     try {
-      fn = new Function('d', src);
+      fn = compileFunction('d', src);
     } catch {
       fn = null;
     }
@@ -902,7 +903,7 @@ function buildParse (self, decline, extended) {
   let copy;
   try {
     // eslint-disable-next-line no-new-func
-    copy = new Function('data', 'return ' + expr);
+    copy = compileFunction('data', 'return ' + expr);
   } catch {
     return decline('code generation is not allowed here');
   }
