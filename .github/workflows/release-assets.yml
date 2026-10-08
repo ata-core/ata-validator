@@ -30,8 +30,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
+      # The same install as the publish job: the lock cannot carry natives that
+      # are published after the version bump, so no clean install.
       - name: Install dependencies
-        run: npm ci --ignore-scripts
+        run: npm install --ignore-scripts --omit=optional --no-audit --no-fund
       - name: Pack
         id: pack
         run: |
