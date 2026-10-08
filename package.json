@@ -49,6 +49,11 @@
       "import": "./compiled-verdict.mjs",
       "require": "./compiled-verdict.js"
     },
+    "./lite": {
+      "types": "./lite.d.ts",
+      "import": "./lite.mjs",
+      "require": "./lite.js"
+    },
     "./package.json": "./package.json"
   },
   "sideEffects": false,
@@ -139,6 +144,9 @@
     "compiled-verdict.js",
     "compiled-verdict.mjs",
     "compiled-verdict.d.ts",
+    "lite.js",
+    "lite.mjs",
+    "lite.d.ts",
     "bin/",
     "README.md",
     "LICENSE"

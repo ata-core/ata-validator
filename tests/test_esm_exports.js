@@ -40,5 +40,13 @@ for (const file of ['index.mjs', 'index.node.mjs', 'index.browser.mjs']) {
     for (const k of names) assert.notStrictEqual(mod[k], undefined, `${sub}.mjs does not export ${k}`)
     checked += names.length
   }
+  // The subpaths are reachable through the exports map, not only as files:
+  // lite.js sat in the repository for months without an `exports` entry, so
+  // `ata-validator/lite` could not be imported by anyone.
+  for (const sub of ['build', 'compiled', 'compiled-verdict', 'aot', 'compat', 't', 'lite']) {
+    assert.strictEqual(require(`ata-validator/${sub}`), require(`../${sub}.js`), `ata-validator/${sub} resolves through the exports map`)
+    const mod = await import(`ata-validator/${sub}`)
+    assert.ok(mod && typeof mod === 'object', `ata-validator/${sub} imports through the exports map`)
+  }
   console.log(`ok: the six subpath ESM entries export the ${checked} names of their CommonJS entries`)
 })().catch((e) => { console.error(e); process.exit(1) })

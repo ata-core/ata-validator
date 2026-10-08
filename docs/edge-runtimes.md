@@ -117,6 +117,22 @@ Worth doing when the schemas are static. The runtime API is the better choice
 when schemas arrive at runtime, for instance from a database or a tenant
 configuration.
 
+## The lite entry
+
+On a worker or a page nothing generates code anyway, so the generator is dead
+weight in the bundle. `ata-validator/lite` leaves it out:
+
+```ts
+import { Validator } from 'ata-validator/lite'
+```
+
+Same `Validator`, same verdicts and errors, on the interpreted engine; it
+passes the official suite in the same three dialects, and a parity test holds
+it to the full entry's answers. What it lacks is `parse()` and the
+ahead-of-time bundle methods, which need the generator. A Hono app with one
+validated route bundles to 58 KB gzipped with it against 136 KB with the full
+entry (esbuild, browser platform, 2026-10-08).
+
 ## Deno and Deno Deploy
 
 Same code, from npm or from JSR:

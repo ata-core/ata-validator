@@ -5,6 +5,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 ## Unreleased
 
 ### Added
+- `ata-validator/lite` is published: the `Validator` and the one-shot functions on the interpreted engine alone, without the code generator, for pages and workers where the size of what ships matters. It existed in the repository with its parity test since 1.19.0 and was never in the tarball or the `exports` map, so nothing could import it. In a Hono app bundled for Workers the runtime entry is 136 KB gzipped and the lite entry 58 KB, with the same verdicts and errors.
 - A JSR package, `@ata/validator`, from `jsr/`: it re-exports the npm package of the same version, so `jsr:@ata/validator` and `npm:ata-validator` are one engine. Published by `.github/workflows/jsr.yml` after the npm version is visible; `tests/test_version_sync.js` holds its version and specifiers to `package.json`.
 - CI runs the package under Deno on every change: a smoke test with dynamic code refused the way Deno Deploy refuses it (`tests/deno_smoke.ts`), the suite with `eval` and `new Function` blocked, and the official suite in three dialects.
 
