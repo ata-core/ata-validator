@@ -9,7 +9,11 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 - A JSR package, `@ata/validator`, from `jsr/`: it re-exports the npm package of the same version, so `jsr:@ata/validator` and `npm:ata-validator` are one engine. Published by `.github/workflows/jsr.yml` after the npm version is visible; `tests/test_version_sync.js` holds its version and specifiers to `package.json`.
 - CI runs the package under Deno on every change: a smoke test with dynamic code refused the way Deno Deploy refuses it (`tests/deno_smoke.ts`), the suite with `eval` and `new Function` blocked, and the official suite in three dialects.
 
+### Fixed
+- `parseJSON` threw `native.parseJSON is not a function` whenever the native engine was loaded: the addon has not carried that function since the per-platform packages, and the pure-JS fallback hid it. It parses with JSON.parse, and a Buffer is decoded first (`tests/test_parse_json.js`).
+
 ### Changed
+- The JSON text scanner behind `isValidJSON()` and `validateJSON()` ends the scan when a member fails and its key cannot repeat later in the object: two native searches over the rest of the text, for the key as written and for any backslash, which is the only way to spell it differently, replace the full pass the duplicate-key rule required. A 69 KB request body whose first item is wrong is refused in 26 µs where it took 112, against 149 for JSON.parse alone; a wrong top-level shape stays at 1.5 µs. Verdicts are unchanged: a key that does repeat, plain or escaped, still goes to the parser (`tests/test_scanner_early_exit.js`, and the scanner differential's 413,178 comparisons agree).
 - `package.json` declares `"type": "commonjs"`, which it already was. Deno reads a `.js` file as ESM without it; Node's default is unchanged.
 
 ## 1.47.0 - 2026-10-08
