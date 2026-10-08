@@ -58,7 +58,9 @@ const esbuild = require('esbuild')
 // (lib/unique-items.js), in place of a canonical string per item.
 // 49400 with the interpreter asking a leaf child for its verdict before
 // building the paths for its errors: tsconfig's samples collect 42% faster.
-const BUDGET = 49400
+// 49500 with the environment reads and the one `new Function` site behind
+// two small modules (lib/env.js, lib/compile-fn.js): 28 bytes.
+const BUDGET = 49500
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

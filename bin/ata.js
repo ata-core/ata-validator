@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 'use strict';
+const { env } = require('../lib/env');
 
 const fs = require('fs');
 const path = require('path');
@@ -135,7 +136,7 @@ function parseArgs(argv) {
 function resolveSourceDefault (opts) {
   if (opts.source === true) return true;
   if (opts.source === false) return false;
-  return process.env.NODE_ENV !== 'production';
+  return env('NODE_ENV') !== 'production';
 }
 
 function inferOutput(inputPath, format) {
