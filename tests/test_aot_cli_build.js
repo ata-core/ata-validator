@@ -61,19 +61,19 @@ test('cli: build --watch re-emits on change then exits on SIGINT', async () => {
   let stdout = '';
   child.stdout.on('data', (d) => { stdout += d.toString(); });
 
-  // Wait for initial build line.
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  assert(/w\.schema\.json/.test(stdout), `initial build did not emit; stdout=${stdout}`);
+  // Wait for the initial build line: polled, not a fixed delay, because the
+  // CLI's start on a loaded CI runner has taken longer than half a second.
+  const until = async (ok, ms) => { const end = Date.now() + ms; while (!ok() && Date.now() < end) await new Promise((r) => setTimeout(r, 50)); return ok(); };
+  assert(await until(() => /w\.schema\.json/.test(stdout), 15000), `initial build did not emit; stdout=${stdout}`);
 
   // Modify the schema.
   const altered = JSON.parse(fs.readFileSync(path.join(dir, 'w.schema.json'), 'utf8'));
   altered.properties.id.minimum = 7;
   fs.writeFileSync(path.join(dir, 'w.schema.json'), JSON.stringify(altered));
 
-  // Wait for re-emit.
-  await new Promise((resolve) => setTimeout(resolve, 700));
-  const reemitMatches = (stdout.match(/w\.schema\.json/g) || []).length;
-  assert(reemitMatches >= 2, `expected re-emit, stdout occurrences=${reemitMatches}; stdout=${stdout}`);
+  // Wait for the re-emit the same way.
+  const reemits = () => (stdout.match(/w\.schema\.json/g) || []).length;
+  assert(await until(() => reemits() >= 2, 15000), `expected re-emit, stdout occurrences=${reemits()}; stdout=${stdout}`);
 
   child.kill('SIGINT');
   await new Promise((resolve) => child.on('exit', resolve));
