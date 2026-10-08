@@ -1,6 +1,22 @@
-// The JSR entry re-exports the npm package of the same version. The engine,
-// its types and its tests live in the npm package; this file exists so that a
-// Deno project can write `jsr:@ata/validator` and get the same thing, pinned
-// to one version.
+/**
+ * A JSON Schema validator for Deno: `Validator`, the compiled entries and
+ * the Standard Schema interface, re-exported from the npm package of the
+ * same version. Where dynamic code is refused, on Deno Deploy for one, the
+ * validator runs its interpreted engine with the same answers.
+ *
+ * ```ts
+ * import { Validator } from "jsr:@ata/validator";
+ *
+ * const user = new Validator({
+ *   type: "object",
+ *   required: ["email"],
+ *   properties: { email: { type: "string", format: "email" } },
+ * });
+ * const result = user.validate(JSON.parse(body));
+ * if (!result.valid) console.log(result.errors[0].message);
+ * ```
+ *
+ * @module
+ */
 export * from "npm:ata-validator@1.47.0";
 export { default } from "npm:ata-validator@1.47.0";
