@@ -7,6 +7,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 Standalone modules can carry the runtime's one-pass error function, the package starts faster and holds less per validator, the generators decline a subschema they produced no code for, and the supply chain is tightened: a tracked lockfile, pinned tools, attested release tarballs, and one place each for dynamic code and environment reads.
 
 Measured against 1.46.1 on an Apple M4 Pro, Node 25.2.1, pure JS:
+- a Hono route on Bun to its first served request through the runtime API, from `benchmark/bundle`: 9.1 to 7.6 ms, against 3.5 for the same app with no validation;
 - cold start (require, compile, first validate): 8.5 to 7.0 ms; `require` alone 6.4 to 4.6 ms, since the error generators are read on the first error compile and the format and regex sources on the first schema that needs them;
 - heap retained per validator that has validated, two thousand validators of a ten-key schema: 9.5 to 8.3 KB;
 - a served request, hot validation, the suite harness and the official suite: unchanged within noise;

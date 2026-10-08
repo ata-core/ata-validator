@@ -244,13 +244,13 @@ is the most common way to get a misleading number out of this library.
 
 | | compiled with `ata build` | runtime `new Validator(schema)` |
 |---|---|---|
-| In a bundle, gzipped | **2.0 KB** | 124.4 KB |
-| Time to a served request | **3.5 ms** | 8.8 ms |
+| In a bundle, gzipped | **2.1 KB** | 125.0 KB |
+| Time to a served request | **3.5 ms** | 7.6 ms |
 | Schema known when | build time | any time |
 
 The bundle row is the ten-field user schema in
 `tests/fixtures/error-dx/user.schema.json`, every export of the compiled module against
-`new Validator(schema)`, built with `bun build --minify --target=browser` on ata 1.46.0.
+`new Validator(schema)`, built with `bun build --minify --target=browser` on ata 1.47.0.
 The startup row is a Hono route on Bun 1.4, the median of three rounds of best-of-seven, from
 `benchmark/bundle`, against 3.5 ms for the same app doing no validation at all, so the
 compiled path costs nothing measurable to start. The runtime figure is what it is because
