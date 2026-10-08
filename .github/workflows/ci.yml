@@ -132,6 +132,32 @@ jobs:
       - name: Run JSON Schema Test Suite
         run: npm run test:suite
 
+  # Deno: the package from this checkout, the eval-free path (Deno Deploy
+  # refuses dynamic code) and the official suite, all run by Deno itself.
+  # No npm install: nothing here needs a dependency or the native engine.
+  deno:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          submodules: true
+
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+
+      - name: Package answers under Deno, with and without dynamic code
+        run: deno run -A tests/deno_smoke.ts
+
+      - name: Suite with eval and new Function blocked
+        run: deno run -A tests/test_no_eval.js
+
+      - name: Official JSON Schema Test Suite, three dialects
+        run: |
+          deno run -A tests/run_suite.js
+          deno run -A tests/run_suite.js draft7
+          deno run -A tests/run_suite.js v1
+
   test-ts:
     runs-on: ubuntu-latest
     steps:

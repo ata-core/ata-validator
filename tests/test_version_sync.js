@@ -53,4 +53,18 @@ assert.strictEqual(
     assert.strictEqual(entry.version, pkg.version, `${name} in package-lock.json is ${entry.version}, package.json is ${pkg.version}; run npm install --package-lock-only`);
   }
 }
-console.log(`ok: lib/version.js and include/ata.h match package.json (${libVersion})`);
+
+// The JSR package (jsr/) re-exports the npm package of the same version: its
+// own version and the `npm:ata-validator@<version>` specifiers it carries
+// must follow every bump, or JSR users get an older engine under a newer
+// number.
+const jsrDir = path.join(__dirname, '..', 'jsr');
+const jsr = JSON.parse(fs.readFileSync(path.join(jsrDir, 'jsr.json'), 'utf8'));
+assert.strictEqual(jsr.version, pkg.version, `jsr/jsr.json (${jsr.version}) is out of sync with package.json (${pkg.version}).`);
+for (const f of ['mod.ts', 'build.ts']) {
+  const specs = fs.readFileSync(path.join(jsrDir, f), 'utf8').match(/npm:ata-validator@([^/"']+)/g) || [];
+  assert.ok(specs.length > 0, `jsr/${f} carries no npm:ata-validator specifier`);
+  for (const sp of specs) assert.strictEqual(sp, `npm:ata-validator@${pkg.version}`, `jsr/${f} pins ${sp}, package.json is ${pkg.version}`);
+}
+
+console.log(`ok: lib/version.js, include/ata.h and jsr/ match package.json (${pkg.version})`);

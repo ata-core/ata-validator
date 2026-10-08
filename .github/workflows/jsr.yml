@@ -1,0 +1,45 @@
+# Publishes jsr/ as @ata/validator on JSR after a release. The JSR package
+# re-exports the npm package of the same version, so this waits for that
+# version to be visible on the npm registry first; the npm publish runs in
+# prebuild.yml on the same release event. JSR authenticates the workflow by
+# its OIDC identity once the package is linked to this repository on jsr.io.
+name: JSR
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Wait for the npm version this package re-exports
+        run: |
+          VERSION=$(node -p "require('./jsr/jsr.json').version")
+          for i in $(seq 1 120); do
+            npm view "ata-validator@$VERSION" version > /dev/null 2>&1 && exit 0
+            sleep 15
+          done
+          echo "ata-validator@$VERSION not on the npm registry after 30 minutes"
+          exit 1
+
+      - name: Publish
+        working-directory: jsr
+        run: deno publish

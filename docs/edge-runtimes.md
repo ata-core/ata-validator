@@ -117,18 +117,29 @@ Worth doing when the schemas are static. The runtime API is the better choice
 when schemas arrive at runtime, for instance from a database or a tenant
 configuration.
 
-## Deno Deploy
+## Deno and Deno Deploy
 
-Same code, imported from npm:
+Same code, from npm or from JSR:
 
 ```ts
 import { Validator } from 'npm:ata-validator'
+// or
+import { Validator } from 'jsr:@ata/validator'
 ```
 
-Unlike the Workers example above, this one has not been measured on the real
-platform. It rests on Deno Deploy refusing `new Function` the same way, which is
-the property the test below covers. If it does not work for you, please open an
-issue.
+The JSR package re-exports the npm package of the same version, so the two are
+the same engine. CI runs the package under Deno on every change: the official
+suite in its three dialects (1301, 929 and 1135 cases, all passing), the
+suite with `eval` and `new Function` blocked, and a smoke test that refuses
+dynamic code the way Deno Deploy does and checks that the interpreted engine
+answers. On Deno Deploy itself nothing has been timed yet; the guarantee is
+the eval-free one above, which these tests cover, and a measurement there is
+still owed.
+
+Two things a Deno user meets on a release day: Deno's minimum dependency age
+refuses an npm version younger than 24 hours unless `--min-dep-age` or
+`minimumDependencyAge` in `deno.json` says otherwise, and the JSR version
+appears a few minutes after the npm one, since it waits for it.
 
 ## Browsers under a strict CSP
 

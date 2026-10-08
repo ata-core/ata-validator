@@ -2,6 +2,15 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+- A JSR package, `@ata/validator`, from `jsr/`: it re-exports the npm package of the same version, so `jsr:@ata/validator` and `npm:ata-validator` are one engine. Published by `.github/workflows/jsr.yml` after the npm version is visible; `tests/test_version_sync.js` holds its version and specifiers to `package.json`.
+- CI runs the package under Deno on every change: a smoke test with dynamic code refused the way Deno Deploy refuses it (`tests/deno_smoke.ts`), the suite with `eval` and `new Function` blocked, and the official suite in three dialects.
+
+### Changed
+- `package.json` declares `"type": "commonjs"`, which it already was. Deno reads a `.js` file as ESM without it; Node's default is unchanged.
+
 ## 1.47.0 - 2026-10-08
 
 Standalone modules can carry the runtime's one-pass error function, the package starts faster and holds less per validator, the generators decline a subschema they produced no code for, and the supply chain is tightened: a tracked lockfile, pinned tools, attested release tarballs, and one place each for dynamic code and environment reads.
