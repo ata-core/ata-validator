@@ -2,7 +2,11 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.48.0 - 2026-10-09
+
+The lite entry is published at last, the text scanner stops at the first member it can refuse, the package is run under Deno in CI and published on JSR, and `parseJSON` works with the native engine loaded.
+
+Measured against 1.47.0 on an Apple M4 Pro, Node 25.2.1, pure JS: cold start 7.2 to 6.9 ms and `require` alone 4.8 to 4.5 ms; a served request, hot validation, compile time, heap per validator and every `ata build` module unchanged, the modules byte for byte. A 69 KB request body whose first item is wrong is refused from the text in 26 µs where 1.47.0 took 112.
 
 ### Added
 - `ata-validator/lite` is published: the `Validator` and the one-shot functions on the interpreted engine alone, without the code generator, for pages and workers where the size of what ships matters. It existed in the repository with its parity test since 1.19.0 and was never in the tarball or the `exports` map, so nothing could import it. In a Hono app bundled for Workers the runtime entry is 136 KB gzipped and the lite entry 58 KB, with the same verdicts and errors.
