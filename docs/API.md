@@ -525,6 +525,11 @@ and `minLength` included, since JSON Schema is what OpenAPI 3.1 takes; nothing
 is converted. `validator('json', user)` validates the request as the ata
 middleware does. Measured with hono-openapi 1.3.5 and standard-json 0.3.6.
 
+On Fastify nothing is registered: `@fastify/swagger` reads the JSON Schema on
+each route and writes it into the document as it is, and
+[fastify-ata](https://www.npmjs.com/package/fastify-ata) validates with the
+same schema (checked with fastify 5.12 and @fastify/swagger 9.9).
+
 ## Utility Functions
 
 ### validate(schema, data)
