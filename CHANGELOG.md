@@ -2,7 +2,17 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.47.0 - 2026-10-08
+
+Standalone modules can carry the runtime's one-pass error function, the package starts faster and holds less per validator, the generators decline a subschema they produced no code for, and the supply chain is tightened: a tracked lockfile, pinned tools, attested release tarballs, and one place each for dynamic code and environment reads.
+
+Measured against 1.46.1 on an Apple M4 Pro, Node 25.2.1, pure JS:
+- cold start (require, compile, first validate): 8.5 to 7.0 ms; `require` alone 6.4 to 4.6 ms, since the error generators are read on the first error compile and the format and regex sources on the first schema that needs them;
+- heap retained per validator that has validated, two thousand validators of a ten-key schema: 9.5 to 8.3 KB;
+- a served request, hot validation, the suite harness and the official suite: unchanged within noise;
+- modules from `ata build` without `--one-pass`: byte for byte the same; with it, on a 175 KB schema and a 15 KB document, a rejected document in 39 µs where the older collector took 89.
+
+Costs: the browser runtime bundle 125.2 to 128.0 KB gzipped (the one-pass emitter and the generator check); `ata build` over twenty schemas 94 to 99 ms, since a module's emission compiles the verdict in full where the validator kept only the light form.
 
 ### Fixed
 
@@ -11,7 +21,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
-- Every place the package turns generated source into a function goes through one module, `lib/compile-fn.js`, instead of calling `new Function` in seven files; the native engine is loaded with one literal `require` per platform package instead of a `require` of a computed name; and every environment variable the package honours is read through `lib/env.js`, which lists them. Nothing changes in what runs; a reader auditing what the package evaluates, or a supply-chain scanner reporting it, finds one site. Where dynamic code is blocked the fallback to the interpreted engine is as before (`tests/test_no_eval.js`).
+- Every place the package turns generated source into a function goes through one module, `lib/compile-fn.js`, instead of calling `new Function` in seven files, and every environment variable the package honours is read through `lib/env.js`, which lists them. Nothing changes in what runs; a reader auditing what the package evaluates, or a supply-chain scanner reporting it, finds one site. Where dynamic code is blocked the fallback to the interpreted engine is as before (`tests/test_no_eval.js`).
 - Supply chain: the package's own `package-lock.json` is tracked and CI, the prebuilds and the publish install with `npm ci`; the npm the publish job updates itself to is pinned; the Bowtie image is pinned by digest. A new workflow attaches to every GitHub release the packed tarball, a Sigstore build provenance attestation for it and a checksum file, so a tarball taken from a release verifies with `gh attestation verify`. On the repository, Dependabot alerts and security updates, secret scanning and push protection are on. `tests/test_version_sync.js` now also holds the lockfile to the package version, so a release bump that forgets `npm install --package-lock-only` fails the release check.
 - A validator retains 8.3 KB of heap instead of 9.5 once it has validated (two thousand validators of a ten-key schema, each with its own schema, measured with `benchmark/bench_memory.cjs`). The compiled verdict function carried, for as long as it lived, the generated source and the factories that build the tiered forms from it, 2.2 of the 3.4 KB it retained; they are now compiled in full only when asked for, at the tier a validator reaches after its first calls or when a build emits it, from the schema again. A validator that gets there pays one more compile, a few hundred microseconds once; one that answers a handful of requests, or only verdicts, never does. Schemas with custom keywords compile in full at once, so a keyword's compile form still runs once per schema.
 - The error generator and the one-pass generator moved out of `lib/js-compiler.js` into `lib/js-compiler-errors.js`, read on the first call that compiles a validator's errors. They were 45 percent of the generator's source, parsed by every process at require; a verdict-only process never reads them now, and one that reads errors parses them when it does. The two files share the generator's helpers through an internal object; nothing in the package's interface changes.

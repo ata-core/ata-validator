@@ -187,6 +187,7 @@ const FILES = [
   "tests/test_verdict_preprocess.js",
   "tests/test_lite_parity.js",
   "tests/test_lite_bundle_size.js",
+  "tests/test_node_bundle.js",
   "tests/test_defaults_own_keys.js",
   "tests/test_plan_compiler.js",
   "tests/test_nullable.js",
