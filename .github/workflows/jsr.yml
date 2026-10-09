@@ -30,14 +30,18 @@ jobs:
         with:
           node-version: 22
 
+      # The registry lists a version minutes before its tarball can be fetched
+      # (1.48.0: nine minutes), and deno publish needs the tarball, so the wait
+      # is for the tarball itself, not the listing.
       - name: Wait for the npm version this package re-exports
         run: |
           VERSION=$(node -p "require('./jsr/jsr.json').version")
+          URL="https://registry.npmjs.org/ata-validator/-/ata-validator-$VERSION.tgz"
           for i in $(seq 1 120); do
-            npm view "ata-validator@$VERSION" version > /dev/null 2>&1 && exit 0
+            [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL")" = "200" ] && exit 0
             sleep 15
           done
-          echo "ata-validator@$VERSION not on the npm registry after 30 minutes"
+          echo "$URL not fetchable after 30 minutes"
           exit 1
 
       - name: Publish
