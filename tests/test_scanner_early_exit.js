@@ -29,10 +29,12 @@ for (const [doc, want] of cases) {
   assert.strictEqual(v.validateJSON(doc).valid, want, 'validateJSON ' + doc)
 }
 
-// The early exit: a 400 KB body whose first item fails must be refused in a
-// small fraction of the time a valid body takes to scan. The bound is loose
-// (a quarter) because the gain measured is twenty times and more; before
-// the shortcut the two took the same time.
+// The early exit: a 300 KB body whose first item fails must be refused in a
+// fraction of the time a valid body takes to scan. The bound is loose, half,
+// because the two searches that end the scan are native and their speed
+// against the scan loop's varies by machine (a fifth on an M4 Pro, nearer a
+// third on a loaded CI runner); before the shortcut the two took the same
+// time, so half still tells the shortcut apart from its absence.
 const item = { id: 'u1', name: 'Ada', age: 36, tags: ['a', 'b'] }
 const list = new Validator({
   type: 'object',
@@ -55,7 +57,7 @@ function time (doc, reps) {
   }
   return best
 }
-const full = time(valid, 20)
-const early = time(badFirst, 20)
-assert.ok(early < full / 4, `a bad first item should end the scan early: ${(early / 1000).toFixed(1)} us against ${(full / 1000).toFixed(1)} us for the full scan`)
+const full = time(valid, 30)
+const early = time(badFirst, 30)
+assert.ok(early < full / 2, `a bad first item should end the scan early: ${(early / 1000).toFixed(1)} us against ${(full / 1000).toFixed(1)} us for the full scan`)
 console.log(`ok: a failed member ends the scan when its key cannot repeat (${(early / 1000).toFixed(1)} us against ${(full / 1000).toFixed(1)} us for a valid ${(valid.length / 1024).toFixed(0)} KB body), and a repeat still follows the parser`)
