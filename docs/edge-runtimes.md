@@ -3,8 +3,11 @@
 Most JSON Schema validators compile a schema by generating JavaScript source and
 handing it to `new Function`. Several runtimes refuse that:
 
-- Cloudflare Workers
-- Deno Deploy
+- Cloudflare Workers, and `workerd` wherever it is run (Cloudflare has made
+  self-hosting it a supported way to run Workers, and the Deno team joined
+  Cloudflare in October 2026 to take that further)
+- Deno Deploy, until it closes: Cloudflare is moving its customers to Workers
+  over the six months from that announcement
 - Browser pages served under a Content-Security-Policy without `unsafe-eval`
 - Various embedded and mobile JavaScript runtimes
 
@@ -12,7 +15,12 @@ ata detects that code generation is unavailable and validates by walking the
 schema directly instead. Nothing to configure and no separate build for it.
 
 Every figure on this page was measured on `wrangler dev`, which runs the same
-`workerd` that Cloudflare runs in production, using ata 1.5.0.
+`workerd` that Cloudflare runs in production, using ata 1.5.0. Checked again
+on 2026-10-09 with ata 1.48.0 and wrangler 4.149: the
+[Hono starter](https://github.com/ata-core/hono-ata-starter), a compiled
+schema behind a route, answers a valid body with 201 and an invalid one with
+400 and the error list through `workerd` at 0.85 ms a request on a laptop,
+with no compatibility flag.
 
 ## Cloudflare Workers
 
@@ -143,14 +151,19 @@ import { Validator } from 'npm:ata-validator'
 import { Validator } from 'jsr:@ata/validator'
 ```
 
+Deno Deploy is closing: the Deno team joined Cloudflare in October 2026 and
+its customers move to Workers, where the section above applies as it is. The
+Deno runtime itself is maintained for a year more and open source after that;
+the package keeps working there, and JSR stays, now on Cloudflare's
+infrastructure.
+
 The JSR package re-exports the npm package of the same version, so the two are
 the same engine. CI runs the package under Deno on every change: the official
 suite in its three dialects (1301, 929 and 1135 cases, all passing), the
 suite with `eval` and `new Function` blocked, and a smoke test that refuses
 dynamic code the way Deno Deploy does and checks that the interpreted engine
-answers. On Deno Deploy itself nothing has been timed yet; the guarantee is
-the eval-free one above, which these tests cover, and a measurement there is
-still owed.
+answers. On Deno Deploy itself nothing was timed, and with its closing nothing
+will be; the guarantee is the eval-free one above, which these tests cover.
 
 Two things a Deno user meets on a release day: Deno's minimum dependency age
 refuses an npm version younger than 24 hours unless `--min-dep-age` or
