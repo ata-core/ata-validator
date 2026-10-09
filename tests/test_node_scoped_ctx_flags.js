@@ -149,6 +149,10 @@ function bothEngines (schema, cases, label) {
     'noCounting',
     // The prepared root of the error generator, the body of the `$ref: "#"` helper (genCodeENode).
     'rootE',
+    // Bytes of code written inline into the function being generated, swapped per hoisted
+    // function, and the count of property functions hoisted so far (emitPropFn, emitPropFnC,
+    // emitPropFnE): per compile, read only to decide where the next large property goes.
+    'fnBytes', 'propFns', 'fnBytesC', 'propFnsC', 'fnBytesE', 'propFnsE',
     'anchors', 'closureVals', 'closureVars', 'condDepth', 'cyclicDefs', 'defFns',
     'deferredChecks', 'helperCode', 'helpers', 'preamble', 'refStack', 'regExpMap',
     'rootDefs', 'rootSchema', 'schemaMap', 'shared', 'sourceMap', 'userFormats',

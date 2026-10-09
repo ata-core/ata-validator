@@ -160,6 +160,24 @@ flowchart TD
   absent native, the buffer/batch methods throw and everything else keeps working
   on JS.
 
+### Generated code stays small enough to optimize
+
+V8 does not optimize a function past its bytecode budget (about 60 KB of
+bytecode), and a schema of a few hundred properties compiled to one function
+of a megabyte or more that ran in the interpreter for its whole life, 7 to 10
+times slower than the same checks in functions of their own. All three
+generators therefore hoist a large property subschema into a function in the
+preamble (the verdict's `_pf<n>`, the error collector's `_pe<n>`, the one-pass
+function's `_pc<n>`) and call it where the property is checked. The decision is
+made on the schema's own size before any code is written, so nothing is
+generated twice, and once a function holds a budget of inline code smaller
+properties move out as well. A property function is generated against its real
+schema path, so its errors keep the precise ordinal keys the sorter uses; a
+property inside a shared definition's body, whose placeholder path is
+substituted after the fact, stays inline. `tests/test_generated_function_split.js`
+holds the bound and the agreement with the interpreted engine. The scanner
+splits the same way (`SPLIT_MIN`, `SPLIT_OBJECT` in `lib/scan-compiler.js`).
+
 ## Validating from the text: the scanner
 
 Measured end to end on a real request, `JSON.parse` is about three quarters of

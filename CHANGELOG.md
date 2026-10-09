@@ -2,6 +2,11 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+- Large property subschemas compile to functions of their own instead of inline code, in all three generators (the verdict, the error collector and the one-pass function). V8 does not optimize a function past its bytecode budget, and a configuration schema of a few hundred properties compiled to one function of a megabyte or more that ran in the interpreter for its whole life. Measured on a 167 KB schema of 140 sections with a 60 KB document, fresh `JSON.parse` on every call: the runtime verdict 522 to 154 µs (the parse alone is 115), a rejected document with its errors read 335 to 71 µs; a standalone module's `validate()` on the rejected document 891 to 146 µs, its `validateJSON()` with positions 1249 to 494, and with `--one-pass` 613 to 402. The threshold is on the schema's own size, so small schemas compile exactly as before; a property of fewer than 700 bytes of schema stays inline unless the function around it already holds 24 KB of code.
+
 ## 1.48.0 - 2026-10-09
 
 The lite entry is published at last, the text scanner stops at the first member it can refuse, the package is run under Deno in CI and published on JSR, and `parseJSON` works with the native engine loaded.
