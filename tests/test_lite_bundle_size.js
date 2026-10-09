@@ -60,7 +60,9 @@ const esbuild = require('esbuild')
 // building the paths for its errors: tsconfig's samples collect 42% faster.
 // 49500 with the environment reads and the one `new Function` site behind
 // two small modules (lib/env.js, lib/compile-fn.js): 28 bytes.
-const BUDGET = 49500
+// 49800 with the position map resolved on the first read of a frame instead
+// of with the error list (defineLazyFrames in lib/enrich-error.js): 266 bytes.
+const BUDGET = 49800
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
