@@ -2,6 +2,11 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+- A standalone module built without `--one-pass` reported every error with an extra `_o` field, the ordinal the runtime sorts errors by, which a module never reads: the collector is now compiled without it for modules and bundles, so an error carries the documented keys only (`tests/test_aot_error_shape.js`). Present since the ordinal was introduced; the one-pass module and the runtime were not affected.
+
 ## 1.48.0 - 2026-10-09
 
 Large schemas compile to code V8 can optimize, which makes a 167 KB configuration schema three to seven times faster to validate; the lite entry is published at last; the text scanner stops at the first member it can refuse; the package is run under Deno in CI and published on JSR; and `parseJSON` works with the native engine loaded.
