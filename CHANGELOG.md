@@ -2,14 +2,9 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
-
-### Changed
-- Large property subschemas compile to functions of their own instead of inline code, in all three generators (the verdict, the error collector and the one-pass function). V8 does not optimize a function past its bytecode budget, and a configuration schema of a few hundred properties compiled to one function of a megabyte or more that ran in the interpreter for its whole life. Measured on a 167 KB schema of 140 sections with a 60 KB document, fresh `JSON.parse` on every call: the runtime verdict 522 to 154 µs (the parse alone is 115), a rejected document with its errors read 335 to 71 µs; a standalone module's `validate()` on the rejected document 891 to 146 µs, its `validateJSON()` with positions 1249 to 494, and with `--one-pass` 613 to 402. The threshold is on the schema's own size, so small schemas compile exactly as before; a property of fewer than 700 bytes of schema stays inline unless the function around it already holds 24 KB of code.
-
 ## 1.48.0 - 2026-10-09
 
-The lite entry is published at last, the text scanner stops at the first member it can refuse, the package is run under Deno in CI and published on JSR, and `parseJSON` works with the native engine loaded.
+Large schemas compile to code V8 can optimize, which makes a 167 KB configuration schema three to seven times faster to validate; the lite entry is published at last; the text scanner stops at the first member it can refuse; the package is run under Deno in CI and published on JSR; and `parseJSON` works with the native engine loaded.
 
 Measured against 1.47.0 on an Apple M4 Pro, Node 25.2.1, pure JS: cold start 7.2 to 6.9 ms and `require` alone 4.8 to 4.5 ms; a served request, hot validation, compile time, heap per validator and every `ata build` module unchanged, the modules byte for byte. A 69 KB request body whose first item is wrong is refused from the text in 26 µs where 1.47.0 took 112.
 
@@ -22,6 +17,7 @@ Measured against 1.47.0 on an Apple M4 Pro, Node 25.2.1, pure JS: cold start 7.2
 - `parseJSON` threw `native.parseJSON is not a function` whenever the native engine was loaded: the addon has not carried that function since the per-platform packages, and the pure-JS fallback hid it. It parses with JSON.parse, and a Buffer is decoded first (`tests/test_parse_json.js`).
 
 ### Changed
+- Large property subschemas compile to functions of their own instead of inline code, in all three generators (the verdict, the error collector and the one-pass function). V8 does not optimize a function past its bytecode budget, and a configuration schema of a few hundred properties compiled to one function of a megabyte or more that ran in the interpreter for its whole life. Measured on a 167 KB schema of 140 sections with a 60 KB document, fresh `JSON.parse` on every call: the runtime verdict 522 to 154 µs (the parse alone is 115), a rejected document with its errors read 335 to 71 µs; a standalone module's `validate()` on the rejected document 891 to 146 µs, its `validateJSON()` with positions 1249 to 494, and with `--one-pass` 613 to 402. The threshold is on the schema's own size, so small schemas compile exactly as before; a property of fewer than 700 bytes of schema stays inline unless the function around it already holds 24 KB of code.
 - The JSON text scanner behind `isValidJSON()` and `validateJSON()` ends the scan when a member fails and its key cannot repeat later in the object: two native searches over the rest of the text, for the key as written and for any backslash, which is the only way to spell it differently, replace the full pass the duplicate-key rule required. A 69 KB request body whose first item is wrong is refused in 26 µs where it took 112, against 149 for JSON.parse alone; a wrong top-level shape stays at 1.5 µs. Verdicts are unchanged: a key that does repeat, plain or escaped, still goes to the parser (`tests/test_scanner_early_exit.js`, and the scanner differential's 413,178 comparisons agree).
 - `package.json` declares `"type": "commonjs"`, which it already was. Deno reads a `.js` file as ESM without it; Node's default is unchanged.
 
