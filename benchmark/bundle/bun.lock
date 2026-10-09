@@ -6,7 +6,7 @@
       "name": "ata-bundle-bench",
       "dependencies": {
         "@sinclair/typebox": "^0.34.52",
-        "ata-validator": "1.47.0",
+        "ata-validator": "1.48.0",
         "hono": "^4.13.7",
         "valibot": "^1.5.0",
         "zod": "^4.6.5",
@@ -14,23 +14,23 @@
     },
   },
   "packages": {
-    "@ata-validator/native-darwin-arm64": ["@ata-validator/native-darwin-arm64@1.47.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-gRtzCGXX1a5iahIbbA1RdhdYWtIdTCP/l6LktriB2+zERMzA1KYOF4YJVsIIHZuKR0xI8LsPF6DyKeol0nxLWw=="],
+    "@ata-validator/native-darwin-arm64": ["@ata-validator/native-darwin-arm64@1.48.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-H0AehP21SmjC2Ini0qvKHaFhKRiAsiztBlB89VAg9i5Z7haIuUmdfvNmOXfsOsKCXhmjkX0ofVSqNX6yPTpB8w=="],
 
-    "@ata-validator/native-darwin-x64": ["@ata-validator/native-darwin-x64@1.47.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-VD6Pu9zIXX+1w39JHcg4tl1bpQEF3nnKl/Yi6SBqHqqQJTRfhlZBEJDGdOzUK388XUWB9SEz45bMAEQZXt+7fw=="],
+    "@ata-validator/native-darwin-x64": ["@ata-validator/native-darwin-x64@1.48.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-khDtMiVEaxmsk0oLpDIxh13gDWTHcaNYANZpxEe3OorhVy4qgodo1R+5NaVT5C5MuXSAPZyVwOL1MgdxryElzA=="],
 
-    "@ata-validator/native-linux-arm64-gnu": ["@ata-validator/native-linux-arm64-gnu@1.47.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-den9oA5/0Q6Tvm5Q+M7bZsJUm/iO8C5QyWCxGi+DoYzSNnqanZHRaJupRGGRJ8ul5Wxz3XozkDDwZt4Rob8+yw=="],
+    "@ata-validator/native-linux-arm64-gnu": ["@ata-validator/native-linux-arm64-gnu@1.48.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-TytZy91RCYna1q00peaTRq6WPTbw8pcGCOVmSL0V4mIGYQoAxCbS8aeUvuHDzHvbGllFars1jmc+feJrzjCpBQ=="],
 
-    "@ata-validator/native-linux-arm64-musl": ["@ata-validator/native-linux-arm64-musl@1.47.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-aObW54CnwA5RiXxL4QcemLukE2TLA+OQBxF750kpZTQBKuvwBU2QlSJwNVRNY3M3mSva1y2b3WzFTjU+HUUEoQ=="],
+    "@ata-validator/native-linux-arm64-musl": ["@ata-validator/native-linux-arm64-musl@1.48.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-t8XPyuG3bpekq4ef8BbSMLubQvmwsy+H3s3cnyrBpMUCkUGuQhru7CKhsAQWfaUK4zaKwWF4gUkBoE7/89ow0w=="],
 
-    "@ata-validator/native-linux-x64-gnu": ["@ata-validator/native-linux-x64-gnu@1.47.0", "", { "os": "linux", "cpu": "x64" }, "sha512-GVWs/4x2CQQF8G4ffoJ9L78Nl8IyDO8Lft7ytPqoExXi4+B8yPZ2J/k/EYhuTYS0Kxvnf8o7Gcj6mnT+Q3acqg=="],
+    "@ata-validator/native-linux-x64-gnu": ["@ata-validator/native-linux-x64-gnu@1.48.0", "", { "os": "linux", "cpu": "x64" }, "sha512-qbLBm4MqhXWI5DR3DxFGL+BAJ5FIb1o1k8Ap+/Bzw+vVmizXRoYvzyDt8I1HqravEQtvkf8tNpLweh+VSz5a+w=="],
 
-    "@ata-validator/native-linux-x64-musl": ["@ata-validator/native-linux-x64-musl@1.47.0", "", { "os": "linux", "cpu": "x64" }, "sha512-VE+3w8VdDKKfxvUK9oR2NlTqlbh1h3HneopQKepbT7cuEIYZG26Zw5qT15tk49H4y9CfaEbToHLz1ANE9PoLiQ=="],
+    "@ata-validator/native-linux-x64-musl": ["@ata-validator/native-linux-x64-musl@1.48.0", "", { "os": "linux", "cpu": "x64" }, "sha512-xB9vsQhh88DiIHQS0EScSqTSK3nFLqeHJW5Te2rJl6e+pbxt7YVEJbCueeN/rLy1AQw1/m+Z6azkCchBArPmVQ=="],
 
-    "@ata-validator/native-win32-x64": ["@ata-validator/native-win32-x64@1.47.0", "", { "os": "win32", "cpu": "x64" }, "sha512-uyQfL79bjaqMExdXLGMEa0H1adabUSXmGHijqukVsmkyncTCnDlbsbBb45/33Zi4wxUfPV89Xp7+sUXSW9Y2bg=="],
+    "@ata-validator/native-win32-x64": ["@ata-validator/native-win32-x64@1.48.0", "", { "os": "win32", "cpu": "x64" }, "sha512-IJXHSe3mSUAAuc3aRcNQbG9Cqt4RYPvu7BWqD1ONHEXFF0nZAo700kdCOlpa2PzZ2PCgBDIdRAQcN8qE0Z/0oA=="],
 
     "@sinclair/typebox": ["@sinclair/typebox@0.34.52", "", {}, "sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw=="],
 
-    "ata-validator": ["ata-validator@1.47.0", "", { "optionalDependencies": { "@ata-validator/native-darwin-arm64": "1.47.0", "@ata-validator/native-darwin-x64": "1.47.0", "@ata-validator/native-linux-arm64-gnu": "1.47.0", "@ata-validator/native-linux-arm64-musl": "1.47.0", "@ata-validator/native-linux-x64-gnu": "1.47.0", "@ata-validator/native-linux-x64-musl": "1.47.0", "@ata-validator/native-win32-x64": "1.47.0" }, "peerDependencies": { "yaml": "^2.0.0" }, "optionalPeers": ["yaml"], "bin": { "ata": "bin/ata.js" } }, "sha512-wtoPiuzZYncOAhcK5UtucJd+Imf2giT47+CprUQPgjBBeHvTVHl2tvhpjx7CIiFXgx0uzLCUixc7gSqUewmrZA=="],
+    "ata-validator": ["ata-validator@1.48.0", "", { "optionalDependencies": { "@ata-validator/native-darwin-arm64": "1.48.0", "@ata-validator/native-darwin-x64": "1.48.0", "@ata-validator/native-linux-arm64-gnu": "1.48.0", "@ata-validator/native-linux-arm64-musl": "1.48.0", "@ata-validator/native-linux-x64-gnu": "1.48.0", "@ata-validator/native-linux-x64-musl": "1.48.0", "@ata-validator/native-win32-x64": "1.48.0" }, "peerDependencies": { "yaml": "^2.0.0" }, "optionalPeers": ["yaml"], "bin": { "ata": "bin/ata.js" } }, "sha512-06kRAUWqX0qZeWdFzpdyB4gMM51XiJjJTaTmdFKLtFOE1JCAwEB5/EnAGIlGVex9ruAbUbSq85fRvjX9lHCTaA=="],
 
     "hono": ["hono@4.13.8", "", {}, "sha512-/Gng7NfoykZl2pjukW5Z6+8Yxm3BPRf86GTbQnt0SbySkvax4fyL4H3HhY1cCpBGmiW9XDRFzRV+CXK2W8QudQ=="],
 
