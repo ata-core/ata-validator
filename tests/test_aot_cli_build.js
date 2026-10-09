@@ -66,10 +66,15 @@ test('cli: build --watch re-emits on change then exits on SIGINT', async () => {
   const until = async (ok, ms) => { const end = Date.now() + ms; while (!ok() && Date.now() < end) await new Promise((r) => setTimeout(r, 50)); return ok(); };
   assert(await until(() => /w\.schema\.json/.test(stdout), 15000), `initial build did not emit; stdout=${stdout}`);
 
-  // Modify the schema.
+  // Modify the schema, after a pause longer than the watcher's modification
+  // time granularity: a rewrite inside the same second as the first build
+  // went unseen on Linux in CI, and the re-emit never came.
+  await new Promise((resolve) => setTimeout(resolve, 1200));
   const altered = JSON.parse(fs.readFileSync(path.join(dir, 'w.schema.json'), 'utf8'));
   altered.properties.id.minimum = 7;
   fs.writeFileSync(path.join(dir, 'w.schema.json'), JSON.stringify(altered));
+  const later = new Date(Date.now() + 2000);
+  fs.utimesSync(path.join(dir, 'w.schema.json'), later, later);
 
   // Wait for the re-emit the same way.
   const reemits = () => (stdout.match(/w\.schema\.json/g) || []).length;
