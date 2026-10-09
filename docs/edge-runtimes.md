@@ -22,6 +22,13 @@ schema behind a route, answers a valid body with 201 and an invalid one with
 400 and the error list through `workerd` at 0.85 ms a request on a laptop,
 with no compatibility flag.
 
+An MCP server is the same shape with a different caller: the
+[MCP starter](https://github.com/ata-core/mcp-ata-workers-starter) compiles
+each tool's `inputSchema` and serves it through `@ata-project/mcp/aot`, so
+the Worker carries no validator engine and a wrong tool call comes back to the
+model naming the field, what was expected and what arrived. Through `workerd`
+a validated `tools/call` answers in 1.34 ms at the median.
+
 ## Cloudflare Workers
 
 No compatibility flags. `nodejs_compat` is **not** required.
