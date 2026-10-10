@@ -46,7 +46,7 @@ or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; 
 In Cloudflare Workers and Vercel Edge, where generated code cannot run, `ata-validator`
 resolves to an entry without the code generator through the `workerd` and `edge-light` export
 conditions: the same names and answers, and a Worker bundled by wrangler goes from 179.1 to
-81.4 KiB gzipped. On a page whose Content-Security-Policy blocks `unsafe-eval`, or in a
+70.4 KiB gzipped. On a page whose Content-Security-Policy blocks `unsafe-eval`, or in a
 browser extension, no condition tells the bundler, so import `ata-validator/lite` there: the
 same `Validator` on the interpreted engine alone.
 

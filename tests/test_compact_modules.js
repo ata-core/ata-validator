@@ -188,6 +188,16 @@ const tests = [
     assert(out.stdout.trim() === '[true,["type","pattern"],true,false]', out.stdout);
   }],
 
+  ['compiledModuleFor leaves new Validator(schema) its own instance', () => {
+    const b = require('../build');
+    const schema = { type: 'object', properties: { a: { type: 'string' } } };
+    b.compiledModuleFor(schema, { format: 'cjs' });
+    b.compiledModuleFor(schema, { format: 'cjs', errorRuntime: './e.cjs' });
+    const v = new Validator(schema);
+    assert(v._initialized === false, 'a caller\'s new Validator must not be the compiled instance the build kept');
+    v._extendChecks(() => null);
+  }],
+
   ['codes and docUrl are stamped like a module stamps them', () => {
     const dir = tmpDir();
     fs.writeFileSync(path.join(dir, 'ata-errors.cjs'), aot.errorRuntimeSource('cjs'));

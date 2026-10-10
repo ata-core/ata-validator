@@ -73,6 +73,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // (error-runtime.js), its rank sort (lib/error-sort-rank.js) and code table
 // (lib/error-code-of.js), and the interpreter split in two
 // (lib/interpreter-core.js). Measured 400.1 KB at the time.
-assert.ok(manifest.size < 404 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 408 KB within 1.49.0: the edge entry (index.edge.js, index.edge.mjs), the
+// tools as separate ES imports (lib/tools.mjs) and index.js split into
+// lib/codegen-engine.js and lib/public-api.js. Measured 405.1 KB at the time.
+assert.ok(manifest.size < 408 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

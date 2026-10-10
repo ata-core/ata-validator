@@ -141,7 +141,7 @@ bundler builds for one of them it says so through an export condition
 without the generator: nothing to change in the code, the same names, the
 same verdicts and errors as the full package gives in those runtimes. A
 Worker with one validated route, bundled by wrangler 4.149.0, went from
-912.8 KiB (179.1 KiB gzipped) to 424.8 KiB (81.4 KiB gzipped). Modules from
+912.8 KiB (179.1 KiB gzipped) to 376.4 KiB (70.4 KiB gzipped). Modules from
 `ata build` load through it; the emitters (`Validator.bundle` and the rest)
 point to `ata-validator/aot`, as they do in a browser bundle.
 

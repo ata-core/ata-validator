@@ -13,7 +13,9 @@ const path = require('path')
 
 const INTERNAL = new Set(['attachSuggestions'])
 const cjs = Object.keys(require('..')).filter((k) => !INTERNAL.has(k))
-for (const file of ['index.mjs', 'index.node.mjs', 'index.browser.mjs']) {
+// index.browser.mjs and index.edge.mjs export the tools one by one (see
+// lib/tools.mjs) and are checked by importing them, below.
+for (const file of ['index.mjs', 'index.node.mjs']) {
   const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
   const m = src.match(/export const \{([^}]*)\}/)
   const names = m ? m[1].split(',').map((s) => s.trim()).filter(Boolean) : []
@@ -21,13 +23,14 @@ for (const file of ['index.mjs', 'index.node.mjs', 'index.browser.mjs']) {
 }
 
 ;(async () => {
-  for (const file of ['index.mjs', 'index.node.mjs']) {
+  for (const file of ['index.mjs', 'index.node.mjs', 'index.browser.mjs', 'index.edge.mjs']) {
     const esm = await import(`../${file}`)
+    for (const k of cjs) assert.notStrictEqual(esm.default[k], undefined, `${file} default export lacks ${k}`)
     for (const k of cjs) assert.notStrictEqual(esm[k], undefined, `${file} ${k}`)
     // One module instance behind every entry, so a class check holds across them.
     assert.strictEqual(esm.Validator, require('..').Validator, `${file} loads a second copy of index.js`)
   }
-  console.log(`ok: the three ESM entries export the ${cjs.length} public names of index.js`)
+  console.log(`ok: the four ESM entries export the ${cjs.length} public names of index.js`)
   // The subpath entries list their names by hand too. build.mjs lacked
   // compiledModuleFor, which 1.35.0 introduced for bundler plugins, and
   // schemaHash, which build.d.ts declares.

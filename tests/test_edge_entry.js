@@ -85,14 +85,17 @@ const root = path.resolve(__dirname, '..');
   try {
     const build = (conditions, platform) => esbuild.buildSync({ entryPoints: [entry], bundle: true, minify: true, format: 'esm', platform, conditions, mainFields: ['browser', 'module', 'main'], write: false, metafile: true, logLevel: 'silent'});
     const worker = build(['workerd', 'worker', 'browser'], 'neutral');
-    const inputs = Object.keys(worker.metafile.inputs);
-    assert.ok(inputs.some((k) => k.endsWith('index.edge.js')), 'the workerd condition selects the edge entry');
+    // Inputs a bundler shook out entirely are listed with no bytes in the output.
+    const shipped = (r) => Object.entries(Object.values(r.metafile.outputs)[0].inputs).filter(([, v]) => v.bytesInOutput > 0).map(([k]) => k);
+    const inputs = shipped(worker);
+    assert.ok(inputs.some((k) => /index\.edge\.m?js$/.test(k)), 'the workerd condition selects the edge entry');
+    assert.ok(!inputs.some((k) => /ts-gen|render-pretty|output-format|describe-schema/.test(k)), 'tools the application does not import stay out');
     assert.ok(!inputs.some((k) => /js-compiler|codegen-engine/.test(k)), 'no code generator in a Workers bundle');
     const size = require('zlib').gzipSync(worker.outputFiles[0].contents, { level: 9 }).length;
-    // 60.5 KB measured when the entry was added.
-    assert.ok(size < 64 * 1024, `the Workers bundle is ${size} bytes gzipped, over 64 KB`);
+    // 52.5 KB measured when the tools became separate imports (60.7 before).
+    assert.ok(size < 56 * 1024, `the Workers bundle is ${size} bytes gzipped, over 56 KB`);
     const browser = build(['browser'], 'browser');
-    assert.ok(Object.keys(browser.metafile.inputs).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
+    assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     console.log(`ok: a Workers bundle resolves to the edge entry, ${size} bytes gzipped, no code generator`);
   } finally {
     fs.rmSync(entry, { force: true });
