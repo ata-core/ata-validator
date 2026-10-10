@@ -814,22 +814,40 @@ function hasDefaultsInside(node, seen) {
 function emitDefaults(node, ov, lines, st) {
   if (st.seen.has(node)) { st.cycle = true; return; }
   st.seen.add(node);
+  // A default is written only where the key is not an own property, and the
+  // own-property test used to be Object.hasOwn for every default on every
+  // call: on a configuration schema of 82 defaults that was 820 ns a call
+  // for a document that already carried every key, against 12 ns with the
+  // pass off. For a plain object (prototype Object.prototype) a key the
+  // prototype does not have is own exactly when reading it gives a value, so
+  // the read, an inline-cached load, settles the common case and hasOwn is
+  // consulted only when the read gives undefined. Keys Object.prototype does
+  // have (constructor, toString, __proto__) keep the hasOwn test, since the
+  // read would find the inherited one; so does any object with another
+  // prototype, where a read may find an inherited value of the same name.
+  const pk = '_pk' + st.n++;
+  lines.push(`const ${pk}=Object.getPrototypeOf(${ov})===Object.prototype`);
   for (const [key, prop] of Object.entries(node.properties || {})) {
     if (!prop || typeof prop !== 'object') continue;
     const k = JSON.stringify(key);
+    const inherited = key in Object.prototype;
+    const absent = inherited ? `!Object.hasOwn(${ov},${k})` : `(${ov}[${k}]===undefined||!${pk})&&!Object.hasOwn(${ov},${k})`;
     if (prop.default !== undefined) {
       const def = JSON.stringify(prop.default);
       // Assignment to a key named __proto__ hits the prototype setter
       // instead of creating a property; defineProperty writes an own key.
       lines.push(key === '__proto__'
-        ? `if(!Object.hasOwn(${ov},${k}))Object.defineProperty(${ov},${k},{value:${def},writable:true,enumerable:true,configurable:true})`
-        : `if(!Object.hasOwn(${ov},${k}))${ov}[${k}]=${def}`);
+        ? `if(${absent})Object.defineProperty(${ov},${k},{value:${def},writable:true,enumerable:true,configurable:true})`
+        : `if(${absent})${ov}[${k}]=${def}`);
     }
     // Into an own property that holds an object, arrays included, as the
-    // closure pass walks it.
+    // closure pass walks it. Object.prototype's own properties are functions
+    // apart from the __proto__ accessor, so on a plain object a read that
+    // gives an object is an own property for every other key.
     if (prop.properties && hasDefaultsInside(prop, new Set())) {
       const n = '_d' + st.n++;
-      lines.push(`if(Object.hasOwn(${ov},${k})){const ${n}=${ov}[${k}];if(typeof ${n}==='object'&&${n}!==null){`);
+      const own = inherited ? `Object.hasOwn(${ov},${k})` : `(${pk}||Object.hasOwn(${ov},${k}))`;
+      lines.push(`{const ${n}=${ov}[${k}];if(typeof ${n}==='object'&&${n}!==null&&${own}){`);
       emitDefaults(prop, n, lines, st);
       lines.push('}}');
     }

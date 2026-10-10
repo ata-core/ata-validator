@@ -4,6 +4,9 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Changed
+- The generated defaults pass reads a key before it asks `Object.hasOwn` about it, and asks only when the read gives undefined, for plain objects and keys `Object.prototype` does not have. On a configuration schema with 82 defaults (SchemaStore's rustfmt), `validate()` on a document that already carried every key cost 827 ns and now costs 52; with `useDefaults: false` it is 12. What is written is unchanged: a new test pins the generated pass to the closure pass on documents with inherited names, null prototypes, explicit `undefined` and `__proto__` keys. Found by timing SchemaStore's 431 sample-bearing schemas against the default validator, where ata lost on the schemas with many defaults and nowhere else for this reason.
+
 ### Fixed
 - A standalone module built without `--one-pass` reported every error with an extra `_o` field, the ordinal the runtime sorts errors by, which a module never reads: the collector is now compiled without it for modules and bundles, so an error carries the documented keys only (`tests/test_aot_error_shape.js`). Present since the ordinal was introduced; the one-pass module and the runtime were not affected.
 
