@@ -62,7 +62,10 @@ const esbuild = require('esbuild')
 // two small modules (lib/env.js, lib/compile-fn.js): 28 bytes.
 // 49800 with the position map resolved on the first read of a frame instead
 // of with the error list (defineLazyFrames in lib/enrich-error.js): 266 bytes.
-const BUDGET = 49800
+// 50100 with the deterministic rule in lib/regex-linear.js (49821 measured):
+// 90 more SchemaStore patterns on the platform RegExp, at 3.5 to 5x the
+// linear engine's speed per character.
+const BUDGET = 50100
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

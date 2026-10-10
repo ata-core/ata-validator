@@ -11,7 +11,7 @@
 const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
-const { compileSafe } = require('../lib/safe-regex')
+const { compileSafe, parse } = require('../lib/safe-regex')
 const { nativeIsLinear } = require('../lib/regex-linear')
 
 // Patterns from the official suite and the synthetic ones below. A one-off run
@@ -24,8 +24,14 @@ const patterns = new Set([
   // Finite repeats of a group, which the rule accepts when the group holds no
   // unbounded quantifier (a SHA-256 fingerprint, a dotted quad, a tag list).
   '^(?:[A-F0-9]{2}:){31}[A-F0-9]{2}$', '^(?:\\d{1,3}\\.){3}\\d{1,3}$', '^([a-z]{2}-){1,3}[a-z]{2}$', '^(?:(ab)?c){2}$',
-  // Still declined: an unbounded quantifier over a group, and nesting.
-  '^([A-Za-z]{1}[A-Za-z\\d_]*\\.)+[A-Za-z][A-Za-z\\d_]*$', '^(a+)+$', '^(?:ab)*$',
+  // Accepted by the deterministic rule: unbounded quantifiers over groups
+  // where the next character always decides the way on (dotted identifiers,
+  // `[^/]+/[^/]+`, version numbers, `(ab)*`).
+  '^[^/]+/[^/]+$', '^\\d+(\\.\\d+)*$', '^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$', '^(?:ab)*$', '^(a|b)*c$',
+  '^[a-z0-9]+(-[a-z0-9]+)*$', '^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$', '^\\w+@\\w+\\.\\w+$', '^did:[a-z0-9]+:.+$',
+  // Still declined: a loop whose body splits two ways, nesting, and a loop
+  // whose first character the continuation shares.
+  '^([A-Za-z]{1}[A-Za-z\\d_]*\\.)+[A-Za-z][A-Za-z\\d_]*$', '^(a+)+$', '^(\\w+\\s?)*$',
 ])
 function collect (node) {
   if (!node || typeof node !== 'object') return
@@ -56,6 +62,36 @@ function inputsFor (p) {
   return out
 }
 
+function leaves (p) {
+  const out = []
+  ;(function walk (n) {
+    if (!n || typeof n !== 'object') return
+    if (n.t === 'char' || n.t === 'class' || n.t === 'any') out.push(n)
+    if (n.child) walk(n.child)
+    if (n.parts) n.parts.forEach(walk)
+    if (n.opts) n.opts.forEach(walk)
+  })(parse(p))
+  return out
+}
+function sampleChar (leaf) {
+  if (leaf.t === 'char') return String.fromCharCode(leaf.c)
+  if (leaf.t === 'any') return 'a'
+  if (!leaf.neg && leaf.ranges[0]) return String.fromCharCode(leaf.ranges[0][0])
+  for (let c = 97; c < 123; c++) if (!leaf.ranges.some(([lo, hi]) => c >= lo && c <= hi)) return String.fromCharCode(c)
+  return 'a'
+}
+function probesFor (p) {
+  const out = ['a'.repeat(20000) + '\u0000']
+  const ls = leaves(p).slice(0, 6).map(sampleChar)
+  for (const ch of ls) out.push(ch.repeat(20000) + '\u0000')
+  if (ls.length >= 2) {
+    out.push((ls[0] + ls[1]).repeat(10000) + '\u0000')
+    out.push((ls[0].repeat(50) + ls[1]).repeat(400) + '\u0000')
+    out.push((ls[1].repeat(50) + ls[0]).repeat(400) + '\u0000')
+  }
+  return out
+}
+
 let accepted = 0, compared = 0
 for (const p of patterns) {
   if (!nativeIsLinear(p)) continue
@@ -66,18 +102,28 @@ for (const p of patterns) {
     assert.strictEqual(native.test(x), safe.test(x), `${JSON.stringify(p)} on ${JSON.stringify(x)}`)
     compared++
   }
-  // Linear on a long input made of what the pattern accepts, with a failing
-  // last character, which is what makes a backtracking engine retry.
-  const probe = 'a'.repeat(20000) + '\u0000'
-  const t = process.hrtime.bigint()
-  native.test(probe)
-  const ms = Number(process.hrtime.bigint() - t) / 1e6
-  assert.ok(ms < 250, `${JSON.stringify(p)} took ${ms.toFixed(1)} ms on a 20000-character probe`)
+  // Linear on long inputs made of what the pattern accepts, with a failing
+  // last character, which is what makes a backtracking engine retry: a run
+  // of one character for each of the pattern's first few leaves, two of them
+  // alternating, and a long run broken by the other.
+  for (const probe of probesFor(p)) {
+    const t = process.hrtime.bigint()
+    native.test(probe)
+    const ms = Number(process.hrtime.bigint() - t) / 1e6
+    assert.ok(ms < 250, `${JSON.stringify(p)} took ${ms.toFixed(1)} ms on a ${probe.length}-character probe`)
+  }
 }
 
-// Patterns a backtracking engine would retry on stay on the linear engine.
-for (const p of ['(a+)+$', '^(a|aa)+$', '^a+a+$', 'a+b', '^(ab)*$', '^[a-z]{0,1000}$', '^(\\w+\\s?)+$', '\\01']) {
+// Patterns a backtracking engine would retry on stay on the linear engine:
+// nested loops, a loop body that splits two ways, a loop the continuation
+// shares its characters with, and unanchored loops.
+for (const p of ['(a+)+$', '^(a+)+$', '^(a|aa)+$', '^a+a+$', '^a*a*$', 'a+b', '^[a-z]{0,1000}$', '^(\\w+\\s?)+$', '^(\\w+\\s?)*$', '\\01',
+  '^(a*)*b$', '^(a?)+$', '^(.*a){10}$', '^[a-z]+[a-z0-9]+$', '^(\\w+\\s?){5}$', '\\w+(,\\w+)*', '^([a-z]+\\.?)+$']) {
   assert.strictEqual(nativeIsLinear(p), false, p)
+}
+// And the deterministic rule takes what the simple one cannot.
+for (const p of ['^[^/]+/[^/]+$', '^\\d+(\\.\\d+)*$', '^(?:ab)*$', '^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$', '^(a|b)*c$']) {
+  assert.strictEqual(nativeIsLinear(p), true, p)
 }
 
 assert.ok(accepted >= 30, `only ${accepted} patterns compared`)
