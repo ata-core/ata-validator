@@ -198,6 +198,22 @@ const tests = [
     v._extendChecks(() => null);
   }],
 
+  ['the runtime warms itself up once when the browser is idle, and only there', () => {
+    // A child process each: whether requestIdleCallback exists is read when
+    // the runtime loads.
+    for (const [label, src] of [['generated runtime', aot.errorRuntimeSource('cjs', [new Validator({ type: 'string' })])], ['package entry', null]]) {
+      const dir = tmpDir();
+      let target = path.join(__dirname, '..', 'error-runtime.js');
+      if (src !== null) { target = path.join(dir, 'rt.cjs'); fs.writeFileSync(target, src); }
+      const withIdle = spawnSync(process.execPath, ['-e', `
+        let n = 0; globalThis.requestIdleCallback = (f) => { n++; setTimeout(() => { f(); const { createErrors } = require(${J(target)}); const e = createErrors({ type: 'object', required: ['x'] })({}); console.log(JSON.stringify([n, e.map((x) => x.keyword)])); }, 0); };
+        require(${J(target)});`], { encoding: 'utf8' });
+      assert(withIdle.stdout.trim() === '[1,["required"]]', label + ': ' + (withIdle.stderr || withIdle.stdout));
+      const without = spawnSync(process.execPath, ['-e', `require(${J(target)}); console.log(typeof requestIdleCallback)`], { encoding: 'utf8' });
+      assert(without.status === 0 && without.stdout.trim() === 'undefined', label + ': ' + without.stderr);
+    }
+  }],
+
   ['codes and docUrl are stamped like a module stamps them', () => {
     const dir = tmpDir();
     fs.writeFileSync(path.join(dir, 'ata-errors.cjs'), aot.errorRuntimeSource('cjs'));

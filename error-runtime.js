@@ -24,4 +24,14 @@ function compileSafe(src) {
   return _safe(src);
 }
 
+// Warm-up, in a browser only: the runtime's code compiles on its first use,
+// which a page would otherwise pay for on its first rejected document, about
+// a millisecond. When the browser is idle, one small error list is built here
+// instead, once, so the first real one finds the code compiled. Nothing it
+// does reaches a caller, and it never runs where there is no
+// requestIdleCallback (Node, workers, servers).
+const WARM_SCHEMA = { type: 'object', properties: { a: { type: 'string' }, b: { type: 'integer', minimum: 0 }, c: { anyOf: [{ type: 'string' }, { type: 'null' }] }, f: { type: 'string', format: 'email' } }, required: ['d'], additionalProperties: false };
+function warm() { try { createErrors(WARM_SCHEMA, { flat: true })({ a: 1, b: -1, c: 2, f: 'x', e: 0 }); } catch (_) {} }
+if (typeof requestIdleCallback === 'function') { try { requestIdleCallback(warm); } catch (_) {} }
+
 module.exports = { createErrors, compileSafe, ataVersion };
