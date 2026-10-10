@@ -19,11 +19,9 @@ const { spawnSync } = require('child_process')
 const root = path.resolve(__dirname, '..')
 const EXPECTED = [
   'index.js',
-  // index.js split in three (1.49.0): the code generator's paths in
-  // lib/codegen-engine.js and the public names in lib/public-api.js, so the
-  // edge entry can leave the first out. Same code, measured no slower to load.
+  // The code generator's paths, split out of index.js so the edge entry
+  // (index.edge.js) can leave them out.
   'lib/codegen-engine.js',
-  'lib/public-api.js',
   'lib/combined-runtime.js',
   'lib/diagnostic-source.js',
   'lib/dialect.js',
