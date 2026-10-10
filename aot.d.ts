@@ -37,7 +37,8 @@ export interface CompactModuleOptions {
  * Emit a compact module: the verdict function and the schema without its
  * descriptive keywords, with error detail from the shared runtime at
  * `opts.errorRuntime` (see errorRuntimeSource). The errors are the ones the
- * runtime Validator reports, in its order. Null when the validator depends on
+ * runtime Validator reports with `richErrors: false`, in its order, and
+ * `errorMessage` is not applied, as in toStandaloneModule. Null when the validator depends on
  * something outside its schema (custom keywords or formats, registered
  * schemas, options other than the defaults); write the self-contained module
  * then. `ata build` makes this choice by itself.

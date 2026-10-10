@@ -190,7 +190,7 @@ export function compiledSchemaFor(schema: unknown): object;
  * {@link compiledEligible} declines, one the emitter cannot compile, and one
  * whose detailed errors the generator cannot produce.
  */
-export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cjs' }): string | null;
+export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cjs'; errorRuntime?: string }): string | null;
 
 /**
  * The Validator options `fromCompiled()` reproduces, so a plugin can tell

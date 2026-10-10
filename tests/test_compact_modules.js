@@ -32,9 +32,10 @@ const DIALECTS = {
 
 let n = 0;
 function loadPair(dir, schema, opts) {
-  const v = new Validator(schema, opts);
-  const full = aot.toStandaloneModule(v, { format: 'cjs', onWarning() {} });
-  const compact = aot.toCompactModule(v, { format: 'cjs', errorRuntime: './ata-errors.cjs' });
+  // The compact module first, from a validator nothing has compiled yet: its
+  // checks must not depend on what an earlier call left behind.
+  const compact = aot.toCompactModule(new Validator(schema, opts), { format: 'cjs', errorRuntime: './ata-errors.cjs' });
+  const full = aot.toStandaloneModule(new Validator(schema, opts), { format: 'cjs', onWarning() {} });
   if (!full || !compact) return null;
   const fa = path.join(dir, `full${n}.cjs`), fb = path.join(dir, `compact${n}.cjs`); n++;
   fs.writeFileSync(fa, full); fs.writeFileSync(fb, compact);
@@ -69,6 +70,37 @@ const tests = [
       }
     }
     assert(schemas > 1300 && cases > 2000, `too little covered: ${schemas} schemas, ${cases} invalid cases`);
+    assert(bad.length === 0, `${bad.length} differences, first:\n${bad.slice(0, 3).join('\n')}`);
+  }],
+
+  ['behind ata-validator/compiled, a compact module answers as new Validator(schema) does', () => {
+    const b = require('../build');
+    const { fromCompiled } = require('../compiled');
+    const dir = tmpDir();
+    const runtime = path.join(__dirname, '..', 'error-runtime.js');
+    let modules = 0, cases = 0;
+    const bad = [];
+    for (const [dia, uri] of Object.entries({ 'draft2020-12': DIALECTS['draft2020-12'], draft7: DIALECTS.draft7 })) {
+      const sdir = path.join(__dirname, 'suite/tests', dia);
+      for (const f of fs.readdirSync(sdir).filter((x) => x.endsWith('.json'))) {
+        for (const g of JSON.parse(fs.readFileSync(path.join(sdir, f), 'utf8'))) {
+          const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
+          let src; try { src = b.compiledModuleFor(schema, { format: 'cjs', errorRuntime: runtime }); } catch { continue; }
+          if (!src || !src.includes('createErrors')) continue;
+          const file = path.join(dir, `w${n++}.cjs`);
+          fs.writeFileSync(file, src);
+          const w = fromCompiled(require(file), b.compiledSchemaFor(schema));
+          const rt = new Validator(schema);
+          modules++;
+          for (const t of g.tests) {
+            cases++;
+            const a = J(w.validate(structuredClone(t.data))), c = J(rt.validate(structuredClone(t.data)));
+            if (a !== c) bad.push(`${dia}/${f}: ${g.description} / ${t.description}\n  compiled ${a.slice(0, 300)}\n  runtime  ${c.slice(0, 300)}`);
+          }
+        }
+      }
+    }
+    assert(modules > 500 && cases > 1800, `too little covered: ${modules} modules, ${cases} cases`);
     assert(bad.length === 0, `${bad.length} differences, first:\n${bad.slice(0, 3).join('\n')}`);
   }],
 
@@ -110,6 +142,20 @@ const tests = [
     const withMap = new Validator({ $ref: 'https://x.test/a' }, { schemas: { 'https://x.test/a': { type: 'string' } } });
     assert(aot.compactDecline(withMap) !== null, 'registered schemas');
     assert(aot.toCompactModule(new Validator(s, { assertFormat: false }), { errorRuntime: './e.mjs' }) === null, 'toCompactModule returns null');
+  }],
+
+  ['a reference outside the schema keeps the self-contained module', () => {
+    const b = require('../build');
+    for (const s of [
+      { $ref: 'https://json-schema.org/draft/2020-12/schema' },
+      { properties: { a: { $ref: '#/$defs/missing' } } },
+    ]) {
+      assert(aot.compactDecline(new Validator(s)) !== null, 'declined: ' + J(s));
+      const src = b.compiledModuleFor(s, { format: 'cjs', errorRuntime: 'ata-validator/error-runtime' });
+      assert(src === null || !src.includes('error-runtime'), 'compiledModuleFor wrote a compact module for ' + J(s));
+    }
+    const local = { $id: 'https://x.test/r', $defs: { a: { $id: 'a.json', type: 'string' } }, $ref: 'a.json' };
+    assert(aot.compactDecline(new Validator(local)) === null, 'a reference to an embedded resource stays eligible');
   }],
 
   ['a "__proto__" property name stays a property', () => {

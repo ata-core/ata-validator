@@ -270,8 +270,9 @@ descriptive keywords (`title`, `description`, `examples` and the like). When a
 document fails, the module hands it to `ata-errors.mjs` (or `.cjs`), one file
 the build writes beside the modules and every one of them imports, which walks
 the schema with the interpreted engine. The errors are the ones the runtime
-`Validator` reports, in the order it reports them, codes and `docUrl`
-included. The build chooses per module, and writes the runtime only when the
+`Validator` reports with `richErrors: false`, in the order it reports them,
+with the codes and `docUrl` a module adds. Like the self-contained module, a
+compact module does not apply `errorMessage`. The build chooses per module, and writes the runtime only when the
 modules that use it save more than it weighs, so one small schema keeps its
 self-contained module. `--errors inline` keeps every module self-contained,
 `--errors shared` uses the runtime wherever a module can. A validator that

@@ -54,6 +54,11 @@
       "import": "./lite.mjs",
       "require": "./lite.js"
     },
+    "./error-runtime": {
+      "types": "./error-runtime.d.ts",
+      "import": "./error-runtime.mjs",
+      "require": "./error-runtime.js"
+    },
     "./package.json": "./package.json"
   },
   "sideEffects": false,
@@ -147,6 +152,9 @@
     "lite.js",
     "lite.mjs",
     "lite.d.ts",
+    "error-runtime.js",
+    "error-runtime.mjs",
+    "error-runtime.d.ts",
     "bin/",
     "README.md",
     "LICENSE"
