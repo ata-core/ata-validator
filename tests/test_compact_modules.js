@@ -216,6 +216,50 @@ const tests = [
     require('assert').deepStrictEqual(JSON.parse(out.stdout), want);
   }],
 
+  ['ata build --base-uri: a shared file without $id, a registry with only what the modules reach', async () => {
+    const dir = tmpDir();
+    const U = 'https://example.test/k/';
+    // Shaped like the Kubernetes schemas: no $id anywhere, references by URL
+    // into one definitions file, most of which these schemas never use.
+    const defs = { definitions: {
+      Meta: { type: 'object', properties: { name: { type: 'string', minLength: 1 }, labels: { $ref: '#/definitions/Labels' } }, required: ['name'] },
+      Labels: { type: 'object', additionalProperties: { type: 'string' } },
+      Port: { type: 'integer', minimum: 1, maximum: 65535 },
+      Unused: { type: 'string', description: 'z'.repeat(400) },
+    } };
+    const svc = { type: 'object', properties: { metadata: { $ref: U + '_definitions.json#/definitions/Meta' }, port: { $ref: U + '_definitions.json#/definitions/Port' } }, required: ['metadata'] };
+    fs.writeFileSync(path.join(dir, '_definitions.json'), J(defs));
+    fs.writeFileSync(path.join(dir, 'service.json'), J(svc));
+    const globs = [path.join(dir, '*.json')];
+    const without = await build({ globs, outDir: path.join(dir, 'a'), types: false, mode: 'schema' });
+    const skip = without.skipped.find((x) => x.input.endsWith('service.json'));
+    assert(skip && skip.reason.includes(U + '_definitions.json#/definitions/Meta') && skip.reason.includes('--base-uri'), 'the skip names the reference: ' + (skip && skip.reason));
+    const r = await build({ globs, outDir: path.join(dir, 'b'), types: false, mode: 'schema', baseUri: U });
+    assert(r.compiled.some((c) => c.output.endsWith('service.compiled.mjs') && c.errors === 'schema'), 'built as a schema module');
+    const reg = fs.readFileSync(path.join(dir, 'b', 'ata-registry.mjs'), 'utf8');
+    assert(reg.includes('Labels') && reg.includes('Port') && !reg.includes('Unused'), 'the registry keeps what is reached, through another definition too, and drops the rest');
+    const docs = [{ metadata: { name: 'a', labels: { x: 'y' } }, port: 80 }, { metadata: { name: '', labels: { x: 1 } }, port: 0 }, { port: 'x' }];
+    const out = spawnSync(process.execPath, ['--disallow-code-generation-from-strings', '--input-type=module', '-e',
+      `const m = await import(${J(require('url').pathToFileURL(path.join(dir, 'b', 'service.compiled.mjs')).href)}); console.log(JSON.stringify(${J(docs)}.map((d) => { const x = m.validate(d); return [m.isValid(d), x.errors.map((e) => [e.keyword, e.instancePath, e.schemaPath])]; })))`], { encoding: 'utf8' });
+    assert(out.status === 0, out.stderr);
+    const v = new Validator(svc, { schemas: [{ $id: U + '_definitions.json', ...defs }] });
+    const want = docs.map((d) => { const x = v.validate(d); return [x.valid, x.valid ? [] : x.errors.map((e) => [e.keyword, e.instancePath, e.schemaPath])]; });
+    require('assert').deepStrictEqual(JSON.parse(out.stdout), want);
+  }],
+
+  ['the registry is kept whole when a module names a document as a whole', async () => {
+    const dir = tmpDir();
+    const U = 'https://example.test/w/';
+    const defs = { type: 'object', definitions: { A: { type: 'string' }, B: { type: 'integer' } } };
+    fs.writeFileSync(path.join(dir, 'defs.json'), J(defs));
+    fs.writeFileSync(path.join(dir, 'x.json'), J({ type: 'object', properties: { whole: { $ref: U + 'defs.json' }, a: { $ref: U + 'defs.json#/definitions/A' } } }));
+    await build({ globs: [path.join(dir, '*.json')], outDir: path.join(dir, 'o'), types: false, mode: 'schema', baseUri: U });
+    const reg = fs.readFileSync(path.join(dir, 'o', 'ata-registry.mjs'), 'utf8');
+    const kept = JSON.parse(JSON.parse(reg.slice(reg.indexOf('JSON.parse(') + 11, reg.lastIndexOf(')'))));
+    const d = kept.find((x) => x.$id === U + 'defs.json');
+    require('assert').deepStrictEqual(Object.keys(d.definitions), ['A', 'B'], 'every definition kept');
+  }],
+
   ['compiledModuleFor leaves new Validator(schema) its own instance', () => {
     const b = require('../build');
     const schema = { type: 'object', properties: { a: { type: 'string' } } };

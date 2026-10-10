@@ -80,6 +80,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // that reference each other (lib/aot-build.js, lib/aot-impl.js), and the
 // error order following a reference into another document
 // (lib/schema-order.js). Measured 410.2 KB at the time.
-assert.ok(manifest.size < 412 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 416 KB with `ata build --base-uri` and the registry pruned to the
+// definitions its modules reach (lib/aot-build.js). Measured 412.2 KB.
+assert.ok(manifest.size < 416 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

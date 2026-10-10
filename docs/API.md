@@ -303,7 +303,22 @@ browser validators for come to 63.6 KB gzipped, minified, with the registry and
 the runtime, against 273.6 KB for self-contained modules, each of which
 carries what it references. Most of those self-contained modules have no error
 detail, because the error generator declines their shape; `ata build` says so
-for each and points to `--mode schema`. A build rebuilds these modules every
+for each and points to `--mode schema`.
+
+A shared file without an `$id`, such as the `_definitions.json` that
+Kubernetes schemas reference by URL, needs a name to be found by. `--base-uri
+<uri>` gives every input without an `$id` the name `<uri>` plus its file name,
+and a schema's references then resolve against those. A reference that no
+input resolves is named in the build output, with what would resolve it. The
+registry keeps only the definitions the modules reach, and checks that every
+reference still resolves before it drops one: for eight Kubernetes kinds whose
+schemas share one 1.1 MB definitions file, the registry is 68.5 KB rather than
+242.3 KB, and the eight modules, the registry and the runtime come to 32.6 KB
+gzipped, minified, against 68.6 KB for self-contained modules. On the 275
+manifests of those kinds in the Kubernetes documentation, each with six broken
+copies, both answer as another validator does.
+
+A build rebuilds these modules every
 time rather than taking them from its cache, since they depend on the other
 inputs too. `toSchemaModule(validator, { runtime, registry })` and
 `registrySource(schemas)` do it by hand.

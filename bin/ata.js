@@ -51,6 +51,9 @@ Build options:
   --mode <mode>           code (default) | schema. schema writes each module as its
                           schema and takes the verdict and errors from one runtime
                           file: far smaller and quicker to load, slower per check
+  --base-uri <uri>        The URI an input without $id is known by: <uri> plus its
+                          file name, for schemas that reference a shared file by URL
+                          or relative path
   --check                 Check (don't write); exit 1 if any output is stale
   --cache-file <path>     Cache file for incremental builds (default: cache disabled)
   --max-size <bytes>      Fail build if any compiled module exceeds this gzipped size
@@ -102,6 +105,7 @@ function parseArgs(argv) {
     if (a === '--one-pass') { out.opts.onePass = true; continue; }
     if (a === '--errors') { out.opts.errors = argv[++i]; continue; }
     if (a === '--mode') { out.opts.mode = argv[++i]; continue; }
+    if (a === '--base-uri') { out.opts.baseUri = argv[++i]; continue; }
     if (a === '--check') { out.opts.check = true; continue; }
     if (a === '--strict') { out.opts.strict = true; continue; }
     if (a === '--strict-schema') { out.opts.strictSchema = true; continue; }
@@ -306,6 +310,7 @@ function cmdBuild(args) {
     onePass: args.opts.onePass === true ? true : undefined,
     errors: args.opts.errors,
     mode: args.opts.mode,
+    baseUri: args.opts.baseUri,
     check: !!args.opts.check,
     maxSize: args.opts.maxSize,
     strict: !!args.opts.strict,
