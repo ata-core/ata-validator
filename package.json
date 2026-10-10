@@ -8,6 +8,16 @@
   "types": "index.d.ts",
   "exports": {
     ".": {
+      "workerd": {
+        "types": "./index.d.ts",
+        "import": "./index.edge.mjs",
+        "require": "./index.edge.js"
+      },
+      "edge-light": {
+        "types": "./index.d.ts",
+        "import": "./index.edge.mjs",
+        "require": "./index.edge.js"
+      },
       "types": "./index.d.ts",
       "browser": {
         "import": "./index.browser.mjs",
@@ -128,6 +138,8 @@
     "index.mjs",
     "index.node.mjs",
     "index.browser.mjs",
+    "index.edge.js",
+    "index.edge.mjs",
     "index.d.ts",
     "aot.js",
     "aot.mjs",

@@ -43,10 +43,12 @@ npm install ata-validator --omit=optional
 
 or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup scores the same on the official suite as the native one, 1301 of 1301 Draft 2020-12 cases. The buffer and parallel APIs (`isValid` on raw buffers, `isValidPrepadded`, `isValidNDJSON`, `isValidParallel`, `countValid`, `batchIsValid`, `validateAndParse`) work without the addon too, answering through the same checks as `isValidJSON()`, slower than the addon: 177 ns against 92 for a small document on Node 25. In a browser, which has no `Buffer`, they throw and name the methods to use instead.
 
-Where the size of what ships matters more than nanoseconds per call, `ata-validator/lite` is
-the same `Validator` on the interpreted engine alone, without the code generator: the same
-verdicts and errors, 58 KB gzipped in a bundled worker against 136 KB for the full entry.
-It leaves out what needs the generator, `parse()` and the ahead-of-time bundle methods.
+In Cloudflare Workers and Vercel Edge, where generated code cannot run, `ata-validator`
+resolves to an entry without the code generator through the `workerd` and `edge-light` export
+conditions: the same names and answers, and a Worker bundled by wrangler goes from 179.1 to
+81.4 KiB gzipped. On a page whose Content-Security-Policy blocks `unsafe-eval`, or in a
+browser extension, no condition tells the bundler, so import `ata-validator/lite` there: the
+same `Validator` on the interpreted engine alone.
 
 On Deno the same package is `npm:ata-validator` or `jsr:@ata/validator`; the JSR package
 re-exports the npm one at the same version, and CI runs the official suite under Deno. The

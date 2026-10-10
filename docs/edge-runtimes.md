@@ -132,21 +132,29 @@ Worth doing when the schemas are static. The runtime API is the better choice
 when schemas arrive at runtime, for instance from a database or a tenant
 configuration.
 
-## The lite entry
+## Without the code generator
 
-On a worker or a page nothing generates code anyway, so the generator is dead
-weight in the bundle. `ata-validator/lite` leaves it out:
+Cloudflare Workers and Vercel Edge refuse `new Function`, so the code
+generator in the full package could only fail there and fall back. When a
+bundler builds for one of them it says so through an export condition
+(`workerd`, `edge-light`), and `ata-validator` then resolves to an entry
+without the generator: nothing to change in the code, the same names, the
+same verdicts and errors as the full package gives in those runtimes. A
+Worker with one validated route, bundled by wrangler 4.149.0, went from
+912.8 KiB (179.1 KiB gzipped) to 424.8 KiB (81.4 KiB gzipped). Modules from
+`ata build` load through it; the emitters (`Validator.bundle` and the rest)
+point to `ata-validator/aot`, as they do in a browser bundle.
+
+A page with a Content-Security-Policy that blocks `unsafe-eval`, or a
+browser extension under Manifest V3, has no such condition: the bundler
+cannot know. There, import `ata-validator/lite`, which is the same thing:
 
 ```ts
 import { Validator } from 'ata-validator/lite'
 ```
 
-Same `Validator`, same verdicts and errors, on the interpreted engine; it
-passes the official suite in the same three dialects, and a parity test holds
-it to the full entry's answers. What it lacks is `parse()` and the
-ahead-of-time bundle methods, which need the generator. A Hono app with one
-validated route bundles to 58 KB gzipped with it against 136 KB with the full
-entry (esbuild, browser platform, 2026-10-08).
+It leaves out the tools no Validator calls (TypeScript generation, the
+renderers) as well, and nothing else changes.
 
 ## Deno and Deno Deploy
 
