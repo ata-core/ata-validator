@@ -198,7 +198,7 @@ const tests = [
     v._extendChecks(() => null);
   }],
 
-  ['the runtime warms itself up once when the browser is idle, and only there', () => {
+  ['the runtime warms itself up once: when the browser is idle, or once Node\'s loop is free', () => {
     // A child process each: whether requestIdleCallback exists is read when
     // the runtime loads.
     for (const [label, src] of [['generated runtime', aot.errorRuntimeSource('cjs', [new Validator({ type: 'string' })])], ['package entry', null]]) {
@@ -209,8 +209,15 @@ const tests = [
         let n = 0; globalThis.requestIdleCallback = (f) => { n++; setTimeout(() => { f(); const { createErrors } = require(${J(target)}); const e = createErrors({ type: 'object', required: ['x'] })({}); console.log(JSON.stringify([n, e.map((x) => x.keyword)])); }, 0); };
         require(${J(target)});`], { encoding: 'utf8' });
       assert(withIdle.stdout.trim() === '[1,["required"]]', label + ': ' + (withIdle.stderr || withIdle.stdout));
-      const without = spawnSync(process.execPath, ['-e', `require(${J(target)}); console.log(typeof requestIdleCallback)`], { encoding: 'utf8' });
-      assert(without.status === 0 && without.stdout.trim() === 'undefined', label + ': ' + without.stderr);
+      // In Node it runs once the event loop is first free, on a timer that
+      // keeps no process alive.
+      const t0 = Date.now();
+      const quick = spawnSync(process.execPath, ['-e', `require(${J(target)})`], { encoding: 'utf8', timeout: 5000 });
+      assert(quick.status === 0 && Date.now() - t0 < 4000, label + ': a script that loads the runtime and exits must not wait for the warm-up');
+      if (src === null) {
+        const node = spawnSync(process.execPath, ['-e', `require(${J(target)}); setTimeout(() => console.log(Object.keys(require.cache).some((k) => k.endsWith('interpreter-core.js'))), 20);`], { encoding: 'utf8' });
+        assert(node.stdout.trim() === 'true', label + ': the warm-up ran in Node once the loop was free: ' + (node.stderr || node.stdout));
+      }
     }
   }],
 
