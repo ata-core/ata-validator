@@ -24,6 +24,33 @@ export function toStandalone(validator: Validator<unknown>): string | null;
 /** Emit one standalone module (no runtime dependency) for one validator. */
 export function toStandaloneModule(validator: Validator<unknown>, opts?: StandaloneOptions): string;
 
+/** Options of toCompactModule. */
+export interface CompactModuleOptions {
+  /** Import specifier of the error runtime the module takes its errors from. */
+  errorRuntime: string;
+  /** Module format for the emitted source. Default: 'esm'. */
+  format?: 'esm' | 'cjs';
+  [key: string]: unknown;
+}
+
+/**
+ * Emit a compact module: the verdict function and the schema without its
+ * descriptive keywords, with error detail from the shared runtime at
+ * `opts.errorRuntime` (see errorRuntimeSource). The errors are the ones the
+ * runtime Validator reports, in its order. Null when the validator depends on
+ * something outside its schema (custom keywords or formats, registered
+ * schemas, options other than the defaults); write the self-contained module
+ * then. `ata build` makes this choice by itself.
+ */
+export function toCompactModule(validator: Validator<unknown>, opts: CompactModuleOptions): string | null;
+
+/** Why a validator cannot be written as a compact module, or null when it can. */
+export function compactDecline(validator: Validator<unknown>): string | null;
+
+/** Source of the error runtime compact modules import. Node only: it is put
+ * together from the library's files. */
+export function errorRuntimeSource(format?: 'esm' | 'cjs'): string;
+
 /** Emit a module of per-schema compiled validators that `loadBundle` consumes. */
 export function bundle(V: ValidatorClass, schemas: ReadonlyArray<JSONSchema | boolean | object>, opts?: StandaloneOptions): string;
 

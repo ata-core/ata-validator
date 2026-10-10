@@ -2,6 +2,15 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+- Compact modules for production builds. `ata build --no-source` (or with `NODE_ENV=production`) can write each module as its verdict function and its schema without the descriptive keywords, and take error detail from one file the build writes beside the modules, `ata-errors.mjs`, which every module of the build imports. The runtime walks the schema with the interpreted engine when a document fails, so it only runs on rejections. The build chooses by size, per module, and writes the runtime only when the modules that use it save more than it weighs; one small schema keeps its self-contained module, and `--errors inline|shared` overrides the choice. On seven SchemaStore schemas (abc-supply-plan 13, airlock-microgateway 3, aspire 8, babelrc, github-workflow, prettierrc, tsconfig) imported into one app and minified, the validation code goes from 148.9 to 69.1 KB gzipped and from 36.6 to 15.3 ms to import with code generation blocked (Apple M4 Pro, Node 25.2.1). On Microsoft's Accessibility Insights assessment schema, the module and its runtime together are 40.9 KB gzipped against 75.9 for the self-contained module. The cost is on rejections: the errors come from an interpreted walk of the document, 398 ns for a rejected request body against a four-field user schema where the self-contained module takes 52, and 57 µs for a 22 KB assessment file with one wrong field where it takes 21 (with several wrong fields, 63 against 94). A build that cares more about rejection speed than size passes `--errors inline`. `toCompactModule`, `compactDecline` and `errorRuntimeSource` in `ata-validator/aot` do the same by hand.
+
+### Changed
+- The interpreted engine builds error paths only while it collects errors. A verdict walk concatenated an instance path and a schema path for every child it visited and never read them: on the 22 KB assessment file above, 48.1 to 40.7 µs.
+- A compact module reports the errors the runtime `Validator` reports, in its order: the order of the keywords in the schema. A self-contained module reports them in the order its collector meets them, which differs (a parent's `additionalProperties` before the child properties' errors, for instance). Neither order was documented. Checked over the official suites in five dialects and 13741 SchemaStore documents: no verdict differs from the self-contained module, and every error list equals the runtime's. On that corpus the self-contained module differed from the runtime in 23 error lists (the errors inside a `oneOf` branch) and left `allOf: [false]` without its ATA4005 code; on 73 documents it could only report ATA9000, where the compact module reports the errors.
+
 ## 1.49.0 - 2026-10-10
 
 Draft 2019-09 and draft-06 are read rather than taken for 2020-12, which accepted documents those schemas reject; the generated code gets cheaper on configuration-style schemas (defaults, enums, patterns); and a few error-path and correctness fixes.

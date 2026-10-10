@@ -65,6 +65,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // (onePassCore and its closure serializer in lib/aot-impl.js), the generator's
 // vacuous-emission check, and the split of lib/js-compiler.js (the two files
 // carry the shared-helper lists). Measured 386 KB at the time.
-assert.ok(manifest.size < 392 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 400 KB within 1.49.0: compact modules, whose errors come from one runtime
+// a build writes beside them (lib/error-runtime.js packs it from the library's
+// own files, lib/error-runtime-entry.js, lib/schema-strip.js, lib/error-sort.js
+// split out of rejections.js). Measured 395 KB at the time.
+assert.ok(manifest.size < 400 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

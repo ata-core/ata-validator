@@ -45,6 +45,9 @@ Build options:
   --abort-early           Use stub errors (smallest bundle)
   --one-pass              Report errors with the runtime's one-pass function: faster on
                           rejected documents, a module 1.3 to 1.7x the size
+  --errors <mode>         Where error detail comes from: auto | inline | shared. auto
+                          (default) has modules share one error runtime file when that
+                          makes the output smaller; production builds only (--no-source)
   --check                 Check (don't write); exit 1 if any output is stale
   --cache-file <path>     Cache file for incremental builds (default: cache disabled)
   --max-size <bytes>      Fail build if any compiled module exceeds this gzipped size
@@ -94,6 +97,7 @@ function parseArgs(argv) {
     if (a === '--no-types') { out.opts.types = false; continue; }
     if (a === '--abort-early') { out.opts.abortEarly = true; continue; }
     if (a === '--one-pass') { out.opts.onePass = true; continue; }
+    if (a === '--errors') { out.opts.errors = argv[++i]; continue; }
     if (a === '--check') { out.opts.check = true; continue; }
     if (a === '--strict') { out.opts.strict = true; continue; }
     if (a === '--strict-schema') { out.opts.strictSchema = true; continue; }
@@ -296,6 +300,7 @@ function cmdBuild(args) {
     suffix: args.opts.suffix,
     abortEarly: !!args.opts.abortEarly,
     onePass: args.opts.onePass === true ? true : undefined,
+    errors: args.opts.errors,
     check: !!args.opts.check,
     maxSize: args.opts.maxSize,
     strict: !!args.opts.strict,
@@ -312,7 +317,10 @@ function cmdBuild(args) {
       return;
     }
     for (const c of report.compiled) {
-      process.stdout.write(`ata: ${c.input} -> ${c.output} (${c.bytes.toLocaleString()} bytes)\n`);
+      process.stdout.write(`ata: ${c.input} -> ${c.output} (${c.bytes.toLocaleString()} bytes${c.errors === 'compact' ? ', shared errors' : ''})\n`);
+    }
+    if (report.runtime) {
+      process.stdout.write(`ata: error runtime -> ${report.runtime.output} (${report.runtime.bytes.toLocaleString()} bytes, shared by the modules above)\n`);
     }
     for (const c of report.cached) {
       process.stdout.write(`ata: cached  ${c.input}\n`);

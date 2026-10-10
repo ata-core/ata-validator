@@ -262,6 +262,24 @@ a `$ref` is the usual case) the one-pass function is taken without asking,
 since the alternative was one stub error. A module built with `source`
 frames, or from a validator with a custom format, keeps the older collector.
 
+A production build can also leave error detail out of the modules
+altogether. `ata build` with `source` off (`--no-source`, or
+`NODE_ENV=production`) writes, where it makes the output smaller, a compact
+module per schema: the verdict function and the schema without its
+descriptive keywords (`title`, `description`, `examples` and the like). When a
+document fails, the module hands it to `ata-errors.mjs` (or `.cjs`), one file
+the build writes beside the modules and every one of them imports, which walks
+the schema with the interpreted engine. The errors are the ones the runtime
+`Validator` reports, in the order it reports them, codes and `docUrl`
+included. The build chooses per module, and writes the runtime only when the
+modules that use it save more than it weighs, so one small schema keeps its
+self-contained module. `--errors inline` keeps every module self-contained,
+`--errors shared` uses the runtime wherever a module can. A validator that
+depends on something outside its schema (custom keywords or formats, schemas
+registered beside it, any option but the defaults) always gets the
+self-contained module. `toCompactModule(validator, { errorRuntime })` and
+`errorRuntimeSource(format)` in `ata-validator/aot` do the same by hand.
+
 When error detail is requested (the default) but neither generator takes the
 schema, the module still
 ships with an exact verdict, reports every failure as the single ATA9000
