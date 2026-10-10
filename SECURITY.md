@@ -30,7 +30,21 @@ Security issues we care about:
 | Latest minor release | Yes |
 | Older releases | No, upgrade to the latest |
 
-Fixes ship in a new patch or minor release.
+Fixes ship in a new patch or minor release. Every 1.x release is compatible
+with the one before it, so moving to the latest minor to get a fix does not
+mean changing your code. A change that would break that waits for 2.0.
+
+What a report can expect:
+
+- An answer within 48 hours.
+- For a vulnerability that lets crafted input or a crafted schema run code,
+  pollute prototypes, crash the process or make validation accept what it
+  should reject: a fixed release within 7 days of confirming it.
+- A published GitHub security advisory for every fixed vulnerability, naming
+  the affected versions and the release that fixes it.
+
+The project has one maintainer (see GOVERNANCE.md). These are commitments one
+person can keep, and they are stated so you can hold the project to them.
 
 ## ReDoS
 
