@@ -68,7 +68,12 @@ const esbuild = require('esbuild')
 // 51200 with draft-06 and 2019-09 read rather than taken for 2020-12: their
 // meta-schemas are vendored so a `$ref` to them resolves offline, eight
 // documents, about 1.1 KB of the growth.
-const BUDGET = 51200
+// 51500 with the closure tree compiled after a schema's first 1000 calls
+// rather than on the first (51259 measured): the first check of a 97 KB
+// schema went from 9.45 to 5.83 ms in a bundle with code generation blocked.
+// The growth is the tiering, the deep-data fallback to the closure tree, and
+// custom keywords checked by the plain walk on nodes that are not leaves.
+const BUDGET = 51500
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
