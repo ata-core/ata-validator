@@ -5,11 +5,14 @@
 // bundle. The bundler then keeps one copy, shared with ata-validator/compiled
 // where both are used. `ata build` writes the same runtime as a file instead
 // (errorRuntimeSource in ata-validator/aot).
-const { createErrors: create } = require('./lib/error-runtime-entry.js');
-const { codeOf } = require('./lib/error-code-of.js');
 const ataVersion = require('./lib/version.js');
 
+// The interpreter and the code table load on the first call, not at import:
+// a compact module calls this only when a document it rejected is asked for
+// its errors.
 function createErrors(schema, options) {
+  const { createErrors: create } = require('./lib/error-runtime-entry.js');
+  const { codeOf } = require('./lib/error-code-of.js');
   return create(schema, codeOf, options);
 }
 

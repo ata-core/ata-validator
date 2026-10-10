@@ -69,6 +69,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // a build writes beside them (lib/error-runtime.js packs it from the library's
 // own files, lib/error-runtime-entry.js, lib/schema-strip.js, lib/error-sort.js
 // split out of rejections.js). Measured 395 KB at the time.
-assert.ok(manifest.size < 400 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 404 KB within 1.49.0: the error runtime as a package entry
+// (error-runtime.js), its rank sort (lib/error-sort-rank.js) and code table
+// (lib/error-code-of.js), and the interpreter split in two
+// (lib/interpreter-core.js). Measured 400.1 KB at the time.
+assert.ok(manifest.size < 404 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
