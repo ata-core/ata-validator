@@ -14,7 +14,7 @@ Run these before proposing a change. They are not optional and CI runs all of th
 
 ```bash
 npm test               # unit and integration suite
-npm run test:suite     # official JSON Schema Test Suite, three dialects
+npm run test:suite     # official JSON Schema Test Suite, five dialects
 node tests/test_no_eval.js   # the whole suite with eval and new Function blocked
 npm run release:check  # pack purity, doc coverage, error-code lock, version sync
 ```
@@ -49,9 +49,10 @@ quoting any figure; a stale pin once hid a real bug for five months.
 
 Every figure in the README, the docs and on the site is measured, not estimated. If a
 change moves one, remeasure and update all of them together. Current figures, all with
-zero regressions: Draft 2020-12 1301 of 1301, draft 7 929 of 929, the v1 dialect 1135
+zero regressions: Draft 2020-12 1301 of 1301, 2019-09 1261 of 1261, draft 7 929 of 929,
+draft-06 841 of 841, the v1 dialect 1135
 of 1135, identical with code generation blocked. The buffer path
-agrees with `validate()` on all 3365 suite cases; `lib/buffer-gate.js` routes the shapes
+agrees with `validate()` on all 3365 cases of the 2020-12, draft-07 and v1 suites; `lib/buffer-gate.js` routes the shapes
 the native walker gets wrong, and that count must stay at zero.
 
 Do not write a number you have not run. Do not round a measured figure into a claim.

@@ -65,7 +65,10 @@ const esbuild = require('esbuild')
 // 50100 with the deterministic rule in lib/regex-linear.js (49821 measured):
 // 90 more SchemaStore patterns on the platform RegExp, at 3.5 to 5x the
 // linear engine's speed per character.
-const BUDGET = 50100
+// 51200 with draft-06 and 2019-09 read rather than taken for 2020-12: their
+// meta-schemas are vendored so a `$ref` to them resolves offline, eight
+// documents, about 1.1 KB of the growth.
+const BUDGET = 51200
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

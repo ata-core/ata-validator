@@ -55,6 +55,8 @@ const { Validator } = require('../index')
 const DIALECTS = {
   'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
   draft7: 'http://json-schema.org/draft-07/schema#',
+  draft6: 'http://json-schema.org/draft-06/schema#',
+  'draft2019-09': 'https://json-schema.org/draft/2019-09/schema',
   v1: 'https://json-schema.org/v1',
 }
 
@@ -81,6 +83,8 @@ const registry = {}
 const FLOOR = {
   'draft2020-12': { total: 1301, minPass: 1301 },
   draft7: { total: 929, minPass: 929 },
+  draft6: { total: 841, minPass: 841 },
+  'draft2019-09': { total: 1261, minPass: 1261 },
   v1: { total: 1135, minPass: 1135 },
 }
 

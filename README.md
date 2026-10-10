@@ -726,7 +726,7 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 
 ### Dialects
 
-`$schema` selects the dialect. Draft 2020-12 is the default, draft-07 is normalized on the way in, and `https://json-schema.org/v1` (or the dated `https://json-schema.org/v1/2026`) selects JSON Schema v1.
+`$schema` selects the dialect. Draft 2020-12 is the default; draft-07, draft-06 and Draft 2019-09 are rewritten to the 2020-12 spelling on the way in (draft-06 as draft-07 without `if`/`then`/`else`, 2019-09's tuple `items` and `$recursiveRef` as `prefixItems` and `$dynamicRef`); and `https://json-schema.org/v1` (or the dated `https://json-schema.org/v1/2026`) selects JSON Schema v1. The official suite passes in full on all five: 1301 of 1301 on 2020-12, 1261 of 1261 on 2019-09, 929 of 929 on draft-07, 841 of 841 on draft-06 and 1135 of 1135 on v1, with code generation allowed and blocked. Draft-04 and earlier are not supported; draft-04's boolean `exclusiveMinimum`/`exclusiveMaximum` is read wherever it appears.
 
 Two things differ under v1. `propertyDependencies` selects a subschema by the value of a property rather than by its presence, which is what `dependentSchemas` does. And `$dynamicRef` no longer requires bookending: the reference resolves through the dynamic scope whether or not the schema it first lands on carries a matching `$dynamicAnchor`, so the outermost matching anchor still in scope wins. Everything else ata implements is identical under both dialects, so a schema that declares no `$schema` behaves exactly as before.
 

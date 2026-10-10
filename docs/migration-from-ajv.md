@@ -7,7 +7,7 @@ The goal here is a low-friction switch. Pick the sections that apply to your cod
 ## Who this is for
 
 - You have a Node.js project using `ajv` (or `@fastify/ajv-compiler`) for request / response / message validation.
-- Your schemas are JSON Schema Draft 2020-12 or Draft 7.
+- Your schemas are JSON Schema Draft 2020-12, 2019-09, Draft 7 or draft-06.
 - You want either (a) a runtime-competitive drop-in, (b) a smaller browser bundle, or (c) TypeScript types generated from your schemas.
 
 If your codebase relies on ajv-specific features like custom keywords, custom formats beyond the built-in set, or the plugin ecosystem (`ajv-errors`, `ajv-i18n`, `ajv-keywords`), check the [Differences](#differences) section before committing.
@@ -353,7 +353,7 @@ Things that work slightly differently or are not yet supported:
 - **`$data` references**: not supported. The shim throws at construction.
 - **Error order under `allErrors: true`**: after a `type` failure the reference keeps evaluating the node's other keywords and reports those too; ata stops at the type error. The shim does not add the extra errors.
 - **`uniqueItems` with objects**: supported, uses `JSON.stringify` for content comparison.
-- **`unevaluatedProperties` / `unevaluatedItems`**: supported, with no known spec gaps: all three dialects run clean, Draft 2020-12 1301 of 1301, draft 7 929 of 929, the v1 dialect 1135 of 1135. The verdict is generated code; errors for a schema using these keywords come from the interpreted engine, which is the one thing to know if you measure the rejection path on such a schema.
+- **`unevaluatedProperties` / `unevaluatedItems`**: supported, with no known spec gaps: all five dialects run clean, Draft 2020-12 1301 of 1301, 2019-09 1261 of 1261, draft 7 929 of 929, draft-06 841 of 841, the v1 dialect 1135 of 1135. The verdict is generated code; errors for a schema using these keywords come from the interpreted engine, which is the one thing to know if you measure the rejection path on such a schema.
 
 If you rely on any of the unsupported items, file an issue at [github.com/ata-core/ata-validator](https://github.com/ata-core/ata-validator/issues) with a minimal schema.
 

@@ -157,6 +157,8 @@ jobs:
           deno run -A tests/run_suite.js
           deno run -A tests/run_suite.js draft7
           deno run -A tests/run_suite.js v1
+          deno run -A tests/run_suite.js draft6
+          deno run -A tests/run_suite.js draft2019-09
 
   test-ts:
     runs-on: ubuntu-latest
