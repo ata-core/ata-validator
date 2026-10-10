@@ -109,6 +109,27 @@ file.
   passes with nothing failed, errored or skipped under Bowtie's own runner. The v1 dialect is
   declared in a pending harness change that waits for a Bowtie release.
 
+### Side by side
+
+[validator-benchmarks](https://github.com/ata-core/validator-benchmarks) is ata's own
+comparison, so it comes after the ones above: eleven validators on three realistic bodies
+and four scenes, each library in its own process, 27 samples per cell, every schema and
+document in the repository. On an order body with formats and a pattern, 900 valid
+documents, Node 24:
+
+| | documents a second, the verdict | same, `new Function` refused |
+|---|---:|---:|
+| ata | 3,295,880 | 607,614 |
+| ata, compiled module | 3,319,594 | 3,344,948 |
+| typebox | 1,638,813 | EvalError |
+| ajv | 1,285,492 | EvalError |
+| typia | 939,572 | 964,507 |
+| zod | 440,473 | 237,176 |
+
+Where ata is behind is in the same tables: on a four-field body that fails, ajv answers the
+verdict faster, and with every error read it does 6.6M a second against ata's 2.9M with rich
+errors (7.6M with `richErrors: false`).
+
 ## Why AOT
 
 | Dimension | Schema | ata-AOT | runtime validator | Difference |
