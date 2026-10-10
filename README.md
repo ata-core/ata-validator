@@ -117,6 +117,8 @@ and four scenes, each library in its own process, 27 samples per cell, every sch
 document in the repository. On an order body with formats and a pattern, 900 valid
 documents, Node 24:
 
+[![Documents a second on one order body, eleven validators](https://raw.githubusercontent.com/ata-core/validator-benchmarks/main/media/race-order-verdict-valid.gif)](https://github.com/ata-core/validator-benchmarks/blob/main/media/race-order-verdict-valid.mp4)
+
 | | documents a second, the verdict | same, `new Function` refused |
 |---|---:|---:|
 | ata | 3,295,880 | 607,614 |
