@@ -122,7 +122,14 @@ flowchart TD
     package's interface.
   - `lib/branch-collapse.js` folds redundant conditionals; `lib/safe-regex.js`
     routes `pattern`/`patternProperties`/`propertyNames` and built-in formats
-    through a linear-time engine (ReDoS-safe).
+    through a linear-time engine (ReDoS-safe). `lib/regex-linear.js` decides
+    which patterns the platform RegExp may take instead, at three to five
+    times the engine's speed per character: those with one unbounded
+    quantifier on a single character, anchored, and those deterministic
+    around their loops on the Glushkov construction (disjoint first and
+    follow sets, one route to each follower, no empty loop body, anchored).
+    `tests/test_regex_native_linear.js` holds both engines to the same
+    answers and the RegExp to linear time on adversarial probes.
 - **Interpreted engine** (`lib/interpreter.js`): the answer for every schema the
   code generator declines, and the reference implementation the other engines
   are diffed against. It plans each schema node once (`Plan`), then walks it.
