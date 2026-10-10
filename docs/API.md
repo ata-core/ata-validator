@@ -281,6 +281,18 @@ registered beside it, any option but the defaults) always gets the
 self-contained module. `toCompactModule(validator, { errorRuntime })` and
 `errorRuntimeSource(format)` in `ata-validator/aot` do the same by hand.
 
+`ata build --mode schema` goes one step further, for pages where the bytes
+shipped matter more than the time per check: every module that can be is
+its schema and a few lines, and the verdict comes from the same runtime as
+the errors, the interpreted engine walking the schema (with its closure tree
+for a schema used more than 1000 times). On forty SchemaStore schemas in one
+app, minified, that is 101.6 KB gzipped against 212.6 for compact modules and
+513.8 for self-contained ones, and loading them and checking each once takes
+23.0 ms against 35.5 for compact modules; a check once warm costs about five
+times what generated code costs (3289 against 590 ns a document on
+SchemaStore samples). The answers are the same.
+`toSchemaModule(validator, { runtime })` does it by hand.
+
 When error detail is requested (the default) but neither generator takes the
 schema, the module still
 ships with an exact verdict, reports every failure as the single ATA9000

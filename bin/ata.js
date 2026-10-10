@@ -48,6 +48,9 @@ Build options:
   --errors <mode>         Where error detail comes from: auto | inline | shared. auto
                           (default) has modules share one error runtime file when that
                           makes the output smaller; production builds only (--no-source)
+  --mode <mode>           code (default) | schema. schema writes each module as its
+                          schema and takes the verdict and errors from one runtime
+                          file: far smaller and quicker to load, slower per check
   --check                 Check (don't write); exit 1 if any output is stale
   --cache-file <path>     Cache file for incremental builds (default: cache disabled)
   --max-size <bytes>      Fail build if any compiled module exceeds this gzipped size
@@ -98,6 +101,7 @@ function parseArgs(argv) {
     if (a === '--abort-early') { out.opts.abortEarly = true; continue; }
     if (a === '--one-pass') { out.opts.onePass = true; continue; }
     if (a === '--errors') { out.opts.errors = argv[++i]; continue; }
+    if (a === '--mode') { out.opts.mode = argv[++i]; continue; }
     if (a === '--check') { out.opts.check = true; continue; }
     if (a === '--strict') { out.opts.strict = true; continue; }
     if (a === '--strict-schema') { out.opts.strictSchema = true; continue; }
@@ -301,6 +305,7 @@ function cmdBuild(args) {
     abortEarly: !!args.opts.abortEarly,
     onePass: args.opts.onePass === true ? true : undefined,
     errors: args.opts.errors,
+    mode: args.opts.mode,
     check: !!args.opts.check,
     maxSize: args.opts.maxSize,
     strict: !!args.opts.strict,
@@ -317,7 +322,7 @@ function cmdBuild(args) {
       return;
     }
     for (const c of report.compiled) {
-      process.stdout.write(`ata: ${c.input} -> ${c.output} (${c.bytes.toLocaleString()} bytes${c.errors === 'compact' ? ', shared errors' : ''})\n`);
+      process.stdout.write(`ata: ${c.input} -> ${c.output} (${c.bytes.toLocaleString()} bytes${c.errors === 'compact' ? ', shared errors' : c.errors === 'schema' ? ', schema module' : ''})\n`);
     }
     if (report.runtime) {
       process.stdout.write(`ata: error runtime -> ${report.runtime.output} (${report.runtime.bytes.toLocaleString()} bytes, shared by the modules above)\n`);

@@ -48,9 +48,21 @@ export function toCompactModule(validator: Validator<unknown>, opts: CompactModu
 /** Why a validator cannot be written as a compact module, or null when it can. */
 export function compactDecline(validator: Validator<unknown>): string | null;
 
-/** Source of the error runtime compact modules import. Node only: it is put
+/**
+ * Emit a schema module: the schema without its descriptive keywords and a few
+ * lines; the verdict and the errors come from the runtime at `opts.runtime`
+ * (errorRuntimeSource with `schemaMode`). Far smaller and quicker to load than
+ * generated code, about five times slower per check once warm. Answers as the
+ * runtime Validator does with `richErrors: false`. Null where
+ * toCompactModule would be null. `ata build --mode schema` writes these.
+ */
+export function toSchemaModule(validator: Validator<unknown>, opts: { runtime: string; format?: 'esm' | 'cjs' }): string | null;
+
+/** Source of the runtime compact modules (and, with `schemaMode`, schema
+ * modules) import. With `schemas`, the validators or schemas whose modules
+ * will import it, parts none of them needs are left out. Node only: it is put
  * together from the library's files. */
-export function errorRuntimeSource(format?: 'esm' | 'cjs'): string;
+export function errorRuntimeSource(format?: 'esm' | 'cjs', schemas?: ReadonlyArray<unknown> | null, schemaMode?: boolean): string;
 
 /** Emit a module of per-schema compiled validators that `loadBundle` consumes. */
 export function bundle(V: ValidatorClass, schemas: ReadonlyArray<JSONSchema | boolean | object>, opts?: StandaloneOptions): string;

@@ -582,7 +582,10 @@ The errors are the ones `new Validator(schema, { richErrors: false })` reports, 
 order. Seven SchemaStore schemas imported into one app, minified with esbuild, go from 148.9 KB
 to 63.3 KB gzipped, and from 35.8 ms to 13.8 ms to import with code generation blocked. A
 rejected document costs more this way, since its errors come from an interpreted walk:
-`--errors inline` keeps every module self-contained.
+`--errors inline` keeps every module self-contained. `--mode schema` writes each module as
+its schema and takes the verdict from the runtime too: forty SchemaStore schemas in one app
+come to 101.6 KB gzipped against 212.6 KB as compact modules, and load and check each once in
+23.0 ms against 35.5, while a check once warm costs about five times what generated code costs.
 
 Bundle sizes for the 10-field user schema in `tests/fixtures/error-dx/user.schema.json`,
 minified and gzipped, measured with `bun build --minify --target=browser` on ata 1.45.0:

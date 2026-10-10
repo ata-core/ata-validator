@@ -145,6 +145,49 @@ const tests = [
     assert(bad.length === 0, `${bad.length} differences, first:\n${bad.slice(0, 3).join('\n')}`);
   }],
 
+  ['schema modules: verdicts and errors match the runtime Validator, five dialects', () => {
+    const dir = tmpDir();
+    fs.writeFileSync(path.join(dir, 'ata-schema.cjs'), aot.errorRuntimeSource('cjs', null, true));
+    let schemas = 0, cases = 0;
+    const bad = [];
+    for (const [dia, uri] of Object.entries(DIALECTS)) {
+      const sdir = path.join(__dirname, 'suite/tests', dia);
+      for (const f of fs.readdirSync(sdir).filter((x) => x.endsWith('.json'))) {
+        for (const g of JSON.parse(fs.readFileSync(path.join(sdir, f), 'utf8'))) {
+          const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
+          let src, rt;
+          try { src = aot.toSchemaModule(new Validator(schema), { format: 'cjs', runtime: './ata-schema.cjs' }); rt = new Validator(schema, { useDefaults: false, richErrors: false }); } catch { continue; }
+          if (!src) continue;
+          const file = path.join(dir, `s${n++}.cjs`);
+          fs.writeFileSync(file, src);
+          const m = require(file);
+          schemas++;
+          for (const t of g.tests) {
+            cases++;
+            const want = rt.validate(structuredClone(t.data));
+            const got = m.validate(t.data);
+            if (got.valid !== want.valid || m.isValid(t.data) !== want.valid) { bad.push(`verdict ${dia}/${f}: ${g.description} / ${t.description}`); continue; }
+            if (!got.valid && got.errors.map(noCode).join('\n') !== want.errors.map(noCode).join('\n')) bad.push(`errors ${dia}/${f}: ${g.description} / ${t.description}`);
+          }
+        }
+      }
+    }
+    assert(schemas > 1300 && cases > 5000, `too little covered: ${schemas} schemas, ${cases} cases`);
+    assert(bad.length === 0, `${bad.length} differences, first:\n${bad.slice(0, 3).join('\n')}`);
+  }],
+
+  ['ata build --mode schema writes schema modules and one runtime', async () => {
+    const dir = tmpDir();
+    fs.writeFileSync(path.join(dir, 'a.schema.json'), J({ type: 'object', properties: { id: { type: 'integer' }, tag: { type: 'string', pattern: '^[a-z]+$' } }, required: ['id'] }));
+    fs.writeFileSync(path.join(dir, 'b.schema.json'), J({ type: 'string', format: 'email' }));
+    const r = await build({ globs: [path.join(dir, '*.schema.json')], outDir: path.join(dir, 'out'), types: false, mode: 'schema' });
+    assert(r.runtime !== null && r.compiled.every((c) => c.errors === 'schema'), 'schema modules and a runtime');
+    const out = spawnSync(process.execPath, ['--disallow-code-generation-from-strings', '--input-type=module', '-e',
+      `const a = await import(${J(path.join(dir, 'out', 'a.compiled.mjs'))}); const b = await import(${J(path.join(dir, 'out', 'b.compiled.mjs'))}); console.log(JSON.stringify([a.isValid({ id: 1, tag: 'x' }), a.validate({ id: 'x', tag: 'X' }).errors.map((e) => e.keyword), b.isValid('a@b.co'), b.isValid('nope')]))`], { encoding: 'utf8' });
+    assert(out.status === 0, out.stderr);
+    assert(out.stdout.trim() === '[true,["type","pattern"],true,false]', out.stdout);
+  }],
+
   ['codes and docUrl are stamped like a module stamps them', () => {
     const dir = tmpDir();
     fs.writeFileSync(path.join(dir, 'ata-errors.cjs'), aot.errorRuntimeSource('cjs'));
