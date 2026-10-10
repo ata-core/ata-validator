@@ -574,6 +574,16 @@ npx ata build 'schemas/*.json' --out-dir build/validators --check
 
 Run with `--watch` during development for incremental rebuilds.
 
+In a production build (`--no-source`, or `NODE_ENV=production`), `ata build` can leave the
+error collector out of the modules: each one carries its verdict and its schema, and takes
+its errors from one `ata-errors.mjs` the build writes beside them. The build does this only
+where it makes the output smaller, so a single small schema keeps its self-contained module.
+The errors are the ones `new Validator(schema, { richErrors: false })` reports, in the same
+order. Seven SchemaStore schemas imported into one app, minified with esbuild, go from 148.9 KB
+to 69.1 KB gzipped, and from 36.6 ms to 15.3 ms to import with code generation blocked. A
+rejected document costs more this way, since its errors come from an interpreted walk:
+`--errors inline` keeps every module self-contained.
+
 Bundle sizes for the 10-field user schema in `tests/fixtures/error-dx/user.schema.json`,
 minified and gzipped, measured with `bun build --minify --target=browser` on ata 1.45.0:
 
