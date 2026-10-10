@@ -183,7 +183,7 @@ const tests = [
     const r = await build({ globs: [path.join(dir, '*.schema.json')], outDir: path.join(dir, 'out'), types: false, mode: 'schema' });
     assert(r.runtime !== null && r.compiled.every((c) => c.errors === 'schema'), 'schema modules and a runtime');
     const out = spawnSync(process.execPath, ['--disallow-code-generation-from-strings', '--input-type=module', '-e',
-      `const a = await import(${J(path.join(dir, 'out', 'a.compiled.mjs'))}); const b = await import(${J(path.join(dir, 'out', 'b.compiled.mjs'))}); console.log(JSON.stringify([a.isValid({ id: 1, tag: 'x' }), a.validate({ id: 'x', tag: 'X' }).errors.map((e) => e.keyword), b.isValid('a@b.co'), b.isValid('nope')]))`], { encoding: 'utf8' });
+      `const a = await import(${J(require('url').pathToFileURL(path.join(dir, 'out', 'a.compiled.mjs')).href)}); const b = await import(${J(require('url').pathToFileURL(path.join(dir, 'out', 'b.compiled.mjs')).href)}); console.log(JSON.stringify([a.isValid({ id: 1, tag: 'x' }), a.validate({ id: 'x', tag: 'X' }).errors.map((e) => e.keyword), b.isValid('a@b.co'), b.isValid('nope')]))`], { encoding: 'utf8' });
     assert(out.status === 0, out.stderr);
     assert(out.stdout.trim() === '[true,["type","pattern"],true,false]', out.stdout);
   }],
@@ -242,7 +242,7 @@ const tests = [
     const v = new Validator({ type: 'object', properties: { s: { type: 'string', pattern: '^[a-z]+$' } }, additionalProperties: false });
     fs.writeFileSync(path.join(dir, 'm.mjs'), aot.toCompactModule(v, { format: 'esm', errorRuntime: './ata-errors.mjs' }));
     const r = spawnSync(process.execPath, ['--disallow-code-generation-from-strings', '--input-type=module', '-e',
-      `const m = await import(${J(path.join(dir, 'm.mjs'))}); const r = m.validate({ s: 'A1', z: 1 }); console.log(JSON.stringify([m.isValid({ s: 'ab' }), r.valid, r.errors.map((e) => e.keyword)]))`], { encoding: 'utf8' });
+      `const m = await import(${J(require('url').pathToFileURL(path.join(dir, 'm.mjs')).href)}); const r = m.validate({ s: 'A1', z: 1 }); console.log(JSON.stringify([m.isValid({ s: 'ab' }), r.valid, r.errors.map((e) => e.keyword)]))`], { encoding: 'utf8' });
     assert(r.status === 0, r.stderr);
     assert(r.stdout.trim() === '[true,false,["pattern","additionalProperties"]]', r.stdout);
   }],
@@ -343,7 +343,7 @@ const tests = [
     const src = fs.readFileSync(path.join(dir, 'auto', 's0.compiled.mjs'), 'utf8');
     assert(src.includes('from "./ata-errors.mjs"'), 'imports the runtime beside it');
     const r = spawnSync(process.execPath, ['--input-type=module', '-e',
-      `const m = await import(${J(path.join(dir, 'auto', 's1.compiled.mjs'))}); const i = await import(${J(path.join(dir, 'inline', 's1.compiled.mjs'))}); const d = { field1_0: 'AB', field1_1: 0.5, extra: 1 }; console.log(m.validate(d).valid === i.validate(d).valid && m.validate(d).errors.length > 0)`], { encoding: 'utf8' });
+      `const m = await import(${J(require('url').pathToFileURL(path.join(dir, 'auto', 's1.compiled.mjs')).href)}); const i = await import(${J(require('url').pathToFileURL(path.join(dir, 'inline', 's1.compiled.mjs')).href)}); const d = { field1_0: 'AB', field1_1: 0.5, extra: 1 }; console.log(m.validate(d).valid === i.validate(d).valid && m.validate(d).errors.length > 0)`], { encoding: 'utf8' });
     assert(r.stdout.trim() === 'true', r.stderr || r.stdout);
   }],
 

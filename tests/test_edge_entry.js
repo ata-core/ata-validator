@@ -22,7 +22,7 @@ const root = path.resolve(__dirname, '..');
   const edge = spawnSync(process.execPath, ['-e', `console.log(JSON.stringify(Object.keys(require(${JSON.stringify(path.join(root, 'index.edge.js'))})).sort()))`], { encoding: 'utf8' });
   assert.strictEqual(edge.stdout.trim(), out.stdout.trim(), 'the edge entry exports what the full package exports');
   const esm = spawnSync(process.execPath, ['--input-type=module', '-e', `
-    const a = Object.keys(await import(${JSON.stringify(path.join(root, 'index.mjs'))})).sort(), b = Object.keys(await import(${JSON.stringify(path.join(root, 'index.edge.mjs'))})).sort();
+    const a = Object.keys(await import(${JSON.stringify(require('url').pathToFileURL(path.join(root, 'index.mjs')).href)})).sort(), b = Object.keys(await import(${JSON.stringify(require('url').pathToFileURL(path.join(root, 'index.edge.mjs')).href)})).sort();
     console.log(JSON.stringify(a) === JSON.stringify(b));
   `], { encoding: 'utf8' });
   assert.strictEqual(esm.stdout.trim(), 'true', esm.stderr);
