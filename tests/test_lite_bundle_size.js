@@ -73,7 +73,10 @@ const esbuild = require('esbuild')
 // schema went from 9.45 to 5.83 ms in a bundle with code generation blocked.
 // The growth is the tiering, the deep-data fallback to the closure tree, and
 // custom keywords checked by the plain walk on nodes that are not leaves.
-const BUDGET = 51500
+// 52000 with the error order following a `$ref` into another document
+// (51733 measured): lite has the `schemas` option, and without it the two
+// engines ordered such errors differently.
+const BUDGET = 52000
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
