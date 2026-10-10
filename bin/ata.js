@@ -326,6 +326,22 @@ function cmdBuild(args) {
     }
     if (report.runtime) {
       process.stdout.write(`ata: error runtime -> ${report.runtime.output} (${report.runtime.bytes.toLocaleString()} bytes, shared by the modules above)\n`);
+      if (report.runtime.registry) process.stdout.write(`ata: schema registry -> ${report.runtime.registry.output} (${report.runtime.registry.bytes.toLocaleString()} bytes, the schemas the modules above reference)\n`);
+    }
+    // A module the error generator declined still has an exact verdict, but
+    // every failure is the one ATA9000 error. Said once per module, short,
+    // and once with what to do about it.
+    let noDetail = 0;
+    for (const w of report.warnings || []) {
+      if (w.kind === 'error-detail') {
+        noDetail++;
+        process.stderr.write(`ata: warning ${w.input}: no error detail, failures report the single ATA9000 error (the verdict is exact)\n`);
+      } else {
+        process.stderr.write(`ata: warning ${w.input}: ${w.warning}\n`);
+      }
+    }
+    if (noDetail > 0 && args.opts.mode !== 'schema') {
+      process.stderr.write(`ata: ${noDetail} module${noDetail === 1 ? '' : 's'} without error detail; with --mode schema a module takes its errors from the interpreted engine instead\n`);
     }
     for (const c of report.cached) {
       process.stdout.write(`ata: cached  ${c.input}\n`);

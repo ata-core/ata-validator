@@ -56,7 +56,17 @@ export function compactDecline(validator: Validator<unknown>): string | null;
  * runtime Validator does with `richErrors: false`. Null where
  * toCompactModule would be null. `ata build --mode schema` writes these.
  */
-export function toSchemaModule(validator: Validator<unknown>, opts: { runtime: string; format?: 'esm' | 'cjs' }): string | null;
+export function toSchemaModule(validator: Validator<unknown>, opts: { runtime: string; registry?: string; format?: 'esm' | 'cjs' }): string | null;
+
+/**
+ * Source of the registry module schema modules import when their schemas
+ * reference each other by `$id`: the schemas, without descriptive keywords,
+ * as one array. Pass its import specifier as `registry` to toSchemaModule,
+ * for a validator built with those schemas in its `schemas` option; the module
+ * then names its schema by `$id` and carries no copy of it. `ata build --mode
+ * schema` does this for inputs that reference each other.
+ */
+export function registrySource(schemas: ReadonlyArray<object | Validator<unknown>>, format?: 'esm' | 'cjs'): string;
 
 /** Source of the runtime compact modules (and, with `schemaMode`, schema
  * modules) import. With `schemas`, the validators or schemas whose modules

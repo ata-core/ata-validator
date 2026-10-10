@@ -188,6 +188,34 @@ const tests = [
     assert(out.stdout.trim() === '[true,["type","pattern"],true,false]', out.stdout);
   }],
 
+  ['ata build --mode schema: schemas that reference each other share one registry', async () => {
+    const dir = tmpDir();
+    const common = { $id: 'https://example.test/common.json', $defs: { id: { type: 'string', minLength: 1, pattern: '^[a-z]+:' }, actor: { type: 'object', additionalProperties: false, required: ['kind', 'actorId'], properties: { kind: { enum: ['user', 'agent'] }, actorId: { $ref: '#/$defs/id' } } } } };
+    const order = { $id: 'https://example.test/order.json', description: 'x'.repeat(200), type: 'object', required: ['id', 'by'], properties: { id: { $ref: 'common.json#/$defs/id' }, by: { $ref: 'common.json#/$defs/actor' }, lines: { type: 'array', items: { $ref: 'line.json' } } } };
+    const line = { $id: 'https://example.test/line.json', type: 'object', required: ['sku'], properties: { sku: { $ref: 'common.json#/$defs/id' }, qty: { type: 'integer', minimum: 1 } } };
+    for (const [n, s] of Object.entries({ common, order, line })) fs.writeFileSync(path.join(dir, n + '.schema.json'), J(s));
+    const r = await build({ globs: [path.join(dir, '*.schema.json')], outDir: path.join(dir, 'out'), types: false, mode: 'schema' });
+    const mods = r.compiled.filter((c) => c.errors === 'schema').map((c) => path.basename(c.output)).sort();
+    assert(mods.includes('order.compiled.mjs') && mods.includes('line.compiled.mjs'), 'schema modules for the referencing schemas: ' + mods.join(', '));
+    const reg = path.join(dir, 'out', 'ata-registry.mjs');
+    assert(fs.existsSync(reg), 'the build writes the registry');
+    const orderSrc = fs.readFileSync(path.join(dir, 'out', 'order.compiled.mjs'), 'utf8');
+    assert(orderSrc.includes('ata-registry.mjs') && !orderSrc.includes('minLength'), 'the module names its schema by $id and carries no copy');
+    assert(!fs.readFileSync(reg, 'utf8').includes('xxxxxxxx'), 'the registry has no descriptive keywords');
+    const docs = [
+      { id: 'o:1', by: { kind: 'user', actorId: 'u:1' }, lines: [{ sku: 's:1', qty: 2 }] },
+      { id: '', by: { kind: 'robot', actorId: 'u', extra: 1 }, lines: [{ qty: 0 }, { sku: 'x' }] },
+      { id: 'o:1', by: {}, lines: 'no' },
+      {},
+    ];
+    const out = spawnSync(process.execPath, ['--disallow-code-generation-from-strings', '--input-type=module', '-e',
+      `const m = await import(${J(require('url').pathToFileURL(path.join(dir, 'out', 'order.compiled.mjs')).href)}); const docs = ${J(docs)}; console.log(JSON.stringify(docs.map((d) => { const r = m.validate(structuredClone(d)); return [m.isValid(structuredClone(d)), r.valid, r.errors.map((e) => [e.code, e.keyword, e.instancePath, e.schemaPath, e.message])]; })))`], { encoding: 'utf8' });
+    assert(out.status === 0, out.stderr);
+    const v = new Validator(order, { schemas: [common, line] });
+    const want = docs.map((d) => { const x = v.validate(structuredClone(d)); return [v.isValidObject(structuredClone(d)), x.valid, x.valid ? [] : x.errors.map((e) => [e.code, e.keyword, e.instancePath, e.schemaPath, e.message])]; });
+    require('assert').deepStrictEqual(JSON.parse(out.stdout), want);
+  }],
+
   ['compiledModuleFor leaves new Validator(schema) its own instance', () => {
     const b = require('../build');
     const schema = { type: 'object', properties: { a: { type: 'string' } } };

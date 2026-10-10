@@ -293,6 +293,21 @@ times what generated code costs (3289 against 590 ns a document on
 SchemaStore samples). The answers are the same.
 `toSchemaModule(validator, { runtime })` does it by hand.
 
+Schemas that reference each other by `$id` are built against each other: a
+schema whose references leave it gets the other inputs registered beside it,
+as the `schemas` option would, and one that resolves within itself is built as
+it would be alone. In schema mode such a module names its schema by `$id`, and
+the schemas are written once to `ata-registry.mjs` beside the runtime. On 64
+schemas that reference each other 1124 times, the 19 one application builds
+browser validators for come to 63.6 KB gzipped, minified, with the registry and
+the runtime, against 273.6 KB for self-contained modules, each of which
+carries what it references. Most of those self-contained modules have no error
+detail, because the error generator declines their shape; `ata build` says so
+for each and points to `--mode schema`. A build rebuilds these modules every
+time rather than taking them from its cache, since they depend on the other
+inputs too. `toSchemaModule(validator, { runtime, registry })` and
+`registrySource(schemas)` do it by hand.
+
 When error detail is requested (the default) but neither generator takes the
 schema, the module still
 ships with an exact verdict, reports every failure as the single ATA9000

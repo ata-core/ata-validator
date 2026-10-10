@@ -76,6 +76,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 408 KB within 1.49.0: the edge entry (index.edge.js, index.edge.mjs), the
 // tools as separate ES imports (lib/tools.mjs) and index.js split into
 // lib/codegen-engine.js and lib/public-api.js. Measured 405.1 KB at the time.
-assert.ok(manifest.size < 408 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 412 KB after 1.50.0: schema modules over a shared registry for schemas
+// that reference each other (lib/aot-build.js, lib/aot-impl.js), and the
+// error order following a reference into another document
+// (lib/schema-order.js). Measured 410.2 KB at the time.
+assert.ok(manifest.size < 412 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

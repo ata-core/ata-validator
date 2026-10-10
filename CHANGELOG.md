@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- `ata build` builds schemas that reference each other by `$id`. A schema whose references leave it gets the other inputs registered beside it, as the `schemas` option would; one that resolves within itself is built as before. Such schemas used to be skipped as not AOT-compatible: on 64 schemas that reference each other 1124 times, 2 were built, now 63 are (the 64th holds only `$defs`).
+- With `--mode schema` those modules name their schema by `$id`, and the schemas are written once to `ata-registry.mjs` beside the runtime. For the 19 of those schemas one application builds browser validators for, that is 63.6 KB gzipped, minified, against 273.6 KB for self-contained modules, which each carry what they reference. The answers are the same: on 59,724 document and schema pairs from the project's fixtures, verdicts match the self-contained modules and another validator, and error lists match the runtime `Validator`. `toSchemaModule(validator, { runtime, registry })` and `registrySource(schemas)` in `ata-validator/aot` do it by hand.
+
+### Fixed
+
+- Errors behind a `$ref` into another document (the `schemas` option, `addSchema`) are ordered as they would be inline. The ordering followed only references within the root, so the generated code and the interpreter each kept their own order and disagreed: `required` before `additionalProperties` from one, after the nested property errors from the other.
+- `ata build` prints its warnings. A module whose error detail the generator declined reported every failure as the single ATA9000 error and the build said nothing; it now says so for each such module and points to `--mode schema`.
+
 ## 1.50.0 - 2026-10-10
 
 Less to download and less to load. A production build can leave error detail out of its modules and share one error runtime among them, or ship each module as its schema alone; a browser bundle keeps only the tools it imports; and in Cloudflare Workers and Vercel Edge the package leaves out the code generator those runtimes cannot run. The answers do not change: every new path is held to the runtime Validator's verdicts and error lists on the official suites in five dialects and on SchemaStore's sample documents.
