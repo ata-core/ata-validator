@@ -2,7 +2,11 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.49.0 - 2026-10-10
+
+Draft 2019-09 and draft-06 are read rather than taken for 2020-12, which accepted documents those schemas reject; the generated code gets cheaper on configuration-style schemas (defaults, enums, patterns); and a few error-path and correctness fixes.
+
+Measured against 1.48.0 on an Apple M4 Pro, Node 25.2.1, pure JS: on 20 real API schemas, validating a valid document 10 to 11% faster and a realistic invalid one 8 to 9%; compiled modules 4.4% smaller gzipped; cold start unchanged (4.87 to 4.56 ms `require`, inside its noise). On SchemaStore's rustfmt schema, a document that already carries its 82 defaults validates in 52 ns where 1.48.0 took 827.
 
 ### Added
 - Draft 2019-09 and draft-06. A 2019-09 schema is rewritten to the 2020-12 spelling on the way in: the array form of `items` with `additionalItems` becomes `prefixItems` and `items`, and `$recursiveRef`/`$recursiveAnchor` become `$dynamicRef` and a `$dynamicAnchor`, which is the same outward search. A draft-06 schema goes through the draft-07 rewrite with `if`, `then` and `else` dropped, since draft-06 has no conditional. Their meta-schemas are vendored, so a `$ref` to them resolves offline, and their vocabularies are recognised in `$vocabulary`. The official suite passes in full on both, 1261 of 1261 and 841 of 841, with code generation allowed and blocked, and both run in CI under Node and Deno. `ata-validator/lite` grows by 1.1 KB gzipped for the meta-schemas.
