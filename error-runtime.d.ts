@@ -17,5 +17,8 @@ export interface CompactError {
  */
 export function createErrors(schema: object, options?: { v1?: boolean }): (data: unknown) => CompactError[] | null;
 
+/** The linear-time pattern engine compact modules share (the RegExp-like object it returns has `test`). */
+export function compileSafe(source: string): { test(input: string): boolean };
+
 /** The ata-validator version this runtime belongs to. */
 export const ataVersion: string;

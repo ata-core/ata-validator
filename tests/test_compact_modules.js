@@ -73,6 +73,47 @@ const tests = [
     assert(bad.length === 0, `${bad.length} differences, first:\n${bad.slice(0, 3).join('\n')}`);
   }],
 
+  ['a runtime holding only the parts a schema needs gives the same errors', () => {
+    // Every suite schema against a runtime built for it alone: a part left
+    // out that the schema reaches would throw or answer differently here.
+    const { runtimeFeatures } = require('../lib/error-runtime');
+    const dir = tmpDir();
+    const written = new Set();
+    let schemas = 0, cases = 0, trimmed = 0;
+    const bad = [];
+    for (const [dia, uri] of Object.entries(DIALECTS)) {
+      const sdir = path.join(__dirname, 'suite/tests', dia);
+      for (const f of fs.readdirSync(sdir).filter((x) => x.endsWith('.json'))) {
+        for (const g of JSON.parse(fs.readFileSync(path.join(sdir, f), 'utf8'))) {
+          const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
+          let v, src, rt;
+          try { v = new Validator(schema); rt = new Validator(schema, { useDefaults: false, richErrors: false }); } catch { continue; }
+          const feats = runtimeFeatures([stripAnnotations(v._schemaObj)]);
+          const tag = Object.values(feats).map((b) => (b ? 1 : 0)).join('');
+          if (tag !== '111') trimmed++;
+          const rtFile = `ata-errors-${tag}.cjs`;
+          if (!written.has(tag)) { fs.writeFileSync(path.join(dir, rtFile), aot.errorRuntimeSource('cjs', [v])); written.add(tag); }
+          try { src = aot.toCompactModule(v, { format: 'cjs', errorRuntime: './' + rtFile }); } catch { continue; }
+          if (!src) continue;
+          const file = path.join(dir, `t${n++}.cjs`);
+          fs.writeFileSync(file, src);
+          const m = require(file);
+          schemas++;
+          for (const t of g.tests) {
+            let r;
+            try { r = m.validate(t.data); } catch (e) { bad.push(`threw ${dia}/${f}: ${g.description} / ${t.description}: ${e.message}`); continue; }
+            if (r.valid) continue;
+            cases++;
+            const want = rt.validate(structuredClone(t.data)).errors.map(noCode).join('\n');
+            if (r.errors.map(noCode).join('\n') !== want) bad.push(`errors ${dia}/${f}: ${g.description} / ${t.description}`);
+          }
+        }
+      }
+    }
+    assert(schemas > 1300 && trimmed > 800, `too little covered: ${schemas} schemas, ${trimmed} with a trimmed runtime`);
+    assert(bad.length === 0, `${bad.length} differences, first:\n${bad.slice(0, 3).join('\n')}`);
+  }],
+
   ['behind ata-validator/compiled, a compact module answers as new Validator(schema) does', () => {
     const b = require('../build');
     const { fromCompiled } = require('../compiled');

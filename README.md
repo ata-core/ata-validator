@@ -580,7 +580,7 @@ its errors from one `ata-errors.mjs` the build writes beside them. The build doe
 where it makes the output smaller, so a single small schema keeps its self-contained module.
 The errors are the ones `new Validator(schema, { richErrors: false })` reports, in the same
 order. Seven SchemaStore schemas imported into one app, minified with esbuild, go from 148.9 KB
-to 69.1 KB gzipped, and from 36.6 ms to 15.3 ms to import with code generation blocked. A
+to 63.3 KB gzipped, and from 35.8 ms to 13.8 ms to import with code generation blocked. A
 rejected document costs more this way, since its errors come from an interpreted walk:
 `--errors inline` keeps every module self-contained.
 

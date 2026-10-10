@@ -13,4 +13,12 @@ function createErrors(schema, options) {
   return create(schema, codeOf, options);
 }
 
-module.exports = { createErrors, ataVersion };
+// The linear-time pattern engine, which a compact module imports from here
+// instead of embedding its own copy.
+let _safe = null;
+function compileSafe(src) {
+  if (_safe === null) _safe = require('./lib/safe-regex.js').compileSafe;
+  return _safe(src);
+}
+
+module.exports = { createErrors, compileSafe, ataVersion };
