@@ -229,6 +229,10 @@ function bothEngines (schema, cases, label) {
     // Whether the verdict generator writes shared definitions as functions,
     // fixed per attempt, and the functions it wrote, for the whole compile.
     'shareDefs', 'sharedDefFns',
+    // A shared definition's body, how many references name each definition,
+    // and how many of them have been emitted, which picks the copy a
+    // reference calls (sharedDefCopy): all for the whole compile.
+    'sharedDefBody', 'sharedDefSiteCounts', 'sharedDefSites',
   ])
 
   const src = require('node:fs').readFileSync(require.resolve('../lib/js-compiler.js'), 'utf8')
