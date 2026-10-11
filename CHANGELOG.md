@@ -2,7 +2,11 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.53.0 - 2026-10-11
+
+OpenAPI validators can run on `ata-validator/compat`. express-openapi-validator's own test suite passes 470 of 470 with ata injected, as it does on the default validator, and loads GitHub's and Stripe's API descriptions, which the default validator cannot load. Custom keywords can read where their value sits, and compat now coerces, fills defaults and reads `discriminator` where the reference does. Two engine disagreements are fixed.
+
+Measured on an Apple M4 Pro, Node 25.2.1, against 1.52.0 with both sides in worktrees, interleaved: cold require, compile and first validate 8.31 to 8.18 ms, Fastify's ten routes to first validated request 2.83 to 2.92 ms, warm compile 60.7 to 63.0 µs a schema, request cost within 3%, hot validation the same (that run moves between 19.5 and 24.5 ns a document on both versions). The browser bundle grows from 125.6 to 128.5 KB gzipped: the interpreted engine carries what compat needs from it (coercion where each type is checked, the discriminator, number formats, `post` keywords). Standalone modules are byte for byte the same size. On SchemaStore's 31,822 sample documents the engines give the same answers.
 
 ### Added
 
