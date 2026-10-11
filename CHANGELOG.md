@@ -6,6 +6,9 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
+- The linear-time pattern engine, which runs the patterns the platform RegExp cannot be trusted with, steps through one flat transition table instead of a state object per character: 25 to 35% less per test on SchemaStore's patterns. dart-build goes from 2.82 to 1.96 µs a document, popxf from 6.44 to 4.46, apple-app-site-association from 0.73 to 0.50.
+- A `oneOf` whose branches each allow only their own properties (`{ properties: {...}, additionalProperties: false }`, no property in two branches) is answered by the branch the object's first key names instead of trying every branch. Traefik's file-provider schemas, 25 middleware branches, go from 10.8 to 1.2 µs a document. Values that are not objects, and objects with no keys, still try every branch.
+
 - A server bundle built with esbuild, Rollup or webpack reads a new ESM entry, `index.bundle.mjs`, through the `module` condition, which those bundlers match and Node does not. It imports each tool on its own, as the browser entry does, so the tools an application does not import stay out: an app that imports only `Validator` goes from 142.8 to 135.0 KB gzipped with esbuild, 150.0 to 141.5 with Rollup and 134.9 to 127.1 with webpack. Node and Bun at run time keep the entries they had, since loading every tool up front cost 7.6 ms in Node before 22.10 and 1.3 ms in Bun. `bun build` does not match `module` unless asked: `bun build --conditions=module` gives 134.7 KB against 142.6.
 
 ## 1.51.0 - 2026-10-11

@@ -149,6 +149,7 @@ const FILES = [
   "tests/test_error_order.js",
   "tests/test_error_order_ordinal.js",
   "tests/test_ref_error_order.js",
+  "tests/test_oneof_keyed.js",
   "tests/test_rejection_shape.js",
   "tests/test_lazy_normalization.js",
   "tests/test_value_equality.js",
