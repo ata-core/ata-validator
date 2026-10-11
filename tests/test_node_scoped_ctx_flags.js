@@ -199,8 +199,11 @@ function bothEngines (schema, cases, label) {
     // Character-class run checks by class and length bounds (classRunCheck):
     // a preamble function of its string argument, valid for the whole compile.
     'classRuns',
-    // String enums of sixteen or more as preamble Sets, by value list.
+    // String enums of 64 or more as preamble Sets, by value list.
     'enumSets',
+    // Names of hoisted not/if/then/else functions that take no plain-object
+    // flag. Names are unique per compile, so the set holds for all of it.
+    'flaglessChecks',
     // Definitions referenced from several places, counted once from the root:
     // the errors generator writes each of them as one helper.
     'sharedDefs',
