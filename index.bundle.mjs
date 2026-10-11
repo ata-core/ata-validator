@@ -6,16 +6,9 @@
 // CommonJS module and keeps all of them.
 import core from './lib/validator-core.js';
 import engine from './lib/codegen-engine.js';
-import jsCompiler from './lib/js-compiler.js';
-import jsCompilerErrors from './lib/js-compiler-errors.js';
-import scanCompiler from './lib/scan-compiler.js';
 import { toTypeScript, renderPretty, renderCompact, toOutput, toRetryMessage, describeSchema, renderJSON } from './lib/tools.mjs';
 
 core._registerCodegen(engine);
-// The error and one-pass generators, which lib/js-compiler.js does not name
-// so that a browser bundle can leave them out (see errorsModule there).
-jsCompiler._setErrorsModule(jsCompilerErrors);
-engine._setScanCompiler(scanCompiler);
 
 export const { Validator, compile, validate, validateAsync, parseAsync, version, createPaddedBuffer, SIMDJSON_PADDING, parseJSON, defineSchema } = core;
 export { toTypeScript, renderPretty, renderCompact, toOutput, toRetryMessage, describeSchema, renderJSON };

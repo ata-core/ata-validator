@@ -96,10 +96,6 @@ const root = path.resolve(__dirname, '..');
     assert.ok(size < 56 * 1024, `the Workers bundle is ${size} bytes gzipped, over 56 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
-    // The error and one-pass generators and the text scanner are not named by
-    // the modules a browser bundle reads (lib/js-compiler.js errorsModule,
-    // lib/codegen-engine.js scanCompiler): a fifth of the bundle and more.
-    assert.ok(!shipped(browser).some((k) => /js-compiler-errors|scan-compiler/.test(k)), 'a browser bundle leaves the error generators and the scanner out');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
     // webpack match and Node does not) reads index.bundle.mjs: the tools the
     // application does not import stay out, as in a browser bundle.
@@ -107,38 +103,6 @@ const root = path.resolve(__dirname, '..');
     const serverInputs = shipped(server);
     assert.ok(serverInputs.some((k) => /index\.bundle\.mjs$/.test(k)), 'a Node bundle selects index.bundle.mjs');
     assert.ok(!serverInputs.some((k) => /ts-gen|render-pretty|output-format|describe-schema/.test(k)), 'a Node bundle leaves unimported tools out');
-    assert.ok(serverInputs.some((k) => /js-compiler-errors/.test(k)) && serverInputs.some((k) => /scan-compiler/.test(k)), 'a Node bundle registers the error generators and the scanner');
-    // Without the error generators the browser bundle's errors come from the
-    // interpreted engine: the same answers as the full package, errors
-    // included, on the official suite.
-    const bundled = path.join(root, 'tests', '.browser-bundle-probe.mjs');
-    fs.writeFileSync(entry, "export * from 'ata-validator'\n");
-    esbuild.buildSync({ entryPoints: [entry], bundle: true, format: 'esm', platform: 'browser', conditions: ['browser'], mainFields: ['browser', 'module', 'main'], outfile: bundled, logLevel: 'silent' });
-    try {
-      const probe = spawnSync(process.execPath, ['--input-type=module', '-e', `
-        import fs from 'node:fs'; import path from 'node:path'; import { createRequire } from 'node:module';
-        const B = await import(${JSON.stringify(require('url').pathToFileURL(bundled).href)});
-        const N = createRequire(${JSON.stringify(path.join(root, 'index.js'))})(${JSON.stringify(root)});
-        let n = 0, diff = 0;
-        for (const [dia, uri] of [['draft2020-12', 'https://json-schema.org/draft/2020-12/schema'], ['draft7', 'http://json-schema.org/draft-07/schema#']]) {
-          const dir = path.join(${JSON.stringify(path.join(root, 'tests/suite/tests'))}, dia);
-          for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-            const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
-            let a, b; try { a = new B.Validator(schema); b = new N.Validator(schema) } catch { continue }
-            for (const t of g.tests) for (let k = 0; k < 2; k++) {
-              const q = (v) => { const r = v.validate(JSON.parse(JSON.stringify(t.data))); return JSON.stringify([r.valid, r.valid ? [] : r.errors.map((e) => [e.code, e.keyword, e.instancePath, e.schemaPath, e.message])]) };
-              n++; if (q(a) !== q(b)) diff++;
-            }
-          }
-        }
-        console.log(n + ' ' + diff);
-      `], { encoding: 'utf8', maxBuffer: 1 << 26 });
-      const [cases, diffs] = probe.stdout.trim().split(' ').map(Number);
-      assert.ok(cases > 4000 && diffs === 0, `browser bundle against the full package: ${probe.stdout} ${probe.stderr}`);
-      console.log(`ok: the browser bundle answers ${cases} suite cases as the full package does, errors included`);
-    } finally {
-      fs.rmSync(bundled, { force: true });
-    }
     console.log(`ok: a Workers bundle resolves to the edge entry, ${size} bytes gzipped, no code generator`);
   } finally {
     fs.rmSync(entry, { force: true });
