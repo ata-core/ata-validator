@@ -2,7 +2,11 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.51.0 - 2026-10-11
+
+Schemas that reference each other now build. A schema whose `$ref` leads into another input used to be skipped by `ata build`; it is now built against the others, and with `--mode schema` the schemas are written once to a shared registry that keeps only the definitions the modules reach. `--base-uri` names shared files that declare no `$id`, such as the definitions file Kubernetes schemas reference.
+
+Measured on an Apple M4 Pro, Node 25.2.1, minified with esbuild, gzipped: eight Kubernetes kinds go from not built to 32.6 KB as schema modules (68.6 KB self-contained), and the 19 browser validators of a project with 64 schemas that reference each other 1124 times come to 63.6 KB (273.6 KB self-contained). Verdicts match another validator on 15,348 Kubernetes and 59,724 project document pairs, and error lists match the runtime `Validator`. Against 1.50.0: require, first check, hot paths and a Fastify app's first request are within noise; the browser bundle is 0.48 KB larger; reading the errors of a validator with the `schemas` option costs 2 to 3% more, since those errors are now put in order rather than left as the engine emitted them.
 
 ### Added
 
