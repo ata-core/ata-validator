@@ -29,6 +29,14 @@ const cases = [
   // Through oneOf the self-reference is left as it is, and the schema answers
   // as before, whichever engine takes it.
   [{ $ref: '#/definitions/Y', definitions: { Y: { oneOf: [{ $ref: '#/definitions/Y' }, { type: 'string' }] } } }, ['s', 1, null]],
+  // A string enum long enough to be a Set lookup, against strings, numbers and
+  // objects; and a single-branch anyOf and oneOf, one of them the same $ref an
+  // allOf beside it applies.
+  [{ type: 'object', properties: { e: { enum: Array.from({ length: 20 }, (_, i) => 'v' + i) } } },
+    [{ e: 'v0' }, { e: 'v19' }, { e: 'v20' }, { e: 0 }, { e: {} }, { e: null }]],
+  [{ definitions: { R: { type: 'object', required: ['t'], properties: { t: { type: 'string' } } } }, type: 'array',
+    items: { allOf: [{ $ref: '#/definitions/R' }], anyOf: [{ $ref: '#/definitions/R' }], oneOf: [{ properties: { t: { minLength: 2 } } }] } },
+    [[{ t: 'ab' }], [{ t: 'a' }], [{}], [1], [{ t: 1 }]]],
 ];
 
 let compared = 0;
