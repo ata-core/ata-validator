@@ -196,6 +196,9 @@ function bothEngines (schema, cases, label) {
     // branch reads only module-level names, so it is valid for the whole
     // compile wherever the same branch recurs.
     'hoistedBranch', 'hoistedAny',
+    // Character-class run checks by class and length bounds (classRunCheck):
+    // a preamble function of its string argument, valid for the whole compile.
+    'classRuns',
     // Definitions referenced from several places, counted once from the root:
     // the errors generator writes each of them as one helper.
     'sharedDefs',
