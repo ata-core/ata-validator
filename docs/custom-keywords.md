@@ -67,6 +67,32 @@ new Validator(
 // ['maximum', 'range']
 ```
 
+## Where the value sits
+
+`dataContext: true` gives the keyword's function the value's place as a last
+argument, `{ instancePath, parentData, parentDataProperty, rootData }`, the
+same object the default validator gives its keywords: `validate(value, data,
+parentSchema, ctx)`, or `fn(data, ctx)` for the function `compile` returns. The
+function may change the data there, which is how a request validator removes
+read-only properties before a handler sees them:
+
+```javascript
+const readOnly = {
+  dataContext: true,
+  compile: (on) => on
+    ? (data, ctx) => { delete ctx.parentData[ctx.parentDataProperty]; return true }
+    : () => true,
+}
+new Validator(schema, { keywords: { readOnly } })
+```
+
+A schema that uses such a keyword is answered by the interpreted engine's
+collecting walk on every call, the verdict included, since that walk is the
+one that knows each value's path. Errors such a keyword writes are placed at
+the `instancePath` they carry, as given, rather than relative to the value.
+The compat class gives every keyword this context, and `it.schemaPath.str` to
+`compile`, as the reference does.
+
 ## Errors
 
 A failing keyword reports one error with the keyword's name, the instance
