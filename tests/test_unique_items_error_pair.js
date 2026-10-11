@@ -45,3 +45,27 @@ for (const schema of schemas) {
 assert.ok(rejected >= 2000, `too few rejections compared: ${rejected}`)
 assert.strictEqual(generated, schemas.length * 2, 'every schema should compile')
 console.log(`ok: uniqueItems error pairs match the interpreter (${compared} documents, ${rejected} rejected, short and long arrays)`)
+
+// The generator hoists its own copy of the JSON equality the interpreted
+// engine calls (DEQ_HELPER in lib/js-compiler.js, `_deq` in
+// lib/unique-items.js). They must stay the same function: compare them, and
+// node's own deep equality, over values that differ in key order, nesting,
+// numbers that are equal as JSON, and keys holding undefined.
+{
+  const assert = require('assert')
+  const { _deq } = require('../lib/unique-items')
+  const hoisted = new Function(require('../lib/js-compiler')._helperSources.DEQ_HELPER + ';return _deq')()
+  const vals = [1, 1.0, 0, -0, 2, 'a', '', null, true, false, [], {}, [1, 2], [2, 1], { a: 1, b: 2 }, { b: 2, a: 1 }, { a: 1 },
+    { a: [1, { b: null }] }, { a: [1, { b: null }] }, { a: [1, { b: 0 }] }, [{}], [[]], { a: undefined }, { b: undefined },
+    { id: 1, tags: ['x'], name: 'n' }, { name: 'n', tags: ['x'], id: 1 }, { id: 1, tags: ['y'], name: 'n' }]
+  let n = 0
+  for (const x of vals) for (const y of vals) {
+    assert.strictEqual(hoisted(x, y), _deq(x, y), `${JSON.stringify(x)} ${JSON.stringify(y)}`)
+    const json = JSON.parse(JSON.stringify([x, y]))
+    if (json.length === 2 && json[0] !== undefined && json[1] !== undefined) {
+      assert.strictEqual(_deq(json[0], json[1]), require('util').isDeepStrictEqual(json[0], json[1]) || (json[0] === json[1]), `${JSON.stringify(x)} ${JSON.stringify(y)}`)
+    }
+    n++
+  }
+  console.log(`ok: the hoisted and the module JSON equality agree on ${n} pairs`)
+}
