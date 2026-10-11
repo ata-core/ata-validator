@@ -76,7 +76,11 @@ const esbuild = require('esbuild')
 // 52000 with the error order following a `$ref` into another document
 // (51733 measured): lite has the `schemas` option, and without it the two
 // engines ordered such errors differently.
-const BUDGET = 52000
+// 52500 after 1.52.0 (52228 measured): the typo distance counts a swap of
+// two characters (lib/levenshtein.js) and normalization compares the copy in
+// place instead of serializing it twice (lib/validator-core.js), which took a
+// Stripe-sized OpenAPI document's load from 14.6 to 6.6 s in openapi-backend.
+const BUDGET = 52500
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
