@@ -132,6 +132,39 @@ jobs:
       - name: Run JSON Schema Test Suite
         run: npm run test:suite
 
+  # The release job strips comments from the JavaScript it publishes
+  # (scripts/strip-comments.js). This runs every suite on that stripped tree,
+  # pure JS, so the form users install is the form that was tested.
+  test-published-form:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          submodules: true
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Pure JS, no native engine
+        run: |
+          node -e "require('fs').rmSync('node_modules/@ata-validator', { recursive: true, force: true })"
+
+      - name: Strip comments as the release job does
+        run: node scripts/strip-comments.js
+
+      - name: Run Node.js tests
+        run: npm test
+
+      - name: Run JSON Schema Test Suite
+        run: npm run test:suite
+
+      - name: Suite with eval and new Function blocked
+        run: node tests/test_no_eval.js
+
   # Deno: the package from this checkout, the eval-free path (Deno Deploy
   # refuses dynamic code) and the official suite, all run by Deno itself.
   # No npm install: nothing here needs a dependency or the native engine.
