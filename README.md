@@ -138,18 +138,19 @@ errors (7.6M with `richErrors: false`).
 
 | Dimension | Schema | ata-AOT | runtime validator | Difference |
 |---|---|---|---|---|
-| Bundle (gzipped) | simple | 1.4 KB | 52.7 KB | 38.4x smaller |
-| Bundle (gzipped) | complex | 3.0 KB | 52.7 KB | 17.5x smaller |
-| Bundle (gzipped) | nested | 4.5 KB | 52.7 KB | 11.6x smaller |
+| Bundle (gzipped) | simple | 1.3 KB | 52.7 KB | 39.0x smaller |
+| Bundle (gzipped) | complex | 3.0 KB | 52.7 KB | 17.7x smaller |
+| Bundle (gzipped) | nested | 4.5 KB | 52.7 KB | 11.8x smaller |
 | Cold start | simple | 20 ms | 37 ms | 1.9x faster |
-| Throughput (1M ops) | simple | 289 Mops/s | 96 Mops/s | 3.0x faster |
-| Compile time | simple | 18 µs | 1.56 ms | 85x faster |
+| Throughput (1M ops) | simple | 315 Mops/s | 99 Mops/s | 3.2x faster |
+| Compile time | simple | 24 µs | 1.57 ms | 65x faster |
 
 The runtime column is the default validator most frameworks ship. Reproduce on your machine
-with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-10-06,
-on ata-validator 1.46.0. Across four runs throughput moved between 288 and 329 Mops/s against
-96 to 116, cold start between 19 and 20 ms against 37 to 39, and the compile ratio between 77x
-and 85x. The throughput row times a single one-million-call
+with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-10-11,
+on ata-validator 1.51.0. Across five runs throughput moved between 263 and 325 Mops/s against
+97 to 110, cold start between 20 and 22 ms against 37 to 40, and the compile ratio between 61x
+and 65x. The compile row is the time to write a module, a build-time cost; it was 18 µs on
+1.46.0, and modules have carried the one-pass error function since 1.47.0. The throughput row times a single one-million-call
 loop of a few milliseconds, so it moves the most from run to run; treat the last three rows as
 an order of magnitude rather than a constant.
 
@@ -279,13 +280,13 @@ is the most common way to get a misleading number out of this library.
 
 | | compiled with `ata build` | runtime `new Validator(schema)` |
 |---|---|---|
-| In a bundle, gzipped | **2.1 KB** | 126.1 KB |
+| In a bundle, gzipped | **2.1 KB** | 123.9 KB |
 | Time to a served request | **3.5 ms** | 7.6 ms |
 | Schema known when | build time | any time |
 
 The bundle row is the ten-field user schema in
 `tests/fixtures/error-dx/user.schema.json`, every export of the compiled module against
-`new Validator(schema)`, built with `bun build --minify --target=browser` on ata 1.48.0.
+`new Validator(schema)`, built with `bun build --minify --target=browser` on ata 1.51.0.
 The startup row is a Hono route on Bun 1.4, the median of three rounds of best-of-seven, from
 `benchmark/bundle`, against 3.5 ms for the same app doing no validation at all, so the
 compiled path costs nothing measurable to start. The runtime figure is what it is because
@@ -293,7 +294,7 @@ a schema that arrives at run time can use any keyword, so the whole engine has t
 there. The compiled module imports nothing and contains only the checks your schema asks
 for.
 
-**On a server, use whichever fits your schemas.** 113 KB of JavaScript on a Node or Bun
+**On a server, use whichever fits your schemas.** 124 KB of JavaScript on a Node or Bun
 process is not a cost anyone notices, and the runtime API is the simpler thing to reach
 for. Speed is the same either way once warm.
 
@@ -535,7 +536,7 @@ const v = new Validator(schema, {
 
 ### Build-time compile (`ata compile`)
 
-The `ata` CLI turns a JSON Schema file into a self-contained JavaScript module. No runtime dependency on `ata-validator`, so only the generated validator ships to the browser. For the ten-field user schema in `tests/fixtures/error-dx/user.schema.json` the module is 2.1 KB gzipped, full error detail included, against 113.3 KB for the runtime bundled for the browser (ata 1.45.0).
+The `ata` CLI turns a JSON Schema file into a self-contained JavaScript module. No runtime dependency on `ata-validator`, so only the generated validator ships to the browser. For the ten-field user schema in `tests/fixtures/error-dx/user.schema.json` the module is 2.1 KB gzipped, full error detail included, against 123.9 KB for the runtime bundled for the browser (ata 1.51.0).
 
 ```bash
 npx ata compile schemas/user.json -o src/generated/user.validator.mjs
@@ -581,20 +582,25 @@ error collector out of the modules: each one carries its verdict and its schema,
 its errors from one `ata-errors.mjs` the build writes beside them. The build does this only
 where it makes the output smaller, so a single small schema keeps its self-contained module.
 The errors are the ones `new Validator(schema, { richErrors: false })` reports, in the same
-order. Seven SchemaStore schemas imported into one app, minified with esbuild, go from 148.9 KB
-to 63.3 KB gzipped, and from 35.8 ms to 13.8 ms to import with code generation blocked. A
+order. Forty SchemaStore schemas imported into one app, minified with esbuild, go from 513.8 KB
+to 213.3 KB gzipped, and from 60.4 ms to 28.4 ms to import with code generation blocked. A
 rejected document costs more this way, since its errors come from an interpreted walk:
 `--errors inline` keeps every module self-contained. `--mode schema` writes each module as
 its schema and takes the verdict from the runtime too: forty SchemaStore schemas in one app
-come to 101.6 KB gzipped against 212.6 KB as compact modules, and load and check each once in
-23.0 ms against 35.5, while a check once warm costs about five times what generated code costs.
+come to 102.4 KB gzipped against 213.3 KB as compact modules, and load and check each once in
+23.9 ms against 34.5, while a check once warm costs about five times what generated code costs.
+Schemas that reference each other by `$id` are built against each other, and in schema mode
+they are written once to a shared registry that keeps only the definitions the modules reach;
+`--base-uri <uri>` names files that declare no `$id`. Eight Kubernetes kinds, whose schemas
+share one 1.1 MB definitions file, come to 32.6 KB gzipped as schema modules against 68.6 KB
+self-contained, on ata 1.51.0.
 
 Bundle sizes for the 10-field user schema in `tests/fixtures/error-dx/user.schema.json`,
-minified and gzipped, measured with `bun build --minify --target=browser` on ata 1.45.0:
+minified and gzipped, measured with `bun build --minify --target=browser` on ata 1.51.0:
 
 | What the app imports | Size | Notes |
 |---|---|---|
-| `Validator` from `ata-validator` | 113.3 KB | The compiler ships with it, because a runtime schema can use any keyword |
+| `Validator` from `ata-validator` | 123.9 KB | The compiler ships with it, because a runtime schema can use any keyword |
 | `isValid` from the compiled module | **1.3 KB** | Nothing else is reachable, so the error collector is dropped |
 | `validate` from the compiled module | **1.9 KB** | Adds the detailed error collector |
 
@@ -632,7 +638,7 @@ through a `setFormats()` export the module carries. `docs/API.md` has the
 details.
 
 **Fastify startup, 10 route schemas, from a cold process to the first validated request:
-ajv 19.7 ms, ata 2.75 ms, no build step required.** ata registers in 0.25 ms of that and
+ajv 19.0 ms, ata 2.81 ms, no build step required.** ata registers in 0.20 ms of that and
 compiles on the first request, so counting only registration would overstate the gap.
 Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
