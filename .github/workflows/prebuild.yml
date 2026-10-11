@@ -239,13 +239,5 @@ jobs:
             done
           done
 
-      # The published JavaScript carries no comments: V8 scans a function's
-      # comments with its code the first time it runs, so a fresh process
-      # validates sooner without them. Lines stay where they are, and the
-      # script refuses any file where a token would change. CI's
-      # test-published-form job runs every suite on the same stripped tree.
-      - name: Strip comments from the published JavaScript
-        run: node scripts/strip-comments.js
-
       - name: Publish core
         run: npm publish

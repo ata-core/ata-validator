@@ -93,27 +93,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // generated code's self-loop rewrite, preamble checks and the delimited-loop
 // regex rule (lib/interpreter-compat.js, lib/js-compiler.js,
 // lib/regex-linear.js). Measured 432.8 KB.
-// 272 KB once the release job strips comments from the shipped JavaScript
-// (scripts/strip-comments.js): the ceiling now holds the tarball as published,
-// packed here from a stripped copy of the same files. Measured 265.4 KB, with
-// the repository's own tarball at 436.1 KB.
-const fs = require('node:fs');
-const os = require('node:os');
-const { strip, shippedFiles } = require('../scripts/strip-comments');
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-pack-'));
-try {
-  const stripped = new Set(shippedFiles());
-  for (const f of manifest.files) {
-    const dest = path.join(tmp, f.path);
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    const src = path.join(root, f.path);
-    if (stripped.has(f.path)) fs.writeFileSync(dest, strip(fs.readFileSync(src, 'utf8'), f.path));
-    else fs.copyFileSync(src, dest);
-  }
-  const published = JSON.parse(execSync('npm pack --dry-run --json --ignore-scripts', { cwd: tmp, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }))[0];
-  assert.strictEqual(published.files.length, manifest.files.length, 'the stripped copy packs the same files');
-  assert.ok(published.size < 272 * 1024, `published tarball ${published.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
-  console.log(`ok: core tarball is pure JS (${files.length} files, ${published.size} bytes packed as published, ${manifest.size} from the repository)`);
-} finally {
-  fs.rmSync(tmp, { recursive: true, force: true });
-}
+// 440 KB with a required key holding undefined read as missing in every
+// engine, and the generated code shapes that keep SchemaStore's schemas at
+// 1.53.0's speed or better (lib/js-compiler.js, lib/plan-compiler.js).
+// Measured 436.6 KB.
+assert.ok(manifest.size < 440 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+
+console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

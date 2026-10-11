@@ -34,9 +34,6 @@ jobs:
       # are published after the version bump, so no clean install.
       - name: Install dependencies
         run: npm install --ignore-scripts --omit=optional --no-audit --no-fund
-      # As the publish job does, so this tarball holds what npm serves.
-      - name: Strip comments from the published JavaScript
-        run: node scripts/strip-comments.js
       - name: Pack
         id: pack
         run: |
