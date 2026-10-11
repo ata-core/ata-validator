@@ -4,7 +4,13 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Fixed
+
+- A declared property holding `undefined` still got different answers in 1.53.0: the generated code checked the value where the key was required, where the node had no `type`, and inside `if`, `not` and similar subschemas, and the first-call engine treated a required key holding `undefined` as missing. Every engine now skips the value and counts the key as present, as the default validator does. `{ if: { properties: { t: { const: 'x' } } }, then: false }` accepted `{ t: undefined }` on generated code and rejected it on the interpreter; both reject it now. `tests/test_undefined_property.js` covers 19 shapes on every engine, with and without code generation.
+
 ### Changed
+
+- A definition that refers to itself on the same value through `allOf` or `anyOf` (`X: { allOf: [{ $ref: X }] }`) no longer sends the whole schema to the interpreted engine. SchemaStore's cloudify, 284 KB, goes from 38 to 15.5 µs a document, against 12 for the default validator. A `not`, `if`, `then` or `else` subschema is a function written once instead of a closure made on every call.
 
 - The browser bundle no longer carries what only `ata-validator/compat` uses: coercion where each `type` is checked and the discriminator are in their own file, which compat installs, and the schema scan's compat questions are asked only when compat is loaded. An app that imports only `Validator` goes from 128.5 to 127.6 KB gzipped with esbuild, `ata-validator/lite` from 54.8 to 53.8 KB. compat behaves as before: express-openapi-validator's suite still passes, and verdicts and coerced data still match the reference on 2400 generated documents.
 
