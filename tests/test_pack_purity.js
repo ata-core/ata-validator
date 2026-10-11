@@ -82,6 +82,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // (lib/schema-order.js). Measured 410.2 KB at the time.
 // 416 KB with `ata build --base-uri` and the registry pruned to the
 // definitions its modules reach (lib/aot-build.js). Measured 412.2 KB.
-assert.ok(manifest.size < 416 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 420 KB after 1.52.0: own-key loops in both generators (lib/js-compiler.js),
+// the swap-aware typo distance (lib/levenshtein.js) and the compat error path
+// (compat.js, lib/compat-errors.js). Measured 416.2 KB.
+assert.ok(manifest.size < 420 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

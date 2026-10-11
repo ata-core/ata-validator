@@ -100,6 +100,10 @@ class Ata {
       coerceTypes: !!o.coerceTypes,
       removeAdditional: !!o.removeAdditional,
       verbose: !!o.verbose,
+      // The errors are reshaped into the reference's own; the fields only
+      // rich errors carry (code, received, suggestion, docUrl) are dropped on
+      // the way, so they are not built at all.
+      richErrors: false,
     };
     // `strict` and `strictSchema`: the unknown-keyword and dangling-local-$ref
     // checks are enforced; `strictTypes`, `strictTuples` and `strictRequired`
@@ -403,7 +407,7 @@ const _metaValidators = new Map();
 function metaValidator(id) {
   let v = _metaValidators.get(id);
   if (!v) {
-    v = new Validator({ $ref: id }, { useDefaults: false });
+    v = new Validator({ $ref: id }, { useDefaults: false, engine: 'interpreter' });
     _metaValidators.set(id, v);
   }
   return v;

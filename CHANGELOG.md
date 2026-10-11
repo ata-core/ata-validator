@@ -7,6 +7,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 ### Fixed
 
 - Typo hints count two swapped adjacent characters as one edit. Since 1.44.0 a hint needs a name's typo to be within one edit for names of three or four characters, and a swap counted as two, so a missing `name` beside `nmae`, the commonest typo of all, got no hint. The distance is now the optimal string alignment distance, held to a full table on 720,000 comparisons; `age` is still not offered for `name`.
+- `ata-validator/compat` reads a rejection about 37% faster and compiles its first schemas about 30% faster. Its errors are reshaped into the reference's own, so the validator underneath no longer builds the rich fields that are then dropped, and each schema path is split and classified once rather than on every rejection. The meta-schema that checks every compiled schema runs on the interpreter, which has nothing to compile: ten route schemas through `express-json-validator-middleware` went from 7.7 to 5.5 ms to compile and answer once, and a rejected body with every error collected from 4.1 to 2.6 µs (the default validator takes 1.9). `tests/test_ajv_parity.js` passes unchanged.
 
 ## 1.52.0 - 2026-10-11
 
