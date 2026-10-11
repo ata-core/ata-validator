@@ -25,10 +25,8 @@ const EXPECTED = [
   'lib/combined-runtime.js',
   'lib/diagnostic-source.js',
   'lib/dialect.js',
-  'lib/draft7.js',
   'lib/enrich-error.js',
   'lib/error-codes.js',
-  'lib/formats.js',
   'lib/compile-fn.js',
   'lib/env.js',
   'lib/js-compiler.js',
@@ -39,11 +37,8 @@ const EXPECTED = [
   'lib/rejections.js',
   'lib/schema-order.js',
   'lib/schema-scan.js',
-  'lib/shape-classifier.js',
   'lib/suggestions.js',
-  'lib/tier0.js',
   'lib/validator-core.js',
-  'lib/vocabularies.js',
 ]
 
 // A fresh process each, so nothing this test file loaded counts.

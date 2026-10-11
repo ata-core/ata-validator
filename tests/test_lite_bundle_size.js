@@ -91,7 +91,10 @@ const esbuild = require('esbuild')
 // 54200 (53833 measured): compat's coercion and discriminator moved to
 // lib/interpreter-compat.js and its scan questions to compat.js, so lite
 // carries neither.
-const BUDGET = 54200
+// 54400 (54239 measured, 54767 at 1.53.0): a required key holding undefined is
+// missing in the interpreted engine too (lib/interpreter-core.js,
+// lib/plan-compiler.js).
+const BUDGET = 54400
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
