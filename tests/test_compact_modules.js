@@ -308,6 +308,13 @@ const tests = [
     assert(one.branchErrors[0].code === 'ATA1001', 'branch errors stamped');
   }],
 
+  ['the runtime source has no require call a tool without scope would take for an import', () => {
+    for (const schemaMode of [false, true]) {
+      const src = aot.errorRuntimeSource('esm', null, schemaMode);
+      assert(!/\brequire\(/.test(src), `schemaMode ${schemaMode}: ${(src.match(/.{40}\brequire\(.{30}/) || [''])[0]}`);
+    }
+  }],
+
   ['the error runtime runs with code generation blocked', () => {
     const dir = tmpDir();
     fs.writeFileSync(path.join(dir, 'ata-errors.mjs'), aot.errorRuntimeSource('esm'));

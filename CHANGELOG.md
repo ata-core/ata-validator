@@ -18,6 +18,7 @@ Measured on an Apple M4 Pro, Node 25.2.1. On SchemaStore's 446 schemas with samp
 ### Fixed
 
 - The generated code walked an object's keys with `for...in`, which also visits enumerable keys its prototype carries, where the interpreter reads own keys only. A class instance or an object made with `Object.create` was rejected where `additionalProperties` is false, and under `not` that turned into accepting what the interpreter rejects: on the official suite's object data rebuilt over such prototypes, 236 verdicts and 102 error lists differed, two of them accepts. The key loops of both generators now skip keys an object does not own, with the prototype read once per loop; an ordinary object, whose prototype is Object.prototype, takes its keys as before, so `JSON.parse` output pays nothing. `tests/test_inherited_keys.js` holds the 2,918 variants. A polluted `Object.prototype` is not covered: the generated code takes an ordinary object's prototype as clean, as the default validator does.
+- The shared runtime (`ata-errors.mjs`, schema modules, `errorRuntimeSource`) called its bundled files through a local function named `require`. A tool that reads the file without scope took `require('./interpreter-core')` for an import of a file that is not there: knip reported ten unresolved imports in a project that checks its generated sources. The local function has another name now.
 
 ## 1.51.0 - 2026-10-11
 
