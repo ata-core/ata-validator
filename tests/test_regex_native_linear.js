@@ -29,9 +29,15 @@ const patterns = new Set([
   // `[^/]+/[^/]+`, version numbers, `(ab)*`).
   '^[^/]+/[^/]+$', '^\\d+(\\.\\d+)*$', '^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$', '^(?:ab)*$', '^(a|b)*c$',
   '^[a-z0-9]+(-[a-z0-9]+)*$', '^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$', '^\\w+@\\w+\\.\\w+$', '^did:[a-z0-9]+:.+$',
-  // Still declined: a loop whose body splits two ways, nesting, and a loop
-  // whose first character the continuation shares.
-  '^([A-Za-z]{1}[A-Za-z\\d_]*\\.)+[A-Za-z][A-Za-z\\d_]*$', '^(a+)+$', '^(\\w+\\s?)*$',
+  // Accepted by the delimited-loop rule: each iteration ends with a
+  // character nothing else in the loop or after it matches (SchemaStore's
+  // apple-app-site-association, bungee-plugin, imgbotconfig, size-limit).
+  '^([A-Za-z]{1}[A-Za-z\\d_]*\\.)+[A-Za-z][A-Za-z\\d_]*$', '^([a-zA-Z_$][a-zA-Z\\d_$]*\\.)*[a-zA-Z_$][a-zA-Z\\d_$]*$',
+  '^/?([^/]+/)*[^/]+/?$', '^[A-Z0-9]{10}\\.([A-Za-z]{1}[A-Za-z\\d_]*\\.)+[A-Za-z][A-Za-z\\d_]*$', '^(a*b)*a*$',
+  // Accepted by the one-choice rule (sourcehut-build).
+  '^[a-z0-9_-]{1,128}$', '^ab{2,200}c$',
+  // Still declined: nesting, and a loop body that splits two ways.
+  '^(a+)+$', '^(\\w+\\s?)*$',
 ])
 function collect (node) {
   if (!node || typeof node !== 'object') return
@@ -118,7 +124,9 @@ for (const p of patterns) {
 // nested loops, a loop body that splits two ways, a loop the continuation
 // shares its characters with, and unanchored loops.
 for (const p of ['(a+)+$', '^(a+)+$', '^(a|aa)+$', '^a+a+$', '^a*a*$', 'a+b', '^[a-z]{0,1000}$', '^(\\w+\\s?)+$', '^(\\w+\\s?)*$', '\\01',
-  '^(a*)*b$', '^(a?)+$', '^(.*a){10}$', '^[a-z]+[a-z0-9]+$', '^(\\w+\\s?){5}$', '\\w+(,\\w+)*', '^([a-z]+\\.?)+$']) {
+  '^(a*)*b$', '^(a?)+$', '^(.*a){10}$', '^[a-z]+[a-z0-9]+$', '^(\\w+\\s?){5}$', '\\w+(,\\w+)*', '^([a-z]+\\.?)+$',
+  // A delimiter the loop or the rest also matches, or two varying repeats.
+  '^([a-z]+.)*[a-z]+$', '^([^/]+/)*.*$', '^(ab*b)*$', '^(a[ab]*a)*$', '^[a]{0,200}[a]{0,200}$', '^([a-z.]+\\.)*[a-z]+$']) {
   assert.strictEqual(nativeIsLinear(p), false, p)
 }
 // And the deterministic rule takes what the simple one cannot.
