@@ -111,7 +111,9 @@ const cases = [
   // The root allows one key, the def allows another. The root's walk must name
   // the root's key, and must not name the def's.
   const rootBody = compileToJSCodegen(schema, null, null).toString()
-  assert.ok(/for\s*\(var _k in d\)if\(_k!=="id"\)/.test(rootBody), `the root's key walk should be its own, got:\n${rootBody}`)
+  // A key the walk does not expect is then checked as the object's own,
+  // which a non-ordinary object's inherited keys are not.
+  assert.ok(/for\s*\(var _k in d\)if\(_k!=="id"(?:&&|\))/.test(rootBody), `the root's key walk should be its own, got:\n${rootBody}`)
   assert.ok(!/_k!=="not"/.test(rootBody), `the def's key set leaked into the root, got:\n${rootBody}`)
 
   // And with no `additionalProperties` on the root at all, the root body must
