@@ -42,6 +42,13 @@ const cases = [
     data: { age: 30 },
     expect: null,
   },
+  // two letters swapped is one edit, so a four-letter name still gets it
+  {
+    err: { keyword: 'required', path: '', params: { missingProperty: 'name' } },
+    data: { nmae: 'x', age: 30 },
+    expectKind: 'similar-key',
+    expectTextIncludes: 'nmae',
+  },
   // the nearest key wins, not the first one within reach
   {
     err: { keyword: 'required', path: '', params: { missingProperty: 'address' } },

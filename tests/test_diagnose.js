@@ -43,7 +43,7 @@ function err (o) {
 {
   const errors = [
     err({ code: 'ATA7001', keyword: 'required', params: { missingProperty: 'name' } }),
-    err({ code: 'ATA7001', keyword: 'required', params: { missingProperty: 'mane' } }),
+    err({ code: 'ATA7001', keyword: 'required', params: { missingProperty: 'nmea' } }),
     err({ code: 'ATA7002', keyword: 'additionalProperties', params: { additionalProperty: 'nmae' } }),
   ];
   assert.strictEqual(toDiagnostics(errors).length, 3, 'ambiguity keeps all three');

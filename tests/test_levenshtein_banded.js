@@ -2,7 +2,8 @@
 
 // The bounded distance computes only the band within the bound of the
 // diagonal on longer strings (banded in lib/levenshtein.js). Held here to a
-// full table on random strings over a small alphabet, where near misses are
+// full table (the optimal string alignment distance, a swap of two adjacent
+// characters counting one edit) on random strings over a small alphabet, where near misses are
 // common, at every bound a typo hint uses and a few more. A result past the
 // bound may come back as Infinity or as any number past it; callers compare
 // it with the bound.
@@ -15,7 +16,11 @@ function full (a, b) {
   for (let i = 0; i <= a.length; i++) d[i] = [i]
   for (let j = 0; j <= b.length; j++) d[0][j] = j
   for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+    for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+      // Two adjacent characters swapped are one edit.
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1)
+    }
   }
   return d[a.length][b.length]
 }

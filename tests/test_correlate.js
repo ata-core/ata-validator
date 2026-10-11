@@ -28,10 +28,10 @@ function extra (path, additional) {
   console.log('ok: distant names stay separate');
 }
 
-// A tie on the missing side must not correlate. `nmae` is distance 2 from
-// `name` and distance 2 from `mane`; picking one would be a guess.
+// A tie on the missing side must not correlate. `nmae` is one swap from
+// `name` and one swap from `nmea`; picking one would be a guess.
 {
-  const errs = [req('', 'name'), req('', 'mane'), extra('', 'nmae')];
+  const errs = [req('', 'name'), req('', 'nmea'), extra('', 'nmae')];
   assert.strictEqual(correlateTypos(errs).size, 0, 'ambiguous missing key must not correlate');
   console.log('ok: tie on the missing side blocks correlation');
 }

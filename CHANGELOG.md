@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- Typo hints count two swapped adjacent characters as one edit. Since 1.44.0 a hint needs a name's typo to be within one edit for names of three or four characters, and a swap counted as two, so a missing `name` beside `nmae`, the commonest typo of all, got no hint. The distance is now the optimal string alignment distance, held to a full table on 720,000 comparisons; `age` is still not offered for `name`.
+
 ## 1.52.0 - 2026-10-11
 
 Faster where ata was slowest, smaller server bundles, and both engines answering alike on objects that inherit keys. Three changes to the generated code take on the SchemaStore schemas where ata lost to the default validator, a server bundle leaves out the tools an application does not import, and the generated code now reads only an object's own keys, as the interpreter does.
