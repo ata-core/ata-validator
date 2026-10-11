@@ -2,15 +2,22 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.52.0 - 2026-10-11
+
+Faster where ata was slowest, and smaller server bundles. Three changes to the generated code take on the SchemaStore schemas where ata lost to the default validator, and a server bundle leaves out the tools an application does not import.
+
+Measured on an Apple M4 Pro, Node 25.2.1. On SchemaStore's 446 schemas with sample documents, ata is slower than the default validator on 42 rather than 52, and the median ratio moves from 1.68x to 1.72x; among schemas of 50 to 200 KB it is slower on one rather than five. Against 1.51.0: require and first check within noise (5.01 to 5.09 ms and 4.97 to 4.91 in the two orders), a Fastify app's first validated request the same, hot paths the same with code generation and 6 to 9% faster without it, heap per validator the same. The browser bundle is 0.7 KB larger and the edge bundle 0.1 KB. Across SchemaStore's 875 standalone modules, 179 change and the gzipped total grows 0.4%.
 
 ### Changed
 
-- The linear-time pattern engine, which runs the patterns the platform RegExp cannot be trusted with, steps through one flat transition table instead of a state object per character: 25 to 35% less per test on SchemaStore's patterns. dart-build goes from 2.82 to 1.96 µs a document, popxf from 6.44 to 4.46, apple-app-site-association from 0.73 to 0.50.
 - A `oneOf` whose branches each allow only their own properties (`{ properties: {...}, additionalProperties: false }`, no property in two branches) is answered by the branch the object's first key names instead of trying every branch. Traefik's file-provider schemas, 25 middleware branches, go from 10.8 to 1.2 µs a document. Values that are not objects, and objects with no keys, still try every branch.
-- A small object definition referenced from many places in a large schema is written as several functions with the same body, each serving at most four references. One function called with objects of dozens of shapes falls off V8's fast property reads; SchemaStore's detekt sends 72 shapes through one rule definition and goes from 6.3 to 1.1 µs a document. Definitions without properties are not copied. Across SchemaStore's 875 standalone modules, 48 change and the gzipped total grows 0.2%.
-
+- A small object definition referenced from many places in a large schema is written as several functions with the same body, each serving at most four references. One function called with objects of dozens of shapes falls off V8's fast property reads; SchemaStore's detekt sends 72 shapes through one rule definition and goes from 6.3 to 1.1 µs a document. Definitions without properties are not copied.
+- The linear-time pattern engine, which runs the patterns the platform RegExp cannot be trusted with, steps through one flat transition table of 16-bit entries instead of a state object per character: 25 to 35% less per test on SchemaStore's patterns, and less memory than before (17.9 against 21.2 KB per pattern in use). dart-build goes from 2.82 to 1.96 µs a document, popxf from 6.44 to 4.46, apple-app-site-association from 0.73 to 0.50.
 - A server bundle built with esbuild, Rollup or webpack reads a new ESM entry, `index.bundle.mjs`, through the `module` condition, which those bundlers match and Node does not. It imports each tool on its own, as the browser entry does, so the tools an application does not import stay out: an app that imports only `Validator` goes from 142.8 to 135.0 KB gzipped with esbuild, 150.0 to 141.5 with Rollup and 134.9 to 127.1 with webpack. Node and Bun at run time keep the entries they had, since loading every tool up front cost 7.6 ms in Node before 22.10 and 1.3 ms in Bun. `bun build` does not match `module` unless asked: `bun build --conditions=module` gives 134.7 KB against 142.6.
+
+### Known
+
+- The generated code reads an object's keys with `for...in`, which includes enumerable keys inherited from its prototype, where the interpreter reads only its own. Input from `JSON.parse`, `validateJSON` or a request body never has such keys; a class instance with enumerable prototype properties, or a polluted `Object.prototype`, can be answered differently by the two engines. This predates 1.52.0 and is the next release's first fix.
 
 ## 1.51.0 - 2026-10-11
 
