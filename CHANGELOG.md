@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- The browser bundle no longer carries what only `ata-validator/compat` uses: coercion where each `type` is checked and the discriminator are in their own file, which compat installs, and the schema scan's compat questions are asked only when compat is loaded. An app that imports only `Validator` goes from 128.5 to 127.6 KB gzipped with esbuild, `ata-validator/lite` from 54.8 to 53.8 KB. compat behaves as before: express-openapi-validator's suite still passes, and verdicts and coerced data still match the reference on 2400 generated documents.
+
 ## 1.53.0 - 2026-10-11
 
 OpenAPI validators can run on `ata-validator/compat`. express-openapi-validator's own test suite passes 470 of 470 with ata injected, as it does on the default validator, and loads GitHub's and Stripe's API descriptions, which the default validator cannot load. Custom keywords can read where their value sits, and compat now coerces, fills defaults and reads `discriminator` where the reference does. Two engine disagreements are fixed.

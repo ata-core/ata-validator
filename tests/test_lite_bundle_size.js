@@ -88,7 +88,10 @@ const esbuild = require('esbuild')
 // reads the discriminator, checks formats registered for numbers, runs `post`
 // keywords last and keeps anyOf and oneOf branch errors for keywords that
 // change the data, all for compat.
-const BUDGET = 55100
+// 54200 (53833 measured): compat's coercion and discriminator moved to
+// lib/interpreter-compat.js and its scan questions to compat.js, so lite
+// carries neither.
+const BUDGET = 54200
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

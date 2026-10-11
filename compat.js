@@ -21,6 +21,9 @@ const { resolvePointer } = require('./lib/pointer.js');
 // `strictTuples` and `strictRequired` are accepted and ignored.
 
 const { Validator } = require('./index');
+// The interpreted engine's coercion where each type is checked and its
+// discriminator, which only compat asks for (see lib/interpreter-compat.js).
+require('./lib/interpreter-core')._setCompat(require('./lib/interpreter-compat'));
 const { METASCHEMAS } = require('./lib/metaschemas');
 const { normalizeExclusiveBounds } = require('./lib/draft7');
 const { createShaper, asReferenceKeyword } = require('./lib/compat-errors');
@@ -680,8 +683,16 @@ function fragmentKey(key) {
 // What a schema holds anywhere below it, read from the walk normalization
 // makes of it anyway (lib/schema-scan.js), which remembers it per object.
 const _scan = require('./lib/schema-scan');
-const F_BEYOND = _scan.BEYOND_ITEMS, F_DISCR = _scan.DISCRIMINATOR, F_DEFAULT = _scan.HAS_DEFAULT;
-const F_REF = _scan.HAS_REF, F_ALLOF = _scan.HAS_ALLOF, F_FORMAT = _scan.HAS_FORMAT;
+const F_REF = 1 << 16, F_BEYOND = 1 << 17, F_DISCR = 1 << 18, F_DEFAULT = 1 << 19, F_ALLOF = 1 << 20, F_FORMAT = 1 << 21;
+_scan._setExtraKeys(new Map([
+  ['$ref', F_REF | F_BEYOND], ['$dynamicRef', F_BEYOND], ['allOf', F_ALLOF | F_BEYOND],
+  ['anyOf', F_BEYOND], ['oneOf', F_BEYOND], ['not', F_BEYOND], ['if', F_BEYOND],
+  ['then', F_BEYOND], ['else', F_BEYOND], ['additionalProperties', F_BEYOND],
+  ['patternProperties', F_BEYOND], ['prefixItems', F_BEYOND], ['additionalItems', F_BEYOND],
+  ['contains', F_BEYOND], ['dependentSchemas', F_BEYOND], ['dependencies', F_BEYOND],
+  ['propertyNames', F_BEYOND], ['unevaluatedProperties', F_BEYOND], ['unevaluatedItems', F_BEYOND],
+  ['discriminator', F_DISCR], ['default', F_DEFAULT], ['format', F_FORMAT],
+]));
 const features = _scan.scan;
 
 const _metaValidators = new Map();
