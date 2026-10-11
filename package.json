@@ -24,6 +24,7 @@
         "require": "./index.js"
       },
       "import": {
+        "module": "./index.bundle.mjs",
         "module-sync": "./index.node.mjs",
         "default": "./index.mjs"
       },
@@ -137,6 +138,7 @@
     "index.js",
     "index.mjs",
     "index.node.mjs",
+    "index.bundle.mjs",
     "index.browser.mjs",
     "index.edge.js",
     "index.edge.mjs",

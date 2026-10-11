@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- A server bundle built with esbuild, Rollup or webpack reads a new ESM entry, `index.bundle.mjs`, through the `module` condition, which those bundlers match and Node does not. It imports each tool on its own, as the browser entry does, so the tools an application does not import stay out: an app that imports only `Validator` goes from 142.8 to 135.0 KB gzipped with esbuild, 150.0 to 141.5 with Rollup and 134.9 to 127.1 with webpack. Node and Bun at run time keep the entries they had, since loading every tool up front cost 7.6 ms in Node before 22.10 and 1.3 ms in Bun. `bun build` does not match `module` unless asked: `bun build --conditions=module` gives 134.7 KB against 142.6.
+
 ## 1.51.0 - 2026-10-11
 
 Schemas that reference each other now build. A schema whose `$ref` leads into another input used to be skipped by `ata build`; it is now built against the others, and with `--mode schema` the schemas are written once to a shared registry that keeps only the definitions the modules reach. `--base-uri` names shared files that declare no `$id`, such as the definitions file Kubernetes schemas reference.

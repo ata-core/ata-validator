@@ -96,6 +96,13 @@ const root = path.resolve(__dirname, '..');
     assert.ok(size < 56 * 1024, `the Workers bundle is ${size} bytes gzipped, over 56 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
+    // A bundle for Node (the `module` condition, which esbuild, Rollup and
+    // webpack match and Node does not) reads index.bundle.mjs: the tools the
+    // application does not import stay out, as in a browser bundle.
+    const server = esbuild.buildSync({ entryPoints: [entry], bundle: true, minify: true, format: 'esm', platform: 'node', write: false, metafile: true, logLevel: 'silent' });
+    const serverInputs = shipped(server);
+    assert.ok(serverInputs.some((k) => /index\.bundle\.mjs$/.test(k)), 'a Node bundle selects index.bundle.mjs');
+    assert.ok(!serverInputs.some((k) => /ts-gen|render-pretty|output-format|describe-schema/.test(k)), 'a Node bundle leaves unimported tools out');
     console.log(`ok: a Workers bundle resolves to the edge entry, ${size} bytes gzipped, no code generator`);
   } finally {
     fs.rmSync(entry, { force: true });
