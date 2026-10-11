@@ -128,7 +128,6 @@ class Ata {
     const keywordNames = Object.keys(this._keywords);
     const kws = {};
     for (const name of keywordNames) if (this._keywords[name] !== true) kws[name] = this._keywords[name];
-    if (this._numFormats && Object.keys(this._numFormats).length > 0) kws[NUMBER_FORMAT_KEYWORD] = numberFormatKeyword(this._numFormats);
     if (Object.keys(kws).length > 0) out.keywords = kws;
     const registry = this._registrySnapshot();
     if (registry) out.schemas = registry;
@@ -139,7 +138,7 @@ class Ata {
     if (this._schemas.size === 0) return null;
     if (this._registry === null) {
       const map = {};
-      for (const [key, schema] of this._schemas) map[fragmentKey(key)] = this._fragmentRefs(this._numberFormats(this._withDialect(schema)));
+      for (const [key, schema] of this._schemas) map[fragmentKey(key)] = this._fragmentRefs(this._withDialect(schema));
       this._registry = map;
     }
     return this._registry;
@@ -153,21 +152,46 @@ class Ata {
   // the key's entry in the registry (see fragmentKey).
   _fragmentRefs(schema) {
     if (schema === null || typeof schema !== 'object') return schema;
-    const keys = new Set();
-    for (const key of this._schemas.keys()) if (key.startsWith('#')) keys.add(key);
+    let keys = this._fragmentKeys;
+    if (keys === undefined || this._fragmentStale) {
+      // The copies stand while the fragment-only keys are the same ones.
+      const now = new Set();
+      for (const key of this._schemas.keys()) if (key.startsWith('#')) now.add(key);
+      this._fragmentStale = false;
+      if (keys === undefined || keys.size !== now.size || [...now].some((k) => !keys.has(k))) {
+        // Each key's pointer, split and decoded once.
+        keys = this._fragmentKeys = new Map();
+        for (const key of now) {
+          let segs = null;
+          if (key.startsWith('#/')) {
+            try { segs = key.slice(2).split('/').map((raw) => decodeURIComponent(raw.replace(/~1/g, '/').replace(/~0/g, '~'))); } catch { segs = null; }
+          }
+          keys.set(key, segs);
+        }
+        this._fragmentCopies = new WeakMap();
+      }
+    }
     if (keys.size === 0) return schema;
-    const resolves = (ref) => {
-      if (ref === '#') return true;
-      if (!ref.startsWith('#/')) return true;
+    const hit = this._fragmentCopies.get(schema);
+    if (hit !== undefined) return hit;
+    if ((features(schema) & F_REF) === 0) { this._fragmentCopies.set(schema, schema); return schema; }
+    const resolves = (key, segs) => {
+      if (key === '#') return true;
+      if (segs === null) return !key.startsWith('#/');
       let node = schema;
-      for (const raw of ref.slice(2).split('/')) {
-        let seg = raw.replace(/~1/g, '/').replace(/~0/g, '~');
-        try { seg = decodeURIComponent(seg); } catch { return false; }
-        if (node === null || typeof node !== 'object' || !Object.prototype.hasOwnProperty.call(node, seg)) return false;
-        node = node[seg];
+      for (let i = 0; i < segs.length; i++) {
+        if (node === null || typeof node !== 'object' || !Object.prototype.hasOwnProperty.call(node, segs[i])) return false;
+        node = node[segs[i]];
       }
       return true;
     };
+    // Only a key that does not resolve in this document can need pointing
+    // elsewhere. A document that holds every registered fragment itself, as
+    // an OpenAPI tool's schema carrying the whole `components` does, is left
+    // as it is without a walk.
+    const pointed = new Set();
+    for (const [key, segs] of keys) if (!resolves(key, segs)) pointed.add(key);
+    if (pointed.size === 0) { this._fragmentCopies.set(schema, schema); return schema; }
     let changed = false;
     const copy = (n, data) => {
       if (n === null || typeof n !== 'object') return n;
@@ -175,7 +199,7 @@ class Ata {
       const out = {};
       for (const k of Object.keys(n)) {
         let v;
-        if (!data && k === '$ref' && typeof n[k] === 'string' && keys.has(n[k]) && !resolves(n[k])) { v = fragmentKey(n[k]); changed = true; }
+        if (!data && k === '$ref' && typeof n[k] === 'string' && pointed.has(n[k])) { v = fragmentKey(n[k]); changed = true; }
         else v = copy(n[k], !data && (k === 'const' || k === 'enum' || k === 'default' || k === 'examples' || k === 'example'));
         if (k === '__proto__') Object.defineProperty(out, k, { value: v, writable: true, enumerable: true, configurable: true });
         else out[k] = v;
@@ -183,39 +207,13 @@ class Ata {
       return out;
     };
     const out = copy(schema, false);
-    return changed ? out : schema;
-  }
-
-  // With number formats registered, a copy of the schema where every node
-  // naming one of them in `format` also carries the keyword that checks it on
-  // numbers. Without any, the schema as it is.
-  _numberFormats(schema) {
-    const names = this._numFormats;
-    if (!names || Object.keys(names).length === 0 || schema === null || typeof schema !== 'object') return schema;
-    let used = false;
-    const walk = (n, seen) => {
-      if (n === null || typeof n !== 'object' || seen.has(n)) return;
-      seen.add(n);
-      if (!Array.isArray(n) && typeof n.format === 'string' && names[n.format] !== undefined) used = true;
-      for (const k of Object.keys(n)) walk(n[k], seen);
-    };
-    walk(schema, new Set());
-    if (!used) return schema;
-    const copy = (n) => {
-      if (n === null || typeof n !== 'object') return n;
-      if (Array.isArray(n)) return n.map(copy);
-      const out = {};
-      for (const k of Object.keys(n)) {
-        if (k === '__proto__') Object.defineProperty(out, k, { value: copy(n[k]), writable: true, enumerable: true, configurable: true });
-        else out[k] = copy(n[k]);
-      }
-      if (typeof n.format === 'string' && names[n.format] !== undefined) out[NUMBER_FORMAT_KEYWORD] = n.format;
-      return out;
-    };
-    return copy(schema);
+    const result = changed ? out : schema;
+    this._fragmentCopies.set(schema, result);
+    return result;
   }
 
   _touchRegistry() {
+    this._fragmentStale = true;
     this._registry = null;
     this._registryEpoch++;
   }
@@ -225,8 +223,21 @@ class Ata {
   // reference's 2020-12 class reads one as 2020-12, which is how an OpenAPI
   // 3.1 document's schemas are meant. The copy is shallow: only the root
   // changes.
+  // The copy is kept per schema object, so a schema compiled again or
+  // registered again is the same object to everything that remembers work
+  // per object below (the scan, normalization, the fragment copies).
   _withDialect(schema) {
     if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return schema;
+    if (this._dialectCopies === undefined) this._dialectCopies = new WeakMap();
+    let out = this._dialectCopies.get(schema);
+    if (out === undefined) {
+      out = this._withDialectCopy(schema);
+      this._dialectCopies.set(schema, out);
+    }
+    return out;
+  }
+
+  _withDialectCopy(schema) {
     if (isDraft4(schema)) return draft4AsDraft7(schema);
     if (typeof schema.$schema === 'string') return schema;
     const meta = typeof this.opts.defaultMeta === 'string' ? this.opts.defaultMeta : DRAFT7;
@@ -260,9 +271,12 @@ class Ata {
         }
       }
     }
-    const rootDoc = this._fragmentRefs(this._numberFormats(this._withDialect(schema)));
+    const rootDoc = this._fragmentRefs(this._withDialect(schema));
     const options = this._validatorOptions();
     const allErrors = !!this.opts.allErrors;
+    // The reference's `discriminator` option, for a schema that has one.
+    const discriminated = this.opts.discriminator === true &&
+      ((features(rootDoc) & F_DISCR) !== 0 || Object.values(options.schemas || {}).some((d) => features(d) & F_DISCR));
     let shaper = null;
     if (typeof rootDoc === 'object' && rootDoc !== null) {
       // The root is registered under a private id so the error shaper can
@@ -271,7 +285,7 @@ class Ata {
       const rootId = 'ata-compat:root';
       options.schemas = { ...(options.schemas || {}), [rootId]: rootDoc };
       shaper = createShaper({
-        Validator, rootId, rootDoc, options, allErrors, schemas: options.schemas, discriminator: this.opts.discriminator === true,
+        Validator, rootId, rootDoc, options, allErrors, schemas: options.schemas, discriminator: discriminated,
         macroKeywords: Object.keys(this._keywords).filter((k) => this._keywords[k] !== true && this._keywords[k].macro),
       });
     }
@@ -279,14 +293,20 @@ class Ata {
     // rest, where ata's coercion pass, which runs before validation and
     // follows `properties` and `items`, does not: the interpreted engine then
     // coerces where each `type` is checked, as the reference does.
-    if (options.coerceTypes && COERCE_BEYOND.test(JSON.stringify(rootDoc))) {
+    if (options.coerceTypes && (features(rootDoc) & F_BEYOND) !== 0) {
       options._coerceInWalk = this.opts.coerceTypes === 'array' ? 'array' : true;
       options.coerceTypes = false;
       options.engine = 'interpreter';
     }
     // The reference's `discriminator` option: the interpreted engine reads the
     // keyword (see discriminate in lib/interpreter-core.js).
-    if (this.opts.discriminator === true && (JSON.stringify(rootDoc).includes('"discriminator"') || JSON.stringify(options.schemas || {}).includes('"discriminator"'))) {
+    // A format registered for numbers, for a schema that names a format.
+    if (this._numFormats && Object.keys(this._numFormats).length > 0 &&
+        ((features(rootDoc) & F_FORMAT) !== 0 || Object.values(options.schemas || {}).some((d) => features(d) & F_FORMAT))) {
+      options._numberFormats = { ...this._numFormats };
+      options.engine = 'interpreter';
+    }
+    if (discriminated) {
       options._discriminator = true;
       options.engine = 'interpreter';
     }
@@ -457,8 +477,8 @@ class Ata {
     this._formats[name] = formatToFunction(name, format);
     // The reference applies a format declared `type: 'number'` to numbers,
     // where JSON Schema, and ata, apply formats to strings only. Such a
-    // format is also checked on numbers here, through a keyword the schemas
-    // are given beside `format` (see _numberFormats).
+    // format is also checked on numbers here, by the interpreted engine (see
+    // compile).
     if (format && typeof format === 'object' && format.type === 'number') {
       this._numFormats = this._numFormats || Object.create(null);
       this._numFormats[name] = this._formats[name];
@@ -595,8 +615,6 @@ function inReferenceOrder(errors) {
   return errors;
 }
 
-// The keyword that applies a number format to numbers (see addFormat). Its
-// errors are the reference's format errors.
 // useDefaults the way the reference applies it: in the properties of every
 // subschema the data is validated against outside anyOf, oneOf, not and if,
 // which includes those behind `allOf` and a `$ref`. ata's own pass fills the
@@ -606,8 +624,9 @@ function inReferenceOrder(errors) {
 // default anywhere such a walk could reach that ata's own pass would not.
 function referencedDefaults(rootDoc, registry) {
   if (rootDoc === null || typeof rootDoc !== 'object') return null;
-  const str = JSON.stringify(rootDoc);
-  if (!str.includes('"default"') || (!str.includes('"$ref"') && !str.includes('"allOf"'))) return null;
+  const f = features(rootDoc);
+  if ((f & F_DEFAULT) === 0 && !Object.values(registry || {}).some((d) => features(d) & F_DEFAULT)) return null;
+  if ((f & (F_REF | F_ALLOF)) === 0) return null;
   const resolve = (ref) => {
     const hash = ref.indexOf('#');
     const base = hash < 0 ? ref : ref.slice(0, hash);
@@ -657,23 +676,13 @@ function fragmentKey(key) {
   return key.startsWith('#') ? 'ata-compat:fragment:' + encodeURIComponent(key.slice(1)) : key;
 }
 
-// Keywords whose subschemas ata's coercion pass does not follow.
-const COERCE_BEYOND = /"(?:\$ref|\$dynamicRef|allOf|anyOf|oneOf|not|if|then|else|additionalProperties|patternProperties|prefixItems|additionalItems|contains|dependentSchemas|dependencies|propertyNames|unevaluatedProperties|unevaluatedItems)"\s*:/;
 
-const NUMBER_FORMAT_KEYWORD = 'x-ata-number-format';
-function numberFormatKeyword(formats) {
-  return {
-    type: 'number',
-    // For the error's schemaPath, which names `format` as the reference's does.
-    dataContext: true,
-    validate: function check(name, data, parent, ctx) {
-      const fn = formats[name];
-      if (fn === undefined || fn(data)) return true;
-      check.errors = [{ keyword: 'format', instancePath: ctx.instancePath, schemaPath: ctx.schemaPath.slice(0, ctx.schemaPath.lastIndexOf('/')) + '/format', params: { format: name }, message: `must match format "${name}"` }];
-      return false;
-    },
-  };
-}
+// What a schema holds anywhere below it, read from the walk normalization
+// makes of it anyway (lib/schema-scan.js), which remembers it per object.
+const _scan = require('./lib/schema-scan');
+const F_BEYOND = _scan.BEYOND_ITEMS, F_DISCR = _scan.DISCRIMINATOR, F_DEFAULT = _scan.HAS_DEFAULT;
+const F_REF = _scan.HAS_REF, F_ALLOF = _scan.HAS_ALLOF, F_FORMAT = _scan.HAS_FORMAT;
+const features = _scan.scan;
 
 const _metaValidators = new Map();
 function metaValidator(id) {
