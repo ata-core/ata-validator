@@ -89,6 +89,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // type is checked, the discriminator option, defaults behind $ref and the
 // reference's schema paths (compat.js, lib/compat-errors.js,
 // lib/interpreter-core.js). Measured 427.5 KB.
-assert.ok(manifest.size < 432 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 436 KB with compat's interpreter additions in a file of their own, the
+// generated code's self-loop rewrite, preamble checks and the delimited-loop
+// regex rule (lib/interpreter-compat.js, lib/js-compiler.js,
+// lib/regex-linear.js). Measured 432.8 KB.
+assert.ok(manifest.size < 436 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
