@@ -298,6 +298,13 @@ for.
 process is not a cost anyone notices, and the runtime API is the simpler thing to reach
 for. Speed is the same either way once warm.
 
+**On Node 22 or later, a process that starts often can keep V8's compiled code between
+starts.** Point `NODE_COMPILE_CACHE` at a directory that survives the restart, or call
+`module.enableCompileCache()` in your entry. Measured on an Apple M4 Pro, Node 25.2.1:
+loading ata goes from 4.9 to 2.7 ms, and a fresh process reaches its first validated
+document in 5.3 ms instead of 7.8. This is Node's feature, it covers every module the
+process loads, and ata does not turn it on for you.
+
 **In a browser, on an edge runtime, or anywhere cold starts are charged, compile.** This
 is where the difference is the whole story, and it is also where `new Function` is often
 blocked outright, which the compiled module does not need. With a bundler, adding `@ata-project/unplugin`
