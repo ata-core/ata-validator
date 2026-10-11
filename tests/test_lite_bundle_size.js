@@ -84,7 +84,10 @@ const esbuild = require('esbuild')
 // (parentData and the rest, lib/interpreter-core.js) and normalized schemas
 // cached per object (lib/validator-core.js), which took express-openapi-
 // validator's first request on GitHub's API description from 10.5 to 1.1 s.
-const BUDGET = 53000
+// 54700 (54349 measured): the interpreter coerces where each type is checked,
+// reads the discriminator, runs `post` keywords last and keeps anyOf and
+// oneOf branch errors for keywords that change the data, all for compat.
+const BUDGET = 54700
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

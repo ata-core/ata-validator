@@ -93,6 +93,13 @@ the `instancePath` they carry, as given, rather than relative to the value.
 The compat class gives every keyword this context, and `it.schemaPath.str` to
 `compile`, as the reference does.
 
+A keyword that changes the value is followed by keywords that read the value
+it left. Two fields of the definition order such keywords at a node:
+`before: 'name'` runs the keyword ahead of the custom keyword `name`, and
+`post: true` runs it after everything else at the node, subschemas included,
+so a request validator can deserialize a date string after `anyOf` has checked
+the string.
+
 ## Errors
 
 A failing keyword reports one error with the keyword's name, the instance

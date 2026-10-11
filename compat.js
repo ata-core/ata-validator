@@ -107,7 +107,7 @@ class Ata {
     const o = this.opts;
     const out = {
       useDefaults: !!o.useDefaults,
-      coerceTypes: !!o.coerceTypes,
+      coerceTypes: o.coerceTypes === 'array' ? 'array' : !!o.coerceTypes,
       removeAdditional: !!o.removeAdditional,
       verbose: !!o.verbose,
       // The errors are reshaped into the reference's own; the fields only
@@ -126,11 +126,10 @@ class Ata {
     const formatNames = Object.keys(this._formats);
     if (formatNames.length > 0) out.formats = { ...this._formats };
     const keywordNames = Object.keys(this._keywords);
-    if (keywordNames.length > 0) {
-      const kws = {};
-      for (const name of keywordNames) if (this._keywords[name] !== true) kws[name] = this._keywords[name];
-      if (Object.keys(kws).length > 0) out.keywords = kws;
-    }
+    const kws = {};
+    for (const name of keywordNames) if (this._keywords[name] !== true) kws[name] = this._keywords[name];
+    if (this._numFormats && Object.keys(this._numFormats).length > 0) kws[NUMBER_FORMAT_KEYWORD] = numberFormatKeyword(this._numFormats);
+    if (Object.keys(kws).length > 0) out.keywords = kws;
     const registry = this._registrySnapshot();
     if (registry) out.schemas = registry;
     return out;
@@ -140,10 +139,80 @@ class Ata {
     if (this._schemas.size === 0) return null;
     if (this._registry === null) {
       const map = {};
-      for (const [key, schema] of this._schemas) map[key] = this._withDialect(schema);
+      for (const [key, schema] of this._schemas) map[fragmentKey(key)] = this._fragmentRefs(this._numberFormats(this._withDialect(schema)));
       this._registry = map;
     }
     return this._registry;
+  }
+
+  // A schema registered under a key that is only a fragment
+  // (`addSchema(s, '#/components/schemas/Pet')`, as OpenAPI tools do) is
+  // found by a `$ref` of that exact string that does not resolve in its own
+  // document: the reference looks it up among the registered keys then. ata
+  // resolves a fragment in the document alone, so such a `$ref` is pointed at
+  // the key's entry in the registry (see fragmentKey).
+  _fragmentRefs(schema) {
+    if (schema === null || typeof schema !== 'object') return schema;
+    const keys = new Set();
+    for (const key of this._schemas.keys()) if (key.startsWith('#')) keys.add(key);
+    if (keys.size === 0) return schema;
+    const resolves = (ref) => {
+      if (ref === '#') return true;
+      if (!ref.startsWith('#/')) return true;
+      let node = schema;
+      for (const raw of ref.slice(2).split('/')) {
+        let seg = raw.replace(/~1/g, '/').replace(/~0/g, '~');
+        try { seg = decodeURIComponent(seg); } catch { return false; }
+        if (node === null || typeof node !== 'object' || !Object.prototype.hasOwnProperty.call(node, seg)) return false;
+        node = node[seg];
+      }
+      return true;
+    };
+    let changed = false;
+    const copy = (n, data) => {
+      if (n === null || typeof n !== 'object') return n;
+      if (Array.isArray(n)) return n.map((x) => copy(x, data));
+      const out = {};
+      for (const k of Object.keys(n)) {
+        let v;
+        if (!data && k === '$ref' && typeof n[k] === 'string' && keys.has(n[k]) && !resolves(n[k])) { v = fragmentKey(n[k]); changed = true; }
+        else v = copy(n[k], !data && (k === 'const' || k === 'enum' || k === 'default' || k === 'examples' || k === 'example'));
+        if (k === '__proto__') Object.defineProperty(out, k, { value: v, writable: true, enumerable: true, configurable: true });
+        else out[k] = v;
+      }
+      return out;
+    };
+    const out = copy(schema, false);
+    return changed ? out : schema;
+  }
+
+  // With number formats registered, a copy of the schema where every node
+  // naming one of them in `format` also carries the keyword that checks it on
+  // numbers. Without any, the schema as it is.
+  _numberFormats(schema) {
+    const names = this._numFormats;
+    if (!names || Object.keys(names).length === 0 || schema === null || typeof schema !== 'object') return schema;
+    let used = false;
+    const walk = (n, seen) => {
+      if (n === null || typeof n !== 'object' || seen.has(n)) return;
+      seen.add(n);
+      if (!Array.isArray(n) && typeof n.format === 'string' && names[n.format] !== undefined) used = true;
+      for (const k of Object.keys(n)) walk(n[k], seen);
+    };
+    walk(schema, new Set());
+    if (!used) return schema;
+    const copy = (n) => {
+      if (n === null || typeof n !== 'object') return n;
+      if (Array.isArray(n)) return n.map(copy);
+      const out = {};
+      for (const k of Object.keys(n)) {
+        if (k === '__proto__') Object.defineProperty(out, k, { value: copy(n[k]), writable: true, enumerable: true, configurable: true });
+        else out[k] = copy(n[k]);
+      }
+      if (typeof n.format === 'string' && names[n.format] !== undefined) out[NUMBER_FORMAT_KEYWORD] = n.format;
+      return out;
+    };
+    return copy(schema);
   }
 
   _touchRegistry() {
@@ -152,12 +221,17 @@ class Ata {
   }
 
   // A schema with no `$schema` is read as draft-07, which is what the
-  // reference class does. The copy is shallow: only the root changes.
+  // reference class does, or as `defaultMeta` when that names a dialect: the
+  // reference's 2020-12 class reads one as 2020-12, which is how an OpenAPI
+  // 3.1 document's schemas are meant. The copy is shallow: only the root
+  // changes.
   _withDialect(schema) {
     if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return schema;
     if (isDraft4(schema)) return draft4AsDraft7(schema);
     if (typeof schema.$schema === 'string') return schema;
-    return { $schema: DRAFT7, ...schema };
+    const meta = typeof this.opts.defaultMeta === 'string' ? this.opts.defaultMeta : DRAFT7;
+    if (DRAFT4_IDS.has(meta)) return draft4AsDraft7({ $schema: meta, ...schema });
+    return { $schema: meta, ...schema };
   }
 
   // ----- compile / validate --------------------------------------------
@@ -186,7 +260,7 @@ class Ata {
         }
       }
     }
-    const rootDoc = this._withDialect(schema);
+    const rootDoc = this._fragmentRefs(this._numberFormats(this._withDialect(schema)));
     const options = this._validatorOptions();
     const allErrors = !!this.opts.allErrors;
     let shaper = null;
@@ -197,18 +271,41 @@ class Ata {
       const rootId = 'ata-compat:root';
       options.schemas = { ...(options.schemas || {}), [rootId]: rootDoc };
       shaper = createShaper({
-        Validator, rootId, rootDoc, options, allErrors,
+        Validator, rootId, rootDoc, options, allErrors, schemas: options.schemas, discriminator: this.opts.discriminator === true,
         macroKeywords: Object.keys(this._keywords).filter((k) => this._keywords[k] !== true && this._keywords[k].macro),
       });
     }
+    // coerceTypes reaching a value behind allOf, anyOf, oneOf, $ref and the
+    // rest, where ata's coercion pass, which runs before validation and
+    // follows `properties` and `items`, does not: the interpreted engine then
+    // coerces where each `type` is checked, as the reference does.
+    if (options.coerceTypes && COERCE_BEYOND.test(JSON.stringify(rootDoc))) {
+      options._coerceInWalk = this.opts.coerceTypes === 'array' ? 'array' : true;
+      options.coerceTypes = false;
+      options.engine = 'interpreter';
+    }
+    // The reference's `discriminator` option: the interpreted engine reads the
+    // keyword (see discriminate in lib/interpreter-core.js).
+    if (this.opts.discriminator === true && (JSON.stringify(rootDoc).includes('"discriminator"') || JSON.stringify(options.schemas || {}).includes('"discriminator"'))) {
+      options._discriminator = true;
+      options.engine = 'interpreter';
+    }
     const v = new Validator(rootDoc, options);
+    const defaults = this.opts.useDefaults ? referencedDefaults(rootDoc, options.schemas) : null;
+    // With keywords that read their data's context, the shaper is given the
+    // errors as the validator made them: those carry each anyOf and oneOf
+    // branch's errors (see keepBranches in lib/interpreter-core.js), which the
+    // copies handed out do not.
+    const ctxKeywords = options.keywords !== undefined && Object.values(options.keywords).some((k) => k && k.dataContext === true);
     const validate = (data) => {
+      if (defaults !== null) defaults(data);
       const result = v.validate(data);
       if (result.valid) {
         validate.errors = null;
         return true;
       }
-      let errors = shaper === null ? result.errors.map(asReferenceKeyword) : shaper(result.errors, data);
+      const raw = ctxKeywords && shaper !== null && typeof result._ataRaw === 'function' ? result._ataRaw() : result.errors;
+      let errors = shaper === null ? result.errors.map(asReferenceKeyword) : shaper(raw, data);
       // Errors the shaper synthesises, the `if` wrapper among them, are built
       // from the group rather than carried up from the validator, so verbose
       // mode has to fill in the value they point at here or they would be the
@@ -218,7 +315,7 @@ class Ata {
           ? { ...e, data: resolvePointer(data, e.instancePath || '', undefined) }
           : e));
       }
-      validate.errors = shaper === null && !allErrors ? errors.slice(0, 1) : errors;
+      validate.errors = inReferenceOrder(shaper === null && !allErrors ? errors.slice(0, 1) : errors);
       return false;
     };
     validate.errors = null;
@@ -336,7 +433,7 @@ class Ata {
     // boolean exclusive bounds in their numeric form, against draft-07's
     // meta-schema (ata carries no draft-04 meta-schema).
     if (isDraft4(schema)) schema = normalizeExclusiveBounds(structuredClone(draft4AsDraft7(schema)));
-    const declared = typeof schema.$schema === 'string' ? schema.$schema : DRAFT7;
+    const declared = typeof schema.$schema === 'string' ? schema.$schema : typeof this.opts.defaultMeta === 'string' && !DRAFT4_IDS.has(this.opts.defaultMeta) ? this.opts.defaultMeta : DRAFT7;
     const metaId = METASCHEMAS.has(declared) ? declared : isDraft7Id(declared) ? DRAFT7 : DRAFT2020;
     const meta = metaValidator(metaId);
     const result = meta.validate(schema);
@@ -358,6 +455,15 @@ class Ata {
 
   addFormat(name, format) {
     this._formats[name] = formatToFunction(name, format);
+    // The reference applies a format declared `type: 'number'` to numbers,
+    // where JSON Schema, and ata, apply formats to strings only. Such a
+    // format is also checked on numbers here, through a keyword the schemas
+    // are given beside `format` (see _numberFormats).
+    if (format && typeof format === 'object' && format.type === 'number') {
+      this._numFormats = this._numFormats || Object.create(null);
+      this._numFormats[name] = this._formats[name];
+    } else if (this._numFormats) delete this._numFormats[name];
+    this._touchRegistry();
     this._compiled = new WeakMap();
     return this;
   }
@@ -407,6 +513,8 @@ class Ata {
     if (typeof definition.validate === 'function') mapped.validate = definition.validate;
     if (typeof definition.compile === 'function') mapped.compile = compileWithContext(definition.compile);
     if (typeof definition.macro === 'function') mapped.macro = definition.macro;
+    if (typeof definition.before === 'string') mapped.before = definition.before;
+    if (definition.post === true) mapped.post = true;
     if (mapped.validate && mapped.compile) delete mapped.validate;
     // The reference hands every keyword function the data's context
     // (parentData, parentDataProperty, instancePath, rootData), and keywords
@@ -464,6 +572,106 @@ function compileWithContext(compile) {
     // Errors the keyword writes land on its own function, read from here.
     wrapped.source = inner;
     return wrapped;
+  };
+}
+
+// The reference writes an error's fields as instancePath, schemaPath,
+// keyword, params, message; code that serializes errors sees the order. The
+// errors a custom keyword reports come out in another, and are put in this one.
+const REFERENCE_FIELDS = ['instancePath', 'schemaPath', 'keyword', 'params', 'message'];
+function inReferenceOrder(errors) {
+  for (let i = 0; i < errors.length; i++) {
+    const e = errors[i];
+    if (e === null || typeof e !== 'object') continue;
+    const keys = Object.keys(e);
+    let ordered = true;
+    for (let j = 0; j < REFERENCE_FIELDS.length && j < keys.length; j++) if (keys[j] !== REFERENCE_FIELDS[j]) { ordered = false; break; }
+    if (ordered) continue;
+    const out = {};
+    for (const k of REFERENCE_FIELDS) if (k in e) out[k] = e[k];
+    for (const k of keys) if (!(k in out)) out[k] = e[k];
+    errors[i] = out;
+  }
+  return errors;
+}
+
+// The keyword that applies a number format to numbers (see addFormat). Its
+// errors are the reference's format errors.
+// useDefaults the way the reference applies it: in the properties of every
+// subschema the data is validated against outside anyOf, oneOf, not and if,
+// which includes those behind `allOf` and a `$ref`. ata's own pass fills the
+// `properties` it can reach by nesting alone; this one, run before it, also
+// goes through `allOf` and `$ref`. Both fill only a key the object does not
+// have, so what one fills the other leaves. Null when the schema has no
+// default anywhere such a walk could reach that ata's own pass would not.
+function referencedDefaults(rootDoc, registry) {
+  if (rootDoc === null || typeof rootDoc !== 'object') return null;
+  const str = JSON.stringify(rootDoc);
+  if (!str.includes('"default"') || (!str.includes('"$ref"') && !str.includes('"allOf"'))) return null;
+  const resolve = (ref) => {
+    const hash = ref.indexOf('#');
+    const base = hash < 0 ? ref : ref.slice(0, hash);
+    const doc = base === '' ? rootDoc : registry && registry[base];
+    if (doc === undefined || doc === null) return null;
+    const frag = hash < 0 ? '' : ref.slice(hash + 1);
+    if (frag !== '' && !frag.startsWith('/')) return null;
+    let node = doc;
+    for (const raw of frag === '' ? [] : frag.slice(1).split('/')) {
+      let seg = raw.replace(/~1/g, '/').replace(/~0/g, '~');
+      try { seg = decodeURIComponent(seg); } catch { return null; }
+      if (node === null || typeof node !== 'object' || !Object.prototype.hasOwnProperty.call(node, seg)) return null;
+      node = node[seg];
+    }
+    return node;
+  };
+  const fill = (schema, data, active) => {
+    if (schema === null || typeof schema !== 'object' || data === null || typeof data !== 'object' || active.has(schema)) return;
+    active.add(schema);
+    if (typeof schema.$ref === 'string') fill(resolve(schema.$ref), data, active);
+    if (Array.isArray(schema.allOf)) for (const sub of schema.allOf) fill(sub, data, active);
+    const props = schema.properties;
+    if (props !== null && typeof props === 'object' && !Array.isArray(data)) {
+      for (const key of Object.keys(props)) {
+        const prop = props[key];
+        if (prop === null || typeof prop !== 'object') continue;
+        if (prop.default !== undefined && !Object.hasOwn(data, key)) {
+          const value = prop.default !== null && typeof prop.default === 'object' ? JSON.parse(JSON.stringify(prop.default)) : prop.default;
+          Object.defineProperty(data, key, { value, writable: true, enumerable: true, configurable: true });
+        }
+        // Into the value with a fresh set: the same schema may apply again
+        // one level down, in a recursive one.
+        if (Object.hasOwn(data, key)) fill(prop, data[key], new Set());
+      }
+    }
+    if (Array.isArray(data) && schema.items !== null && typeof schema.items === 'object' && !Array.isArray(schema.items)) {
+      for (const item of data) fill(schema.items, item, new Set());
+    }
+    active.delete(schema);
+  };
+  return (data) => fill(rootDoc, data, new Set());
+}
+
+// The registry id a fragment-only key is kept under: a `#...` string is not an
+// id a document can be found by, so it is given one.
+function fragmentKey(key) {
+  return key.startsWith('#') ? 'ata-compat:fragment:' + encodeURIComponent(key.slice(1)) : key;
+}
+
+// Keywords whose subschemas ata's coercion pass does not follow.
+const COERCE_BEYOND = /"(?:\$ref|\$dynamicRef|allOf|anyOf|oneOf|not|if|then|else|additionalProperties|patternProperties|prefixItems|additionalItems|contains|dependentSchemas|dependencies|propertyNames|unevaluatedProperties|unevaluatedItems)"\s*:/;
+
+const NUMBER_FORMAT_KEYWORD = 'x-ata-number-format';
+function numberFormatKeyword(formats) {
+  return {
+    type: 'number',
+    // For the error's schemaPath, which names `format` as the reference's does.
+    dataContext: true,
+    validate: function check(name, data, parent, ctx) {
+      const fn = formats[name];
+      if (fn === undefined || fn(data)) return true;
+      check.errors = [{ keyword: 'format', instancePath: ctx.instancePath, schemaPath: ctx.schemaPath.slice(0, ctx.schemaPath.lastIndexOf('/')) + '/format', params: { format: name }, message: `must match format "${name}"` }];
+      return false;
+    },
   };
 }
 

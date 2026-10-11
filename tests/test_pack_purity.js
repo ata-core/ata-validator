@@ -85,6 +85,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 420 KB after 1.52.0: own-key loops in both generators (lib/js-compiler.js),
 // the swap-aware typo distance (lib/levenshtein.js) and the compat error path
 // (compat.js, lib/compat-errors.js). Measured 416.2 KB.
-assert.ok(manifest.size < 420 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 432 KB with compat reading OpenAPI validators' setup: coercion where each
+// type is checked, the discriminator option, defaults behind $ref and the
+// reference's schema paths (compat.js, lib/compat-errors.js,
+// lib/interpreter-core.js). Measured 427.5 KB.
+assert.ok(manifest.size < 432 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

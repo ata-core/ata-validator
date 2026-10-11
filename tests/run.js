@@ -154,6 +154,7 @@ const FILES = [
   "tests/test_inherited_keys.js",
   "tests/test_normalized_cache.js",
   "tests/test_keyword_context.js",
+  "tests/test_undefined_property.js",
   "tests/test_rejection_shape.js",
   "tests/test_lazy_normalization.js",
   "tests/test_value_equality.js",

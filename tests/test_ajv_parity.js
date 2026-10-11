@@ -515,6 +515,99 @@ test('a code-only keyword is refused where a schema uses it, not silently accept
   assert(threw && /gen/.test(threw.message), 'compiling a schema that uses it throws naming the keyword, got ' + (threw && threw.message));
 });
 
+parity('oneOf and anyOf with no branch passing report the reference\'s wording, with and without allErrors', (Klass) => {
+  const schema = { type: 'object', properties: { arr: { type: 'array', items: { oneOf: [{ type: 'object', required: ['a'] }, { type: 'object', required: ['b'] }] } }, x: { anyOf: [{ type: 'string' }, { type: 'number' }] } } };
+  const out = [];
+  for (const allErrors of [false, true]) {
+    const validate = new Klass({ allErrors }).compile(schema);
+    out.push([validate({ arr: [{ c: 1 }], x: true }), validate.errors]);
+  }
+  return out;
+});
+
+parity('an error reached through a $ref names the path of the schema the $ref points to', (Klass) => {
+  const out = [];
+  const schemas = [
+    { type: 'object', properties: { s: { $ref: '#/definitions/SL' } }, definitions: { SL: { type: 'string', anyOf: [{ maxLength: 2 }, { minLength: 4 }] } } },
+    { type: 'object', properties: { s: { $ref: '#/definitions/A' } }, definitions: { A: { $ref: '#/definitions/SL' }, SL: { type: 'string', maxLength: 1 } } },
+  ];
+  for (const schema of schemas) {
+    for (const allErrors of [false, true]) {
+      const validate = new Klass({ allErrors }).compile(schema);
+      out.push([validate({ s: 'abc' }), validate.errors, validate({ s: 1 }), validate.errors]);
+    }
+  }
+  return out;
+});
+
+parity('useDefaults fills defaults behind allOf and $ref, recursive schemas included', (Klass) => {
+  const paged = { type: 'object', properties: { q: { type: 'object', properties: { p: { $ref: '#/definitions/PS' } } } }, definitions: { PS: { allOf: [{ $ref: '#/definitions/Pg' }, { $ref: '#/definitions/So' }] }, Pg: { type: 'object', properties: { page: { type: 'integer', default: 1 } } }, So: { type: 'object', properties: { field: { type: 'string', default: 'id' } } } } };
+  const tree = { $ref: '#/definitions/T', definitions: { T: { type: 'object', properties: { n: { type: 'integer', default: 0 }, kids: { type: 'array', items: { $ref: '#/definitions/T' } } } } } };
+  const out = [];
+  for (const [schema, docs] of [[paged, [{ q: { p: {} } }, { q: {} }, { q: { p: { page: 3 } } }]], [tree, [{ kids: [{}, { kids: [{}] }] }]]]) {
+    const validate = new Klass({ useDefaults: true }).compile(schema);
+    for (const doc of docs) { const d = JSON.parse(JSON.stringify(doc)); out.push([validate(d), d]); }
+  }
+  return out;
+});
+
+parity('a $ref names a schema registered under a fragment-only key, as OpenAPI tools register components', (Klass) => {
+  const ajv = new Klass({ allErrors: true });
+  ajv.addSchema({ type: 'object', properties: { x: { $ref: '#/components/schemas/B' } } }, '#/components/schemas/A');
+  ajv.addSchema({ type: 'string' }, '#/components/schemas/B');
+  const validate = ajv.compile({ type: 'object', properties: { a: { $ref: '#/components/schemas/A' } } });
+  const byKey = ajv.getSchema('#/components/schemas/A');
+  return [validate({ a: { x: 's' } }), validate({ a: { x: 1 } }), validate.errors, byKey({ x: 2 }), byKey.errors];
+});
+
+parity('the discriminator option applies the branch the tag names, and reports a bad tag', (Klass) => {
+  const schema = { type: 'object', properties: { ops: { type: 'array', items: { $ref: '#/definitions/Op' } } }, definitions: {
+    Op: { type: 'object', oneOf: [{ $ref: '#/definitions/A' }, { $ref: '#/definitions/B' }], discriminator: { propertyName: 'type' }, required: ['type'] },
+    A: { type: 'object', required: ['type', 'a'], properties: { type: { const: 'a' }, a: { type: 'string' } }, additionalProperties: false },
+    B: { type: 'object', required: ['type', 'b'], properties: { type: { enum: ['b', 'bb'] }, b: { type: 'number' } } } } };
+  const docs = [{ ops: [{ type: 'a', a: 'x' }] }, { ops: [{ type: 'zz' }] }, { ops: [{ type: 1 }] }, { ops: [{ type: 'a' }] }, { ops: [{ type: 'bb', b: 'no', a: 1 }] }, { ops: [{}] }, { ops: ['str'] }];
+  const out = [];
+  for (const allErrors of [false, true]) {
+    const validate = new Klass({ discriminator: true, allErrors }).compile(schema);
+    for (const d of docs) out.push([validate(d), validate.errors]);
+  }
+  return out;
+});
+
+parity('an error behind a $ref whose target holds a $ref carries the path from that target', (Klass) => {
+  const schema = { type: 'object', properties: { s: { $ref: '#/definitions/O' } }, definitions: { O: { oneOf: [{ type: 'integer' }, { $ref: '#/definitions/SL' }] }, SL: { type: 'string', maxLength: 1 } } };
+  const out = [];
+  for (const allErrors of [false, true]) {
+    const validate = new Klass({ allErrors }).compile(schema);
+    out.push([validate({ s: 'abc' }), validate.errors]);
+  }
+  return out;
+});
+
+parity('coerceTypes reaches values behind anyOf, oneOf, allOf and $ref, in the order the reference tries them', (Klass) => {
+  const schema = { type: 'object', properties: {
+    t: { anyOf: [{ type: 'integer' }, { type: 'string', pattern: '\\S' }] },
+    o: { oneOf: [{ type: 'string', pattern: 'x' }, { type: 'number' }] },
+    s: { allOf: [{ type: 'object', properties: { b: { type: 'boolean' }, n: { type: 'array', items: { type: 'integer' } } } }] },
+    r: { $ref: '#/definitions/R' },
+    w: { anyOf: [{ type: 'number' }, { type: 'string' }] },
+  }, definitions: { R: { type: 'number', minimum: 2 } } };
+  const docs = [{ t: '123', o: '5', s: { b: 'true', n: ['1', '2'] }, r: '3', w: true }, { t: '12.5', o: 'x', s: { b: 'no' }, r: '1' }, { w: 'abc', r: null }];
+  const out = [];
+  for (const coerceTypes of [true, 'array']) {
+    const validate = new Klass({ coerceTypes, allErrors: true }).compile(schema);
+    for (const doc of docs) { const d = JSON.parse(JSON.stringify(doc)); out.push([validate(d), d, validate.errors]); }
+  }
+  return out;
+});
+
+parity('a format declared type: number is checked on numbers, as the reference does', (Klass) => {
+  const ajv = new Klass({ allErrors: true });
+  ajv.addFormat('three-digits', { type: 'number', validate: (v) => /^[0-9]{3}$/.test(String(v)) });
+  const validate = ajv.compile({ type: 'object', properties: { n: { type: 'number', format: 'three-digits' }, s: { type: 'string' } } });
+  return [{ n: 123 }, { n: 3342 }, { s: 'x' }].map((d) => [validate(d), validate.errors]);
+});
+
 test('the reference formats plugin is accepted, for libraries that call it in their own setup', () => {
   const ata = new Ata();
   addFormats(ata);
