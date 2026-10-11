@@ -3,9 +3,9 @@
 // A declared property whose value is undefined. No JSON document carries one,
 // but a JavaScript object handed to validate() can, and a response a server is
 // about to serialize often does (`{ id: req.params.id }` with no such param).
-// The generated code skips the check, as the default validator does; the
-// interpreted engine and its compiled closures checked the value and rejected
-// it. The engines must give one answer.
+// Every engine reads it as the default validator does, and as it would be
+// once serialized: absent. Its value is not checked, and a required key
+// holding it is missing. The engines must give one answer.
 
 const assert = require('assert');
 const { Validator } = require('..');
@@ -18,15 +18,17 @@ const cases = [
   // Required, untyped and nested shapes, and subschemas the value is checked
   // against in place (if, not), where the generated code once read the key
   // as present and checked the undefined value.
-  [{ type: 'object', required: ['a'], properties: { a: { type: 'number' } } }, { a: undefined }, true],
+  [{ type: 'object', required: ['a'], properties: { a: { type: 'number' } } }, { a: undefined }, false],
   [{ properties: { a: { type: 'number' } } }, { a: undefined }, true],
   [{ type: 'object', properties: { p: { properties: { a: { type: 'number' } } } } }, { p: { a: undefined } }, true],
-  [{ type: 'object', required: ['a'], properties: { a: { type: 'object', properties: { b: { type: 'number' } } } } }, { a: undefined }, true],
+  [{ type: 'object', required: ['a'], properties: { a: { type: 'object', properties: { b: { type: 'number' } } } } }, { a: undefined }, false],
+  [{ type: 'object', required: ['a'], properties: { a: {} } }, { a: undefined }, false],
+  [{ type: 'object', required: ['a'] }, { a: undefined }, false],
   [{ if: { properties: { t: { const: 'x' } } }, then: false }, { t: undefined }, false],
   [{ not: { properties: { t: { const: 'x' } } } }, { t: undefined }, false],
   [{ allOf: [{ if: { properties: { t: { const: 'x' } } }, then: false }] }, { t: undefined }, false],
   [{ type: 'object', properties: { a: { const: 1 } }, additionalProperties: false }, { a: undefined, b: 1 }, false],
-  // An absent required key still fails, typed or not, in every engine: the
+  // An absent required key fails, typed or not, in every engine: the
   // generated code finds a typed one absent through its value check.
   [{ type: 'object', required: ['a'], properties: { a: { type: 'number' } } }, {}, false],
   [{ type: 'object', required: ['a', 'b'], properties: { a: { type: 'number' }, b: { type: 'string' } } }, { a: undefined }, false],

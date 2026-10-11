@@ -6,7 +6,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Fixed
 
-- A declared property holding `undefined` still got different answers in 1.53.0: the generated code checked the value where the key was required, where the node had no `type`, and inside `if`, `not` and similar subschemas, and the first-call engine treated a required key holding `undefined` as missing. Every engine now skips the value and counts the key as present, as the default validator does. `{ if: { properties: { t: { const: 'x' } } }, then: false }` accepted `{ t: undefined }` on generated code and rejected it on the interpreter; both reject it now. `tests/test_undefined_property.js` covers 19 shapes on every engine, with and without code generation.
+- A declared property holding `undefined` still got different answers in 1.53.0: the generated code checked the value where the key was required, where the node had no `type`, and inside `if`, `not` and similar subschemas, and the engines disagreed on whether a required key holding `undefined` was there. Every engine now reads such a key as the default validator does, and as it reads once serialized: absent. Its value is not checked, and a required key holding it is missing, so `{ a: undefined }` no longer passes `required: ['a']` on any engine. `{ if: { properties: { t: { const: 'x' } } }, then: false }` accepted `{ t: undefined }` on generated code and rejected it on the interpreter; both reject it now. `tests/test_undefined_property.js` covers 21 shapes on every engine, with and without code generation.
 
 ### Changed
 
