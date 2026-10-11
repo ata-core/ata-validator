@@ -80,7 +80,11 @@ const esbuild = require('esbuild')
 // two characters (lib/levenshtein.js) and normalization compares the copy in
 // place instead of serializing it twice (lib/validator-core.js), which took a
 // Stripe-sized OpenAPI document's load from 14.6 to 6.6 s in openapi-backend.
-const BUDGET = 52500
+// 53000 (52740 measured): custom keywords that read their data's context
+// (parentData and the rest, lib/interpreter-core.js) and normalized schemas
+// cached per object (lib/validator-core.js), which took express-openapi-
+// validator's first request on GitHub's API description from 10.5 to 1.1 s.
+const BUDGET = 53000
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

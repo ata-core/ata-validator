@@ -504,18 +504,27 @@ test('$data references are refused with a clear error, not accepted', () => {
   assert(threw && /\$data/.test(threw.message), 'throws mentioning $data, got ' + (threw && threw.message));
 });
 
-test('a code-only keyword is refused, not silently accepted', () => {
+test('a code-only keyword is refused where a schema uses it, not silently accepted', () => {
   const ata = new Ata();
+  ata.addKeyword({ keyword: 'gen', code: () => {} });
+  // Registering one is accepted, so a library that defines such keywords for
+  // an option it may not use can take the class; a schema without it compiles.
+  assert(ata.compile({ type: 'string' })('x') === true, 'a schema that does not use it compiles');
   let threw = null;
-  try { ata.addKeyword({ keyword: 'gen', code: () => {} }); } catch (e) { threw = e; }
-  assert(threw && /gen/.test(threw.message), 'throws naming the keyword, got ' + (threw && threw.message));
+  try { ata.compile({ type: 'object', properties: { a: { gen: 1 } } }); } catch (e) { threw = e; }
+  assert(threw && /gen/.test(threw.message), 'compiling a schema that uses it throws naming the keyword, got ' + (threw && threw.message));
 });
 
-test('the reference formats plugin is refused with a pointer to the built-ins', () => {
+test('the reference formats plugin is accepted, for libraries that call it in their own setup', () => {
   const ata = new Ata();
-  let threw = null;
-  try { addFormats(ata); } catch (e) { threw = e; }
-  assert(threw, 'addFormats(ata) throws');
+  addFormats(ata);
+  const ref = new Ajv();
+  addFormats(ref);
+  const schema = { type: 'object', properties: { e: { type: 'string', format: 'email' }, d: { type: 'string', format: 'date' }, u: { type: 'string', format: 'uuid' } } };
+  const a = ata.compile(schema), r = ref.compile(schema);
+  for (const doc of [{ e: 'a@b.co', d: '2024-02-29', u: '123e4567-e89b-12d3-a456-426614174000' }, { e: 'nope' }, { d: '2023-02-30' }, { u: 'x' }]) {
+    assert(a(doc) === r(doc), 'same verdict as the reference with the plugin on ' + JSON.stringify(doc));
+  }
 });
 
 // ----- a config loader with nullable fields (TypeSpec's tspconfig shape) ---

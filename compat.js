@@ -22,10 +22,25 @@ const { resolvePointer } = require('./lib/pointer.js');
 
 const { Validator } = require('./index');
 const { METASCHEMAS } = require('./lib/metaschemas');
+const { normalizeExclusiveBounds } = require('./lib/draft7');
 const { createShaper, asReferenceKeyword } = require('./lib/compat-errors');
 
 const DRAFT7 = 'http://json-schema.org/draft-07/schema#';
 const DRAFT2020 = 'https://json-schema.org/draft/2020-12/schema';
+
+// draft-04, which OpenAPI 3.0 builds on, is read as draft-07, the nearest
+// dialect ata implements: its boolean exclusiveMinimum and exclusiveMaximum
+// are normalized to the numeric form, and its `id` names the schema as `$id`
+// does. The reference ships a separate class for it (ajv-draft-04).
+const DRAFT4_IDS = new Set(['http://json-schema.org/draft-04/schema#', 'http://json-schema.org/draft-04/schema', 'https://json-schema.org/draft-04/schema#', 'https://json-schema.org/draft-04/schema']);
+function isDraft4(schema) {
+  return schema !== null && typeof schema === 'object' && typeof schema.$schema === 'string' && DRAFT4_IDS.has(schema.$schema);
+}
+function draft4AsDraft7(schema) {
+  const out = { ...schema, $schema: DRAFT7 };
+  if (typeof schema.id === 'string' && schema.$id === undefined) { out.$id = schema.id; delete out.id; }
+  return out;
+}
 
 function isDraft7Id(id) {
   return id === DRAFT7 || id === 'http://json-schema.org/draft-07/schema';
@@ -58,17 +73,12 @@ class Ata {
       throw new Error('ata compat: $data references are not supported');
     }
     this.opts = { ...opts };
-    // The formats plugin of the reference assigns into `opts.code.formats`
-    // before registering anything; the formats it carries are built in here,
-    // so say so at that exact point instead of failing further down.
-    const code = { ...(opts.code || {}) };
-    Object.defineProperty(code, 'formats', {
-      get() { return undefined; },
-      set() {
-        throw new Error('ata compat: the formats plugin is not needed, formats such as email, uri, date-time and uuid are built in; remove addFormats()');
-      },
-    });
-    this.opts.code = code;
+    // The formats plugin of the reference assigns into `opts.code.formats` and
+    // then registers each of its formats through addFormat, which is what it
+    // does here too. It is not needed (the formats are built in), but a
+    // library that calls it inside its own setup, as express-openapi-validator
+    // does, could not take this class at all while the call was refused.
+    this.opts.code = { ...(opts.code || {}) };
 
     this.errors = null;
     this._schemas = new Map();      // key or $id -> schema object
@@ -145,6 +155,7 @@ class Ata {
   // reference class does. The copy is shallow: only the root changes.
   _withDialect(schema) {
     if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return schema;
+    if (isDraft4(schema)) return draft4AsDraft7(schema);
     if (typeof schema.$schema === 'string') return schema;
     return { $schema: DRAFT7, ...schema };
   }
@@ -164,6 +175,14 @@ class Ata {
           if (logger && typeof logger.error === 'function') logger.error(message);
         } else {
           throw new Error(message);
+        }
+      }
+    }
+    if (this._codeOnly && typeof schema === 'object' && schema !== null) {
+      const { schemaUsesKeywords } = require('./lib/keywords');
+      for (const name of Object.keys(this._codeOnly)) {
+        if (schemaUsesKeywords(schema, { [name]: this._codeOnly[name] }) || [...this._schemas.values()].some((s) => schemaUsesKeywords(s, { [name]: this._codeOnly[name] }))) {
+          throw new Error(`keyword "${name}": code-generating keywords are not supported; define it with validate, compile or macro`);
         }
       }
     }
@@ -235,7 +254,8 @@ class Ata {
       for (const s of schema) this.addSchema(s);
       return this;
     }
-    const id = schema && typeof schema === 'object' && typeof schema.$id === 'string' ? schema.$id : undefined;
+    const id = schema && typeof schema === 'object' && typeof schema.$id === 'string' ? schema.$id
+      : isDraft4(schema) && typeof schema.id === 'string' ? schema.id : undefined;
     const k = key !== undefined ? String(key) : id;
     if (k === undefined) throw new Error('schema with key or id "undefined" cannot be added: no key and no $id');
     if (this._schemas.has(k) && this._schemas.get(k) !== schema) {
@@ -312,6 +332,10 @@ class Ata {
       this.errors = [{ keyword: 'type', instancePath: '', schemaPath: '#/type', params: { type: 'object' }, message: 'must be object,boolean' }];
       return false;
     }
+    // A draft-04 schema is checked as the draft-07 schema it is read as: the
+    // boolean exclusive bounds in their numeric form, against draft-07's
+    // meta-schema (ata carries no draft-04 meta-schema).
+    if (isDraft4(schema)) schema = normalizeExclusiveBounds(structuredClone(draft4AsDraft7(schema)));
     const declared = typeof schema.$schema === 'string' ? schema.$schema : DRAFT7;
     const metaId = METASCHEMAS.has(declared) ? declared : isDraft7Id(declared) ? DRAFT7 : DRAFT2020;
     const meta = metaValidator(metaId);
@@ -350,6 +374,12 @@ class Ata {
       keyword = kwdOrDef.keyword;
       definition = kwdOrDef;
     }
+    // The reference takes a list of names for one definition (the formats
+    // plugin registers formatMinimum and its kin that way).
+    if (Array.isArray(keyword)) {
+      for (const k of keyword) this.addKeyword({ ...definition, keyword: k });
+      return this;
+    }
     if (typeof keyword !== 'string' || keyword === '') {
       throw new Error('addKeyword: keyword must be a non-empty string');
     }
@@ -362,14 +392,26 @@ class Ata {
       return this;
     }
     if (typeof definition.code === 'function' && !definition.validate && !definition.compile && !definition.macro) {
-      throw new Error(`keyword "${keyword}": code-generating keywords are not supported; define it with validate, compile or macro`);
+      // A keyword defined only as generated code cannot run here. It is
+      // registered as known and refused when a schema uses it (see compile),
+      // so a library that defines such keywords for options it may never use
+      // can still take this class, and a schema that relies on one is never
+      // accepted without the check.
+      this._codeOnly = this._codeOnly || Object.create(null);
+      this._codeOnly[keyword] = { name: keyword, types: null, validate: null, compile: null, macro: null };
+      this._compiled = new WeakMap();
+      return this;
     }
     const mapped = {};
     if (definition.type !== undefined) mapped.type = definition.type;
     if (typeof definition.validate === 'function') mapped.validate = definition.validate;
-    if (typeof definition.compile === 'function') mapped.compile = definition.compile;
+    if (typeof definition.compile === 'function') mapped.compile = compileWithContext(definition.compile);
     if (typeof definition.macro === 'function') mapped.macro = definition.macro;
     if (mapped.validate && mapped.compile) delete mapped.validate;
+    // The reference hands every keyword function the data's context
+    // (parentData, parentDataProperty, instancePath, rootData), and keywords
+    // that remove or rewrite the value they check rely on it.
+    if (mapped.validate || mapped.compile) mapped.dataContext = true;
     this._keywords[keyword] = mapped;
     this._keywordDefs = this._keywordDefs || Object.create(null);
     this._keywordDefs[keyword] = definition;
@@ -390,6 +432,7 @@ class Ata {
 
   removeKeyword(keyword) {
     delete this._keywords[keyword];
+    if (this._codeOnly) delete this._codeOnly[keyword];
     if (this._keywordDefs) delete this._keywordDefs[keyword];
     this._compiled = new WeakMap();
     return this;
@@ -401,6 +444,27 @@ class Ata {
     if (!errors || errors.length === 0) return 'No errors';
     return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
   }
+}
+
+// A reference keyword's compile(schema, parentSchema, it) returns a function
+// of (data, dataCxt). `it.schemaPath.str` is read by keywords that build their
+// own error objects, at the time they fail: it names the schema the check
+// sits in, which is known per call here, so it is read from the context the
+// call was given.
+function compileWithContext(compile) {
+  return (value, parentSchema) => {
+    let current = '#';
+    const it = { get schemaPath() { return { str: current }; } };
+    const inner = compile(value, parentSchema, it);
+    if (typeof inner !== 'function') return inner;
+    const wrapped = (data, ctx) => {
+      if (ctx && typeof ctx.schemaPath === 'string') current = ctx.schemaPath.slice(0, ctx.schemaPath.lastIndexOf('/')) || '#';
+      return inner(data, ctx);
+    };
+    // Errors the keyword writes land on its own function, read from here.
+    wrapped.source = inner;
+    return wrapped;
+  };
 }
 
 const _metaValidators = new Map();
