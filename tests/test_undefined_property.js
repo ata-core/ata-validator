@@ -15,6 +15,12 @@ const cases = [
   [{ type: 'object', properties: { a: { type: 'number' } }, required: ['b'] }, { a: undefined, b: 1 }, true],
   [{ type: 'object', properties: { a: { type: 'number' } }, additionalProperties: false }, { a: undefined }, true],
   [{ type: 'object', properties: { n: { type: 'object', properties: { b: { type: 'string' } } } } }, { n: { b: undefined } }, true],
+  // A required property is still checked: the generated code checks it
+  // unguarded, so `type` rejects undefined there, and a property without a
+  // type accepts it as present (#61).
+  [{ type: 'object', properties: { a: { type: 'string' } }, required: ['a'] }, { a: undefined }, false],
+  [{ type: 'object', properties: { a: { type: 'string' } }, patternProperties: { '^z': {} }, required: ['a'] }, { a: undefined }, false],
+  [{ type: 'object', properties: { a: {} }, required: ['a'] }, { a: undefined }, true],
   // Only declared properties: a value matched by patternProperties or
   // additionalProperties is still checked, by every engine.
   [{ type: 'object', additionalProperties: { type: 'number' } }, { a: undefined }, false],
@@ -32,4 +38,17 @@ for (const [schema, doc, expected] of cases) {
     }
   }
 }
+// The reason matches too: a typed required property set to undefined is
+// reported as missing, as the generated code reports it.
+{
+  const schema = { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] };
+  for (const opts of [{}, { engine: 'interpreter' }]) {
+    const v = new Validator(schema, opts);
+    for (let i = 0; i < 200; i++) {
+      const errors = v.validate({ a: undefined }).errors;
+      assert.deepStrictEqual(errors.map((e) => [e.keyword, e.params.missingProperty]), [['required', 'a']], `${JSON.stringify(opts)} validate call ${i}`);
+    }
+  }
+}
+
 console.log(`ok: ${cases.length} schemas give one answer for an undefined property value on both engines`);
