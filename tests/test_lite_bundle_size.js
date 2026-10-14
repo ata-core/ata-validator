@@ -97,7 +97,10 @@ const esbuild = require('esbuild')
 // 54600 (54581 measured, still under 1.53.0's 54767): draft-04 as a dialect,
 // its vendored meta-schema and its URIs (lib/metaschemas.js, lib/dialect.js,
 // lib/draft7.js).
-const BUDGET = 54600
+// 54620 (54605 measured, still under 1.53.0's 54767): the linear regex
+// engine's DFA loop reads its tables through locals, popxf-1.0 18% faster
+// (lib/safe-regex.js).
+const BUDGET = 54620
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
