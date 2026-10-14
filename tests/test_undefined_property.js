@@ -14,6 +14,9 @@ const cases = [
   [{ type: 'object', properties: { a: { type: 'number' } } }, { a: undefined }, true],
   [{ type: 'object', properties: { a: { type: 'number' } }, required: ['b'] }, { a: undefined, b: 1 }, true],
   [{ type: 'object', properties: { a: { type: 'number' } }, additionalProperties: false }, { a: undefined }, true],
+  // A required key holding undefined is missing beside patternProperties too (from PR #66).
+  [{ type: 'object', properties: { a: { type: 'string' } }, patternProperties: { '^z': {} }, required: ['a'] }, { a: undefined }, false],
+  [{ type: 'object', properties: { a: {} }, required: ['a'] }, { a: undefined }, false],
   [{ type: 'object', properties: { n: { type: 'object', properties: { b: { type: 'string' } } } } }, { n: { b: undefined } }, true],
   // Required, untyped and nested shapes, and subschemas the value is checked
   // against in place (if, not), where the generated code once read the key
