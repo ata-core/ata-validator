@@ -162,6 +162,7 @@ const FILES = [
   "tests/test_pattern_literal_keys.js",
   "tests/test_oneof_known_object.js",
   "tests/test_rich_key_loop_guard.js",
+  "tests/test_compile_source_tag.js",
   "tests/test_hoisted_checks.js",
   "tests/test_rejection_shape.js",
   "tests/test_lazy_normalization.js",
