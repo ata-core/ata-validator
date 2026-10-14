@@ -157,6 +157,7 @@ const FILES = [
   "tests/test_undefined_property.js",
   "tests/test_name_map_value_keys.js",
   "tests/test_item_key_loop.js",
+  "tests/test_def_root_forwarder.js",
   "tests/test_hoisted_checks.js",
   "tests/test_rejection_shape.js",
   "tests/test_lazy_normalization.js",

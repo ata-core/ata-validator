@@ -208,6 +208,10 @@ function bothEngines (schema, cases, label) {
     // and the record node being written in its key-loop form, set and
     // restored around that one function like nestedBoolean.
     'itemFns', 'keyLoopNode',
+    // The root forwarder's name (rootForwarder), one per compile, and the
+    // depth of definition functions being written, raised and restored around
+    // each like nestedBoolean.
+    'rootFwd', 'inDefFn',
     // Definitions referenced from several places, counted once from the root:
     // the errors generator writes each of them as one helper.
     'sharedDefs',
