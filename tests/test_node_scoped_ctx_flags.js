@@ -204,6 +204,10 @@ function bothEngines (schema, cases, label) {
     // Names of hoisted not/if/then/else functions that take no plain-object
     // flag. Names are unique per compile, so the set holds for all of it.
     'flaglessChecks',
+    // The item function counter (emitItemFn), unique names for the compile,
+    // and the record node being written in its key-loop form, set and
+    // restored around that one function like nestedBoolean.
+    'itemFns', 'keyLoopNode',
     // Definitions referenced from several places, counted once from the root:
     // the errors generator writes each of them as one helper.
     'sharedDefs',
