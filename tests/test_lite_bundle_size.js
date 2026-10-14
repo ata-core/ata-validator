@@ -100,7 +100,16 @@ const esbuild = require('esbuild')
 // 54620 (54605 measured, still under 1.53.0's 54767): the linear regex
 // engine's DFA loop reads its tables through locals, popxf-1.0 18% faster
 // (lib/safe-regex.js).
-const BUDGET = 54620
+// 54760 (54735 measured, still under 1.53.0's 54767): the URI family walks
+// RFC 3986 in full (lib/uri-core.js, shared with the code generator), a
+// uri-template literal's "%" needs two hex digits, and a quoted email local
+// part is checked inside the quotes; 17 official format tests that failed now
+// pass, and the old uri walks and their tables are gone from lib/formats.js.
+// 54860 (54844 measured, 77 bytes over 1.53.0's 54767): the URI walk's
+// authority read in one pass with a port and a bracketed host told apart,
+// and the plain-reference scan in front of it, which keeps a reference check
+// at the speed of the character scan it replaced.
+const BUDGET = 54860
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

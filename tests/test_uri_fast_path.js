@@ -35,15 +35,17 @@ if (walk === null) {
   process.exit(0);
 }
 
+
 let checked = 0;
 let accepted = 0;
 let bad = 0;
 function check (s) {
   checked++;
-  if (!FAST.test(s)) return;
-  accepted++;
-  if (!walk(s) || !formats.uri(s)) {
-    if (bad++ < 10) console.error(`fast path accepts ${JSON.stringify(s)}, the walk does not`);
+  if (FAST.test(s)) {
+    accepted++;
+    if (!walk(s) || !formats.uri(s)) {
+      if (bad++ < 10) console.error(`fast path accepts ${JSON.stringify(s)}, the walk does not`);
+    }
   }
 }
 
