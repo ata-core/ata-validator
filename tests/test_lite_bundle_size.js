@@ -94,7 +94,10 @@ const esbuild = require('esbuild')
 // 54400 (54239 measured, 54767 at 1.53.0): a required key holding undefined is
 // missing in the interpreted engine too (lib/interpreter-core.js,
 // lib/plan-compiler.js).
-const BUDGET = 54400
+// 54600 (54581 measured, still under 1.53.0's 54767): draft-04 as a dialect,
+// its vendored meta-schema and its URIs (lib/metaschemas.js, lib/dialect.js,
+// lib/draft7.js).
+const BUDGET = 54600
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

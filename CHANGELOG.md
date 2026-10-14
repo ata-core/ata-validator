@@ -6,6 +6,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Fixed
 
+- Draft-04 is read as draft-04. A schema that declared it was read as 2020-12: `id` did not set the base URI, tuple `items`, `additionalItems` and `dependencies` were not applied, and `const`, `contains` and `propertyNames`, which draft-04 does not have, were. It now goes through the draft-06 rules plus its own (`id` for `$id`, those three keywords dropped), and its meta-schema is vendored with the others. The official suite's draft-04 tests pass, 618 of 618, also with code generation blocked; `npm run test:suite` runs them. SchemaStore's draft-04 schemas answer their sample documents as before.
 - A declared property holding `undefined` still got different answers in 1.53.0: the generated code checked the value where the key was required, where the node had no `type`, and inside `if`, `not` and similar subschemas, and the engines disagreed on whether a required key holding `undefined` was there. Every engine now reads such a key as the default validator does, and as it reads once serialized: absent. Its value is not checked, and a required key holding it is missing, so `{ a: undefined }` no longer passes `required: ['a']` on any engine. `{ if: { properties: { t: { const: 'x' } } }, then: false }` accepted `{ t: undefined }` on generated code and rejected it on the interpreter; both reject it now. `tests/test_undefined_property.js` covers 21 shapes on every engine, with and without code generation.
 
 ### Changed

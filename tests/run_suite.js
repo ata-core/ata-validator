@@ -21,6 +21,7 @@ const DIALECTS = {
   "draft2020-12": "https://json-schema.org/draft/2020-12/schema",
   draft7: "http://json-schema.org/draft-07/schema#",
   draft6: "http://json-schema.org/draft-06/schema#",
+  draft4: "http://json-schema.org/draft-04/schema#",
   "draft2019-09": "https://json-schema.org/draft/2019-09/schema",
   v1: "https://json-schema.org/v1",
 };
@@ -43,6 +44,7 @@ const KNOWN_FAILURES = {
   ]),
   v1: new Set([]),
   draft6: new Set([]),
+  draft4: new Set([]),
   "draft2019-09": new Set([]),
 };
 
