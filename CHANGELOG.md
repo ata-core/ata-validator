@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- A compact module (`ata build --errors auto`, `toCompactModule`, the bundler plugin's `sharedErrors`) takes the RFC 3986 walk behind the URI formats from the error runtime it already imports (`uriWalk`), instead of carrying the factory's text. 1.54.0 put that text, about 1.3 KB gzipped, in every module with a `uri`, `uri-reference`, `iri` or `iri-reference` field: forty SchemaStore schemas built that way went from 213.3 to 224.9 KB gzipped, and measure 217.9 now (the rest is the 1.54.0 email and record-list code, which stays). A self-contained module still carries it, since it imports nothing. `ata-validator/error-runtime` exports `uriWalk` for the same reason; a compact module written by 1.55 needs that export, so build and runtime come from one version, as before.
+
 ## 1.54.0 - 2026-10-15
 
 ### Fixed

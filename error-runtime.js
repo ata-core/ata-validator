@@ -24,6 +24,15 @@ function compileSafe(src) {
   return _safe(src);
 }
 
+// The RFC 3986 walk behind the uri, uri-reference, iri and iri-reference
+// formats, which a compact module imports from here instead of carrying the
+// factory's text; `mode` as lib/uri-core.js reads it.
+let _walk = null;
+function uriWalk(s, mode) {
+  if (_walk === null) _walk = require('./lib/formats.js').uriWalk;
+  return _walk(s, mode);
+}
+
 // Warm-up, in a browser only: the runtime's code compiles on its first use,
 // which a page would otherwise pay for on its first rejected document, about
 // a millisecond. When the browser is idle, one small error list is built here
@@ -37,4 +46,4 @@ if (typeof requestIdleCallback === 'function') { try { requestIdleCallback(warm)
 // once never runs it, and a server has it done before its first request.
 else if (typeof process === 'object' && process !== null && process.versions && process.versions.node && typeof setTimeout === 'function') { try { const t = setTimeout(warm, 0); if (t && typeof t.unref === 'function') t.unref(); } catch (_) {} }
 
-module.exports = { createErrors, compileSafe, ataVersion };
+module.exports = { createErrors, compileSafe, uriWalk, ataVersion };
