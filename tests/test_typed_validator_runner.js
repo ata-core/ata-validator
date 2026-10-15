@@ -8,7 +8,7 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 
-const TSC_JS = require.resolve('typescript/lib/tsc.js');
+const { TSC_JS } = require('./_tsc');
 const TSCONFIG = path.join(__dirname, 'tsconfig.types.json');
 
 const tsc = spawnSync(process.execPath, [TSC_JS, '--project', TSCONFIG], { encoding: 'utf8' });

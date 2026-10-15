@@ -25,7 +25,7 @@ const { toTypeScript } = require('../lib/ts-gen');
 const aot = require('../lib/aot');
 
 const FIXTURES_DIR = path.join(__dirname, 'ts_fixtures');
-const TSC_BIN = require.resolve('typescript/lib/tsc.js');
+const { TSC_JS: TSC_BIN } = require('./_tsc');
 
 function toTypeName(name) {
   const cleaned = String(name).replace(/[^A-Za-z0-9_]/g, '_');

@@ -27,7 +27,7 @@ const aot = require('../lib/aot');
 
 const DRAFT = process.env.CORPUS_DRAFT || 'draft2020-12';
 const SUITE_DIR = path.join(__dirname, 'suite', 'tests', DRAFT);
-const TSC_BIN = require.resolve('typescript/lib/tsc.js');
+const { TSC_JS: TSC_BIN } = require('./_tsc');
 const FAIL_BUDGET_PCT = Number(process.env.CORPUS_TS_FAIL_BUDGET || '0');
 const ONLY = process.env.CORPUS_ONLY ? new Set(process.env.CORPUS_ONLY.split(',')) : null;
 
