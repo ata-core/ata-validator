@@ -109,7 +109,9 @@ const esbuild = require('esbuild')
 // authority read in one pass with a port and a bracketed host told apart,
 // and the plain-reference scan in front of it, which keeps a reference check
 // at the speed of the character scan it replaced.
-const BUDGET = 54860
+// 54900: esbuild 0.28.2 on Windows measured 54863, 19 bytes more than 0.28.0
+// here; the budget leaves room for the bundler, not for the package.
+const BUDGET = 54900
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
