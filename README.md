@@ -138,18 +138,18 @@ errors (7.6M with `richErrors: false`).
 
 | Dimension | Schema | ata-AOT | runtime validator | Difference |
 |---|---|---|---|---|
-| Bundle (gzipped) | simple | 1.3 KB | 52.7 KB | 39.0x smaller |
-| Bundle (gzipped) | complex | 3.0 KB | 52.7 KB | 17.7x smaller |
-| Bundle (gzipped) | nested | 4.5 KB | 52.7 KB | 11.8x smaller |
-| Cold start | simple | 20 ms | 37 ms | 1.9x faster |
-| Throughput (1M ops) | simple | 315 Mops/s | 99 Mops/s | 3.2x faster |
-| Compile time | simple | 24 µs | 1.57 ms | 65x faster |
+| Bundle (gzipped) | simple | 1.4 KB | 52.7 KB | 38.3x smaller |
+| Bundle (gzipped) | complex | 3.1 KB | 52.7 KB | 16.8x smaller |
+| Bundle (gzipped) | nested | 4.7 KB | 52.7 KB | 11.3x smaller |
+| Cold start | simple | 20 ms | 38 ms | 1.9x faster |
+| Throughput (1M ops) | simple | 308 Mops/s | 115 Mops/s | 2.7x faster |
+| Compile time | simple | 25 µs | 1.42 ms | 56x faster |
 
 The runtime column is the default validator most frameworks ship. Reproduce on your machine
-with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-10-11,
-on ata-validator 1.51.0. Across five runs throughput moved between 263 and 325 Mops/s against
-97 to 110, cold start between 20 and 22 ms against 37 to 40, and the compile ratio between 61x
-and 65x. The compile row is the time to write a module, a build-time cost; it was 18 µs on
+with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-10-15,
+on ata-validator 1.54.0. On 1.51.0, across five runs, throughput moved between 263 and 325 Mops/s
+against 97 to 110, cold start between 20 and 22 ms against 37 to 40, and the compile ratio between
+61x and 65x. The compile row is the time to write a module, a build-time cost; it was 18 µs on
 1.46.0, and modules have carried the one-pass error function since 1.47.0. The throughput row times a single one-million-call
 loop of a few milliseconds, so it moves the most from run to run; treat the last three rows as
 an order of magnitude rather than a constant.
@@ -280,21 +280,21 @@ is the most common way to get a misleading number out of this library.
 
 | | compiled with `ata build` | runtime `new Validator(schema)` |
 |---|---|---|
-| In a bundle, gzipped | **2.1 KB** | 123.9 KB |
-| Time to a served request | **3.5 ms** | 7.6 ms |
+| In a bundle, gzipped | **2.2 KB** | 131.1 KB |
+| Time to a served request | **3.5 ms** | 6.9 ms |
 | Schema known when | build time | any time |
 
 The bundle row is the ten-field user schema in
 `tests/fixtures/error-dx/user.schema.json`, every export of the compiled module against
-`new Validator(schema)`, built with `bun build --minify --target=browser` on ata 1.51.0.
+`new Validator(schema)`, built with `bun build --minify --target=browser` on ata 1.54.0.
 The startup row is a Hono route on Bun 1.4, the median of three rounds of best-of-seven, from
-`benchmark/bundle`, against 3.5 ms for the same app doing no validation at all, so the
+`benchmark/bundle`, against 3.4 ms for the same app doing no validation at all, so the
 compiled path costs nothing measurable to start. The runtime figure is what it is because
 a schema that arrives at run time can use any keyword, so the whole engine has to be
 there. The compiled module imports nothing and contains only the checks your schema asks
 for.
 
-**On a server, use whichever fits your schemas.** 124 KB of JavaScript on a Node or Bun
+**On a server, use whichever fits your schemas.** 131 KB of JavaScript on a Node or Bun
 process is not a cost anyone notices, and the runtime API is the simpler thing to reach
 for. Speed is the same either way once warm.
 
@@ -589,13 +589,15 @@ error collector out of the modules: each one carries its verdict and its schema,
 its errors from one `ata-errors.mjs` the build writes beside them. The build does this only
 where it makes the output smaller, so a single small schema keeps its self-contained module.
 The errors are the ones `new Validator(schema, { richErrors: false })` reports, in the same
-order. Forty SchemaStore schemas imported into one app, minified with esbuild, go from 513.8 KB
-to 213.3 KB gzipped, and from 60.4 ms to 28.4 ms to import with code generation blocked. A
+order. Forty SchemaStore schemas imported into one app, minified with esbuild, go from 571.7 KB
+to 224.9 KB gzipped, and from 61.5 ms to 29.5 ms to import with code generation blocked. A
 rejected document costs more this way, since its errors come from an interpreted walk:
 `--errors inline` keeps every module self-contained. `--mode schema` writes each module as
 its schema and takes the verdict from the runtime too: forty SchemaStore schemas in one app
-come to 102.4 KB gzipped against 213.3 KB as compact modules, and load and check each once in
-23.9 ms against 34.5, while a check once warm costs about five times what generated code costs.
+come to 104.4 KB gzipped against 224.9 KB as compact modules, and load and check each once in
+23.4 ms against 35.8, while a check once warm costs about five times what generated code costs.
+These are ata 1.54.0 figures; 1.51.0 measured 513.8, 213.3 and 102.4 KB, and the growth is the
+RFC 3986 walk that every module with a `uri` or `uri-reference` field now carries.
 Schemas that reference each other by `$id` are built against each other, and in schema mode
 they are written once to a shared registry that keeps only the definitions the modules reach;
 `--base-uri <uri>` names files that declare no `$id`. Eight Kubernetes kinds, whose schemas
@@ -603,13 +605,13 @@ share one 1.1 MB definitions file, come to 32.6 KB gzipped as schema modules aga
 self-contained, on ata 1.51.0.
 
 Bundle sizes for the 10-field user schema in `tests/fixtures/error-dx/user.schema.json`,
-minified and gzipped, measured with `bun build --minify --target=browser` on ata 1.51.0:
+minified and gzipped, measured with `bun build --minify --target=browser` on ata 1.54.0:
 
 | What the app imports | Size | Notes |
 |---|---|---|
-| `Validator` from `ata-validator` | 123.9 KB | The compiler ships with it, because a runtime schema can use any keyword |
-| `isValid` from the compiled module | **1.3 KB** | Nothing else is reachable, so the error collector is dropped |
-| `validate` from the compiled module | **1.9 KB** | Adds the detailed error collector |
+| `Validator` from `ata-validator` | 131.1 KB | The compiler ships with it, because a runtime schema can use any keyword |
+| `isValid` from the compiled module | **1.4 KB** | Nothing else is reachable, so the error collector is dropped |
+| `validate` from the compiled module | **2.0 KB** | Adds the detailed error collector |
 
 `--abort-early` makes the generated source about three times smaller, and after
 bundling it makes no difference: importing only `isValid` already leaves the error
@@ -645,7 +647,7 @@ through a `setFormats()` export the module carries. `docs/API.md` has the
 details.
 
 **Fastify startup, 10 route schemas, from a cold process to the first validated request:
-ajv 19.0 ms, ata 2.81 ms, no build step required.** ata registers in 0.20 ms of that and
+ajv 18.3 ms, ata 2.67 ms, no build step required.** ata registers in 0.22 ms of that and
 compiles on the first request, so counting only registration would overstate the gap.
 Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
@@ -754,7 +756,7 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 
 ### Dialects
 
-`$schema` selects the dialect. Draft 2020-12 is the default; draft-07, draft-06 and Draft 2019-09 are rewritten to the 2020-12 spelling on the way in (draft-06 as draft-07 without `if`/`then`/`else`, 2019-09's tuple `items` and `$recursiveRef` as `prefixItems` and `$dynamicRef`); and `https://json-schema.org/v1` (or the dated `https://json-schema.org/v1/2026`) selects JSON Schema v1. The official suite passes in full on all five: 1301 of 1301 on 2020-12, 1261 of 1261 on 2019-09, 929 of 929 on draft-07, 841 of 841 on draft-06 and 1135 of 1135 on v1, with code generation allowed and blocked. Draft-04 and earlier are not supported; draft-04's boolean `exclusiveMinimum`/`exclusiveMaximum` is read wherever it appears.
+`$schema` selects the dialect. Draft 2020-12 is the default; draft-07, draft-06, draft-04 and Draft 2019-09 are rewritten to the 2020-12 spelling on the way in (draft-06 as draft-07 without `if`/`then`/`else`, draft-04 as draft-06 with `id` for `$id` and without `const`, `contains` and `propertyNames`, 2019-09's tuple `items` and `$recursiveRef` as `prefixItems` and `$dynamicRef`); and `https://json-schema.org/v1` (or the dated `https://json-schema.org/v1/2026`) selects JSON Schema v1. The official suite passes in full on all five: 1301 of 1301 on 2020-12, 1261 of 1261 on 2019-09, 929 of 929 on draft-07, 841 of 841 on draft-06 and 1135 of 1135 on v1, with code generation allowed and blocked. Draft-04 and earlier are not supported; draft-04's boolean `exclusiveMinimum`/`exclusiveMaximum` is read wherever it appears.
 
 Two things differ under v1. `propertyDependencies` selects a subschema by the value of a property rather than by its presence, which is what `dependentSchemas` does. And `$dynamicRef` no longer requires bookending: the reference resolves through the dynamic scope whether or not the schema it first lands on carries a matching `$dynamicAnchor`, so the outermost matching anchor still in scope wins. Everything else ata implements is identical under both dialects, so a schema that declares no `$schema` behaves exactly as before.
 
@@ -766,7 +768,7 @@ Both are implemented in the interpreted engine, so a v1 schema that uses `$dynam
 
 ### Known limitations
 
-Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1301 of 1301 cases. Draft 7 gives 929 of 929. The v1 dialect gives 1135 of 1135. `npm run test:suite` reproduces all three.
+Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1301 of 1301 cases. Draft 2019-09 gives 1261 of 1261, draft 7 929 of 929, draft-06 841 of 841, draft-04 618 of 618. The v1 dialect gives 1135 of 1135. `npm run test:suite` reproduces all three.
 
 Areas that remain deliberate scope decisions for 1.x:
 
