@@ -111,7 +111,11 @@ const esbuild = require('esbuild')
 // at the speed of the character scan it replaced.
 // 54900: esbuild 0.28.2 on Windows measured 54863, 19 bytes more than 0.28.0
 // here; the budget leaves room for the bundler, not for the package.
-const BUDGET = 54900
+// 55600 (55503 measured, 736 bytes over 1.53.0's 54767): the interpreted
+// engine's fused leaves, the leaf run inside the property step and the
+// direct read of declared properties on ordinary objects (lib/plan-compiler.js),
+// which take a document on this bundle's own engine from 195 to 144 ns.
+const BUDGET = 55600
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
