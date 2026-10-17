@@ -166,6 +166,7 @@ const FILES = [
   "tests/test_uri_family_rules.js",
   "tests/test_compact_uri_walk.js",
   "tests/test_plan_compiles.js",
+  "tests/test_bundle_cplen.js",
   "tests/test_hoisted_checks.js",
   "tests/test_rejection_shape.js",
   "tests/test_lazy_normalization.js",
