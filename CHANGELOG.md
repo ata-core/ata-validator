@@ -2,7 +2,7 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.55.0 - 2026-10-17
 
 ### Fixed
 
@@ -12,6 +12,14 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 - The interpreted engine, which answers where code generation is blocked (Cloudflare Workers, Deno Deploy, a strict Content-Security-Policy), does the same work in fewer calls. A leaf of one type and only that type's keywords (`{ type: 'string', maxLength: 80 }`, `{ type: 'integer', minimum: 1 }`) is one closure over `typeof` and the check, with no type bits computed first; an object's value checks run inside its property step instead of beside it; and a required key that is also a declared property is counted while the properties are walked, not looked up again. A declared property of an ordinary object (one whose prototype is `Object.prototype`) is read directly where its name is not on that prototype, instead of after an own-property test; a key such as `constructor` or `toString`, and any other object, keep the test. An enum of primitive values is one Set lookup, and a `minLength` with a `maxLength` is one closure that decides most strings from their UTF-16 length. On the request benchmark with code generation blocked, against 1.53.0: accepting the body 240 to 155 µs, rejecting it 106 to 73, the error list read 577 to 506; the hot loop 195 to 142 ns a document. A hand-written closure tree for the same schema measures 136 ns, so the engine is within 5% of what closures can do; the generated code's 20 ns is a different mechanism. `ata-validator/lite`, which is this engine, grows from 54.8 to 55.5 KB gzipped for it. `tests/test_plan_compiles.js` holds the closure-tree compiler to every schema of the official suite, since the engine quietly falls back to its plain walk when the compiler throws, and did so for a while during this work with every test green; `ATA_DEBUG=1` now reports that fallback.
 - A compact module (`ata build --errors auto`, `toCompactModule`, the bundler plugin's `sharedErrors`) takes the RFC 3986 walk behind the URI formats from the error runtime it already imports (`uriWalk`), instead of carrying the factory's text. 1.54.0 put that text, about 1.3 KB gzipped, in every module with a `uri`, `uri-reference`, `iri` or `iri-reference` field: forty SchemaStore schemas built that way went from 213.3 to 224.9 KB gzipped, and measure 217.9 now (the rest is the 1.54.0 email and record-list code, which stays). A self-contained module still carries it, since it imports nothing. `ata-validator/error-runtime` exports `uriWalk` for the same reason; a compact module written by 1.55 needs that export, so build and runtime come from one version, as before.
+
+### Tests
+
+- The official suite runs through every standalone emitter (`toStandaloneModule`, `bundleStandalone`, `bundleCompact`), five dialects plus the asserted formats, against `new Validator(schema)`: about 21,000 answers. On 1.53.0 the same test finds 128 differences, every one the `_cpLen` crash above. `tests/test_plan_compiles.js` holds the interpreted engine's closure-tree compiler to every suite schema, and the TypeScript tests find `tsc` through the package's `bin`, which TypeScript 7 exports instead of `lib/tsc.js`.
+
+### Size
+
+- `ata-validator/lite` is 55.5 KB gzipped, up from 54.8 in 1.54.0, for the interpreted engine's fused checks. Compact modules that check a URI format are about 1.3 KB smaller each.
 
 ## 1.54.0 - 2026-10-15
 
