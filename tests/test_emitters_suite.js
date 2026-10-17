@@ -66,6 +66,31 @@ for (const [dialect, uri] of Object.entries(URIS)) {
     }
   }
 }
+// The format checks, asserted: each needs its own helper in the module
+// (`_uri`, `_em`, the IPv6 walk), the same class of miss as `_cpLen`.
+{
+  const dir = path.join(root, 'draft2020-12/optional/format');
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
+    const groups = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).map((g) => ({ g, v: new Validator(g.schema, { assertFormat: true }) }));
+    const builds = {
+      'format toStandaloneModule': () => groups.map(({ v }) => { const src = aot.toStandaloneModule(v, { format: 'cjs' }); if (!src) return null; const m = load(src); return (d) => m.validate(d); }),
+      'format bundleStandalone': () => load(Validator.bundleStandalone(groups.map(({ g }) => g.schema), { format: 'cjs', assertFormat: true })),
+      'format bundleCompact': () => load(Validator.bundleCompact(groups.map(({ g }) => g.schema), { format: 'cjs', assertFormat: true })),
+    };
+    for (const [k, build] of Object.entries(builds)) {
+      const fns = build();
+      groups.forEach(({ g, v }, i) => {
+        if (typeof fns[i] !== 'function') return;
+        for (const t of g.tests) {
+          let got;
+          try { got = fns[i](t.data).valid; } catch (e) { got = 'threw ' + e.message; }
+          check(k, got, v.validate(t.data).valid, `format/${f} | ${g.description} | ${t.description}`);
+        }
+      });
+    }
+  }
+}
 assert.strictEqual(bad.length, 0, `${bad.length} differences, first:\n${bad.slice(0, 8).join('\n')}`);
 for (const k of ['toStandaloneModule', 'bundleStandalone', 'bundleCompact']) assert.ok(counts[k] > 3000, `${k} covered only ${counts[k]} cases`);
+for (const k of ['format toStandaloneModule', 'format bundleStandalone', 'format bundleCompact']) assert.ok(counts[k] > 700, `${k} covered only ${counts[k]} cases`);
 console.log(`ok: the suite through every standalone emitter matches the runtime Validator (${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(', ')})`);
