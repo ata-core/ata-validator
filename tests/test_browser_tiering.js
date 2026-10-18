@@ -12,10 +12,14 @@
 const assert = require('assert');
 const { execFileSync } = require('child_process');
 const path = require('path');
+const { pathToFileURL } = require('url');
+// Absolute paths go to import() as file URLs: on Windows a bare `C:\\...` is
+// read as a URL scheme and refused.
+const url = (...p) => JSON.stringify(pathToFileURL(path.join(__dirname, '..', ...p)).href);
 
 const script = `
-const { Validator } = await import(${JSON.stringify(path.join(__dirname, '..', 'index.browser.mjs'))});
-const core = (await import(${JSON.stringify(path.join(__dirname, '..', 'lib', 'validator-core.js'))})).default;
+const { Validator } = await import(${url('index.browser.mjs')});
+const core = (await import(${url('lib', 'validator-core.js')})).default;
 const out = {};
 const schema = { type: 'object', properties: { a: { type: 'integer', minimum: 1 }, s: { type: 'string', maxLength: 3 }, e: { type: 'string', format: 'email' } }, required: ['a'], additionalProperties: false };
 const docs = [{ a: 1 }, { a: 0 }, { s: 'abcd' }, { a: 2, s: 'ab', e: 'x' }, { a: 1, z: 1 }, 'str', null];
@@ -53,8 +57,8 @@ assert.strictEqual(blocked.same, true);
 
 // 'ata-validator/codegen' has generated code from the first call.
 const eager = execFileSync(process.execPath, ['--input-type=module', '-e', `
-await import(${JSON.stringify(path.join(__dirname, '..', 'codegen.mjs'))});
-const { Validator } = await import(${JSON.stringify(path.join(__dirname, '..', 'index.browser.mjs'))});
+await import(${url('codegen.mjs')});
+const { Validator } = await import(${url('index.browser.mjs')});
 const v = new Validator({ type: 'string' }); v.validate('x'); console.log(v._engine);
 `], { encoding: 'utf8' }).trim();
 assert.strictEqual(eager, 'codegen', "import 'ata-validator/codegen' compiles from the first call");
