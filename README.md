@@ -49,10 +49,10 @@ conditions: the same names and answers, and a Worker bundled by wrangler goes fr
 70.4 KiB gzipped.
 
 In a browser bundle the code generator is not part of the page. Every schema starts on the
-interpreted engine, which gives the same answers, and a validator that is called often (a
-thousand times) loads the generator in the background, through a dynamic import that Vite,
-webpack and Rollup put in a chunk of their own, and switches to generated code. A form, checked
-as the user types, never loads it. On a react-jsonschema-form page this takes the validator's
+interpreted engine, which gives the same answers, and a validator called a thousand times within
+a second loads the generator in the background, through a dynamic import that Vite, webpack and
+Rollup put in a chunk of their own, and is rebuilt on generated code when the page is idle. A
+form, checked as the user types, never loads it. On a react-jsonschema-form page this takes the validator's
 share of the first load from 134.7 KB to about 57 KB gzipped; the generator chunk is about 78 KB
 more when it does load. Where `unsafe-eval` is blocked, on a page with a strict
 Content-Security-Policy or in a Manifest V3 extension, it is never fetched and every schema
