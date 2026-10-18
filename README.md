@@ -46,9 +46,19 @@ or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; 
 In Cloudflare Workers and Vercel Edge, where generated code cannot run, `ata-validator`
 resolves to an entry without the code generator through the `workerd` and `edge-light` export
 conditions: the same names and answers, and a Worker bundled by wrangler goes from 179.1 to
-70.4 KiB gzipped. On a page whose Content-Security-Policy blocks `unsafe-eval`, or in a
-browser extension, no condition tells the bundler, so import `ata-validator/lite` there: the
-same `Validator` on the interpreted engine alone.
+70.4 KiB gzipped.
+
+In a browser bundle the code generator is not part of the page. Every schema starts on the
+interpreted engine, which gives the same answers, and a validator that is called often (a
+thousand times) loads the generator in the background, through a dynamic import that Vite,
+webpack and Rollup put in a chunk of their own, and switches to generated code. A form, checked
+as the user types, never loads it. On a react-jsonschema-form page this takes the validator's
+share of the first load from 134.7 KB to about 57 KB gzipped; the generator chunk is about 78 KB
+more when it does load. Where `unsafe-eval` is blocked it is never fetched. To have generated
+code from the first call, import `ata-validator/codegen` once; it also makes `parse()`
+available in the browser, which otherwise waits for the generator. In a browser extension,
+where no condition tells the bundler it is a browser, import `ata-validator/lite`, the same
+`Validator` on the interpreted engine alone.
 
 On Deno the same package is `npm:ata-validator` or `jsr:@ata/validator`; the JSR package
 re-exports the npm one at the same version, and CI runs the official suite under Deno. The

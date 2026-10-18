@@ -115,7 +115,10 @@ const esbuild = require('esbuild')
 // engine's fused leaves, the leaf run inside the property step and the
 // direct read of declared properties on ordinary objects (lib/plan-compiler.js),
 // which take a document on this bundle's own engine from 195 to 144 ns.
-const BUDGET = 55600
+// 55800 (55722 measured): the core's hooks for the browser build's
+// on-demand code generator (lib/tiering.js is not in lite) and parse()
+// declining without caching until the generator loads.
+const BUDGET = 55800
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

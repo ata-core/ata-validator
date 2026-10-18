@@ -100,6 +100,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 444 KB with draft-04 as a dialect and its vendored meta-schema, definitions
 // that refer back to the root compiled, and the linear regex engine's loop
 // reading its tables through locals (popxf 18% faster). Measured 440.1 KB.
-assert.ok(manifest.size < 444 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 448 KB with the browser build's on-demand code generator (lib/tiering.js,
+// the ata-validator/codegen entry). Measured 445.1 KB.
+assert.ok(manifest.size < 448 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

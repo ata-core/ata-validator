@@ -70,9 +70,17 @@
       "import": "./error-runtime.mjs",
       "require": "./error-runtime.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./codegen": {
+      "types": "./codegen.d.ts",
+      "import": "./codegen.mjs",
+      "require": "./codegen.js"
+    }
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./codegen.js",
+    "./codegen.mjs"
+  ],
   "bin": {
     "ata": "bin/ata.js"
   },
@@ -171,7 +179,10 @@
     "error-runtime.d.ts",
     "bin/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "codegen.js",
+    "codegen.mjs",
+    "codegen.d.ts"
   ],
   "optionalDependencies": {
     "@ata-validator/native-darwin-arm64": "1.55.0",

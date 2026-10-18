@@ -2,6 +2,18 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- The browser build (the `browser` export condition, which Vite, webpack, Rollup and esbuild use for a page) no longer puts the code generator in the page. Every schema starts on the interpreted engine, and a validator called a thousand times loads the generator through a dynamic import, which bundlers split into a chunk of its own, and rebuilds itself on generated code (`lib/tiering.js`). The answers are the same on both engines, valid and errors alike. On a react-jsonschema-form page the validator's share of the first load goes from 134.7 KB to 57.5 KB gzipped with esbuild's splitting (205.9 KB for the whole page with Vite, 280.2 before); the generator chunk is 77 to 80 KB when it loads. A bundler that does not split chunks puts it back in the page, as before. Where code generation is blocked the chunk is never fetched.
+- `ata-validator/codegen` registers the generator at once, for a page that wants generated code from the first call.
+- In the browser build, `parse()` waits for the generator: before it has loaded, it throws a `TypeError` that names `ata-validator/codegen`, and once it has, it works. The ahead-of-time bundle methods were already left out of the browser build and still point to `ata-validator/aot`. `tests/test_browser_tiering.js` covers the switch, a cold validator, blocked code generation and the eager import.
+
+### Size
+
+- `ata-validator/lite` is 55.7 KB gzipped, up 0.2 KB for the core's hooks for the on-demand generator, which lite does not carry.
+
 ## 1.55.0 - 2026-10-17
 
 ### Fixed
