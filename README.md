@@ -54,11 +54,11 @@ thousand times) loads the generator in the background, through a dynamic import 
 webpack and Rollup put in a chunk of their own, and switches to generated code. A form, checked
 as the user types, never loads it. On a react-jsonschema-form page this takes the validator's
 share of the first load from 134.7 KB to about 57 KB gzipped; the generator chunk is about 78 KB
-more when it does load. Where `unsafe-eval` is blocked it is never fetched. To have generated
-code from the first call, import `ata-validator/codegen` once; it also makes `parse()`
-available in the browser, which otherwise waits for the generator. In a browser extension,
-where no condition tells the bundler it is a browser, import `ata-validator/lite`, the same
-`Validator` on the interpreted engine alone.
+more when it does load. Where `unsafe-eval` is blocked, on a page with a strict
+Content-Security-Policy or in a Manifest V3 extension, it is never fetched and every schema
+stays on the interpreted engine. To have generated code from the first call, import
+`ata-validator/codegen` once; it also makes `parse()` available in the browser, which otherwise
+waits for the generator.
 
 On Deno the same package is `npm:ata-validator` or `jsr:@ata/validator`; the JSR package
 re-exports the npm one at the same version, and CI runs the official suite under Deno. The

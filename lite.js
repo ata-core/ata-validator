@@ -1,6 +1,11 @@
 'use strict';
 
-// ata-validator/lite: the Validator without the code generator. Every schema
+// ata-validator/lite, kept for code that already imports it. The browser build
+// of ata-validator now starts on the interpreted engine and loads the code
+// generator only on demand, so a page needs nothing else; new code imports
+// ata-validator.
+//
+// The Validator without the code generator. Every schema
 // runs on the interpreted engine, which passes the same official test suite as
 // the compiled path and never calls `new Function`, so it also runs under a
 // strict Content-Security-Policy. The results are the ones `ata-validator`

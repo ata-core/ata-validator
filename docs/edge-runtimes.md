@@ -146,15 +146,11 @@ Worker with one validated route, bundled by wrangler 4.149.0, went from
 point to `ata-validator/aot`, as they do in a browser bundle.
 
 A page with a Content-Security-Policy that blocks `unsafe-eval`, or a
-browser extension under Manifest V3, has no such condition: the bundler
-cannot know. There, import `ata-validator/lite`, which is the same thing:
-
-```ts
-import { Validator } from 'ata-validator/lite'
-```
-
-It leaves out the tools no Validator calls (TypeScript generation, the
-renderers) as well, and nothing else changes.
+browser extension under Manifest V3, needs nothing either. The browser
+build starts every schema on the interpreted engine and loads the code
+generator only for a validator that gets hot; before loading it, it checks
+whether generated code can run, and where it cannot, the generator chunk is
+never fetched. The same `import { Validator } from 'ata-validator'` works.
 
 ## Deno and Deno Deploy
 
