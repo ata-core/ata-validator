@@ -2,6 +2,19 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- In the browser build, a page's first check no longer pays for V8 compiling the engine, nor for building the schema's engine. Both move to when the page is idle (`requestIdleCallback`, or 200 ms later where there is none, as in Safari and in workers): the first validator a page builds schedules one check of a small schema of ata's own, once per page, and then the engine for each validator built since, at most eight, which a validator adopts at its first check only if every input is still the same, its schema text included. `addSchema()` or a change to the schema object between construction and the first check is honored as before, a schema with custom keywords is left to its first check, since their compile functions are the caller's code, and nothing on a validator changes until it is used. The warm-up is dropped when a validator has compiled before the page is idle. Measured in Chrome with `@hookform/resolvers` on an eight-field form, the first submit 300 ms after the form was built went from 6.43 to 0.88 ms, and from 18.56 to 2.48 ms with the CPU slowed 4x as Lighthouse does for mobile. A submit before the page has been idle went from 3.97 to 3.66 ms, and from 18.93 to 17.20 ms with the CPU slowed. Node, lite and edge do not carry the idle work. `tests/test_browser_warmup.js` covers the warm-up, the adoption and each case where an engine built while idle must not be used.
+- The interpreted engine gives a pattern to the platform RegExp when it has no group or alternation, few bounded choices in all, and at most one unbounded repeat, on one character or class and only when the pattern starts with `^`: such a pattern runs in linear time on a backtracking engine, as the code generator already decided for these patterns (`lib/regex-linear.js`). The linear engine took 40 to 100 us to build a pattern's automaton, a RegExp about one. On lite, a form's first check went from 3.83 to 3.49 ms and a valid document from 205.8 to 193.0 ns. `tests/test_regex_plain_linear.js` holds that every pattern taking the RegExp gets one from the code generator too, so both engines answer with the same matcher, and that the answers equal the linear engine's on generated strings.
+- `lib/rejections.js` and the schema order and diagnostic modules it brings load at the first compile, where they are first used, rather than when the package loads. Importing the browser build went from 4.41 to 4.36 ms in Node.
+
+### Size
+
+- The browser build's first load is 1,095 bytes larger gzipped (57,059 to 58,154), for the idle work and the pattern check. With the CPU slowed 4x and a 1.6 Mbps link, the time from navigation until the form's resolver was ready did not move beyond noise (1,664.8 ms before, 1,666.7 after, against 1,658.9 for a second copy of the old build).
+- `ata-validator/lite` is 56,159 bytes gzipped, up 411, and the Workers bundle 57,540, up 389, for the pattern check and the core's hook for the idle work.
+
 ## 1.56.0 - 2026-10-18
 
 ### Changed

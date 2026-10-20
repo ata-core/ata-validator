@@ -118,7 +118,12 @@ const esbuild = require('esbuild')
 // 55800 (55722 measured): the core's hooks for the browser build's
 // on-demand code generator (lib/tiering.js is not in lite) and parse()
 // declining without caching until the generator loads.
-const BUDGET = 55800
+// 56200 (56159 measured): the interpreted engine gives plain linear patterns
+// to the platform RegExp (plainLinear in lib/interpreter-core.js), which takes
+// a form's first check on lite from 3.83 to 3.49 ms and a valid document from
+// 205.8 to 193.0 ns; and the core's hook for the browser build's idle engine
+// build (lib/tiering.js is not in lite).
+const BUDGET = 56200
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

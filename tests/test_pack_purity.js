@@ -102,6 +102,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // reading its tables through locals (popxf 18% faster). Measured 440.1 KB.
 // 448 KB with the browser build's on-demand code generator (lib/tiering.js,
 // the ata-validator/codegen entry). Measured 445.1 KB.
-assert.ok(manifest.size < 448 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 452 KB with the browser build warming the engine and building validators'
+// engines while the page is idle (lib/tiering.js), and plain linear patterns
+// on the platform RegExp in the interpreted engine (lib/interpreter-core.js):
+// a form's first submit in Chrome 18.56 to 2.48 ms with the CPU slowed 4x.
+// Measured 449.6 KB.
+assert.ok(manifest.size < 452 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

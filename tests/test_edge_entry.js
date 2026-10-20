@@ -93,7 +93,10 @@ const root = path.resolve(__dirname, '..');
     assert.ok(!inputs.some((k) => /js-compiler|codegen-engine/.test(k)), 'no code generator in a Workers bundle');
     const size = require('zlib').gzipSync(worker.outputFiles[0].contents, { level: 9 }).length;
     // 52.5 KB measured when the tools became separate imports (60.7 before).
-    assert.ok(size < 56 * 1024, `the Workers bundle is ${size} bytes gzipped, over 56 KB`);
+    // 57 KB with plain linear patterns on the platform RegExp in the
+    // interpreted engine, the engine here (lib/interpreter-core.js): 57151
+    // to 57540 bytes, a form's first check 3.83 to 3.49 ms on lite's engine.
+    assert.ok(size < 57 * 1024, `the Workers bundle is ${size} bytes gzipped, over 57 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

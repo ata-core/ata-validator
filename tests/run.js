@@ -169,6 +169,8 @@ const FILES = [
   "tests/test_bundle_cplen.js",
   "tests/test_emitters_suite.js",
   "tests/test_browser_tiering.js",
+  "tests/test_browser_warmup.js",
+  "tests/test_regex_plain_linear.js",
   "tests/test_hoisted_checks.js",
   "tests/test_rejection_shape.js",
   "tests/test_lazy_normalization.js",
