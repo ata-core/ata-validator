@@ -53,8 +53,9 @@ interpreted engine, which gives the same answers, and a validator called a thous
 a second loads the generator in the background, through a dynamic import that Vite, webpack and
 Rollup put in a chunk of their own, and is rebuilt on generated code when the page is idle. A
 form, checked as the user types, never loads it. On a react-jsonschema-form page this takes the validator's
-share of the first load from 134.7 KB to about 57 KB gzipped; the generator chunk is about 78 KB
-more when it does load. Where `unsafe-eval` is blocked, on a page with a strict
+share of the first load from 134.7 KB to about 55 KB gzipped; the generator chunk is about 78 KB
+more when it does load, and the plan compiler, which speeds up a schema the interpreted engine checks
+often, comes in a 6 KB chunk once the page is idle. Where `unsafe-eval` is blocked, on a page with a strict
 Content-Security-Policy or in a Manifest V3 extension, it is never fetched and every schema
 stays on the interpreted engine. To have generated code from the first call, import
 `ata-validator/codegen` once; it also makes `parse()` available in the browser, which otherwise

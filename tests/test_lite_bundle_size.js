@@ -132,7 +132,11 @@ const esbuild = require('esbuild')
 // also stops where an object default refers back to an enclosing schema
 // (Renovate's schema took it to the heap limit), and a schema with defaults
 // builds its errors only when they are read.
-const BUDGET = 57200
+// 57400 (57380 measured): the plan compiler comes through a dynamic import
+// (lib/interpreter.browser.js), and this bundle does not split chunks, so it
+// stays in and the code that loads it is added. With a bundler that splits,
+// lite's first load went from 57283 to 51839 bytes.
+const BUDGET = 57400
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

@@ -170,6 +170,7 @@ const FILES = [
   "tests/test_emitters_suite.js",
   "tests/test_browser_tiering.js",
   "tests/test_browser_warmup.js",
+  "tests/test_browser_plan_lazy.js",
   "tests/test_regex_plain_linear.js",
   "tests/test_aot_order_defaults.js",
   "tests/test_defaults_reach.js",

@@ -12,12 +12,15 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 - A validator whose schema has defaults, or that coerces, builds its errors when they are read, as other validators do. It built them on every rejection, read or not: on Kestra's schema that was 25 ms of the first `validate()` spent ordering errors nobody asked for. A rejection on a small schema with defaults went from 46 to 22 ns when the errors are not read.
 - A schema whose defaults would expand past the generated pass's size limit is handed to the closure pass before any code is written. SARIF's schema wrote 4,000 lines in 2.7 ms and threw them away. The generated source is unchanged on all 1,692 SchemaStore cases checked.
 
+- In the browser build, the plan compiler, which turns a schema the interpreted engine checks often into a tree of closures, is no longer in the page's first load. It arrives through a dynamic import, a chunk of its own in a bundler that splits, once the page is idle after its first validator (`lib/interpreter.browser.js`, which the package.json browser field puts in place of `lib/interpreter.js`). Until then the plain walk answers, as it already did for each schema's first thousand calls, with the same answers and the same depth of data before the stack runs out. The first load is 53,953 bytes gzipped, from 58,245 in 1.57.0. In Chrome with the CPU slowed 4x and a 1.6 Mbps link, a react-hook-form page with `ataResolver` was ready in 1,594 ms instead of 1,672 (1,668 for a second copy of 1.57.0); the first submit 300 ms after the form was built went from 2.50 to 2.25 ms, and a submit before the page was idle did not move (17.43 and 16.86 before, 16.92 after). With code generation blocked, a hot validator answers as before once the chunk is in (49.5 ns a rejection, both). `tests/test_browser_plan_lazy.js` covers the split and the answers before and after.
+
 Measured on the 564 SchemaStore schemas with a default, constructing each and validating its first sample: 1,462 to 1,327 ms in total, and with code generation blocked 934 to 991 ms. The blocked figure is the closure pass filling what it now reaches: a 400 KB SARIF log gains 4,130 values. The per-schema gate over SchemaStore and the request gate show no change beyond noise.
 
 ### Size
 
-- The browser build's first load is 1,077 bytes larger gzipped (58,245 to 59,322), `ata-validator/lite` is 57,151 bytes (up 984) and the Workers bundle 58,521 (up 957), for the defaults pass and its guard.
-- The package is 469.0 KB packed.
+- The browser build's first load is 4,292 bytes smaller gzipped (58,245 to 53,953): the defaults pass and its guard added 1,077 and moving the plan compiler out took 5,369. The plan compiler's chunk is 6,334 bytes.
+- `ata-validator/lite` is 57,380 bytes gzipped (up 1,213) where it is bundled without splitting, as `tests/test_lite_bundle_size.js` does: the plan compiler stays in, and the code that loads it is added. With a bundler that splits, its first load is 51,839, from 56,277 in 1.57.0. The Workers bundle is 58,577 (up 1,013).
+- The package is 469.7 KB packed.
 
 ## 1.57.0 - 2026-10-20
 
