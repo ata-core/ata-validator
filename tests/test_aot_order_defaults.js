@@ -73,6 +73,14 @@ const shape = (errors) => JSON.stringify(errors.map((e) => [e.keyword, e.instanc
   assert.strictEqual(shape(mod.validate(structuredClone(data)).errors), shape(want));
 }
 
+// compiledModuleFor passes `order` on, for a plugin writing a module a resolver reads directly.
+{
+  const { compiledModuleFor } = require('../build.js');
+  const schema = { type: 'object', properties: { a: { type: 'string', format: 'email', pattern: '^x' } }, additionalProperties: false };
+  assert.match(compiledModuleFor(schema, { order: true }), /_ataOrder/, 'compiledModuleFor with order sorts');
+  assert.doesNotMatch(compiledModuleFor(schema), /_ataOrder/, 'compiledModuleFor without it does not');
+}
+
 // Asked for where it cannot be given: told.
 {
   const warnings = [];

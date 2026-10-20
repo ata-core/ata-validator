@@ -116,6 +116,12 @@ export interface ToStandaloneModuleOptions {
    * older collector either way.
    */
   onePass?: boolean;
+  /**
+   * Hand errors out in the runtime's order, schema declaration order, rather
+   * than the order the collector found them in (`ata compile --order`). Adds a
+   * sort, and for a schema with `$ref` its key skeleton; off by default.
+   */
+  order?: boolean;
   source?: boolean;
   sourceMap?: unknown;
   schemaFile?: string;
@@ -190,7 +196,7 @@ export function compiledSchemaFor(schema: unknown): object;
  * {@link compiledEligible} declines, one the emitter cannot compile, and one
  * whose detailed errors the generator cannot produce.
  */
-export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cjs'; errorRuntime?: string }): string | null;
+export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cjs'; errorRuntime?: string; order?: boolean }): string | null;
 
 /**
  * The Validator options `fromCompiled()` reproduces, so a plugin can tell
