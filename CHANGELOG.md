@@ -2,6 +2,23 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- `default` values are filled in every schema applied to a value, as the default validator's `useDefaults` fills them: behind a `$ref` into the same document (recursive ones included), in each `allOf` member, in array elements under `items` and `prefixItems`, under `additionalProperties` and `patternProperties` for the keys they cover, and under `dependentSchemas` for the keys present. The pass stopped at `properties`, so a `required` property whose default sat behind a reference or in an array element was rejected where the default validator accepts it. `anyOf`, `oneOf` and `not` fill nothing, as there. `if`/`then`/`else` fill nothing here either, since which branch applies is only known once the value has been checked; the default validator fills some of those cases. On SchemaStore's sample documents for the 372 schemas with defaults it compiles (1,287 documents), the filled data differs from the default validator's on 161 documents, down from 488, and the verdict on 23, down from 42; every remaining difference is in a schema with `oneOf`, `anyOf`, `if` or `not`. All three passes fill the same: the generated one, the closure one (the interpreted engine, and where the generated pass declines a schema), and a module's `applyDefaults`, which now embeds the closure pass where the generated one declines: 405 of 878 SchemaStore modules export `applyDefaults`, up from 289. `tests/test_defaults_reach.js` covers each place, against values taken from the default validator, and 300 generated schemas on all three passes.
+- This can reject a document that was accepted before, when a schema's own default breaks one of its rules. Of SchemaStore's 1,537 positive samples, 17 are now rejected; the default validator with `useDefaults` rejects 16 of them. The 17th fills `layout: true` where a sibling `then` says `not: { required: ["layout"] }`: the default validator checks `allOf` before it fills `properties`, ata fills first. `useDefaults: false` leaves the input as it is.
+- Inside a value the pass made from a default, a schema already applied to an enclosing value is not applied again. A schema whose object default refers back to an enclosing one would otherwise fill without end; Renovate's schema did, and the default validator throws a `RangeError` on it. An empty Renovate configuration fills to 22,774 bytes, as before.
+- A validator whose schema has defaults, or that coerces, builds its errors when they are read, as other validators do. It built them on every rejection, read or not: on Kestra's schema that was 25 ms of the first `validate()` spent ordering errors nobody asked for. A rejection on a small schema with defaults went from 46 to 22 ns when the errors are not read.
+- A schema whose defaults would expand past the generated pass's size limit is handed to the closure pass before any code is written. SARIF's schema wrote 4,000 lines in 2.7 ms and threw them away. The generated source is unchanged on all 1,692 SchemaStore cases checked.
+
+Measured on the 564 SchemaStore schemas with a default, constructing each and validating its first sample: 1,462 to 1,327 ms in total, and with code generation blocked 934 to 991 ms. The blocked figure is the closure pass filling what it now reaches: a 400 KB SARIF log gains 4,130 values. The per-schema gate over SchemaStore and the request gate show no change beyond noise.
+
+### Size
+
+- The browser build's first load is 1,077 bytes larger gzipped (58,245 to 59,322), `ata-validator/lite` is 57,151 bytes (up 984) and the Workers bundle 58,521 (up 957), for the defaults pass and its guard.
+- The package is 469.0 KB packed.
+
 ## 1.57.0 - 2026-10-20
 
 ### Changed

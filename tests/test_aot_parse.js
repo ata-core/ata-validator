@@ -273,7 +273,7 @@ const compile = (schema) => {
     const input = { name: 'a', extra: 1, home: { city: 'x', junk: 2 } }
     const out = m.parse(input)
     check('ref target strips unknown keys', out.home && out.home.city === 'x' && !('junk' in out.home) && !('extra' in out))
-    check('inner default does not fill, same as the runtime', !('country' in out.home))
+    check('inner default fills, as the runtime fills it behind a $ref', out.home.country === 'TR')
     const r = new Validator(schema).validate({ name: 'a', home: { city: 'x' } })
     const p = m.parse({ name: 'a', home: { city: 'x' } })
     check('parse output equals runtime validate().data', JSON.stringify(p) === JSON.stringify(r.data))
@@ -379,9 +379,9 @@ const compile = (schema) => {
     const out = m.parse(input)
     check('record keeps every key', 'us' in out && 'eu' in out)
     check('record strips inside values', !('junk' in out.us))
-    // The runtime's useDefaults does not fill defaults under a record value,
-    // and parse() mirrors the runtime exactly rather than improving on it.
-    check('record does not fill value defaults, same as the runtime', !('note' in out.us) && !('note' in out.eu))
+    // The runtime's useDefaults fills defaults under a record value, and
+    // parse() mirrors the runtime exactly.
+    check('record fills value defaults, as the runtime does', out.us.note === 'none' && out.eu.note === 'none')
     check('record leaves the input alone', input.us.junk === 1)
     const r = new Validator(schema).validate({ us: { include: ['a'] } })
     check('record parse equals runtime validate().data', JSON.stringify(m.parse({ us: { include: ['a'] } })) === JSON.stringify(r.data))

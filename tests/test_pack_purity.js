@@ -111,6 +111,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // `order: true`, handing out their errors in the runtime's order
 // (lib/aot-order.js), so a module read directly, as a form resolver does,
 // answers as the runtime Validator does. Measured 452.6 KB.
-assert.ok(manifest.size < 456 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 460 KB with defaults filled in every schema applied to a value, as ajv's
+// useDefaults fills them, in the closure pass, the generated pass, parse()
+// and the modules' applyDefaults (lib/defaults.js, lib/codegen-engine.js,
+// lib/clone-emit.js, lib/aot-impl.js). Measured 456.5 KB.
+assert.ok(manifest.size < 460 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

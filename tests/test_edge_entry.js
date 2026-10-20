@@ -96,7 +96,11 @@ const root = path.resolve(__dirname, '..');
     // 57 KB with plain linear patterns on the platform RegExp in the
     // interpreted engine, the engine here (lib/interpreter-core.js): 57151
     // to 57564 bytes, a form's first check 3.83 to 3.49 ms on lite's engine.
-    assert.ok(size < 57 * 1024, `the Workers bundle is ${size} bytes gzipped, over 57 KB`);
+    // 58 KB with defaults filled through `$ref`, `allOf` and array elements
+    // (lib/defaults.js), a guard against a schema whose object default
+    // refers back to an enclosing schema, and the lazy errors for a schema
+    // with defaults: 58521 bytes.
+    assert.ok(size < 58 * 1024, `the Workers bundle is ${size} bytes gzipped, over 58 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

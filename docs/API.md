@@ -35,7 +35,7 @@ new Validator(false).isValidObject(anything); // false
 |--------|------|---------|-------------|
 | `coerceTypes` | boolean | false | Convert types in-place. `"42"` becomes `42` for integer fields. |
 | `removeAdditional` | boolean | false | Remove properties not defined in schema. |
-| `useDefaults` | boolean | true | Fill in `default` values on absent properties, in place, before validating. Set `false` to leave the input untouched. |
+| `useDefaults` | boolean | true | Fill in `default` values on absent properties, in place, before validating, in every schema applied to the value: `properties`, a `$ref` into the same document, `allOf`, `items` and `prefixItems`, `additionalProperties`, `patternProperties` and `dependentSchemas`. `anyOf`, `oneOf`, `not` and `if`/`then`/`else` fill nothing. Set `false` to leave the input untouched. |
 | `engine` | `'auto'` \| `'interpreter'` | `'auto'` | `'interpreter'` keeps the schema off code generation: no `new Function`, no shared compile cache; the eval-free interpreted engine answers `validate()`, `isValidObject()` and `validateJSON()`. For a schema that arrives from outside the trust boundary. Any other value throws. |
 | `baseURI` | string | none | The URI the schema was retrieved from. Relative `$ref`s resolve against it when the schema declares no `$id` of its own, including a draft-07 root whose `$id` sits beside a `$ref` and is therefore ignored. An editor or loader that knows where a schema came from passes it here. |
 | `assertFormat` | boolean | true | Assert `format`. Set `false` to treat it as an annotation. |

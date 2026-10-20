@@ -123,7 +123,16 @@ const esbuild = require('esbuild')
 // a form's first check on lite from 3.83 to 3.49 ms and a valid document from
 // 205.8 to 193.0 ns; and the core's hook for the browser build's idle engine
 // build (lib/tiering.js is not in lite).
-const BUDGET = 56200
+// 57200 (57151 measured): the closure defaults pass, lite's, fills defaults
+// in every schema applied to a value, as ajv's useDefaults does: through
+// `$ref`, `allOf`, array elements, `additionalProperties`,
+// `patternProperties` and `dependentSchemas` (lib/defaults.js, 484 to 1368
+// bytes on its own). It stopped at `properties`, so a `required` property
+// with a default behind a reference was rejected where ajv accepts it. It
+// also stops where an object default refers back to an enclosing schema
+// (Renovate's schema took it to the heap limit), and a schema with defaults
+// builds its errors only when they are read.
+const BUDGET = 57200
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
