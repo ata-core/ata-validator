@@ -249,6 +249,18 @@ Error detail carries the same guarantee wherever the module ships it; a
 module that cannot carry error detail says so (below) and still keeps the
 verdict contract.
 
+A module returns its errors in the order its collector found them unless it
+is written with `toStandaloneModule(schema, { order: true })` (`ata compile
+--order`), which sorts them as the runtime does, by schema declaration order,
+and leaves out the ordinal it sorts by. Without a `$ref` the collector writes
+each error site's ordinal into the error and the module sorts by it; with one,
+the module ranks each error's path with the functions of
+`lib/schema-order.js`, embedded as their text, over the schema's key skeleton.
+A module of a schema that declares a `default` also exports
+`applyDefaults(data)`, the runtime's defaults pass, which `validate()` does not
+call: the runtime fills defaults before it checks unless `useDefaults` is off,
+and a module cannot see that option.
+
 Error detail comes from one of two generators. The default is the collector
 modules have always carried. `toStandaloneModule(schema, { onePass: true })`
 (`ata compile --one-pass`) writes the runtime's one-pass function instead,

@@ -30,6 +30,9 @@ Compile options:
   --abort-early           Use stub errors (smallest bundle)
   --one-pass              Report errors with the runtime's one-pass function: faster on
                           rejected documents, a module 1.3 to 1.7x the size
+  --order                 Hand errors out in the runtime's order (schema declaration
+                          order) rather than the order they were found in; adds a sort,
+                          and for a schema with $ref its key skeleton
   --source                Embed schema source map (default in development)
   --no-source             Omit source map (default in production, NODE_ENV=production)
 
@@ -45,6 +48,10 @@ Build options:
   --abort-early           Use stub errors (smallest bundle)
   --one-pass              Report errors with the runtime's one-pass function: faster on
                           rejected documents, a module 1.3 to 1.7x the size
+  --order                 Hand errors out in the runtime's order (schema declaration
+                          order) rather than the order they were found in; adds a sort,
+                          and for a schema with $ref its key skeleton (modules that share
+                          the error runtime are in that order already)
   --errors <mode>         Where error detail comes from: auto | inline | shared. auto
                           (default) has modules share one error runtime file when that
                           makes the output smaller; production builds only (--no-source)
@@ -103,6 +110,7 @@ function parseArgs(argv) {
     if (a === '--no-types') { out.opts.types = false; continue; }
     if (a === '--abort-early') { out.opts.abortEarly = true; continue; }
     if (a === '--one-pass') { out.opts.onePass = true; continue; }
+    if (a === '--order') { out.opts.order = true; continue; }
     if (a === '--errors') { out.opts.errors = argv[++i]; continue; }
     if (a === '--mode') { out.opts.mode = argv[++i]; continue; }
     if (a === '--base-uri') { out.opts.baseUri = argv[++i]; continue; }
@@ -250,7 +258,7 @@ function cmdCompile(args) {
   }
   const schemaFile = path.relative(process.cwd(), input) || input;
   const compileWarnings = [];
-  const src = aot.toStandaloneModule(v, { format, abortEarly, source, sourceMap, schemaFile, onePass: args.opts.onePass === true ? true : undefined, onWarning: (w) => compileWarnings.push(w) });
+  const src = aot.toStandaloneModule(v, { format, abortEarly, source, sourceMap, schemaFile, onePass: args.opts.onePass === true ? true : undefined, order: args.opts.order === true ? true : undefined, onWarning: (w) => compileWarnings.push(w) });
   if (compileWarnings.length > 0) {
     if (args.opts.strict) {
       for (const w of compileWarnings) reportCompileError(input, w);
@@ -277,7 +285,7 @@ function cmdCompile(args) {
     const typeName = args.opts.name || path.basename(input, path.extname(input))
       .replace(/[^A-Za-z0-9_]/g, '_')
       .replace(/^([a-z])/, (m) => m.toUpperCase()) || 'Data';
-    const dts = toTypeScript(schema, { name: typeName });
+    const dts = toTypeScript(schema, { name: typeName, applyDefaults: /\nfunction applyDefaults\(/.test(src) });
     const ext = path.extname(output);
     const dtsExt = ext === '.mjs' ? '.d.mts'
       : ext === '.cjs' ? '.d.cts'
@@ -308,6 +316,7 @@ function cmdBuild(args) {
     suffix: args.opts.suffix,
     abortEarly: !!args.opts.abortEarly,
     onePass: args.opts.onePass === true ? true : undefined,
+    order: args.opts.order === true ? true : undefined,
     errors: args.opts.errors,
     mode: args.opts.mode,
     baseUri: args.opts.baseUri,

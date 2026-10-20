@@ -107,6 +107,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // on the platform RegExp in the interpreted engine (lib/interpreter-core.js):
 // a form's first submit in Chrome 18.56 to 2.48 ms with the CPU slowed 4x.
 // Measured 449.6 KB.
-assert.ok(manifest.size < 452 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 456 KB with standalone modules exporting applyDefaults and, asked for with
+// `order: true`, handing out their errors in the runtime's order
+// (lib/aot-order.js), so a module read directly, as a form resolver does,
+// answers as the runtime Validator does. Measured 452.6 KB.
+assert.ok(manifest.size < 456 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

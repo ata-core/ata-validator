@@ -584,7 +584,10 @@ CLI options:
 | `-f, --format <fmt>` | `esm` | `esm` or `cjs` |
 | `--name <TypeName>` | from filename | Root type name in the `.d.ts` |
 | `--abort-early` | off | Generate the stub-error variant, about a third of the source |
+| `--order` | off | Hand errors out in the runtime's order (schema declaration order), not the order the collector found them in |
 | `--no-types` | off | Skip the `.d.mts` / `.d.cts` output |
+
+A module answers `validate()` as the runtime does, with two differences a caller reading the module directly should know. The runtime fills in `default` values before it checks (`useDefaults` is on unless turned off), and the module does not: where the schema declares a default the module exports `applyDefaults(data)`, the runtime's own pass, to call first. And the module returns its errors in the order its collector found them, which can put a field's `format` error before its `pattern` error, or behind a `$ref` a definition's `required` before its `properties`; `--order` sorts them as the runtime does. It is off by default because it costs bytes: 225 more gzipped for an eight-field form, about 1 KB for a small schema with references, whose key skeleton the module then carries, and 12.6% over 267 SchemaStore schemas. With both, a module matched the runtime's verdict, filled data and error list, in order, on every case of the official suites it compiles (1,500 groups, 5,324 cases across six dialects) and on 1,952 of SchemaStore's sample documents. `fromCompiled()` and modules that share the error runtime sort already and need neither.
 
 For a project with many schemas, `ata build <glob>` compiles them all in one command:
 
