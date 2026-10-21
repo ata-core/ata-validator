@@ -2,7 +2,7 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
-## Unreleased
+## 1.58.0 - 2026-10-21
 
 ### Security
 
@@ -31,7 +31,7 @@ Measured on the 564 SchemaStore schemas with a default, constructing each and va
 
 - The browser build's first load is 4,292 bytes smaller gzipped (58,245 to 53,953): the defaults pass and its guard added 1,077 and moving the plan compiler out took 5,369. The plan compiler's chunk is 6,334 bytes.
 - `ata-validator/lite` is 57,380 bytes gzipped (up 1,213) where it is bundled without splitting, as `tests/test_lite_bundle_size.js` does: the plan compiler stays in, and the code that loads it is added. With a bundler that splits, its first load is 51,839, from 56,277 in 1.57.0. The Workers bundle is 58,577 (up 1,013).
-- The package is 469.7 KB packed.
+- The package is 470.3 KB packed.
 
 ## 1.57.0 - 2026-10-20
 

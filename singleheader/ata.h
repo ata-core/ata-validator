@@ -1,4 +1,4 @@
-/* auto-generated on 2026-10-20 19:45:16 +0300. Do not edit! */
+/* auto-generated on 2026-10-21 17:41:43 +0300. Do not edit! */
 /* begin file include/ata.h */
 #pragma once
 
@@ -10,12 +10,12 @@
 #include <variant>
 #include <vector>
 
-#define ATA_VERSION "1.57.0"
+#define ATA_VERSION "1.58.0"
 
 namespace ata {
 
 inline constexpr uint32_t VERSION_MAJOR = 1;
-inline constexpr uint32_t VERSION_MINOR = 57;
+inline constexpr uint32_t VERSION_MINOR = 58;
 inline constexpr uint32_t VERSION_REVISION = 0;
 
 inline constexpr std::string_view version() noexcept {
