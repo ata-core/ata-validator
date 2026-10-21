@@ -308,8 +308,14 @@ static void validate_napi(const schema_node_ptr& node,
                            std::vector<ata::validation_error>& errors) {
   if (!node) return;
 
+  // Past the depth limit the document is rejected, not the rest of it taken
+  // as valid (see validate_node in src/ata.cpp).
   NapiDepthGuard guard;
-  if (guard.overflow) return;
+  if (guard.overflow) {
+    errors.push_back({ata::error_code::depth_exceeded, path,
+                      "nested deeper than the native engine walks"});
+    return;
+  }
 
   // Boolean schema
   if (node->boolean_schema.has_value()) {
@@ -1164,9 +1170,14 @@ static bool FastValidateImpl(uint32_t slot, const uint8_t* data, size_t length) 
   return ata::is_valid_buf(g_fast_schemas[slot], data, length);
 }
 
-// Zero-copy validation with pre-padded buffer
-static bool FastValidatePrepadded(uint32_t slot, const uint8_t* data, size_t length) {
+// Zero-copy validation with pre-padded buffer. The document length comes
+// from the caller and is checked against the buffer: past its end the
+// document is not there to read, and short of REQUIRED_PADDING before it the
+// padding is not, so that case takes the copying path.
+static bool FastValidatePrepadded(uint32_t slot, const uint8_t* data, size_t length, size_t capacity) {
   if (slot >= g_fast_slot_count) return false;
+  if (length > capacity) return false;
+  if (capacity - length < ata::REQUIRED_PADDING) return FastValidateImpl(slot, data, length);
   return ata::is_valid_prepadded(g_fast_schemas[slot],
                                   reinterpret_cast<const char*>(data), length);
 }
@@ -1235,7 +1246,7 @@ static napi_value RawFastValidate(napi_env env, napi_callback_info info) {
     if (data) {
       size_t actual_len = prepadded ? json_length : length;
       if (prepadded) {
-        valid = FastValidatePrepadded(slot, static_cast<const uint8_t*>(data), actual_len);
+        valid = FastValidatePrepadded(slot, static_cast<const uint8_t*>(data), actual_len, length);
       } else {
         valid = FastValidateImpl(slot, static_cast<const uint8_t*>(data), actual_len);
       }
@@ -1250,7 +1261,7 @@ static napi_value RawFastValidate(napi_env env, napi_callback_info info) {
       if (data) {
         size_t actual_len = prepadded ? json_length : length;
         if (prepadded) {
-          valid = FastValidatePrepadded(slot, static_cast<const uint8_t*>(data), actual_len);
+          valid = FastValidatePrepadded(slot, static_cast<const uint8_t*>(data), actual_len, length);
         } else {
           valid = FastValidateImpl(slot, static_cast<const uint8_t*>(data), actual_len);
         }
@@ -1349,7 +1360,21 @@ static napi_value RawBatchValidate(napi_env env, napi_callback_info info) {
   return result_arr;
 }
 
-// --- Parallel NDJSON: multi-core validation, ajv can't do this ---
+// One line of a caller's NDJSON buffer, checked without reading past it.
+// is_valid_prepadded wants REQUIRED_PADDING readable bytes after the document,
+// and the next line supplies them, except for a line that ends within that
+// distance of the buffer's end: the last one, or a short one just before it.
+// Those are copied into a padded buffer of this thread's.
+static bool line_is_valid(const ata::schema_ref& s, const char* p, size_t len, const char* end) {
+  if (static_cast<size_t>(end - (p + len)) >= ata::REQUIRED_PADDING)
+    return ata::is_valid_prepadded(s, p, len);
+  thread_local std::string tl_line;
+  tl_line.assign(p, len);
+  tl_line.append(ata::REQUIRED_PADDING, '\0');
+  return ata::is_valid_prepadded(s, tl_line.data(), len);
+}
+
+// --- Parallel NDJSON: multi-core validation ---
 static napi_value RawParallelValidate(napi_env env, napi_callback_info info) {
   size_t argc = 2;
   napi_value args[2];
@@ -1394,7 +1419,10 @@ static napi_value RawParallelValidate(napi_env env, napi_callback_info info) {
   }
 
   size_t n = lines.size();
-  std::vector<bool> results(n, false);
+  // One byte per line: std::vector<bool> packs eight lines into a byte, and
+  // workers writing neighbouring lines raced on it, so a valid line could come
+  // back false.
+  std::vector<uint8_t> results(n, 0);
 
   // Parallel validation across CPU cores
   unsigned num_threads = std::thread::hardware_concurrency();
@@ -1422,17 +1450,15 @@ static napi_value RawParallelValidate(napi_env env, napi_callback_info info) {
       size_t to = std::min(from + chunk, n);
       if (from >= n) break;
 
-      tp.submit([&results, &lines, from, to, slot](
+      tp.submit([&results, &lines, from, to, slot, end](
           std::unordered_map<uint32_t, ata::schema_ref>& cache) {
         auto it = cache.find(slot);
         if (it == cache.end()) {
           it = cache.emplace(slot, ata::compile(g_fast_schema_jsons[slot])).first;
         }
         auto& s = it->second;
-        // Free padding: lines in NDJSON buffer almost always have free padding
-        // (next line's data serves as padding). Only last line might need copy.
         for (size_t i = from; i < to; i++) {
-          results[i] = ata::is_valid_prepadded(s, lines[i].ptr, lines[i].len);
+          results[i] = line_is_valid(s, lines[i].ptr, lines[i].len, end);
         }
       });
     }
@@ -1514,7 +1540,7 @@ static napi_value RawParallelCount(napi_env env, napi_callback_info info) {
     size_t to = std::min(from + chunk, n);
     if (from >= n) break;
 
-    tp.submit([&valid_count, &lines, from, to, slot](
+    tp.submit([&valid_count, &lines, from, to, slot, end](
         std::unordered_map<uint32_t, ata::schema_ref>& cache) {
       auto it = cache.find(slot);
       if (it == cache.end()) {
@@ -1523,7 +1549,7 @@ static napi_value RawParallelCount(napi_env env, napi_callback_info info) {
       auto& s = it->second;
       uint32_t local_cnt = 0;
       for (size_t i = from; i < to; i++) {
-        if (ata::is_valid_prepadded(s, lines[i].ptr, lines[i].len))
+        if (line_is_valid(s, lines[i].ptr, lines[i].len, end))
           local_cnt++;
       }
       valid_count.fetch_add(local_cnt, std::memory_order_relaxed);

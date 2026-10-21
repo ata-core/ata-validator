@@ -49,6 +49,7 @@ enum class error_code : uint8_t {
   not_failed,
   ref_not_found,
   if_then_else_failed,
+  depth_exceeded,
 };
 
 struct validation_error {

@@ -509,6 +509,40 @@ TEST(empty_schema) {
   ASSERT(r3.valid);
 }
 
+// --- Object enum/const compare member names exactly ---
+// A key holding quote characters must not read as two members: the object
+// {"a\":1,\"b": 2} is not {"a": 1, "b": 2}.
+
+TEST(enum_object_key_with_quotes_is_not_two_members) {
+  const char* schema = R"({"enum":[{"a":1,"b":2}]})";
+  ASSERT(!ata::validate(schema, R"({"a\":1,\"b":2})").valid);
+  ASSERT(ata::validate(schema, R"({"b":2,"a":1})").valid);
+}
+
+TEST(const_object_key_with_quotes_is_not_two_members) {
+  const char* schema = R"({"const":{"a":1,"b":2}})";
+  ASSERT(!ata::validate(schema, R"({"a\":1,\"b":2})").valid);
+  ASSERT(ata::validate(schema, R"({"a":1,"b":2})").valid);
+}
+
+TEST(unique_items_tells_quoted_key_apart) {
+  const char* schema = R"({"uniqueItems":true})";
+  ASSERT(ata::validate(schema, R"([{"a":1,"b":2},{"a\":1,\"b":2}])").valid);
+  ASSERT(!ata::validate(schema, R"([{"a":1},{"a":1}])").valid);
+}
+
+// --- Past the depth limit the document is rejected, not accepted ---
+
+TEST(depth_limit_rejects_violation_below_it) {
+  const char* schema = R"({"type":"object","properties":{"next":{"$ref":"#"},"data":{"type":"string","pattern":"^[A-Z]+$"}},"required":["data"]})";
+  std::string doc = R"({"data":"lower"})";
+  for (int i = 0; i < 80; i++) doc = R"({"data":"OK","next":)" + doc + "}";
+  auto s = ata::compile(schema);
+  ASSERT(!ata::validate(s, doc).valid);
+  std::string padded = doc + std::string(ata::REQUIRED_PADDING, ' ');
+  ASSERT(!ata::is_valid_prepadded(s, padded.data(), doc.size()));
+}
+
 int main() {
   printf("\nata v%.*s - JSON Schema Validator Tests\n",
          static_cast<int>(ata::version().size()), ata::version().data());

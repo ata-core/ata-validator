@@ -261,6 +261,23 @@ static bool read_count(dom::element el, uint64_t& out) {
 }
 
 // Canonical JSON: sort object keys for semantic equality comparison
+// A member name as a JSON string. simdjson hands keys over unescaped, so a
+// key written as "a\":1,\"b" arrives as the bytes a":1,"b; put between quotes
+// as it is, the object {"a\":1,\"b": 2} read the same as {"a": 1, "b": 2}, and
+// an enum or const of the second accepted the first. Escaping the quote, the
+// backslash and the control characters makes the form one-to-one.
+static void append_json_key(std::string& r, std::string_view k) {
+  static const char hex[] = "0123456789abcdef";
+  r += '"';
+  for (char ch : k) {
+    const unsigned char c = static_cast<unsigned char>(ch);
+    if (c == '"' || c == '\\') { r += '\\'; r += ch; }
+    else if (c < 0x20) { r += "\\u00"; r += hex[c >> 4]; r += hex[c & 15]; }
+    else r += ch;
+  }
+  r += '"';
+}
+
 static std::string canonical_json(dom::element el) {
   switch (el.type()) {
     case dom::element_type::OBJECT: {
@@ -272,9 +289,8 @@ static std::string canonical_json(dom::element el) {
       std::string r = "{";
       for (size_t i = 0; i < entries.size(); ++i) {
         if (i) r += ',';
-        r += '"';
-        r += entries[i].first;
-        r += "\":";
+        append_json_key(r, entries[i].first);
+        r += ':';
         r += canonical_json(entries[i].second);
       }
       r += '}';
@@ -1230,8 +1246,15 @@ static void validate_node(const schema_node_ptr& node,
                            dynamic_scope_t* dynamic_scope) {
   if (!node) return;
 
+  // Past the depth limit the walk stops, and the document is rejected rather
+  // than the rest of it taken as valid: a recursive schema and data nested
+  // fifty levels deep accepted a violation below that point.
   DepthGuard guard;
-  if (guard.overflow) return;
+  if (guard.overflow) [[unlikely]] {
+    errors.push_back({error_code::depth_exceeded, path,
+                      "nested deeper than the native engine walks"});
+    return;
+  }
 
   // Boolean schema
   if (node->boolean_schema.has_value()) {
@@ -1917,8 +1940,9 @@ static bool validate_fast(const schema_node_ptr& node,
                            const compiled_schema& ctx) {
   if (!node) [[unlikely]] return true;
 
+  // Rejected past the depth limit, as validate_node does.
   DepthGuard guard;
-  if (guard.overflow) [[unlikely]] return true;
+  if (guard.overflow) [[unlikely]] return false;
 
   if (node->boolean_schema.has_value()) [[unlikely]]
     return node->boolean_schema.value();

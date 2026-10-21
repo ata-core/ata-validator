@@ -136,7 +136,9 @@ const esbuild = require('esbuild')
 // (lib/interpreter.browser.js), and this bundle does not split chunks, so it
 // stays in and the code that loads it is added. With a bundler that splits,
 // lite's first load went from 57283 to 51839 bytes.
-const BUDGET = 57400
+// 57500 (57405 measured): the native engine's depth error has an entry in
+// lib/error-codes.js, now that its walker rejects past its depth limit.
+const BUDGET = 57500
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

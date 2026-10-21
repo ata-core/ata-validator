@@ -1,17 +1,37 @@
-/* auto-generated on 2026-04-18 10:54:35 +0100. Do not edit! */
+/* auto-generated on 2026-10-20 19:45:16 +0300. Do not edit! */
 /* begin file src/ata.cpp */
 #include "ata.h"
 
 // mimalloc: faster new/delete for small allocations.
-#if __has_include(<mimalloc-new-delete.h>)
+//
+// ATA_NO_MIMALLOC opts out. A toolchain can ship the headers while providing
+// its own operator new/delete over the same allocator, and including this one
+// on top of that is a duplicate-symbol link error rather than a speedup.
+// Emscripten with -sMALLOC=mimalloc is the case that prompted the flag.
+#if !defined(ATA_NO_MIMALLOC) && __has_include(<mimalloc-new-delete.h>)
 #include <mimalloc-new-delete.h>
 #endif
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #ifndef ATA_NO_RE2
 #include <re2/re2.h>
+
+// RE2 logs every unparseable pattern to stderr by default. A pattern outside
+// RE2's subset (lookahead, backreferences) is an expected input here, not a
+// fault: construction is probed, ok() is checked, and the JavaScript engines
+// answer for the pattern instead. Handled cases should not print.
+static const re2::RE2::Options& ata_quiet_re2_options() {
+  static const re2::RE2::Options opts = [] {
+    re2::RE2::Options o;
+    o.set_log_errors(false);
+    return o;
+  }();
+  return opts;
+}
 #endif
 #include <set>
 #include <unordered_map>
@@ -165,11 +185,105 @@ namespace ata {
 
 using namespace simdjson;
 
+// For a get() whose type was checked just before: the call cannot fail, and
+// GCC does not accept a (void) cast as using a warn_unused_result value.
+static inline void type_checked(simdjson::error_code) {}
+
+// Numbers as JSON.parse reads them, which is what validate() sees: every JSON
+// number is a double, big integers included, and an integer is a number with
+// no fractional part however it is written, so "1.0" and "1e2" are integers.
+// simdjson reports the written form instead (DOUBLE, or BIGINT past 64 bits),
+// and taking that for the JSON Schema type rejected `{"id": 1.0}` against
+// `type: "integer"` on the text paths while validate() accepted it.
+static bool is_number_type(dom::element_type t) {
+  return t == dom::element_type::INT64 || t == dom::element_type::UINT64 ||
+         t == dom::element_type::DOUBLE || t == dom::element_type::BIGINT;
+}
+
+static double to_double(dom::element el) {
+  switch (el.type()) {
+    case dom::element_type::DOUBLE: { double v = 0; type_checked(el.get(v)); return v; }
+    case dom::element_type::INT64:  { int64_t v = 0; type_checked(el.get(v)); return static_cast<double>(v); }
+    case dom::element_type::UINT64: { uint64_t v = 0; type_checked(el.get(v)); return static_cast<double>(v); }
+    case dom::element_type::BIGINT: {
+      std::string_view digits;
+      if (el.get_bigint().get(digits) != SUCCESS) return 0;
+      return std::strtod(std::string(digits).c_str(), nullptr);
+    }
+    default: return 0;
+  }
+}
+
+static bool is_integral(double d) { return std::isfinite(d) && std::floor(d) == d; }
+
+static bool is_integer_value(dom::element el) {
+  switch (el.type()) {
+    case dom::element_type::INT64:
+    case dom::element_type::UINT64:
+    case dom::element_type::BIGINT: return true;
+    case dom::element_type::DOUBLE: return is_integral(to_double(el));
+    default: return false;
+  }
+}
+
+// multipleOf as validate() decides it (multipleOfOk in lib/interpreter.js):
+// the quotient is an integer, or within 1e-9 of one. The engine used an
+// absolute remainder test, which disagreed on large values: 1e308 against
+// multipleOf 0.5 has a remainder of 0, but the quotient overflows to infinity
+// and validate() rejects it.
+static bool multiple_of_ok(double d, double m) {
+  if (m == 0) return false;
+  double q = d / m;
+  if (std::isfinite(q) && std::floor(q) == q) return true;
+  return std::abs(q - std::round(q)) < 1e-9;
+}
+
+// One spelling per numeric value, so enum, const and uniqueItems compare the
+// way JavaScript's === does: 1 and 1.0 are the same, and so are 0 and -0.
+static std::string canonical_number(double d) {
+  if (d == 0) d = 0;
+  char buf[32];
+  int n = std::snprintf(buf, sizeof buf, "%.17g", d);
+  return std::string(buf, n > 0 ? static_cast<size_t>(n) : 0);
+}
+
+// A count keyword (minLength, maxItems and the rest) as JSON.parse reads it.
+// The schema reaches the engine through JSON.stringify, which writes 1e21 and
+// above in exponent form, a DOUBLE that get(uint64_t) refuses, so the keyword
+// was dropped and `minLength: 1e21` accepted every string. Any non-negative
+// integral value is kept, clamped to the largest count.
+static bool read_count(dom::element el, uint64_t& out) {
+  if (!is_number_type(el.type())) return false;
+  uint64_t u;
+  if (el.get(u) == SUCCESS) { out = u; return true; }
+  double d = to_double(el);
+  if (!is_integral(d) || d < 0) return false;
+  out = d >= 18446744073709551615.0 ? UINT64_MAX : static_cast<uint64_t>(d);
+  return true;
+}
+
 // Canonical JSON: sort object keys for semantic equality comparison
+// A member name as a JSON string. simdjson hands keys over unescaped, so a
+// key written as "a\":1,\"b" arrives as the bytes a":1,"b; put between quotes
+// as it is, the object {"a\":1,\"b": 2} read the same as {"a": 1, "b": 2}, and
+// an enum or const of the second accepted the first. Escaping the quote, the
+// backslash and the control characters makes the form one-to-one.
+static void append_json_key(std::string& r, std::string_view k) {
+  static const char hex[] = "0123456789abcdef";
+  r += '"';
+  for (char ch : k) {
+    const unsigned char c = static_cast<unsigned char>(ch);
+    if (c == '"' || c == '\\') { r += '\\'; r += ch; }
+    else if (c < 0x20) { r += "\\u00"; r += hex[c >> 4]; r += hex[c & 15]; }
+    else r += ch;
+  }
+  r += '"';
+}
+
 static std::string canonical_json(dom::element el) {
   switch (el.type()) {
     case dom::element_type::OBJECT: {
-      dom::object obj; el.get(obj);
+      dom::object obj; type_checked(el.get(obj));
       std::vector<std::pair<std::string_view, dom::element>> entries;
       for (auto [k, v] : obj) entries.push_back({k, v});
       std::sort(entries.begin(), entries.end(),
@@ -177,16 +291,15 @@ static std::string canonical_json(dom::element el) {
       std::string r = "{";
       for (size_t i = 0; i < entries.size(); ++i) {
         if (i) r += ',';
-        r += '"';
-        r += entries[i].first;
-        r += "\":";
+        append_json_key(r, entries[i].first);
+        r += ':';
         r += canonical_json(entries[i].second);
       }
       r += '}';
       return r;
     }
     case dom::element_type::ARRAY: {
-      dom::array arr; el.get(arr);
+      dom::array arr; type_checked(el.get(arr));
       std::string r = "[";
       bool first = true;
       for (auto v : arr) {
@@ -198,6 +311,7 @@ static std::string canonical_json(dom::element el) {
       return r;
     }
     default:
+      if (is_number_type(el.type())) return canonical_number(to_double(el));
       return std::string(minify(el));
   }
 }
@@ -245,8 +359,18 @@ static uint8_t element_type_mask(dom::element_type t) {
     case dom::element_type::NULL_VALUE: return json_type_bit(json_type::null_value);
     case dom::element_type::ARRAY:      return json_type_bit(json_type::array);
     case dom::element_type::OBJECT:     return json_type_bit(json_type::object);
+    case dom::element_type::BIGINT:     return json_type_bit(json_type::integer) | json_type_bit(json_type::number);
   }
   return 0;
+}
+
+// The type bits of a value rather than of its written form: a double with no
+// fractional part is an integer too.
+static uint8_t value_type_mask(dom::element el) {
+  auto t = el.type();
+  if (t == dom::element_type::DOUBLE && is_integer_value(el))
+    return json_type_bit(json_type::integer) | json_type_bit(json_type::number);
+  return element_type_mask(t);
 }
 
 // Resolve format string to numeric ID at compile time.
@@ -393,13 +517,29 @@ struct od_plan {
 #ifndef ATA_NO_RE2
   re2::RE2* pattern = nullptr;        // borrowed pointer from schema_node
 #endif
+  // Inline digit pattern: ^[0-9]+$ / ^[0-9]{N}$ / ^[0-9]{N,M}$ / ^\d+$ etc.
+  // When set, supersedes the RE2 pattern call.
+  struct digit_pattern_t { uint32_t min_len; uint32_t max_len; };
+  std::optional<digit_pattern_t> digit_pattern;
   uint8_t format_id = 255;            // 255 = no format check
 
   // Object — single iterate with merged required+property lookup
+  // fast_kind allows the obj iterator to skip the recursive od_exec_plan call
+  // (and its inner type().get() + switch) for primitive sub-plans, dispatching
+  // straight to inline constraint code.
+  enum class fast_kind : uint8_t {
+    OTHER = 0,    // recurse via od_exec_plan
+    INTEGER,      // value.get(int64)  + numeric range/multipleOf
+    STRING,       // value.get(string) + length/pattern/format/enum
+    BOOLEAN,      // value.get(bool)
+    OBJECT,       // value.get(object) + nested obj iteration (skips type detect)
+    ARRAY,        // value.get(array) + element iteration (skips type detect)
+  };
   struct prop_entry {
     std::string key;
     int required_idx = -1;            // bit index for required tracking, or -1
     std::shared_ptr<od_plan> sub;     // property sub-plan, or nullptr
+    fast_kind fk = fast_kind::OTHER;  // inline dispatch hint, set at compile time
   };
   struct obj_plan {
     std::vector<prop_entry> entries;  // merged required + properties — single scan
@@ -415,6 +555,17 @@ struct od_plan {
     std::optional<uint64_t> min_items, max_items;
   };
   std::shared_ptr<arr_plan> array;
+
+  // Enum: primitive-only set membership. Complex (object/array) enums fall back.
+  struct enum_constraint {
+    std::vector<std::string> strings;   // unescaped string values
+    std::vector<int64_t> integers;
+    std::vector<double> doubles;
+    bool has_null = false;
+    bool has_true = false;
+    bool has_false = false;
+  };
+  std::shared_ptr<enum_constraint> enum_check;
 
   // If false, schema uses unsupported features — must fall back to DOM path.
   bool supported = true;
@@ -446,12 +597,21 @@ struct compiled_schema {
 
 // Thread-local persistent parsers — reused across all validate calls on the
 // same thread.  Keeps internal buffers hot in cache and avoids re-allocation.
+// Integers past 64 bits are kept as BIGINT elements instead of failing the
+// parse: JSON.parse reads them as doubles, and a document carrying one is not
+// malformed. Without this the native engine called such a document invalid,
+// and a schema with `minimum: 1e20` failed to compile.
+static dom::parser make_dom_parser() {
+  dom::parser p;
+  p.number_as_string(true);
+  return p;
+}
 static dom::parser& tl_dom_parser() {
-  thread_local dom::parser p;
+  thread_local dom::parser p = make_dom_parser();
   return p;
 }
 static dom::parser& tl_dom_key_parser() {
-  thread_local dom::parser p;
+  thread_local dom::parser p = make_dom_parser();
   return p;
 }
 static simdjson::ondemand::parser& tl_od_parser() {
@@ -470,8 +630,8 @@ static schema_node_ptr compile_node(dom::element el,
 
   // Boolean schema
   if (el.is<bool>()) {
-    bool bval;
-    el.get(bval);
+    bool bval = false;
+    type_checked(el.get(bval));
     node->boolean_schema = bval;
     return node;
   }
@@ -481,7 +641,7 @@ static schema_node_ptr compile_node(dom::element el,
   }
 
   dom::object obj;
-  el.get(obj);
+  type_checked(el.get(obj));
 
   // $ref
   dom::element ref_el;
@@ -555,10 +715,10 @@ static schema_node_ptr compile_node(dom::element el,
   if (obj["type"].get(type_el) == SUCCESS) {
     if (type_el.is<std::string_view>()) {
       std::string_view sv;
-      type_el.get(sv);
+      type_checked(type_el.get(sv));
       node->type_mask |= json_type_bit(json_type_from_sv(sv));
     } else if (type_el.is<dom::array>()) {
-      dom::array type_arr; type_el.get(type_arr); for (auto t : type_arr) {
+      dom::array type_arr; type_checked(type_el.get(type_arr)); for (auto t : type_arr) {
         std::string_view sv;
         if (t.get(sv) == SUCCESS) {
           node->type_mask |= json_type_bit(json_type_from_sv(sv));
@@ -567,38 +727,35 @@ static schema_node_ptr compile_node(dom::element el,
     }
   }
 
-  // numeric constraints
+  // numeric constraints. A bound past 64 bits is a BIGINT element, which
+  // get(double) refuses; to_double reads every numeric form, so the constraint
+  // is kept rather than dropped.
   dom::element num_el;
-  if (obj["minimum"].get(num_el) == SUCCESS) {
-    double v;
-    if (num_el.get(v) == SUCCESS) node->minimum = v;
+  if (obj["minimum"].get(num_el) == SUCCESS && is_number_type(num_el.type())) {
+    node->minimum = to_double(num_el);
   }
-  if (obj["maximum"].get(num_el) == SUCCESS) {
-    double v;
-    if (num_el.get(v) == SUCCESS) node->maximum = v;
+  if (obj["maximum"].get(num_el) == SUCCESS && is_number_type(num_el.type())) {
+    node->maximum = to_double(num_el);
   }
-  if (obj["exclusiveMinimum"].get(num_el) == SUCCESS) {
-    double v;
-    if (num_el.get(v) == SUCCESS) node->exclusive_minimum = v;
+  if (obj["exclusiveMinimum"].get(num_el) == SUCCESS && is_number_type(num_el.type())) {
+    node->exclusive_minimum = to_double(num_el);
   }
-  if (obj["exclusiveMaximum"].get(num_el) == SUCCESS) {
-    double v;
-    if (num_el.get(v) == SUCCESS) node->exclusive_maximum = v;
+  if (obj["exclusiveMaximum"].get(num_el) == SUCCESS && is_number_type(num_el.type())) {
+    node->exclusive_maximum = to_double(num_el);
   }
-  if (obj["multipleOf"].get(num_el) == SUCCESS) {
-    double v;
-    if (num_el.get(v) == SUCCESS) node->multiple_of = v;
+  if (obj["multipleOf"].get(num_el) == SUCCESS && is_number_type(num_el.type())) {
+    node->multiple_of = to_double(num_el);
   }
 
   // string constraints
   dom::element str_el;
   if (obj["minLength"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->min_length = v;
+    if (read_count(str_el, v)) node->min_length = v;
   }
   if (obj["maxLength"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->max_length = v;
+    if (read_count(str_el, v)) node->max_length = v;
   }
   if (obj["pattern"].get(str_el) == SUCCESS) {
     std::string_view sv;
@@ -608,7 +765,7 @@ static schema_node_ptr compile_node(dom::element el,
       ctx.compile_error = "pattern keyword requires RE2 support (built with ATA_NO_RE2)";
       return node;
 #else
-      auto re = std::make_shared<re2::RE2>(node->pattern.value());
+      auto re = std::make_shared<re2::RE2>(node->pattern.value(), ata_quiet_re2_options());
       if (re->ok()) {
         node->compiled_pattern = std::move(re);
       }
@@ -619,11 +776,11 @@ static schema_node_ptr compile_node(dom::element el,
   // array constraints
   if (obj["minItems"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->min_items = v;
+    if (read_count(str_el, v)) node->min_items = v;
   }
   if (obj["maxItems"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->max_items = v;
+    if (read_count(str_el, v)) node->max_items = v;
   }
   dom::element ui_el;
   if (obj["uniqueItems"].get(ui_el) == SUCCESS) {
@@ -633,7 +790,7 @@ static schema_node_ptr compile_node(dom::element el,
   // prefixItems (Draft 2020-12)
   dom::element pi_el;
   if (obj["prefixItems"].get(pi_el) == SUCCESS && pi_el.is<dom::array>()) {
-    dom::array pi_arr; pi_el.get(pi_arr); for (auto item : pi_arr) {
+    dom::array pi_arr; type_checked(pi_el.get(pi_arr)); for (auto item : pi_arr) {
       node->prefix_items.push_back(compile_node(item, ctx));
     }
   }
@@ -651,24 +808,24 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element mc_el;
   if (obj["minContains"].get(mc_el) == SUCCESS) {
     uint64_t v;
-    if (mc_el.get(v) == SUCCESS) node->min_contains = v;
+    if (read_count(mc_el, v)) node->min_contains = v;
   }
   if (obj["maxContains"].get(mc_el) == SUCCESS) {
     uint64_t v;
-    if (mc_el.get(v) == SUCCESS) node->max_contains = v;
+    if (read_count(mc_el, v)) node->max_contains = v;
   }
 
   // object constraints
   dom::element props_el;
   if (obj["properties"].get(props_el) == SUCCESS && props_el.is<dom::object>()) {
-    dom::object props_obj; props_el.get(props_obj); for (auto [key, val] : props_obj) {
+    dom::object props_obj; type_checked(props_el.get(props_obj)); for (auto [key, val] : props_obj) {
       node->properties[std::string(key)] = compile_node(val, ctx);
     }
   }
 
   dom::element req_el;
   if (obj["required"].get(req_el) == SUCCESS && req_el.is<dom::array>()) {
-    dom::array req_arr; req_el.get(req_arr); for (auto r : req_arr) {
+    dom::array req_arr; type_checked(req_el.get(req_arr)); for (auto r : req_arr) {
       std::string_view sv;
       if (r.get(sv) == SUCCESS) {
         node->required.emplace_back(sv);
@@ -679,7 +836,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element ap_el;
   if (obj["additionalProperties"].get(ap_el) == SUCCESS) {
     if (ap_el.is<bool>()) {
-      bool ap_bool; ap_el.get(ap_bool); node->additional_properties_bool = ap_bool;
+      bool ap_bool = false; type_checked(ap_el.get(ap_bool)); node->additional_properties_bool = ap_bool;
     } else {
       node->additional_properties_schema = compile_node(ap_el, ctx);
     }
@@ -687,11 +844,11 @@ static schema_node_ptr compile_node(dom::element el,
 
   if (obj["minProperties"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->min_properties = v;
+    if (read_count(str_el, v)) node->min_properties = v;
   }
   if (obj["maxProperties"].get(str_el) == SUCCESS) {
     uint64_t v;
-    if (str_el.get(v) == SUCCESS) node->max_properties = v;
+    if (read_count(str_el, v)) node->max_properties = v;
   }
 
   // propertyNames
@@ -704,10 +861,10 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element dr_el;
   if (obj["dependentRequired"].get(dr_el) == SUCCESS &&
       dr_el.is<dom::object>()) {
-    dom::object dr_obj; dr_el.get(dr_obj); for (auto [key, val] : dr_obj) {
+    dom::object dr_obj; type_checked(dr_el.get(dr_obj)); for (auto [key, val] : dr_obj) {
       std::vector<std::string> deps;
       if (val.is<dom::array>()) {
-        dom::array val_arr; val.get(val_arr); for (auto d : val_arr) {
+        dom::array val_arr; type_checked(val.get(val_arr)); for (auto d : val_arr) {
           std::string_view sv;
           if (d.get(sv) == SUCCESS) deps.emplace_back(sv);
         }
@@ -720,7 +877,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element ds_el;
   if (obj["dependentSchemas"].get(ds_el) == SUCCESS &&
       ds_el.is<dom::object>()) {
-    dom::object ds_obj; ds_el.get(ds_obj); for (auto [key, val] : ds_obj) {
+    dom::object ds_obj; type_checked(ds_el.get(ds_obj)); for (auto [key, val] : ds_obj) {
       node->dependent_schemas[std::string(key)] = compile_node(val, ctx);
     }
   }
@@ -733,12 +890,12 @@ static schema_node_ptr compile_node(dom::element el,
     ctx.compile_error = "patternProperties keyword requires RE2 support (built with ATA_NO_RE2)";
     return node;
 #else
-    dom::object pp_obj; pp_el.get(pp_obj);
+    dom::object pp_obj; type_checked(pp_el.get(pp_obj));
     for (auto [key, val] : pp_obj) {
       schema_node::pattern_prop pp;
       pp.pattern = std::string(key);
       pp.schema = compile_node(val, ctx);
-      auto re = std::make_shared<re2::RE2>(pp.pattern);
+      auto re = std::make_shared<re2::RE2>(pp.pattern, ata_quiet_re2_options());
       if (re->ok()) {
         pp.compiled = std::move(re);
       }
@@ -761,7 +918,7 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element enum_el;
   if (obj["enum"].get(enum_el) == SUCCESS) {
     if (enum_el.is<dom::array>()) {
-      dom::array enum_arr; enum_el.get(enum_arr); for (auto e : enum_arr) {
+      dom::array enum_arr; type_checked(enum_el.get(enum_arr)); for (auto e : enum_arr) {
         node->enum_values_minified.push_back(canonical_json(e));
       }
     }
@@ -776,19 +933,19 @@ static schema_node_ptr compile_node(dom::element el,
   // composition
   dom::element comp_el;
   if (obj["allOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    dom::array comp_arr; comp_el.get(comp_arr);
+    dom::array comp_arr; type_checked(comp_el.get(comp_arr));
     for (auto s : comp_arr) {
       node->all_of.push_back(compile_node(s, ctx));
     }
   }
   if (obj["anyOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    dom::array comp_arr2; comp_el.get(comp_arr2);
+    dom::array comp_arr2; type_checked(comp_el.get(comp_arr2));
     for (auto s : comp_arr2) {
       node->any_of.push_back(compile_node(s, ctx));
     }
   }
   if (obj["oneOf"].get(comp_el) == SUCCESS && comp_el.is<dom::array>()) {
-    dom::array comp_arr3; comp_el.get(comp_arr3);
+    dom::array comp_arr3; type_checked(comp_el.get(comp_arr3));
     for (auto s : comp_arr3) {
       node->one_of.push_back(compile_node(s, ctx));
     }
@@ -815,7 +972,7 @@ static schema_node_ptr compile_node(dom::element el,
   // $defs / definitions
   dom::element defs_el;
   if (obj["$defs"].get(defs_el) == SUCCESS && defs_el.is<dom::object>()) {
-    dom::object defs_obj; defs_el.get(defs_obj); for (auto [key, val] : defs_obj) {
+    dom::object defs_obj; type_checked(defs_el.get(defs_obj)); for (auto [key, val] : defs_obj) {
       std::string def_path = "#/$defs/" + std::string(key);
       auto compiled = compile_node(val, ctx);
       ctx.defs[def_path] = compiled;
@@ -824,7 +981,7 @@ static schema_node_ptr compile_node(dom::element el,
   }
   if (obj["definitions"].get(defs_el) == SUCCESS &&
       defs_el.is<dom::object>()) {
-    dom::object defs_obj; defs_el.get(defs_obj); for (auto [key, val] : defs_obj) {
+    dom::object defs_obj; type_checked(defs_el.get(defs_obj)); for (auto [key, val] : defs_obj) {
       std::string def_path = "#/definitions/" + std::string(key);
       auto compiled = compile_node(val, ctx);
       ctx.defs[def_path] = compiled;
@@ -1043,8 +1200,9 @@ static std::string_view type_of_sv(dom::element el) {
   switch (el.type()) {
     case et::STRING:    return "string";
     case et::INT64:
-    case et::UINT64:    return "integer";
-    case et::DOUBLE:    return "number";
+    case et::UINT64:
+    case et::BIGINT:    return "integer";
+    case et::DOUBLE:    return is_integer_value(el) ? "integer" : "number";
     case et::BOOL:      return "boolean";
     case et::NULL_VALUE:return "null";
     case et::ARRAY:     return "array";
@@ -1056,17 +1214,10 @@ static std::string_view type_of_sv(dom::element el) {
 
 // O(1) type check: test element's type bits against the schema's type_mask.
 static bool type_matches_mask(dom::element el, uint8_t type_mask) {
-  return (element_type_mask(el.type()) & type_mask) != 0;
+  return (value_type_mask(el) & type_mask) != 0;
 }
 
-static double to_double(dom::element el) {
-  switch (el.type()) {
-    case et::DOUBLE:  { double v; el.get(v); return v; }
-    case et::INT64:   { int64_t v; el.get(v); return static_cast<double>(v); }
-    case et::UINT64:  { uint64_t v; el.get(v); return static_cast<double>(v); }
-    default: return 0;
-  }
-}
+
 
 // Count UTF-8 codepoints — branchless: count non-continuation bytes
 static uint64_t utf8_length(std::string_view s) {
@@ -1097,8 +1248,15 @@ static void validate_node(const schema_node_ptr& node,
                            dynamic_scope_t* dynamic_scope) {
   if (!node) return;
 
+  // Past the depth limit the walk stops, and the document is rejected rather
+  // than the rest of it taken as valid: a recursive schema and data nested
+  // fifty levels deep accepted a violation below that point.
   DepthGuard guard;
-  if (guard.overflow) return;
+  if (guard.overflow) [[unlikely]] {
+    errors.push_back({error_code::depth_exceeded, path,
+                      "nested deeper than the native engine walks"});
+    return;
+  }
 
   // Boolean schema
   if (node->boolean_schema.has_value()) {
@@ -1362,8 +1520,10 @@ static void validate_node(const schema_node_ptr& node,
           expected += json_type_name(static_cast<json_type>(b));
         }
       }
+      std::string actual = std::string(type_of_sv(value));
       errors.push_back({error_code::type_mismatch, path,
-                        "expected type " + expected + ", got " + std::string(type_of_sv(value))});
+                        "expected type " + expected + ", got " + actual,
+                        expected, actual});
       ATA_CHECK_EARLY();
     }
   }
@@ -1397,7 +1557,7 @@ static void validate_node(const schema_node_ptr& node,
   ATA_CHECK_EARLY();
   // Numeric validations
   auto vtype = value.type();
-  if (vtype == et::INT64 || vtype == et::UINT64 || vtype == et::DOUBLE) {
+  if (is_number_type(vtype)) {
     double v = to_double(value);
     if (node->minimum.has_value() && v < node->minimum.value()) {
       errors.push_back({error_code::minimum_violation, path,
@@ -1422,10 +1582,7 @@ static void validate_node(const schema_node_ptr& node,
                             std::to_string(node->exclusive_maximum.value())});
     }
     if (node->multiple_of.has_value()) {
-      double divisor = node->multiple_of.value();
-      double rem = std::fmod(v, divisor);
-      // Use relative tolerance for floating point comparison
-      if (std::abs(rem) > 1e-8 && std::abs(rem - divisor) > 1e-8) {
+      if (!multiple_of_ok(v, node->multiple_of.value())) {
         errors.push_back({error_code::multiple_of_violation, path,
                           "value not a multiple of " +
                               std::to_string(node->multiple_of.value())});
@@ -1436,7 +1593,7 @@ static void validate_node(const schema_node_ptr& node,
   // String validations
   if (vtype == et::STRING) {
     std::string_view sv;
-    value.get(sv);
+    type_checked(value.get(sv));
     uint64_t len = utf8_length(sv);
 
     if (node->min_length.has_value() && len < node->min_length.value()) {
@@ -1472,7 +1629,7 @@ static void validate_node(const schema_node_ptr& node,
 
   // Array validations
   if (vtype == et::ARRAY) {
-    dom::array arr; value.get(arr);
+    dom::array arr; type_checked(value.get(arr));
     uint64_t arr_size = arr.size();
     if(arr_size == 0xFFFFFF) [[unlikely]]	{
       // Fallback for large arrays where size() saturates — count manually to avoid overflow
@@ -1504,10 +1661,10 @@ static void validate_node(const schema_node_ptr& node,
         if (all_same && first_type == et::STRING) {
           std::set<std::string_view> seen;
           for (auto item : arr) {
-            std::string_view sv; item.get(sv);
+            std::string_view sv; type_checked(item.get(sv));
             if (!seen.insert(sv).second) { has_dup = true; break; }
           }
-        } else if (all_same && (first_type == et::INT64 || first_type == et::UINT64 || first_type == et::DOUBLE)) {
+        } else if (all_same && is_number_type(first_type)) {
           std::set<double> seen;
           for (auto item : arr) {
             if (!seen.insert(to_double(item)).second) { has_dup = true; break; }
@@ -1563,7 +1720,7 @@ static void validate_node(const schema_node_ptr& node,
 
   // Object validations
   if (vtype == et::OBJECT) {
-    dom::object obj; value.get(obj);
+    dom::object obj; type_checked(value.get(obj));
 
     if (node->min_properties.has_value() || node->max_properties.has_value()) {
       uint64_t prop_count = 0;
@@ -1785,8 +1942,9 @@ static bool validate_fast(const schema_node_ptr& node,
                            const compiled_schema& ctx) {
   if (!node) [[unlikely]] return true;
 
+  // Rejected past the depth limit, as validate_node does.
   DepthGuard guard;
-  if (guard.overflow) [[unlikely]] return true;
+  if (guard.overflow) [[unlikely]] return false;
 
   if (node->boolean_schema.has_value()) [[unlikely]]
     return node->boolean_schema.value();
@@ -1836,22 +1994,21 @@ static bool validate_fast(const schema_node_ptr& node,
   auto vtype = value.type();
 
   // Numeric
-  if (vtype == et::INT64 || vtype == et::UINT64 || vtype == et::DOUBLE) {
+  if (is_number_type(vtype)) {
     double v = to_double(value);
     if (node->minimum.has_value() && v < node->minimum.value()) return false;
     if (node->maximum.has_value() && v > node->maximum.value()) return false;
     if (node->exclusive_minimum.has_value() && v <= node->exclusive_minimum.value()) return false;
     if (node->exclusive_maximum.has_value() && v >= node->exclusive_maximum.value()) return false;
     if (node->multiple_of.has_value()) {
-      double rem = std::fmod(v, node->multiple_of.value());
-      if (std::abs(rem) > 1e-8 && std::abs(rem - node->multiple_of.value()) > 1e-8) return false;
+      if (!multiple_of_ok(v, node->multiple_of.value())) return false;
     }
   }
 
   // String
   if (vtype == et::STRING) {
     std::string_view sv;
-    value.get(sv);
+    type_checked(value.get(sv));
     uint64_t len = utf8_length(sv);
     if (node->min_length.has_value() && len < node->min_length.value()) return false;
     if (node->max_length.has_value() && len > node->max_length.value()) return false;
@@ -1866,7 +2023,7 @@ static bool validate_fast(const schema_node_ptr& node,
 
   // Array
   if (vtype == et::ARRAY) {
-    dom::array arr; value.get(arr);
+    dom::array arr; type_checked(value.get(arr));
     uint64_t arr_size = arr.size();
     if(arr_size == 0xFFFFFF) [[unlikely]]	{
       // Fallback for large arrays where size() saturates — count manually to avoid overflow
@@ -1885,8 +2042,8 @@ static bool validate_fast(const schema_node_ptr& node,
         for (auto item : arr) { if (item.type() != first_type) { all_same = false; break; } }
         if (all_same && first_type == et::STRING) {
           std::set<std::string_view> seen;
-          for (auto item : arr) { std::string_view sv; item.get(sv); if (!seen.insert(sv).second) return false; }
-        } else if (all_same && (first_type == et::INT64 || first_type == et::UINT64 || first_type == et::DOUBLE)) {
+          for (auto item : arr) { std::string_view sv; type_checked(item.get(sv)); if (!seen.insert(sv).second) return false; }
+        } else if (all_same && is_number_type(first_type)) {
           std::set<double> seen;
           for (auto item : arr) { if (!seen.insert(to_double(item)).second) return false; }
         } else {
@@ -1920,7 +2077,7 @@ static bool validate_fast(const schema_node_ptr& node,
 
   // Object
   if (vtype == et::OBJECT) {
-    dom::object obj; value.get(obj);
+    dom::object obj; type_checked(value.get(obj));
 
     if (node->min_properties.has_value() || node->max_properties.has_value()) {
       uint64_t n = 0;
@@ -2137,9 +2294,9 @@ static void cg_compile(const schema_node* n, cg::plan& p,
 // --- Codegen executor ---
 
 static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
-                     dom::element value) {
+                     dom::element value, bool* undecidable = nullptr) {
   auto t = value.type();
-  bool t_numeric = (t == et::INT64 || t == et::UINT64 || t == et::DOUBLE);
+  bool t_numeric = is_number_type(t);
   double t_dval = t_numeric ? to_double(value) : 0.0;
   for (size_t i=0; i<code.size(); ++i) {
     auto& c = code[i];
@@ -2149,34 +2306,35 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::EXPECT_ARRAY: if(t!=et::ARRAY) return false; break;
     case cg::op::EXPECT_STRING: if(t!=et::STRING) return false; break;
     case cg::op::EXPECT_NUMBER: if(!t_numeric) return false; break;
-    case cg::op::EXPECT_INTEGER: if(t!=et::INT64&&t!=et::UINT64) return false; break;
+    case cg::op::EXPECT_INTEGER: if(!t_numeric||!is_integral(t_dval)) return false; break;
     case cg::op::EXPECT_BOOLEAN: if(t!=et::BOOL) return false; break;
     case cg::op::EXPECT_NULL: if(t!=et::NULL_VALUE) return false; break;
     case cg::op::EXPECT_TYPE_MULTI: {
-      if(!(element_type_mask(t) & p.type_masks[c.a])) return false; break;
+      if(!(value_type_mask(value) & p.type_masks[c.a])) return false;
+      break;
     }
     case cg::op::CHECK_MINIMUM: if(t_numeric&&t_dval<p.doubles[c.a])return false; break;
     case cg::op::CHECK_MAXIMUM: if(t_numeric&&t_dval>p.doubles[c.a])return false; break;
     case cg::op::CHECK_EX_MINIMUM: if(t_numeric&&t_dval<=p.doubles[c.a])return false; break;
     case cg::op::CHECK_EX_MAXIMUM: if(t_numeric&&t_dval>=p.doubles[c.a])return false; break;
-    case cg::op::CHECK_MULTIPLE_OF: if(t_numeric){double d=p.doubles[c.a],r=std::fmod(t_dval,d);if(std::abs(r)>1e-8&&std::abs(r-d)>1e-8)return false;} break;
-    case cg::op::CHECK_MIN_LENGTH: if(t==et::STRING){std::string_view sv;value.get(sv);if(utf8_length(sv)<c.a)return false;} break;
-    case cg::op::CHECK_MAX_LENGTH: if(t==et::STRING){std::string_view sv;value.get(sv);if(utf8_length(sv)>c.a)return false;} break;
+    case cg::op::CHECK_MULTIPLE_OF: if(t_numeric&&!multiple_of_ok(t_dval,p.doubles[c.a]))return false; break;
+    case cg::op::CHECK_MIN_LENGTH: if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));if(utf8_length(sv)<c.a)return false;} break;
+    case cg::op::CHECK_MAX_LENGTH: if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));if(utf8_length(sv)>c.a)return false;} break;
 #ifndef ATA_NO_RE2
-    case cg::op::CHECK_PATTERN: if(t==et::STRING){std::string_view sv;value.get(sv);if(!re2::RE2::PartialMatch(re2::StringPiece(sv.data(),sv.size()),*p.regexes[c.a]))return false;} break;
+    case cg::op::CHECK_PATTERN: if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));if(!re2::RE2::PartialMatch(re2::StringPiece(sv.data(),sv.size()),*p.regexes[c.a]))return false;} break;
 #else
     case cg::op::CHECK_PATTERN: break;
 #endif
-    case cg::op::CHECK_FORMAT: if(t==et::STRING){std::string_view sv;value.get(sv);if(!check_format_by_id(sv,p.format_ids[c.a]))return false;} break;
-    case cg::op::CHECK_MIN_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s<c.a)return false;} break;
-    case cg::op::CHECK_MAX_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s>c.a)return false;} break;
-    case cg::op::CHECK_UNIQUE_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);std::set<std::string> seen;for(auto x:a)if(!seen.insert(canonical_json(x)).second)return false;} break;
-    case cg::op::ARRAY_ITEMS: if(t==et::ARRAY){dom::array a;value.get(a);for(auto x:a)if(!cg_exec(p,p.subs[c.a],x))return false;} break;
-    case cg::op::CHECK_REQUIRED: if(t==et::OBJECT){dom::object o;value.get(o);dom::element d;if(o[p.strings[c.a]].get(d)!=SUCCESS)return false;} break;
-    case cg::op::CHECK_MIN_PROPS: if(t==et::OBJECT){dom::object o;value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n<c.a)return false;} break;
-    case cg::op::CHECK_MAX_PROPS: if(t==et::OBJECT){dom::object o;value.get(o);uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n>c.a)return false;} break;
+    case cg::op::CHECK_FORMAT: if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));if(!check_format_by_id(sv,p.format_ids[c.a]))return false;} break;
+    case cg::op::CHECK_MIN_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s<c.a)return false;} break;
+    case cg::op::CHECK_MAX_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s>c.a)return false;} break;
+    case cg::op::CHECK_UNIQUE_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));std::set<std::string> seen;for(auto x:a)if(!seen.insert(canonical_json(x)).second)return false;} break;
+    case cg::op::ARRAY_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));for(auto x:a)if(!cg_exec(p,p.subs[c.a],x,undecidable))return false;} break;
+    case cg::op::CHECK_REQUIRED: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));dom::element d;if(o[p.strings[c.a]].get(d)!=SUCCESS)return false;} break;
+    case cg::op::CHECK_MIN_PROPS: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n<c.a)return false;} break;
+    case cg::op::CHECK_MAX_PROPS: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));uint64_t n=0;for([[maybe_unused]]auto _:o)++n;if(n>c.a)return false;} break;
     case cg::op::OBJ_PROPS_START: if(t==et::OBJECT){
-      dom::object o; value.get(o);
+      dom::object o; type_checked(value.get(o));
       // collect prop defs
       struct pd{std::string_view nm;uint32_t si;};
       std::vector<pd> props; bool no_add=false;
@@ -2187,27 +2345,31 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
       }
       for(auto [key,val]:o){
         bool matched=false;
-        for(auto& pp:props){if(key==pp.nm){if(!cg_exec(p,p.subs[pp.si],val))return false;matched=true;break;}}
+        for(auto& pp:props){if(key==pp.nm){if(!cg_exec(p,p.subs[pp.si],val,undecidable))return false;matched=true;break;}}
         if(!matched&&no_add)return false;
       }
       i=j; break;
-    } else { /* skip to OBJ_PROPS_END */ size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j); i=j; } break;
+    } else { /* skip to OBJ_PROPS_END */ size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j) {} i=j; } break;
     case cg::op::OBJ_PROP: case cg::op::OBJ_PROPS_END: case cg::op::CHECK_NO_ADDITIONAL: break;
     case cg::op::CHECK_ENUM_STR: {
       auto& es=p.enum_sets[c.a]; bool f=false;
-      if(t==et::STRING){std::string_view sv;value.get(sv);for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
+      if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
       if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
-      if(!f)return false; break;
+      if(!f)return false;
+      break;
     }
     case cg::op::CHECK_ENUM: {
       auto& es=p.enum_sets[c.a]; bool f=false;
-      if(t==et::STRING){std::string_view sv;value.get(sv);for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
-      if(!f&&value.is<int64_t>()){int64_t v;value.get(v);auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
+      if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
+      if(!f&&value.is<int64_t>()){int64_t v=0;type_checked(value.get(v));auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
       if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
-      if(!f)return false; break;
+      if(!f)return false;
+      break;
     }
     case cg::op::CHECK_CONST: if(canonical_json(value)!=p.strings[c.a])return false; break;
-    case cg::op::COMPOSITION: return false; // fallback to tree walker
+    case cg::op::COMPOSITION:
+      if (undecidable) *undecidable = true;
+      return false; // fallback to tree walker
     }
   }
   return true;
@@ -2229,10 +2391,15 @@ static json_type od_type(simdjson::ondemand::value& v) {
     case simdjson::ondemand::json_type::number: {
       simdjson::ondemand::number_type nt;
       if (v.get_number_type().get(nt) == SUCCESS &&
-          nt == simdjson::ondemand::number_type::floating_point_number)
+          nt == simdjson::ondemand::number_type::floating_point_number) {
+        // "1.0" and "1e2" are integers to JSON Schema, as to JSON.parse.
+        double d;
+        if (v.get(d) == SUCCESS && is_integral(d)) return json_type::integer;
         return json_type::number;
+      }
       return json_type::integer;
     }
+    default: break;
   }
   return json_type::string;
 }
@@ -2256,7 +2423,8 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
       // integer matches both "integer" and "number" type constraints
       uint8_t tbits = json_type_bit(t);
       if (t == json_type::integer) tbits |= json_type_bit(json_type::number);
-      if(!(tbits & p.type_masks[c.a])) return false; break;
+      if(!(tbits & p.type_masks[c.a])) return false;
+      break;
     }
     case cg::op::CHECK_MINIMUM:
     case cg::op::CHECK_MAXIMUM:
@@ -2265,14 +2433,13 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::CHECK_MULTIPLE_OF: {
       if (t_numeric) {
         double v;
-        if (t==json_type::integer) { int64_t iv; if(value.get(iv)!=SUCCESS) return false; v=(double)iv; }
-        else { if(value.get(v)!=SUCCESS) return false; }
+        if(value.get(v)!=SUCCESS) return false;
         double d=p.doubles[c.a];
         if(c.o==cg::op::CHECK_MINIMUM && v<d) return false;
         if(c.o==cg::op::CHECK_MAXIMUM && v>d) return false;
         if(c.o==cg::op::CHECK_EX_MINIMUM && v<=d) return false;
         if(c.o==cg::op::CHECK_EX_MAXIMUM && v>=d) return false;
-        if(c.o==cg::op::CHECK_MULTIPLE_OF){double r=std::fmod(v,d);if(std::abs(r)>1e-8&&std::abs(r-d)>1e-8)return false;}
+        if(c.o==cg::op::CHECK_MULTIPLE_OF&&!multiple_of_ok(v,d))return false;
       }
       break;
     }
@@ -2336,7 +2503,7 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
         if(!matched&&no_add) return false;
       }
       i=j; break;
-    } else { size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j); i=j; } break;
+    } else { size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j) {} i=j; } break;
     case cg::op::OBJ_PROP: case cg::op::OBJ_PROPS_END: case cg::op::CHECK_NO_ADDITIONAL: break;
 
     // These require full materialization — bail to DOM path
@@ -2388,8 +2555,21 @@ static bool near_page_boundary(const char* buf, size_t len) {
           + REQUIRED_PADDING >= static_cast<uintptr_t>(get_page_size()));
 }
 
-// Zero-copy validate with free padding (Lemire's trick).
-// Almost never allocates — only if buffer is near a page boundary.
+// Free padding (Lemire's trick): tell simdjson it may read past the end of the
+// document, because a buffer that does not finish near a page boundary has
+// readable bytes after it and simdjson only uses them as padding.
+//
+// It is sound only for a buffer this library owns. For one handed in by a
+// caller those bytes belong to somebody else: the read does not fault, which
+// is the point of the page check, but it is still a read past the end of the
+// caller's allocation. AddressSanitizer reports it, so anyone who fuzzes or
+// sanitizes an application built on ata sees a heap-buffer-overflow inside
+// simdjson and has no way to tell it is deliberate. `validate()` used this on
+// the caller's own buffer, which is how the fuzz targets in fuzz/ found it.
+//
+// Use this only where the padding genuinely exists. Where it does not,
+// `padded_copy` below costs one memcpy, which is small next to parsing the
+// document that follows it.
 static simdjson::padded_string_view get_free_padded_view(
     const char* data, size_t length, simdjson::padded_string& fallback) {
   if (near_page_boundary(data, length)) {
@@ -2399,6 +2579,70 @@ static simdjson::padded_string_view get_free_padded_view(
   }
   // Common: free padding available, zero-copy
   return simdjson::padded_string_view(data, length, length + REQUIRED_PADDING);
+}
+
+// A view over a padded copy of the caller's document, reusing one buffer per
+// thread so a steady stream of documents allocates nothing after the first.
+static simdjson::padded_string_view padded_copy(const char* data, size_t length) {
+  thread_local std::string tl_owned;
+  const size_t needed = length + REQUIRED_PADDING;
+  if (tl_owned.size() < needed) tl_owned.resize(needed);
+  std::memcpy(tl_owned.data(), data, length);
+  std::memset(tl_owned.data() + length, 0, REQUIRED_PADDING);
+  return simdjson::padded_string_view(tl_owned.data(), length, needed);
+}
+
+// Recognize common digit-only regex patterns: ^[0-9]+$, ^[0-9]{N}$, ^[0-9]{N,M}$
+// (and \d variants). Returns true if recognized, fills min_n/max_n.
+static bool parse_digit_pattern(const std::string& p,
+                                uint32_t& min_n, uint32_t& max_n) {
+  if (p.size() < 6) return false;
+  if (p.front() != '^' || p.back() != '$') return false;
+  std::string_view body(p.data() + 1, p.size() - 2);
+  size_t pos = 0;
+  if (body.size() >= 5 && body.compare(0, 5, "[0-9]") == 0) {
+    pos = 5;
+  } else if (body.size() >= 2 && body[0] == '\\' && body[1] == 'd') {
+    pos = 2;
+  } else {
+    return false;
+  }
+  if (pos >= body.size()) return false;
+  char q = body[pos];
+  if (q == '+' && pos + 1 == body.size()) {
+    min_n = 1; max_n = UINT32_MAX; return true;
+  }
+  if (q == '*' && pos + 1 == body.size()) {
+    min_n = 0; max_n = UINT32_MAX; return true;
+  }
+  if (q != '{') return false;
+  size_t close = body.find('}', pos);
+  if (close == std::string_view::npos || close + 1 != body.size()) return false;
+  auto inner = body.substr(pos + 1, close - pos - 1);
+  if (inner.empty()) return false;
+  size_t comma = inner.find(',');
+  auto parse_num = [](std::string_view s, uint32_t& out) -> bool {
+    if (s.empty()) return false;
+    uint64_t v = 0;
+    for (char c : s) {
+      if (c < '0' || c > '9') return false;
+      v = v * 10 + (c - '0');
+      if (v > UINT32_MAX) return false;
+    }
+    out = static_cast<uint32_t>(v);
+    return true;
+  };
+  if (comma == std::string_view::npos) {
+    if (!parse_num(inner, min_n)) return false;
+    max_n = min_n;
+  } else {
+    auto a = inner.substr(0, comma);
+    auto b = inner.substr(comma + 1);
+    if (!parse_num(a, min_n)) return false;
+    if (b.empty()) max_n = UINT32_MAX;
+    else if (!parse_num(b, max_n)) return false;
+  }
+  return true;
 }
 
 // Build an od_plan from a schema_node tree.
@@ -2414,7 +2658,6 @@ static od_plan_ptr compile_od_plan(const schema_node_ptr& node) {
 
   // Unsupported features → fall back to DOM
   if (!node->ref.empty() ||
-      !node->enum_values_minified.empty() ||
       node->const_value_raw.has_value() ||
       node->unique_items ||
       !node->all_of.empty() ||
@@ -2433,6 +2676,47 @@ static od_plan_ptr compile_od_plan(const schema_node_ptr& node) {
     return plan;
   }
 
+  // Enum: handle primitive enums on the on-demand path. Complex enum values
+  // (objects, arrays, escaped strings) fall back to DOM.
+  if (!node->enum_values_minified.empty()) {
+    auto ec = std::make_shared<od_plan::enum_constraint>();
+    for (const auto& ev : node->enum_values_minified) {
+      if (ev.empty()) { plan->supported = false; return plan; }
+      char c = ev[0];
+      if (c == '"') {
+        if (ev.size() < 2 || ev.back() != '"') { plan->supported = false; return plan; }
+        bool has_escape = false;
+        for (size_t i = 1; i + 1 < ev.size(); i++) {
+          if (ev[i] == '\\') { has_escape = true; break; }
+        }
+        if (has_escape) { plan->supported = false; return plan; }
+        ec->strings.push_back(ev.substr(1, ev.size() - 2));
+      } else if (c == '-' || (c >= '0' && c <= '9')) {
+        bool is_int = true;
+        for (size_t i = (c == '-' ? 1 : 0); i < ev.size(); i++) {
+          if (ev[i] < '0' || ev[i] > '9') { is_int = false; break; }
+        }
+        if (is_int) {
+          try { ec->integers.push_back(std::stoll(ev)); }
+          catch (...) { plan->supported = false; return plan; }
+        } else {
+          try { ec->doubles.push_back(std::stod(ev)); }
+          catch (...) { plan->supported = false; return plan; }
+        }
+      } else if (ev == "true") {
+        ec->has_true = true;
+      } else if (ev == "false") {
+        ec->has_false = true;
+      } else if (ev == "null") {
+        ec->has_null = true;
+      } else {
+        plan->supported = false;
+        return plan;
+      }
+    }
+    plan->enum_check = std::move(ec);
+  }
+
   plan->type_mask = node->type_mask;
   if (node->minimum) { plan->num_flags |= od_plan::HAS_MIN; plan->num_min = *node->minimum; }
   if (node->maximum) { plan->num_flags |= od_plan::HAS_MAX; plan->num_max = *node->maximum; }
@@ -2444,6 +2728,16 @@ static od_plan_ptr compile_od_plan(const schema_node_ptr& node) {
 #ifndef ATA_NO_RE2
   plan->pattern = node->compiled_pattern.get();
 #endif
+  // Try to recognize the pattern as an inlined digit check; if so, skip RE2.
+  if (node->pattern.has_value()) {
+    uint32_t min_n, max_n;
+    if (parse_digit_pattern(*node->pattern, min_n, max_n)) {
+      plan->digit_pattern = od_plan::digit_pattern_t{min_n, max_n};
+#ifndef ATA_NO_RE2
+      plan->pattern = nullptr;
+#endif
+    }
+  }
   plan->format_id = node->format_id;
 
   // Object plan — build hash lookup for O(1) per-field dispatch
@@ -2479,7 +2773,46 @@ static od_plan_ptr compile_od_plan(const schema_node_ptr& node) {
         op->entries[it->second].sub = std::move(sub);
       } else {
         key_to_idx[key] = op->entries.size();
-        op->entries.push_back({key, -1, std::move(sub)});
+        op->entries.push_back({key, -1, std::move(sub), od_plan::fast_kind::OTHER});
+      }
+    }
+    // Compute fast_kind for each entry post-hoc — lets the obj iterator
+    // skip the recursive od_exec_plan call (and its type().get + switch)
+    // for primitive properties, and also skip type detection for nested
+    // objects / primitive arrays.
+    for (auto& e : op->entries) {
+      if (!e.sub) continue;
+      // Nested object: dispatch directly to value.get(obj) + iteration helper.
+      if (e.sub->object && !e.sub->array) {
+        e.fk = od_plan::fast_kind::OBJECT;
+        continue;
+      }
+      // Array: dispatch directly to value.get(arr) + element iteration helper.
+      if (e.sub->array && !e.sub->object) {
+        e.fk = od_plan::fast_kind::ARRAY;
+        continue;
+      }
+      if (e.sub->object || e.sub->array) continue;  // unusual: both, skip
+      uint8_t m = e.sub->type_mask;
+      uint8_t s_bit = json_type_bit(json_type::string);
+      uint8_t i_bit = json_type_bit(json_type::integer);
+      uint8_t n_bit = json_type_bit(json_type::number);
+      uint8_t b_bit = json_type_bit(json_type::boolean);
+      if (m == s_bit) e.fk = od_plan::fast_kind::STRING;
+      else if (m == i_bit || m == (i_bit | n_bit)) e.fk = od_plan::fast_kind::INTEGER;
+      else if (m == b_bit) e.fk = od_plan::fast_kind::BOOLEAN;
+      else if (m == 0 && e.sub->enum_check) {
+        // Untyped enum: infer from enum value shapes
+        auto& ec = *e.sub->enum_check;
+        bool only_str = !ec.strings.empty() && ec.integers.empty() && ec.doubles.empty()
+                        && !ec.has_null && !ec.has_true && !ec.has_false;
+        bool only_int = ec.strings.empty() && !ec.integers.empty() && ec.doubles.empty()
+                        && !ec.has_null && !ec.has_true && !ec.has_false;
+        bool only_bool = ec.strings.empty() && ec.integers.empty() && ec.doubles.empty()
+                         && !ec.has_null && (ec.has_true || ec.has_false);
+        if (only_str) e.fk = od_plan::fast_kind::STRING;
+        else if (only_int) e.fk = od_plan::fast_kind::INTEGER;
+        else if (only_bool) e.fk = od_plan::fast_kind::BOOLEAN;
       }
     }
     plan->object = std::move(op);
@@ -2519,11 +2852,24 @@ static inline uint64_t utf8_length_fast(std::string_view s) {
 
 // Execute an od_plan against a simdjson On-Demand value.
 // Each value consumed exactly once. Uses simdjson types directly — no od_type() overhead.
-static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value) {
-  // Use simdjson type directly — skip od_type() conversion + get_number_type()
+// `pre_type` is an optional caller-supplied type hint; when set, the value.type().get
+// simdjson call is skipped (saves ~3-5 ns per recursion). Used by fast_kind::OBJECT
+// / ARRAY dispatch where the type is already established at compile time.
+// `io_err`, when given, is set whenever this returns false because the document
+// could not be read rather than because it failed a constraint. Without that
+// distinction a false is ambiguous and the caller has to re-parse and re-walk
+// the document to find out which it was, which made rejecting a document cost
+// several times more than accepting one.
+static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
+                         std::optional<simdjson::ondemand::json_type> pre_type = std::nullopt,
+                         bool* io_err = nullptr) {
   using sjt = simdjson::ondemand::json_type;
   sjt st;
-  if (value.type().get(st) != SUCCESS) return false;
+  if (pre_type) {
+    st = *pre_type;
+  } else {
+    { auto _e = value.type().get(st); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+  }
 
   // Type check using simdjson type directly
   if (plan.type_mask) {
@@ -2540,8 +2886,10 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value) {
         if ((plan.type_mask & tbits) != tbits) {
           // Schema distinguishes — need to check actual number type
           simdjson::ondemand::number_type nt;
+          double fd;
           if (value.get_number_type().get(nt) == SUCCESS &&
-              nt != simdjson::ondemand::number_type::floating_point_number)
+              (nt != simdjson::ondemand::number_type::floating_point_number ||
+               (value.get(fd) == SUCCESS && is_integral(fd))))
             tbits = json_type_bit(json_type::integer) | json_type_bit(json_type::number);
           else
             tbits = json_type_bit(json_type::number);
@@ -2554,13 +2902,17 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value) {
 
   switch (st) {
   case sjt::number: {
-    if (!plan.num_flags) break;  // No numeric constraints
+    bool need_value = plan.num_flags || plan.enum_check;
+    if (!need_value) break;
     double v;
-    // Try integer first (more common), fall back to double
-    int64_t iv;
-    if (value.get(iv) == SUCCESS) {
+    int64_t iv = 0;
+    bool got_int = (value.get(iv) == SUCCESS);
+    if (got_int) {
       v = static_cast<double>(iv);
     } else if (value.get(v) != SUCCESS) {
+      // A number this path cannot read is left to the DOM walker rather than
+      // called invalid.
+      if (io_err) *io_err = true;
       return false;
     }
     uint8_t f = plan.num_flags;
@@ -2569,21 +2921,43 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value) {
     if ((f & od_plan::HAS_EX_MIN) && v <= plan.num_ex_min) return false;
     if ((f & od_plan::HAS_EX_MAX) && v >= plan.num_ex_max) return false;
     if (f & od_plan::HAS_MUL) {
-      double r = std::fmod(v, plan.num_mul);
-      if (std::abs(r) > 1e-8 && std::abs(r - plan.num_mul) > 1e-8) return false;
+      if (!multiple_of_ok(v, plan.num_mul)) return false;
+    }
+    if (plan.enum_check) {
+      auto& ec = *plan.enum_check;
+      bool match = false;
+      if (got_int) {
+        for (auto i : ec.integers) if (i == iv) { match = true; break; }
+      }
+      if (!match) {
+        for (auto d : ec.doubles) if (d == v) { match = true; break; }
+      }
+      // A value written "1.0" equals the enum's 1, as it does after JSON.parse.
+      if (!match && !got_int) {
+        for (auto i : ec.integers) if (static_cast<double>(i) == v) { match = true; break; }
+      }
+      if (!match) return false;
     }
     break;
   }
   case sjt::string: {
     std::string_view sv;
-    if (value.get(sv) != SUCCESS) return false;
+    { auto _e = value.get(sv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
     if (plan.min_length || plan.max_length) {
       uint64_t len = utf8_length_fast(sv);
       if (plan.min_length && len < *plan.min_length) return false;
       if (plan.max_length && len > *plan.max_length) return false;
     }
+    if (plan.digit_pattern) {
+      auto& dp = *plan.digit_pattern;
+      if (sv.size() < dp.min_len || sv.size() > dp.max_len) return false;
+      const uint8_t* p = reinterpret_cast<const uint8_t*>(sv.data());
+      for (size_t i = 0, n = sv.size(); i < n; i++) {
+        if (p[i] < '0' || p[i] > '9') return false;
+      }
+    }
 #ifndef ATA_NO_RE2
-    if (plan.pattern) {
+    else if (plan.pattern) {
       if (!re2::RE2::PartialMatch(re2::StringPiece(sv.data(), sv.size()), *plan.pattern))
         return false;
     }
@@ -2591,35 +2965,174 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value) {
     if (plan.format_id != 255) {
       if (!check_format_by_id(sv, plan.format_id)) return false;
     }
+    if (plan.enum_check) {
+      auto& ec = *plan.enum_check;
+      bool match = false;
+      for (auto& s : ec.strings) {
+        if (sv.size() == s.size() && std::memcmp(sv.data(), s.data(), s.size()) == 0) {
+          match = true;
+          break;
+        }
+      }
+      if (!match) return false;
+    }
     break;
   }
   case sjt::object: {
     if (!plan.object) break;
     auto& op = *plan.object;
     simdjson::ondemand::object obj;
-    if (value.get(obj) != SUCCESS) return false;
+    { auto _e = value.get(obj); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
 
     uint64_t required_found = 0;
     uint64_t prop_count = 0;
 
     for (auto field : obj) {
-      std::string_view key;
-      if (field.unescaped_key().get(key)) continue;
+      // Fast key compare: use raw_json_string against schema keys directly,
+      // skipping the unescape pass. Schema keys are assumed to have no
+      // unescaped quotes (true for any well-formed JSON Schema).
+      simdjson::ondemand::raw_json_string raw_key;
+      if (field.key().get(raw_key) != SUCCESS) continue;
       prop_count++;
 
-      // Single merged scan: required + property in one pass
       bool matched = false;
       for (auto& e : op.entries) {
-        if (key == e.key) {
+        if (raw_key.unsafe_is_equal(e.key)) {
           if (e.required_idx >= 0)
             required_found |= (1ULL << e.required_idx);
           if (e.sub) {
-            simdjson::ondemand::value fv;
-            if (field.value().get(fv) != SUCCESS) return false;
-            if (!od_exec_plan(*e.sub, fv)) return false;
+            // Fast dispatch: skip recursive od_exec_plan + type().get + switch
+            // for primitive sub-plans. Mirrors the constraint code in od_exec_plan.
+            switch (e.fk) {
+              case od_plan::fast_kind::INTEGER: {
+                int64_t iv = 0;
+                double v;
+                bool got_int = true;
+                {
+                  auto fv = field.value();
+                  auto _e = fv.get(iv);
+                  if (_e == SUCCESS) {
+                    v = static_cast<double>(iv);
+                  } else if (_e == simdjson::INCORRECT_TYPE && fv.get(v) == SUCCESS) {
+                    // "1.0" is an integer; "1.5" is not.
+                    if (!is_integral(v)) return false;
+                    got_int = false;
+                  } else {
+                    if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true;
+                    return false;
+                  }
+                }
+                auto& sub = *e.sub;
+                uint8_t f = sub.num_flags;
+                if ((f & od_plan::HAS_MIN) && v < sub.num_min) return false;
+                if ((f & od_plan::HAS_MAX) && v > sub.num_max) return false;
+                if ((f & od_plan::HAS_EX_MIN) && v <= sub.num_ex_min) return false;
+                if ((f & od_plan::HAS_EX_MAX) && v >= sub.num_ex_max) return false;
+                if (f & od_plan::HAS_MUL) {
+                  if (!multiple_of_ok(v, sub.num_mul)) return false;
+                }
+                if (sub.enum_check) {
+                  bool em = false;
+                  for (auto i2 : sub.enum_check->integers) if (got_int ? i2 == iv : static_cast<double>(i2) == v) { em = true; break; }
+                  if (!em) for (auto d : sub.enum_check->doubles) if (d == v) { em = true; break; }
+                  if (!em) return false;
+                }
+                break;
+              }
+              case od_plan::fast_kind::STRING: {
+                std::string_view sv;
+                { auto _e = field.value().get(sv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+                auto& sub = *e.sub;
+                if (sub.min_length || sub.max_length) {
+                  uint64_t len = utf8_length_fast(sv);
+                  if (sub.min_length && len < *sub.min_length) return false;
+                  if (sub.max_length && len > *sub.max_length) return false;
+                }
+                if (sub.digit_pattern) {
+                  auto& dp = *sub.digit_pattern;
+                  if (sv.size() < dp.min_len || sv.size() > dp.max_len) return false;
+                  const uint8_t* sp = reinterpret_cast<const uint8_t*>(sv.data());
+                  for (size_t i = 0, n = sv.size(); i < n; i++) {
+                    if (sp[i] < '0' || sp[i] > '9') return false;
+                  }
+                }
+#ifndef ATA_NO_RE2
+                else if (sub.pattern) {
+                  if (!re2::RE2::PartialMatch(re2::StringPiece(sv.data(), sv.size()), *sub.pattern))
+                    return false;
+                }
+#endif
+                if (sub.format_id != 255) {
+                  if (!check_format_by_id(sv, sub.format_id)) return false;
+                }
+                if (sub.enum_check) {
+                  bool em = false;
+                  for (auto& s : sub.enum_check->strings) {
+                    if (sv.size() == s.size() && std::memcmp(sv.data(), s.data(), s.size()) == 0) {
+                      em = true;
+                      break;
+                    }
+                  }
+                  if (!em) return false;
+                }
+                break;
+              }
+              case od_plan::fast_kind::BOOLEAN: {
+                bool bv;
+                { auto _e = field.value().get(bv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+                if (e.sub->enum_check) {
+                  if (bv ? !e.sub->enum_check->has_true : !e.sub->enum_check->has_false) return false;
+                }
+                break;
+              }
+              case od_plan::fast_kind::OBJECT: {
+                simdjson::ondemand::value fv;
+                { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+                if (!od_exec_plan(*e.sub, fv,
+                                  simdjson::ondemand::json_type::object, io_err)) return false;
+                break;
+              }
+              case od_plan::fast_kind::ARRAY: {
+                simdjson::ondemand::value fv;
+                { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+                if (!od_exec_plan(*e.sub, fv,
+                                  simdjson::ondemand::json_type::array, io_err)) return false;
+                break;
+              }
+              case od_plan::fast_kind::OTHER:
+              default: {
+                simdjson::ondemand::value fv;
+                { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+                if (!od_exec_plan(*e.sub, fv, std::nullopt, io_err)) return false;
+              }
+            }
           }
           matched = true;
           break;
+        }
+      }
+      // Safety net: if no match via raw byte compare, the JSON key may be
+      // escaped (e.g., "aname"). Fall back to a properly-unescaped
+      // compare so escaped keys still match the unescaped schema keys.
+      if (!matched) {
+        std::string_view raw_view = field.escaped_key();
+        if (raw_view.find('\\') != std::string_view::npos) {
+          std::string_view ukey;
+          if (field.unescaped_key().get(ukey) == SUCCESS) {
+            for (auto& e : op.entries) {
+              if (ukey == e.key) {
+                if (e.required_idx >= 0)
+                  required_found |= (1ULL << e.required_idx);
+                if (e.sub) {
+                  simdjson::ondemand::value fv;
+                  { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+                  if (!od_exec_plan(*e.sub, fv, std::nullopt, io_err)) return false;
+                }
+                matched = true;
+                break;
+              }
+            }
+          }
         }
       }
       if (!matched && op.no_additional) return false;
@@ -2636,17 +3149,29 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value) {
     if (!plan.array) break;
     auto& ap = *plan.array;
     simdjson::ondemand::array arr;
-    if (value.get(arr) != SUCCESS) return false;
+    { auto _e = value.get(arr); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
 
     uint64_t count = 0;
     for (auto elem : arr) {
       simdjson::ondemand::value v;
-      if (elem.get(v) != SUCCESS) return false;
-      if (ap.items && !od_exec_plan(*ap.items, v)) return false;
+      { auto _e = elem.get(v); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+      if (ap.items && !od_exec_plan(*ap.items, v, std::nullopt, io_err)) return false;
       count++;
     }
     if (ap.min_items && count < *ap.min_items) return false;
     if (ap.max_items && count > *ap.max_items) return false;
+    break;
+  }
+  case sjt::boolean: {
+    if (plan.enum_check) {
+      bool b;
+      { auto _e = value.get(b); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+      if (b ? !plan.enum_check->has_true : !plan.enum_check->has_false) return false;
+    }
+    break;
+  }
+  case sjt::null: {
+    if (plan.enum_check && !plan.enum_check->has_null) return false;
     break;
   }
   default:
@@ -2661,6 +3186,7 @@ schema_ref compile(std::string_view schema_json) {
   ctx->raw_schema = std::string(schema_json);
 
   dom::element doc;
+  ctx->parser.number_as_string(true);
   auto result = ctx->parser.parse(ctx->raw_schema);
   if (result.error()) {
     return schema_ref{nullptr};
@@ -2691,9 +3217,9 @@ validation_result validate(const schema_ref& schema, std::string_view json,
     return {false, {{error_code::invalid_schema, "", "schema not compiled"}}};
   }
 
-  // Free padding trick: avoid padded_string copy when possible
-  simdjson::padded_string fallback;
-  auto psv = get_free_padded_view(json.data(), json.size(), fallback);
+  // The document belongs to the caller, so it is copied into a padded buffer
+  // rather than read past. See get_free_padded_view for why.
+  auto psv = padded_copy(json.data(), json.size());
 
   // Ultra-fast path: On Demand (no DOM materialization)
   static constexpr size_t OD_THRESHOLD = 32;
@@ -2708,8 +3234,9 @@ validation_result validate(const schema_ref& schema, std::string_view json,
         }
       }
     }
-    // Need fresh view for DOM parse (On Demand consumed it)
-    psv = get_free_padded_view(json.data(), json.size(), fallback);
+    // Need fresh view for DOM parse (On Demand consumed it). The copy is
+    // already padded and still holds this document, so re-wrap it.
+    psv = simdjson::padded_string_view(psv.data(), psv.length(), psv.length() + REQUIRED_PADDING);
   }
 
   auto& dom_p = tl_dom_parser();
@@ -2775,9 +3302,17 @@ bool is_valid_prepadded(const schema_ref& schema, const char* data, size_t lengt
     if (!od_result.error()) {
       simdjson::ondemand::value root_val;
       if (od_result.get_value().get(root_val) == SUCCESS) {
-        if (od_exec_plan(*schema.impl->od, root_val)) {
+        bool od_err = false;
+        if (od_exec_plan(*schema.impl->od, root_val, std::nullopt, &od_err)) {
           return true;
         }
+        // A plan built with `supported` covers the whole schema, so a failure
+        // it reached on its own is the answer. Only fall through when the
+        // document could not be read, where the false means "did not get far
+        // enough to tell". Without this a rejected document was parsed twice
+        // and walked again by the DOM walker, which cost several times more
+        // than accepting the same document.
+        if (!od_err) return false;
       }
     }
     psv = get_free_padded_view(data, length, fallback);
@@ -2786,11 +3321,50 @@ bool is_valid_prepadded(const schema_ref& schema, const char* data, size_t lengt
   auto result = tl_dom_parser().parse(psv);
   if (result.error()) return false;
 
+  // A false from cg_exec is ambiguous: the document is invalid, or the plan hit
+  // a COMPOSITION opcode it cannot decide (allOf, anyOf, oneOf, $ref) and wants
+  // the tree walker to finish. validate() falls through on false for exactly
+  // this reason; returning it directly here rejected valid documents whenever
+  // the schema used one of those keywords.
   if (!schema.impl->gen_plan.code.empty()) {
-    return cg_exec(schema.impl->gen_plan, schema.impl->gen_plan.code, result.value_unsafe());
+    bool undecidable = false;
+    if (cg_exec(schema.impl->gen_plan, schema.impl->gen_plan.code, result.value_unsafe(),
+                &undecidable)) {
+      return true;
+    }
+    // Every check the plan compiles mirrors the tree walker exactly (same
+    // element_type_mask, canonical_json, utf8_length, RE2 handle and format
+    // table), so a false that never touched a COMPOSITION opcode is the tree
+    // walker's answer too. Without this the whole DOM was walked a second
+    // time on every rejection, costing about twice an acceptance.
+    if (!undecidable) return false;
   }
 
-  return validate_fast(schema.impl->root, result.value_unsafe(), *schema.impl);
+  // validate_fast was a second, simpler walker, and it disagreed with the one
+  // validate() uses on 13% of the official suite: unevaluated*, $dynamicRef,
+  // remote $ref, patternProperties and dependent* among others, in both
+  // directions. Two walkers meant two sets of semantics to keep in step, and
+  // they drifted. This one now answers from validate_node, the same walker,
+  // asked to stop at the first error since only the verdict is wanted.
+  std::vector<validation_error> errors;
+  if (schema.impl->has_dynamic_refs) {
+    dynamic_scope_t scope;
+    auto rit = schema.impl->resource_dynamic_anchors.find("");
+    if (rit != schema.impl->resource_dynamic_anchors.end()) {
+      scope.push_back(&rit->second);
+    }
+    if (!schema.impl->root->id.empty()) {
+      auto iit = schema.impl->resource_dynamic_anchors.find(schema.impl->root->id);
+      if (iit != schema.impl->resource_dynamic_anchors.end()) {
+        scope.push_back(&iit->second);
+      }
+    }
+    validate_node(schema.impl->root, result.value_unsafe(), "", *schema.impl, errors, false,
+                  &scope);
+  } else {
+    validate_node(schema.impl->root, result.value_unsafe(), "", *schema.impl, errors, false);
+  }
+  return errors.empty();
 }
 
 bool is_valid_buf(const schema_ref& schema, const uint8_t* data, size_t length) {
