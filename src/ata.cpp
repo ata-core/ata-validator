@@ -2349,16 +2349,20 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
       i=j; break;
     } else { /* skip to OBJ_PROPS_END */ size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j) {} i=j; } break;
     case cg::op::OBJ_PROP: case cg::op::OBJ_PROPS_END: case cg::op::CHECK_NO_ADDITIONAL: break;
+    // The string fast paths compare the value's bytes with the enum entry between its quotes. The
+    // entry is JSON text, escaped, and the value is not, so `a\"b` (with a backslash) read the same
+    // as the entry for a"b. They only take entries with no escape in them, where the two are the
+    // same bytes; the rest are compared as canonical text below.
     case cg::op::CHECK_ENUM_STR: {
       auto& es=p.enum_sets[c.a]; bool f=false;
-      if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
+      if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.find('\\')==std::string::npos&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
       if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
       if(!f)return false;
       break;
     }
     case cg::op::CHECK_ENUM: {
       auto& es=p.enum_sets[c.a]; bool f=false;
-      if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
+      if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.find('\\')==std::string::npos&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
       if(!f&&value.is<int64_t>()){int64_t v=0;type_checked(value.get(v));auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
       if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
       if(!f)return false;

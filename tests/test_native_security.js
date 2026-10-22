@@ -47,6 +47,20 @@ for (const schema of [{ enum: [{ a: 1, b: 2 }] }, { const: { a: 1, b: 2 } }]) {
   assert.strictEqual(u.isValidJSON('[{"a":1},{"a":1}]'), false);
 }
 
+// String enums: an entry is escaped JSON text and the value is not, so a value
+// with a backslash where the entry has an escape must not match it.
+for (const schema of [{ enum: ['a"b', 'c'] }, { type: 'object', properties: { role: { enum: ['admin"x', 'user'] } } }]) {
+  const v = new Validator(schema);
+  const bad = schema.enum ? JSON.stringify('a\\"b') : JSON.stringify({ role: 'admin\\"x' });
+  const good = schema.enum ? JSON.stringify('a"b') : JSON.stringify({ role: 'admin"x' });
+  assert.strictEqual(v.validate(JSON.parse(bad)).valid, false);
+  assert.strictEqual(v.isValid(Buffer.from(bad)), false, 'isValid, backslash in a string enum value');
+  assert.strictEqual(v.isValidJSON(bad + pad), false, 'isValidJSON, backslash in a string enum value');
+  assert.strictEqual(v.isValid(Buffer.from(good)), true);
+  const c = new native.CompiledSchema(JSON.stringify(schema));
+  assert.strictEqual(c.isValidJSON(bad), false, 'addon isValidJSON, backslash in a string enum value');
+}
+
 // Depth: the addon rejects past its limit; the public APIs answer as validate().
 const recursive = { type: 'object', properties: { next: { $ref: '#' }, data: { type: 'string', pattern: '^[A-Z0-9]+$' } }, required: ['data'], additionalProperties: false };
 const nest = (k, bad) => { let o = { data: bad ? 'lower' : 'OK' }; for (let i = 0; i < k; i++) o = { data: 'OK', next: o }; return o; };
@@ -98,4 +112,4 @@ const nest = (k, bad) => { let o = { data: bad ? 'lower' : 'OK' }; for (let i = 
   assert.strictEqual(v.isValidPrepadded(padded, doc.length), true);
 }
 
-console.log('ok: object enum and const compare member names exactly, the native walker fails closed past its depth and the public APIs answer as validate() at 300 deep, NDJSON lines at the end of the buffer and caller lengths stay inside it');
+console.log('ok: object enum and const compare member names exactly, string enums tell a backslash apart, the native walker fails closed past its depth and the public APIs answer as validate() at 300 deep, NDJSON lines at the end of the buffer and caller lengths stay inside it');

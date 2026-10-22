@@ -531,6 +531,17 @@ TEST(unique_items_tells_quoted_key_apart) {
   ASSERT(!ata::validate(schema, R"([{"a":1},{"a":1}])").valid);
 }
 
+TEST(string_enum_tells_backslash_apart) {
+  // The entry for a"b is the JSON text "a\"b"; the string a\"b (with a backslash) is another value.
+  const char* schema = R"({"enum":["a\"b","c"]})";
+  auto s = ata::compile(schema);
+  ASSERT(ata::validate(s, R"("a\"b")").valid);
+  ASSERT(!ata::validate(s, R"("a\\\"b")").valid);
+  std::string doc = R"("a\\\"b")";
+  std::string padded = doc + std::string(ata::REQUIRED_PADDING, ' ');
+  ASSERT(!ata::is_valid_prepadded(s, padded.data(), doc.size()));
+}
+
 // --- Past the depth limit the document is rejected, not accepted ---
 
 TEST(depth_limit_rejects_violation_below_it) {

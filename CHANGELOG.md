@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Security
+
+- A string in `enum` that needs escaping in JSON could be matched by a different string through the native engine. Its fast path for string enums compared the value's bytes with the entry's JSON text between the quotes, so for `enum: ['a"b']` the value `a\"b`, with a backslash, matched. The fast path now takes only entries with no escape in them; the others are compared as canonical text, as every other path does. This reaches the same APIs as the native fixes in 1.58.0 (`isValid`, `isValidJSON` and `validateJSON` on 8 KB or more, the NDJSON and batch methods); `validate()` and `isValidObject()` were not affected. `tests/test_native_security.js` and `tests/test.cpp` cover it.
+
 ## 1.58.0 - 2026-10-21
 
 ### Security
