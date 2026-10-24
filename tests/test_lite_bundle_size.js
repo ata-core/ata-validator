@@ -138,7 +138,11 @@ const esbuild = require('esbuild')
 // lite's first load went from 57283 to 51839 bytes.
 // 57500 (57405 measured): the native engine's depth error has an entry in
 // lib/error-codes.js, now that its walker rejects past its depth limit.
-const BUDGET = 57500
+// 57700 (57599 measured): Standard Schema is built by lib/standard-schema.js,
+// shared with the wrapper around a module written ahead of time
+// (lib/compiled.js), which now carries `~standard` too; the bytes are the
+// module boundary, the code moved as it was.
+const BUDGET = 57700
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
