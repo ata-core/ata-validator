@@ -3,3 +3,4 @@ web/page.js
 results.json
 worker/.wrangler/
 user.compiled.*
+*.log
