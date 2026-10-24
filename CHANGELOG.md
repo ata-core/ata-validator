@@ -2,6 +2,16 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- A validator the build compiled away (`fromCompiled` around a module written ahead of time, what `@ata-project/unplugin` puts in place of `new Validator(schema)`) carries Standard Schema V1 as the runtime Validator does: the same `~standard` object, built by `lib/standard-schema.js` for both, with the same issues, value and published schema. A compiled validator can now be handed to a form library, a router or an RPC layer that reads `~standard`. `tests/test_compiled_standard.js` compares the two.
+
+### Fixed
+
+- `toStandaloneModule(schema, { coerceTypes })` and `toStandaloneModule(validator)` for a validator built with `coerceTypes` or `removeAdditional` wrote a module that checked the data as it was, so it rejected `{ id: "5" }` where the validator accepts it. The module now runs the validator's pass over the data before the check, as `bundleStandalone` does since 1.59.0, and refuses where that pass cannot be written into a module. `fastify-ata/standalone` builds its files through this call.
+
 ## 1.59.0 - 2026-10-24
 
 ### Added

@@ -58,6 +58,32 @@ for (const options of OPTIONS) {
   }
 }
 
+// toStandaloneModule: the validator's own coerceTypes and removeAdditional run
+// before the check, as the validator runs them. Defaults stay as they were:
+// validate() does not fill them, applyDefaults does.
+const { toStandaloneModule } = require('../build.js')
+let single = 0
+for (const options of [{ coerceTypes: true }, { coerceTypes: 'array' }, { removeAdditional: true }, { removeAdditional: 'all' }, { coerceTypes: true, removeAdditional: true }]) {
+  for (const schema of schemas) {
+    const runtime = new Validator(schema, { useDefaults: false, ...options, schemas })
+    const src = toStandaloneModule(schema, { ...options, schemas, format: 'cjs' })
+    assert.ok(src, 'a module is written')
+    const mod = load(src)
+    for (let k = 0; k < 200; k++) {
+      const d = gen(schema, schema)
+      const a = structuredClone(d), b = structuredClone(d), c = structuredClone(d)
+      const ra = runtime.validate(a), rb = mod.validate(b)
+      const where = `toStandaloneModule ${JSON.stringify(options)} ${schema.$id} ${JSON.stringify(d)}`
+      assert.deepStrictEqual(b, a, `${where}: data afterwards`)
+      assert.strictEqual(rb.valid, ra.valid, `${where}: verdict`)
+      assert.strictEqual(mod.isValid(c), ra.valid, `${where}: isValid`)
+      assert.deepStrictEqual(c, a, `${where}: data after isValid`)
+      single++
+    }
+  }
+}
+assert.throws(() => toStandaloneModule({ type: 'array', items: { type: 'integer' } }, { coerceTypes: true }), /coerceTypes cannot be compiled/)
+
 // applyDefaults is the runtime's defaults pass and validate does not run it
 // unless asked.
 {
@@ -83,4 +109,4 @@ assert.throws(() => bundleStandalone([{ $id: 'r', type: 'array', items: { type: 
   assert.strictEqual(f('5').valid, new Validator({ type: 'integer' }, { coerceTypes: true }).validate('5').valid)
 }
 
-console.log(`ok: bundleStandalone carries coerceTypes, removeAdditional and defaults as the runtime runs them; ${cases} cases`)
+console.log(`ok: bundleStandalone carries coerceTypes, removeAdditional and defaults as the runtime runs them; ${cases} cases, and toStandaloneModule ${single}`)
