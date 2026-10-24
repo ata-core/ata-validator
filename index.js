@@ -6,7 +6,9 @@
 // lib/codegen-engine.js, so that the edge entry (index.edge.js) and
 // ata-validator/lite can load the core without it.
 const core = require('./lib/validator-core.js');
-core._registerCodegen(require('./lib/codegen-engine.js'));
+// Loaded on first need or once the event loop is free, not with the package
+// (see _registerCodegenLoader).
+core._registerCodegenLoader(() => require('./lib/codegen-engine.js'));
 
 // The public names. lib/public-api.js holds the same for index.edge.js; they
 // are written out here rather than required so that loading the package in
