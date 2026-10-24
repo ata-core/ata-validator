@@ -116,4 +116,39 @@ for (const dialect of ['draft2020-12', 'draft7']) {
 }
 assert.ok(groups > 500, `only ${groups} suite groups compiled`);
 
-console.log(`ok: applyDefaults is the runtime's pass, order: true is the runtime's order; ${groups} suite groups, ${cases} cases agree`);
+// bundleStandalone with `order: true`, as rjsf's precompiled validator writes
+// its module: each validator's errors in the runtime's order. A bundle never
+// fills defaults, so the runtime is asked without them.
+const { bundleStandalone } = require('../build.js');
+let bundled = 0;
+for (const dialect of ['draft2020-12', 'draft7']) {
+  const dir = path.join(suite, dialect);
+  if (!fs.existsSync(dir)) continue;
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
+    for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
+      if (g.schema === null || typeof g.schema !== 'object') continue;
+      let fn;
+      try { fn = load(bundleStandalone([g.schema], { order: true, verbose: true }), `.order-bundle-${n++}.cjs`)[0]; } catch { fn = null; }
+      if (typeof fn !== 'function') continue;
+      const plain = load(bundleStandalone([g.schema], { verbose: true }), `.order-bundle-${n++}.cjs`)[0];
+      bundled++;
+      const v = new Validator(g.schema, { useDefaults: false, verbose: true });
+      for (const t of g.tests) {
+        const a = v.validate(structuredClone(t.data));
+        const b = fn(structuredClone(t.data));
+        const where = `bundle ${dialect}/${f}: ${g.description}: ${t.description}`;
+        assert.strictEqual(b.valid, a.valid, where);
+        assert.strictEqual(plain(structuredClone(t.data)).valid, a.valid, `${where}: without order`);
+        if (!a.valid) {
+          // The stub error a bundle reports where the error generator declines is not compared.
+          if (b.errors.length === 1 && b.errors[0].code === 'error') continue;
+          assert.strictEqual(shape(b.errors), shape(a.errors), `${where}: errors`);
+          for (const e of b.errors) assert.ok(!('_o' in e), `${where}: no ordinal`);
+        }
+      }
+    }
+  }
+}
+assert.ok(bundled > 500, `only ${bundled} suite groups bundled`);
+
+console.log(`ok: applyDefaults is the runtime's pass, order: true is the runtime's order; ${groups} suite groups, ${cases} cases agree; ${bundled} bundled groups in order`);

@@ -251,7 +251,8 @@ verdict contract.
 
 A module returns its errors in the order its collector found them unless it
 is written with `toStandaloneModule(schema, { order: true })` (`ata compile
---order`), which sorts them as the runtime does, by schema declaration order,
+--order`), or `bundleStandalone(schemas, { order: true })` for each validator
+of a bundle, which sorts them as the runtime does, by schema declaration order,
 and leaves out the ordinal it sorts by. Without a `$ref` the collector writes
 each error site's ordinal into the error and the module sorts by it; with one,
 the module ranks each error's path with the functions of

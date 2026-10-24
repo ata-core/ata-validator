@@ -2,6 +2,16 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- `bundleStandalone(schemas, { order: true })` hands each validator's errors out in the runtime's order, as `toStandaloneModule` does with the same option. rjsf's precompiled validator writes its module with `bundleStandalone`, and its error list showed an `additionalProperties` error before the `properties` errors where the runtime validator shows it after. `tests/test_aot_order_defaults.js` holds 553 bundled groups of the 2020-12 and draft-07 suites to the runtime's errors, in order.
+
+### Changed
+
+- Requiring the package no longer loads the code generator. It loads when a validator first compiles, or once the event loop is free, so a server reaches its first request without waiting for it. Importing the package went from 4.55 to 1.64 ms (Node 25, the median of 21 interleaved runs), and a server building 20 validators at startup from 4.71 to 1.83 ms. Validators still compile at their first call, and a script that validates as soon as it starts takes as long as before.
+
 ## 1.58.1 - 2026-10-22
 
 ### Security
