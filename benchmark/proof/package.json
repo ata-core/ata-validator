@@ -1,0 +1,5 @@
+{ "name": "ata-proof", "private": true, "type": "module",
+  "description": "The same schema and documents validated where new Function is allowed, slow or refused: node with code generation refused, node, bun, a page under a Content-Security-Policy, a Cloudflare Worker.",
+  "scripts": { "build": "ata build user.schema.json", "proof": "node run.mjs" },
+  "dependencies": { "ata-validator": "file:../.." },
+  "devDependencies": { "esbuild": "^0.28", "wrangler": "^4" } }

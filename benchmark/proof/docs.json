@@ -1,0 +1,2 @@
+{ "valid": { "email": "ada@example.com", "name": "Ada", "age": 36, "newsletter": true },
+  "invalid": { "email": "not-an-email", "name": "", "age": 7, "extra": 1 } }

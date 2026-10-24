@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "User",
+  "description": "A user as the API accepts it",
+  "type": "object",
+  "required": ["email", "name", "age"],
+  "additionalProperties": false,
+  "properties": {
+    "email": { "type": "string", "format": "email", "maxLength": 128 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80, "description": "Display name" },
+    "age": { "type": "integer", "minimum": 13, "maximum": 130 },
+    "newsletter": { "type": "boolean", "default": false }
+  }
+}
