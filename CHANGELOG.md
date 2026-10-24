@@ -15,7 +15,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
-- Requiring the package no longer loads the code generator. It loads when a validator first compiles, or once the event loop is free, so a server reaches its first request without waiting for it. Importing the package went from 4.55 to 1.64 ms (Node 25, the median of 21 interleaved runs), and a server building 20 validators at startup from 4.71 to 1.83 ms. Validators still compile at their first call, and a script that validates as soon as it starts takes as long as before.
+- Requiring the package no longer loads the code generator. It loads when a validator first compiles, or once the event loop is free, so a server reaches its first request without waiting for it. Importing the package went from 4.55 to 1.64 ms (Node 25, the median of 21 interleaved runs), and a server building 20 validators at startup from 4.71 to 1.83 ms. Validators still compile at their first call, and a script that validates as soon as it starts takes as long as before. `benchmark/bench_fastify_boot.mjs` now counts loading the library on both sides, as "from a cold process" says; the README's Fastify figure moves from 18.3 against 2.67 ms (loading left out) to 30.3 against 9.7 ms.
 
 ## 1.58.1 - 2026-10-22
 

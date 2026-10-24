@@ -661,9 +661,11 @@ through a `setFormats()` export the module carries. `docs/API.md` has the
 details.
 
 **Fastify startup, 10 route schemas, from a cold process to the first validated request:
-ajv 18.3 ms, ata 2.67 ms, no build step required.** ata registers in 0.22 ms of that and
-compiles on the first request, so counting only registration would overstate the gap.
-Reproduce with `node benchmark/bench_fastify_boot.mjs`.
+ajv 30.3 ms, ata 9.7 ms, no build step required** (Node 25, ajv 8.20.0, loading each
+library included). ata loads in 3.7 ms, registers the routes in 0.3 ms and compiles on the
+first request, so counting only registration would overstate the gap. The first request
+here comes in the same tick as setup; a server that listens first has the code generator
+loaded by then. Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
 ### Standard Schema V1
 

@@ -3,8 +3,13 @@
 //
 // ata builds its validators lazily, so counting only the validator-compiler
 // callback flatters it: the compile is still owed and lands on the first
-// request. This bench charges both sides for setup plus that first call, and
-// runs each configuration in a fresh process so nothing is warm.
+// request. This bench charges both sides for loading the library, setup and
+// that first call, in a fresh process each, so nothing is warm. Loading
+// counts: ata loads its code generator on first need, so leaving the import
+// out would move that cost out of the measurement on one side only. The
+// request follows setup in the same tick, the case where nothing has loaded
+// in the background; a server that listens before its first request does
+// better.
 //
 // Usage: node benchmark/bench_fastify_boot.mjs [runs]
 import { spawnSync } from 'node:child_process'
@@ -43,8 +48,10 @@ const ROUTES = ${ROUTES}
 
 const ajvSrc = `${preamble}
 import { createRequire } from 'node:module'
+const tLoad = performance.now()
 const require = createRequire(${JSON.stringify(path.join(here, '/'))})
 const Ajv = require('ajv')
+const load = performance.now() - tLoad
 const t0 = performance.now()
 const ajv = new Ajv({ coerceTypes: 'array', useDefaults: true, removeAdditional: true, allErrors: false })
 const fns = []
@@ -52,11 +59,13 @@ for (let i = 0; i < ROUTES; i++) fns.push(ajv.compile(structuredClone(SCHEMA)))
 const setup = performance.now() - t0
 const t1 = performance.now()
 for (const fn of fns) fn(structuredClone(PAYLOAD))
-console.log(JSON.stringify({ setup, first: performance.now() - t1 }))
+console.log(JSON.stringify({ load, setup, first: performance.now() - t1 }))
 `
 
 const ataSrc = `${preamble}
+const tLoad = performance.now()
 const { Validator } = await import(${JSON.stringify(path.join(root, 'index.mjs'))})
+const load = performance.now() - tLoad
 const opts = { coerceTypes: true, useDefaults: true, removeAdditional: true }
 const t0 = performance.now()
 const vs = []
@@ -64,7 +73,7 @@ for (let i = 0; i < ROUTES; i++) vs.push(new Validator(structuredClone(SCHEMA), 
 const setup = performance.now() - t0
 const t1 = performance.now()
 for (const v of vs) v.isValidObject(structuredClone(PAYLOAD))
-console.log(JSON.stringify({ setup, first: performance.now() - t1 }))
+console.log(JSON.stringify({ load, setup, first: performance.now() - t1 }))
 `
 
 function measure (src) {
@@ -77,18 +86,19 @@ function measure (src) {
     }
     runs.push(JSON.parse(r.stdout.trim().split('\n').pop()))
   }
-  runs.sort((a, b) => (a.setup + a.first) - (b.setup + b.first))
+  runs.sort((a, b) => (a.load + a.setup + a.first) - (b.load + b.setup + b.first))
   return runs[Math.floor(runs.length / 2)]
 }
 
 const ajv = measure(ajvSrc)
 const ata = measure(ataSrc)
-const ajvTotal = ajv.setup + ajv.first
-const ataTotal = ata.setup + ata.first
+const ajvTotal = ajv.load + ajv.setup + ajv.first
+const ataTotal = ata.load + ata.setup + ata.first
 
 console.log(`${ROUTES} route schemas, median of ${RUNS} fresh processes\n`)
 console.log('| Stage | ajv | ata |')
 console.log('|---|---|---|')
+console.log(`| Load the library | ${ajv.load.toFixed(2)} ms | ${ata.load.toFixed(2)} ms |`)
 console.log(`| Setup | ${ajv.setup.toFixed(2)} ms | ${ata.setup.toFixed(2)} ms |`)
 console.log(`| First request | ${ajv.first.toFixed(2)} ms | ${ata.first.toFixed(2)} ms |`)
 console.log(`| To first validated request | ${ajvTotal.toFixed(2)} ms | ${ataTotal.toFixed(2)} ms |`)
