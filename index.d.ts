@@ -678,3 +678,12 @@ export function toTypeScript(schema: object, options?: { name?: string }): strin
  * Requires TypeScript >= 5.0 for the `const` type parameter.
  */
 export declare function defineSchema<const S extends JSONSchema>(schema: S): S;
+
+/**
+ * The JSON Schema of a TypeScript type, written in at build time by
+ * `@ata-project/unplugin` from the type and the JSDoc tags on its properties
+ * (`@format email`, `@minimum 1`, `@pattern`, `@minLength`, `@maxItems`,
+ * `@asType integer`). `new Validator(schemaOf<User>())` then compiles like any
+ * static schema. Without the plugin the call throws: it has no run-time form.
+ */
+export declare function schemaOf<T>(): JSONSchema;

@@ -15,6 +15,6 @@ import { toTypeScript, renderPretty, renderCompact, toOutput, toRetryMessage, de
 
 core._registerTiering(tiering.createTiering(() => import('./lib/codegen-engine.js')));
 
-export const { Validator, compile, validate, validateAsync, parseAsync, version, createPaddedBuffer, SIMDJSON_PADDING, parseJSON, defineSchema } = core;
+export const { Validator, compile, validate, validateAsync, parseAsync, version, createPaddedBuffer, SIMDJSON_PADDING, parseJSON, defineSchema, schemaOf } = core;
 export { toTypeScript, renderPretty, renderCompact, toOutput, toRetryMessage, describeSchema, renderJSON };
-export default { Validator, compile, validate, validateAsync, parseAsync, version, createPaddedBuffer, SIMDJSON_PADDING, parseJSON, toTypeScript, defineSchema, renderPretty, renderCompact, toOutput, toRetryMessage, describeSchema, renderJSON };
+export default { Validator, compile, validate, validateAsync, parseAsync, version, createPaddedBuffer, SIMDJSON_PADDING, parseJSON, toTypeScript, defineSchema, schemaOf, renderPretty, renderCompact, toOutput, toRetryMessage, describeSchema, renderJSON };

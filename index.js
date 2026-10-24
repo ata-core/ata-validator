@@ -91,6 +91,7 @@ module.exports = {
   parseJSON: core.parseJSON,
   toTypeScript,
   defineSchema: core.defineSchema,
+  schemaOf: core.schemaOf,
   renderPretty,
   renderCompact,
   toOutput,

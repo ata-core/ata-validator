@@ -21,5 +21,6 @@ module.exports = {
   validateAsync: core.validateAsync,
   parseAsync: core.parseAsync,
   defineSchema: core.defineSchema,
+  schemaOf: core.schemaOf,
   version: core.version,
 };

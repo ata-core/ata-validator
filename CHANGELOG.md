@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- `schemaOf<T>()`: a placeholder for the JSON Schema of a TypeScript type, written in at build time by `@ata-project/unplugin` from the type and the JSDoc tags on its properties, so `new Validator(schemaOf<User>())` compiles like any static schema. It has no run-time form: a call that reaches the runtime throws with a message naming the plugin, rather than returning an empty schema that accepts everything. Exported from every entry.
+
 ## 1.60.0 - 2026-10-24
 
 ### Added
