@@ -6,9 +6,19 @@
 // lib/codegen-engine.js, so that the edge entry (index.edge.js) and
 // ata-validator/lite can load the core without it.
 const core = require('./lib/validator-core.js');
-// Loaded on first need or once the event loop is free, not with the package
-// (see _registerCodegenLoader).
-core._registerCodegenLoader(() => require('./lib/codegen-engine.js'));
+// The code generator loads on first need, or once the event loop is free,
+// not with the package: it is most of what requiring the package parsed. The
+// timer is unref'd, so a script that has finished does not stay to load it.
+// The loader lives here rather than in the core, which the browser build
+// shares and which has no use for it there.
+let engine = null;
+const loadCodegen = () => {
+  if (engine === null) core._registerCodegen(engine = require('./lib/codegen-engine.js'));
+  return engine;
+};
+core._setCodegenLoader(loadCodegen);
+const warm = setTimeout(loadCodegen, 0);
+if (typeof warm === 'object' && typeof warm.unref === 'function') warm.unref();
 
 // The public names. lib/public-api.js holds the same for index.edge.js; they
 // are written out here rather than required so that loading the package in
