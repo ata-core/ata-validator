@@ -258,9 +258,13 @@ each error site's ordinal into the error and the module sorts by it; with one,
 the module ranks each error's path with the functions of
 `lib/schema-order.js`, embedded as their text, over the schema's key skeleton.
 A module of a schema that declares a `default` also exports
-`applyDefaults(data)`, the runtime's defaults pass, which `validate()` does not
+`applyDefaults(data)`, the runtime's defaults pass (in a `bundleStandalone`
+bundle, a property of each validator), which `validate()` does not
 call: the runtime fills defaults before it checks unless `useDefaults` is off,
-and a module cannot see that option.
+and a module cannot see that option. `bundleStandalone` takes `coerceTypes`,
+`removeAdditional` and `useDefaults: true` and runs the runtime's pass for
+them before each check; where that pass cannot be written into the module it
+throws rather than leave the option out.
 
 Error detail comes from one of two generators. The default is the collector
 modules have always carried. `toStandaloneModule(schema, { onePass: true })`

@@ -115,6 +115,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // useDefaults fills them, in the closure pass, the generated pass, parse()
 // and the modules' applyDefaults (lib/defaults.js, lib/codegen-engine.js,
 // lib/clone-emit.js, lib/aot-impl.js). Measured 456.5 KB.
-assert.ok(manifest.size < 460 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 464 KB with bundleStandalone answering as the runtime does: errors in the
+// runtime's order with `order`, coerceTypes and removeAdditional run before
+// the check instead of left out (a module that rejected what the runtime
+// accepts), and each validator's applyDefaults, which rjsf's precompiled
+// validator needs to match its runtime one. Measured 460.4 KB.
+assert.ok(manifest.size < 464 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

@@ -208,6 +208,7 @@ const FILES = [
   "tests/test_unicode_property_patterns.js",
   "tests/test_cold_twin.js",
   "tests/test_lazy_codegen.js",
+  "tests/test_bundle_preprocess.js",
   "tests/test_native_positions.js",
   "tests/test_validate_json_single_parse.js",
   "tests/test_single_pass_errors.js",

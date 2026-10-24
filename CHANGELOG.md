@@ -7,6 +7,11 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 ### Added
 
 - `bundleStandalone(schemas, { order: true })` hands each validator's errors out in the runtime's order, as `toStandaloneModule` does with the same option. rjsf's precompiled validator writes its module with `bundleStandalone`, and its error list showed an `additionalProperties` error before the `properties` errors where the runtime validator shows it after. `tests/test_aot_order_defaults.js` holds 553 bundled groups of the 2020-12 and draft-07 suites to the runtime's errors, in order.
+- Each validator of a bundle whose schema has a default carries `applyDefaults(data)`, the runtime's defaults pass, as a property, as standalone modules export it. rjsf's precompiled validator can call it to match its runtime validator. `tests/test_bundle_preprocess.js` compares 8400 generated documents with the runtime: the data afterwards, the verdict and the errors in order.
+
+### Fixed
+
+- `bundleStandalone` left `coerceTypes` and `removeAdditional` out without a word, so a bundle built with `coerceTypes: true` rejected `{ age: "5" }`, which the runtime accepts. Each bundled validator now runs the runtime's pass over the data for those options before it checks, and with `useDefaults: true` fills defaults the same way. Where the generated pass cannot carry what the runtime would do (coercing the items of an array at the root, for one), `bundleStandalone` throws instead of writing a module that answers differently. Without these options a bundle checks the data as it is, as before.
 
 ### Changed
 
