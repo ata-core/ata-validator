@@ -266,3 +266,27 @@ that one keyword), 1024 mixed-traffic documents, ns per document:
 0 disagreements with the plain module on the 1024 documents. The residual
 costs about 14 ns here against the type alone (97); the text path keeps its
 1.28x.
+
+## One form per target engine (2026-10-25, ata a16abb2)
+
+The dual emission (`if(_KC)` per closed object) cost V8 5 to 7% on small
+SchemaStore schemas (json-patch 256 -> 274 ns, npm-badges 44 -> 46, confirmed
+over 15 runs against an A/A of 1.00). Now the generator writes one form for
+the target engine: the runtime for the engine it runs on, `ata build --target
+bun` for JavaScriptCore. V8 modules are byte for byte the 1.60.0 ones; the
+three schemas are back to 1.005 / 0.996 / 0.995. Module built on Node without
+the target and run under Bun keeps the V8 form, correct and at the old speed.
+
+Kit bench.ts, one executable, module from `--target bun`, master runtime, ns
+per document (1024 parsed documents):
+
+| | JIT | --aot |
+|---|---|---|
+| module isValid | 25 | 24.3 |
+| module validate() | 34.7 | 24.7 |
+| runtime Validator, generated code | 28.1 | 492 |
+| runtime Validator, interpreted engine | 52.4 | 80.1 |
+| zod 4.6.7 safeParse | 209 | 512 |
+
+Order module, paired in one executable, 1.60.0 emission against `--target
+bun`: AOT 223 -> 105 accepted, 218 -> 101 refused; JIT 65 -> 53, 59 -> 46.
