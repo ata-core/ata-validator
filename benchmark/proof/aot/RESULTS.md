@@ -75,3 +75,32 @@ With the flag the program counts as closed and ata picks the interpreter by
 itself: 75 ns, no option needed. Closedness buys the interpreter a few
 percent; the engine choice buys seven times. The interpreter's floor under
 the compiler is about 75 ns against 49 on the JIT.
+
+## Shape spike (spike-vm.ts): what the interpreter's cost is made of
+
+The user schema written three ways in one executable, ns per document, two runs:
+
+| shape | JIT | AOT |
+|---|---|---|
+| closure tree, minimal (the interpreted engine's shape) | 55 to 59 | 39.5 to 43.5 |
+| fixed-layout nodes and one switch (a bytecode VM shape) | 51 to 53 | 47 to 48 |
+| module from `ata build` | 24 to 26 | 36 to 37 |
+
+A closure tree compiles well ahead of time (faster there than on the JIT),
+and a switch VM does not beat it. The interpreted engine's 75 ns is twice
+the minimal tree's 41, so the gap is in what the engine does around the
+tree, not in the tree.
+
+## Decision on the interpreter under the compiler
+
+Run-to-run spread of the interpreted engine under `--aot` is 76.7 to 78.6 ns.
+`--explain` attributes the untyped time to one root cause at a time (93% on
+whichever comes first: an `Object.assign` in error-messages.js, then a
+closure handed to a caller, then a caught value in the `contains` branch);
+rewriting each moved the label and not the number. The engine's shape is not
+the problem (a minimal closure tree runs at 41 ns under the compiler); the
+cost is spread over hundreds of sites that hand objects and functions to
+code the compiler cannot follow. Closing that gap means rewriting the plan
+compiler's hot closures in a closed style, for about 1.5x on a path whose
+alternative, the module from `ata build`, is already 2.2x faster and needs no
+option. Not done now; this file and bench.ts are the method when it is.
