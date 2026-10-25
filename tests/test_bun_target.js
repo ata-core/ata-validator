@@ -111,6 +111,13 @@ const order = {
 {
   const split = (s) => { const r = schemaToBunType(s); return { type: r.type, residual: r.residual } }
   assert.deepStrictEqual(split({ type: 'string', format: 'email', minLength: 3 }), { type: 'string & Schema.MinLength<3>', residual: { format: 'email' } })
+  // A format ata decides with one regular expression is carried as that expression.
+  const { IPV4, DURATION_RE } = require('../lib/formats')
+  assert.deepStrictEqual(split({ type: 'string', format: 'ipv4' }), { type: `string & Schema.Pattern<${JSON.stringify(IPV4.source)}>`, residual: null })
+  assert.deepStrictEqual(split({ type: 'string', format: 'duration', maxLength: 40 }), { type: `string & Schema.Pattern<${JSON.stringify(DURATION_RE.source)}> & Schema.MaxLength<40>`, residual: null })
+  assert.deepStrictEqual(split({ format: 'ipv4' }), { type: `(string & Schema.Pattern<${JSON.stringify(IPV4.source)}>) | number | boolean | null | Record<string, unknown> | unknown[]`, residual: null })
+  assert.deepStrictEqual(schemaToBunType({ type: 'string', format: 'ipv4' }, { assertFormat: false }).residual, { format: 'ipv4' })
+  assert.deepStrictEqual(split({ type: 'string', format: 'uuid' }), { type: 'string', residual: { format: 'uuid' } })
   assert.deepStrictEqual(split({ type: 'object', required: ['email'], properties: { email: { type: 'string', format: 'email' }, n: { type: 'integer' } } }),
     { type: '{ "email": string; "n"?: number & Schema.Int }', residual: { properties: { email: { format: 'email' } } } })
   assert.deepStrictEqual(split({ type: 'array', items: { type: 'string', format: 'uuid' }, uniqueItems: true }),

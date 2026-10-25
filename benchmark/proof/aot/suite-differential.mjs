@@ -44,7 +44,8 @@ for (const file of fs.readdirSync(suiteDir).filter((f) => f.endsWith('.json')).s
     groups++
     let mapped
     const schema = withDialect(g.schema)
-    try { mapped = schemaToBunType(schema, { name: `T${cases.length}`, aliasPrefix: `D${cases.length}_` }) } catch (e) {
+    // The suite reads format as an annotation, as suiteOptions below say.
+    try { mapped = schemaToBunType(schema, { name: `T${cases.length}`, aliasPrefix: `D${cases.length}_`, assertFormat: false }) } catch (e) {
       if (!(e instanceof Declined)) throw e
       const key = /^keyword /.test(e.reason) ? e.reason : e.reason.replace(/"[^"]*"/g, '"…"')
       declined.set(key, (declined.get(key) || 0) + 1)
