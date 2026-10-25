@@ -3,7 +3,9 @@
 import type { ValidationResult } from './index.js';
 
 export interface CompiledModule {
-  validate(data: unknown): { valid: boolean; errors: unknown[] };
+  // A module's accepted result is frozen, so the array is read-only here;
+  // under Bun's ahead-of-time compiler a type error fails the build.
+  validate(data: unknown): { valid: boolean; errors: readonly unknown[] };
   isValid(data: unknown): boolean;
 }
 

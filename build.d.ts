@@ -204,3 +204,25 @@ export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cj
  * ata-validator 1.37.0, where only calls without options can be.
  */
 export const compiledOptions: readonly string[];
+
+/** The Bun target, for a build plugin: the schema split into a type for Bun's validate<T> and a residual schema. */
+export const bunTarget: {
+  schemaToBunType(schema: unknown, opts?: { name?: string; aliasPrefix?: string }): { name: string; type: string; aliases: Array<[string, string]>; residual: unknown | null; carried: string[] };
+  toBunModule(args: { schemaFile: string; moduleImport: string; residualImport?: string | null; typeName: string; typeSource: string; aliases: Array<[string, string]> }): string;
+  writeBunTarget(args: { schema: unknown; input: string; output: string; typeName: string; format?: 'esm' | 'cjs' }): { bunPath: string; residualPath: string | null; definitions: number; carried: number; residualKeywords: number };
+  Declined: new (reason: string, pointer: string) => Error & { reason: string; pointer: string };
+};
+
+/** `ata verify` as functions: a compiled module held against the runtime on generated documents and samples. */
+export const verify: {
+  verifyOne(args: { schemaFile: string; moduleFile: string; schema: unknown; generate?: number; seed?: number; samples?: string[] }): Promise<VerifyReport>;
+  verifySource(schema: unknown, src: string, opts?: { name?: string; format?: 'esm' | 'cjs'; generate?: number; seed?: number; samples?: string[] }): Promise<VerifyReport>;
+  generate(schema: unknown, count: number, seed: number): unknown[];
+  renderReport(reports: VerifyReport[], opts?: { json?: boolean }): string;
+  ok(report: VerifyReport): boolean;
+};
+export interface VerifyReport {
+  schema: string; module: string; documents: number; generated: number; samples: number; valid: number; agree: number;
+  disagreements: Array<{ source: string; document: string; runtime: string; module: string; runtimeIsValid: boolean; moduleIsValid: boolean } | { more: number }>;
+  stale: boolean; missing: boolean; ataVersion: string | null; error: string | null;
+}
