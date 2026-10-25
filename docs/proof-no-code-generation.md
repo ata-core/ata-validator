@@ -50,18 +50,38 @@ per document (medians):
 
 | validator | JIT | AOT |
 |---|---|---|
-| module from `ata build`, isValid | 25.9 | 34.2 |
-| module from `ata build`, validate() | 59.5 | 60.2 |
-| runtime Validator, compiled at start with `new Function`, isValidObject | 25.5 | 538 |
-| runtime Validator, validate() | 30.7 | 552 |
-| zod 4, safeParse | 210 | 530 |
+| module from `ata build --target bun`, isValid | 25.0 | 24.3 |
+| module from `ata build --target bun`, validate() | 34.7 | 24.7 |
+| runtime Validator, compiled at start with `new Function`, isValidObject | 28.1 | 492 |
+| runtime Validator, interpreted engine (the default under the compiler) | 52.4 | 80.1 |
+| zod 4, safeParse | 209 | 512 |
 
 Code generated at run time is interpreted under the compiler: ata's own
-run-time path and zod both land near 530 ns. The module written at build time
-is compiled with the program and stays at 34 ns. That is the whole case for
-`ata build` in one row. The module is 30% slower under the compiler than on
-the JIT, which the pull request's numbers for untyped npm code predict; a
-typed emission is a later experiment.
+run-time path and zod both land near 500 ns, which is why a Validator built
+under the compiler takes the interpreted engine by itself (80 ns). The module
+written at build time is compiled with the program and runs at 24 ns, no
+slower than on the JIT. That is the whole case for `ata build` in one row.
+
+Two things the compiler's `--explain` report taught the emitter (ata 1.61.0):
+the `__proto__` plain-object test and a `for...in` walk over an object's keys
+are slow paths under it and the cheaper forms on V8, so the generated code now
+takes one form per target engine, `ata build --target bun` for JavaScriptCore.
+On a ten-item order with closed objects that is 227 against 108 ns under the
+compiler and 65 against 53 on Bun's JIT; the module Node gets is unchanged.
+
+What a module cannot do is what Bun's own `validate<T>()` does, check an
+object's hidden structure in one comparison. So `ata build --target bun` also
+writes the schema's rules as a type with Bun's `Schema` tags for `validate<T>`
+and `JSON.parse<T>`, a second module for the rules a type cannot carry, and
+keeps the plain module behind both for the errors. On 1024 distinct ten-item
+orders, 10% of them invalid, the generated `isValid` runs at 96 to 99 ns
+against 90 to 105 for a type written by hand and 108 for the plain module;
+text to object, 425 against 546 for `JSON.parse` plus the module. Against the
+official suite, type and residual together never accept a document the suite
+refuses (`benchmark/proof/aot/suite-differential.mjs`). `ata verify` holds the
+written module against the runtime on a project's own schemas; the plugin
+does the same inside the bundler and writes the typed target under
+`Bun.build({ compile: { aot: true } })` without a command.
 
 What this does not show:
 
