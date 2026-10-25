@@ -727,9 +727,11 @@ So, in order of preference:
    on the address, which only the residual checks, 111 against 117; text to
    object, `parse` 425 ns against 546. The file is for executables built with
    `--aot`; everywhere else import the plain module. With `--target bun` the
-   plain module is written for JavaScriptCore too (its key walks use
-   `Object.keys`, the faster form there; on V8 the module keeps for...in), as
-   it is when `Bun.build` runs the plugin. Checked against the
+   plain module is written for the compiler too: a closed object's keys are
+   read once and compared with the declared list in order, which on the
+   ten-item order puts the plain module level with Bun's own `validate<T>`
+   (105 to 107 ns against 96 to 105); on V8 the module keeps for...in, on
+   Bun's JIT a plain count, each the cheaper form there. Checked against the
    official suite with the type and the residual together: of the schema
    groups that get a target (122 of 384 on draft 2020-12, 105 of 258 on draft
    7) none accepts a document the suite refuses.

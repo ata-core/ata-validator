@@ -258,7 +258,7 @@ function cmdCompile(args) {
   const aot = require('../lib/aot');
   // `--target bun`: the module is written for JavaScriptCore, the engine the
   // executable the target is for runs on.
-  if (args.opts.target === 'bun') require('../lib/js-compiler').setTargetEngine('jsc');
+  if (args.opts.target === 'bun') require('../lib/js-compiler').setTargetEngine('jsc-aot');
   let v;
   try {
     v = new Validator(schema);

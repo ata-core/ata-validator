@@ -305,3 +305,30 @@ through the compiled-away wrapper, two executables, two runs each:
 The wrapper (`fromCompiled` -> isValidObject) and the document generator in
 the same program put these above the bare-module figures (108 / 96); the
 ratio is the one the bare modules showed.
+
+## The jsc-aot form: level with validate<T> on the parsed object (2026-10-25)
+
+Lemire's rule applied: do not walk data twice. For a closed object whose
+declared keys are all required, the module read the prototype (a flag), ran
+hasOwn over the required list on non-plain objects, counted the keys with an
+allocating Object.keys, then read each property. The `jsc-aot` form reads
+Object.keys once and compares it with the declared list in order (the order
+JSON.parse gives), falling back to a membership walk; that proves presence,
+ownership and closedness together, so the flag and the hasOwn list go.
+
+Order body, 1024 mixed documents, one `--aot` executable, three passes:
+
+| | pass 0 | pass 1 | pass 2 |
+|---|---|---|---|
+| validate<Order> (bun:bundle) | 105.4 | 95.9 | 97.8 |
+| module, jsc form (plain count) | 108.0 | 111.5 | 110.2 |
+| module, jsc-aot form (`--target bun`) | 104.8 | 107.0 | 107.1 |
+
+0 disagreements on the 60 answers and the 1024 documents. On Bun's JIT the
+same form measured 69 to 70 ns against 54 to 66 for the plain count, so it is
+written only for the compiler (`--target bun`, the plugin under
+`compile.aot`). A first attempt that kept the prototype flag and the hasOwn
+list beside the key list measured 129 to 137: the proof has to replace them,
+not sit next to them. The three forms agree on 4730 suite answers including
+objects with other prototypes, inherited keys and reordered keys
+(tests/test_target_engines.js).

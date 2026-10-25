@@ -214,6 +214,7 @@ const FILES = [
   "tests/test_aot_engine.js",
   "tests/test_bun_target.js",
   "tests/test_verify.js",
+  "tests/test_target_engines.js",
   "tests/test_native_positions.js",
   "tests/test_validate_json_single_parse.js",
   "tests/test_single_pass_errors.js",

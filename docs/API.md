@@ -333,8 +333,12 @@ With `--target bun` every module the build writes, the plain one included, is
 written for JavaScriptCore: a closed object's keys are walked with
 `Object.keys`, the cheaper form there, where a module written on Node for V8
 uses for...in. The runtime compiler writes for the engine it runs on, and
-`setTargetEngine('jsc' | 'v8' | null)` from `ata-validator/lib/js-compiler`
-changes that for a build script.
+`setTargetEngine('v8' | 'jsc' | 'jsc-aot' | null)` from `ata-validator/lib/js-compiler`
+(also `bunTarget.setTargetEngine` in `ata-validator/build`) changes that for a
+build script. `jsc-aot` is the form `--target bun` writes: made for an
+executable compiled ahead of time, where it is level with Bun's own
+`validate<T>` on closed objects, and 5 to 15 ns a document slower than the
+`jsc` form on Bun's JIT.
 
 `ata verify <glob>` holds each schema's module against the runtime: it loads
 the module `ata build` wrote (`--out-dir`, `--suffix` and `--format` as given
