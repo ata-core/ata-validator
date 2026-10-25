@@ -352,3 +352,23 @@ level with it on both sides. The accepted-object column is 25% behind in this
 executable where the three-candidate one showed parity; the ten candidates
 and two document sets change the program, and the module's share of the
 compiler's budget with it. Both are reported.
+
+## The error path (2026-10-25): the older collector against the one-pass function
+
+A rejected ten-item order (last item's quantity 0), error list built, ns:
+
+| | Node 25 | Bun --aot |
+|---|---|---|
+| module, default build (older collector, with frames) | 378 to 390 | 724 |
+| module, `--no-source` (older collector, no frames) | 362 to 367 | |
+| module, `--one-pass` | 105 to 108 | 189 |
+| runtime Validator, richErrors: false | 99 to 103 | |
+| runtime Validator, rich | 192 to 196 | |
+
+The cost was never the frames; it is the older collector, which re-evaluates
+its guards per keyword (profile: 62% in that function, 15% the verdict, 7%
+the e-mail regex). The one-pass function is level with the runtime. It stays
+opt-in for browser builds because it is larger: over 60 SchemaStore schemas
+gzipped 1,341,514 against 1,617,278 bytes (1.21x; 53 larger by more than 5%,
+worst act3.json 2,010 to 3,164). `--target bun` and the plugin under
+`compile.aot` take it by default, with no frames.

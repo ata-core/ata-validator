@@ -731,7 +731,11 @@ So, in order of preference:
    read once and compared with the declared list in order, which on the
    ten-item order puts the plain module level with Bun's own `validate<T>`
    (105 to 107 ns against 96 to 105); on V8 the module keeps for...in, on
-   Bun's JIT a plain count, each the cheaper form there. Checked against the
+   Bun's JIT a plain count, each the cheaper form there. The module also
+   answers a rejection with the one-pass error function there (189 ns with
+   the error list on that order, against 724 with the older collector), the
+   form every other build takes only with `--one-pass` since it is 20% larger
+   gzipped. Checked against the
    official suite with the type and the residual together: of the schema
    groups that get a target (122 of 384 on draft 2020-12, 105 of 258 on draft
    7) none accepts a document the suite refuses.

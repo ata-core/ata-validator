@@ -338,7 +338,10 @@ uses for...in. The runtime compiler writes for the engine it runs on, and
 build script. `jsc-aot` is the form `--target bun` writes: made for an
 executable compiled ahead of time, where it is level with Bun's own
 `validate<T>` on closed objects, and 5 to 15 ns a document slower than the
-`jsc` form on Bun's JIT.
+`jsc` form on Bun's JIT. `--target bun` also takes the one-pass error function
+(`onePass`) and leaves schema-source frames out unless `--source` asks for
+them: in an executable the one-pass form's size costs nothing and a rejection
+with its error list costs 3.8x less.
 
 `ata verify <glob>` holds each schema's module against the runtime: it loads
 the module `ata build` wrote (`--out-dir`, `--suffix` and `--format` as given
