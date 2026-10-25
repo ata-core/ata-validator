@@ -161,3 +161,22 @@ A type written from the schema with Bun's `Schema` tags and checked by
 `validate<T>`, the plain module as its error path: accepted 83 (the same
 compiler, the same number as Bun's own type), refused 120, refused with the
 error list 923 (module alone 808); 60 of 60 answers.ts orders agree.
+
+## Mixed traffic (traffic.ts): 1024 distinct orders, 10% invalid
+
+1 to 12 items an order (6.5 on average), names and e-mails of varying
+length, 103 invalid in six different ways spread through the stream, 451,143
+bytes of JSON, the same order of documents for every validator, 7 rounds of
+100 passes, medians, two passes. ns per document (MB/s of JSON text):
+
+| validator | Node 25 | Bun 1.4.0 | Bun PR, compiled JIT | Bun PR, --aot |
+|---|---|---|---|---|
+| zod 4.6.7 safeParse | 1728 to 1731 (255) | 1565 to 1615 (278) | 1462 to 1474 (300) | 3219 to 3248 (137) |
+| validate<Order>, Bun's type | | | | 96 to 97 (4560) |
+| validate<Order>, type written from the JSON Schema | | | | 94 to 97 (4600) |
+| ata module isValid (master emission) | 76 to 79 (5670) | 57 to 61 (7500) | 50 to 52 (8690) | 130 to 135 (3330) |
+
+All four agree on all 1024 verdicts. The single-object numbers above
+(validate<Order> 85 to 90, module 108 to 122) flattered everyone by the same
+amount; the ranking and the ratios (zod 24x behind the module under the
+compiler, the module 1.37x behind the typed validator) hold on traffic.
