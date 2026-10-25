@@ -696,21 +696,21 @@ and 1024 parsed documents, nanoseconds per document (`benchmark/proof/aot`):
 
 | | JIT | ahead of time |
 |---|---|---|
-| a module from `ata build` | 27 | 32 |
-| `new Validator(schema)`, generated code | 28 | 513 |
-| `new Validator(schema)`, interpreted engine | 52 | 82 |
+| a module from `ata build --target bun` | 25 | 24 |
+| `new Validator(schema)`, generated code | 28 | 492 |
+| `new Validator(schema)`, interpreted engine | 52 | 80 |
 
 So, in order of preference:
 
 1. Compile the schema at build time. `@ata-project/unplugin/bun` does it in
    `Bun.build`, including `Bun.build({ compile })`; `ata build` writes the
    module by hand. The module is plain JavaScript and compiles with the
-   program: 32 ns, the same errors as the runtime.
+   program: 24 ns, the same errors as the runtime.
 2. Where the runtime `Validator` stays, let it take the interpreted engine.
    It does so by itself when Bun reports `Bun.isAOT`, when the executable is
    built with `--disallow-code-generation-from-strings` (the program then
    counts as closed for the compiler, too), or when `ATA_ENGINE=interpreter`
-   is set: 82 ns against 513 for the generated code there.
+   is set: 80 ns against 492 for the generated code there.
 3. For the last factor, let Bun's compiler check the rules itself. `ata build
    schema.json --target bun` also writes `schema.compiled.bun.ts`: the rules a
    type can carry exactly (kinds, properties, closed objects, items, lengths,
