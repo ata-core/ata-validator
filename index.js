@@ -20,6 +20,53 @@ core._setCodegenLoader(loadCodegen);
 const warm = setTimeout(loadCodegen, 0);
 if (typeof warm === 'object' && typeof warm.unref === 'function') warm.unref();
 
+// A process whose first check comes after the event loop has turned, a
+// server's first request, pays on that check for V8 compiling the generator's
+// functions and the error builders: on a four-field schema 5 ms for the
+// verdict and 7 to 10 ms for the first error list, measured with the
+// generator already loaded. One check of a small schema, accepted and
+// rejected, run once the loop is free, moves that off the request: 0.5 and
+// 0.7 ms after it (the same warm-up as the browser build's, lib/tiering.js).
+// It runs only where a validator was built and is still uncompiled when the
+// loop turns: a script that builds one and checks in the same tick never runs
+// it, and the timer is unref'd, so a finished script does not stay for it.
+// ATA_NO_WARM=1 turns it off.
+let built = null;
+core._registerBuiltHook((v) => {
+  if (built === null) {
+    built = [];
+    const t = setTimeout(warmUp, 0);
+    if (typeof t === 'object' && typeof t.unref === 'function') t.unref();
+  }
+  if (built.length < 8) built.push(new WeakRef(v));
+});
+function warmUp () {
+  const list = built;
+  built = [];
+  core._registerBuiltHook(null);
+  if (process.env.ATA_NO_WARM === '1') return;
+  // Untouched: neither compiled for validate() nor a verdict or validate
+  // method read off it (the prototype's accessors bind the method on the
+  // instance at the first read, a verdict-only compile sets no other mark).
+  const untouched = (v) => !v._initialized && !Object.prototype.hasOwnProperty.call(v, 'isValidObject') && !Object.prototype.hasOwnProperty.call(v, 'validate');
+  if (!list.some((r) => { const v = r.deref(); return v !== undefined && untouched(v); })) return;
+  try {
+    const v = new core.Validator({
+      type: 'object',
+      properties: {
+        a: { type: 'string', minLength: 2, maxLength: 9, pattern: '^[a-z]+$', format: 'email' },
+        b: { type: 'integer', minimum: 1, maximum: 9 },
+        c: { type: 'array', items: { type: 'string' }, maxItems: 3 },
+        d: { const: true },
+        e: { type: 'object', properties: { f: { type: 'string' } }, required: ['f'] },
+      },
+      required: ['a', 'b'],
+    });
+    v.isValidObject({ a: 'ab@c.de', b: 2, c: ['x'], d: true, e: { f: 'x' } });
+    void v.validate({ a: '1', b: 0, c: [1], d: false, e: {} }).errors.length;
+  } catch { /* a warm-up never reaches the caller */ }
+}
+
 // The public names. lib/public-api.js holds the same for index.edge.js; they
 // are written out here rather than required so that loading the package in
 // Node reads one file fewer (tests/test_edge_entry.js and

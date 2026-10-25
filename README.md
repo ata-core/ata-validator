@@ -667,6 +667,16 @@ first request, so counting only registration would overstate the gap. The first 
 here comes in the same tick as setup; a server that listens first has the code generator
 loaded by then. Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
+A server that listens first also gets the engine warmed: once the event loop is free, if a
+validator was built and not yet called, ata runs one check of a small schema, accepted and
+rejected, so that V8 compiles the generator's functions and the error builders then rather
+than on the first request. Measured on a four-field schema with the generator already
+loaded: the first verdict 3.1 to 3.4 ms without it, 0.5 to 0.6 with it; the first error
+list 6.7 against 0.8; a second route's first verdict 0.9 to 1.0 against 0.7 to 0.9. It costs
+the process 1.5 to 2 ms of CPU once. A script that builds a validator and checks in the
+same tick never runs it, and the timer is unref'd, so a finished script does not stay for
+it; `ATA_NO_WARM=1` turns it off.
+
 ### Proving the build (`ata verify`)
 
 A module written at build time is only a good idea if it answers as the
