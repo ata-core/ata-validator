@@ -667,6 +667,26 @@ first request, so counting only registration would overstate the gap. The first 
 here comes in the same tick as setup; a server that listens first has the code generator
 loaded by then. Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
+### Proving the build (`ata verify`)
+
+A module written at build time is only a good idea if it answers as the
+runtime it replaced. `ata verify` checks that on the project's own schemas:
+
+```bash
+npx ata verify 'schemas/*.json' --samples test/fixtures
+```
+
+For each schema it loads the module `ata build` wrote beside it, makes
+documents from the schema (200 by default, half of them with one rule broken),
+reads the project's sample documents (JSON files, JSON Lines, or a directory
+of them), and has both the module and a `Validator` built from the schema now
+answer every one. Verdicts and error lists have to agree; a module whose
+schema hash no longer matches the schema is reported stale. The exit code is
+non-zero on any disagreement, stale module or missing module, so the command
+works as a CI step. This is the check that found the two silent divergences
+fixed in 1.59.0 and 1.60.0, now in a form a project can run on every change.
+It does not run the `.bun.ts` target, which needs Bun's compiler.
+
 ### Bun, compiled ahead of time
 
 Bun's ahead-of-time compiler (`bun build --compile --aot`, an open pull

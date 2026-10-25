@@ -123,6 +123,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 476 KB with `ata build --target bun`: lib/bun-target.js writes the schema's
 // rules as a type for Bun's validate<T>, with the plain module deciding where
 // the type refuses, and the build and CLI carry the option. Measured 470.3 KB.
-assert.ok(manifest.size < 476 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 486 KB with the type split into a type and a residual schema (every schema
+// with a type gets a Bun target) and `ata verify` (lib/verify.js: documents
+// made from a schema, samples read, module held against the runtime, stale
+// modules reported). Measured 480.2 KB.
+assert.ok(manifest.size < 486 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

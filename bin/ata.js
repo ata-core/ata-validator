@@ -13,6 +13,15 @@ Usage:
   ata build    <glob>...     [options]  Compile a project's schemas (glob pattern) per file.
   ata validate <schema> <data> [options] Validate a JSON data file against a schema.
   ata migrate  [dir]         [options]  Report what switching from ajv would change; --write applies it.
+  ata verify   <glob>...     [options]  Check that each schema's compiled module answers as the runtime
+                                        does, on generated documents and the project's samples.
+
+Verify options:
+  --generate <n>          Documents made from each schema, half with one rule broken. Default: 200
+  --samples <path>        A JSON, JSON Lines file or a directory of them, checked too (repeatable)
+  --seed <n>              Seed for the generated documents. Default: 1
+  --json                  Report as JSON
+  --out-dir, --suffix, --format    Where the modules are, as given to ata build
 
 Validate options:
   --pretty                Render errors with source frames (default on TTY)
@@ -121,6 +130,10 @@ function parseArgs(argv) {
     if (a === '--strict') { out.opts.strict = true; continue; }
     if (a === '--strict-schema') { out.opts.strictSchema = true; continue; }
     if (a === '--target') { out.opts.target = argv[++i]; continue; }
+    if (a === '--generate') { out.opts.generate = Number(argv[++i]); continue; }
+    if (a === '--samples') { (out.opts.samples = out.opts.samples || []).push(argv[++i]); continue; }
+    if (a === '--seed') { out.opts.seed = Number(argv[++i]); continue; }
+    if (a === '--json') { out.opts.json = true; continue; }
     if (a === '--out-dir') { out.opts.outDir = argv[++i]; continue; }
     if (a === '--suffix') { out.opts.suffix = argv[++i]; continue; }
     if (a === '--cache-file') { out.opts.cacheFile = argv[++i]; continue; }
@@ -438,6 +451,33 @@ function cmdBuild(args) {
   });
 }
 
+function cmdVerify (args) {
+  if (args._.length === 0) {
+    process.stderr.write('error: missing <glob>\n\n');
+    usage();
+    process.exit(1);
+  }
+  const buildLib = require('../lib/aot-build');
+  const { verifyOne, renderReport, ok } = require('../lib/verify');
+  const format = args.opts.format || 'esm';
+  (async () => {
+    const inputs = await buildLib.expandGlobs(args._);
+    if (inputs.length === 0) {
+      process.stderr.write(`error: no schema files match ${args._.join(' ')}\n`);
+      process.exit(1);
+    }
+    const reports = [];
+    for (const input of inputs) {
+      let schema;
+      try { schema = buildLib.parseSchemaFile(input); } catch (e) { reports.push({ schema: input, module: '', error: e.message, documents: 0, agree: 0, disagreements: [] }); continue; }
+      const moduleFile = buildLib.outputPathFor(input, { format, outDir: args.opts.outDir, suffix: args.opts.suffix });
+      reports.push(await verifyOne({ schemaFile: input, moduleFile, schema, generate: Number.isFinite(args.opts.generate) ? args.opts.generate : 200, seed: Number.isFinite(args.opts.seed) ? args.opts.seed : 1, samples: args.opts.samples || [] }));
+    }
+    process.stdout.write(renderReport(reports, { json: !!args.opts.json }) + '\n');
+    process.exit(reports.every(ok) ? 0 : 1);
+  })().catch((e) => { process.stderr.write(`error: ${e.message}\n`); process.exit(1); });
+}
+
 function cmdValidate (args) {
   if (args._.length < 2) {
     process.stderr.write('error: ata validate <schema> <data-file>\n');
@@ -535,6 +575,11 @@ function main() {
 
   if (cmd === 'validate') {
     cmdValidate(args);
+    return;
+  }
+
+  if (cmd === 'verify') {
+    cmdVerify(args);
     return;
   }
 

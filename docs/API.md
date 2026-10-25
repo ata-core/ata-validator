@@ -330,6 +330,19 @@ carry that refers to the root with `$ref: "#"`. Under plain `bun run` and
 everywhere else, import the plain module. The suite check behind this is
 `benchmark/proof/aot/suite-differential.mjs`, which needs a Bun with `--aot`.
 
+`ata verify <glob>` holds each schema's module against the runtime: it loads
+the module `ata build` wrote (`--out-dir`, `--suffix` and `--format` as given
+to the build), makes documents from the schema (`--generate <n>`, 200 by
+default, half of them with one rule broken, `--seed <n>` to repeat a run),
+reads the project's samples (`--samples <path>`, a JSON file, a JSON Lines
+file or a directory of them, repeatable), and has both the module and a
+`Validator` built from the schema now answer every document. The verdict and
+the error list (keyword and instance path of each error) have to agree. A
+module whose `schemaHash` differs from the schema's is reported stale, a
+missing module says to run `ata build`. The exit code is 1 on any
+disagreement, stale or missing module; `--json` writes the report as JSON. The
+`.bun.ts` target is not run, since it needs Bun's compiler.
+
 `ata build --mode schema` goes one step further, for pages where the bytes
 shipped matter more than the time per check: every module that can be is
 its schema and a few lines, and the verdict comes from the same runtime as
