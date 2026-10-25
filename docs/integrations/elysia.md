@@ -1,8 +1,9 @@
 # Elysia
 
-[Elysia](https://elysiajs.com) uses TypeBox for its built-in validation. ata is useful when you have schemas coming from outside (OpenAPI specs, JSON Schema Store, shared registries) that you do not want to translate to TypeBox.
-
-The recommended pattern is a direct handler check. No framework hook required.
+[Elysia](https://elysiajs.com) validates with TypeBox by default and, since
+1.3, takes any Standard Schema validator in the same slots. An ata `Validator`
+is one, so a JSON Schema goes straight into `body`, `query`, `params` or
+`headers`, with no hook and no wrapper.
 
 ## Install
 
@@ -10,103 +11,88 @@ The recommended pattern is a direct handler check. No framework hook required.
 bun add ata-validator
 ```
 
-## Direct handler usage
+## The schema in the body slot
 
 ```ts
 import { Elysia } from 'elysia'
 import { Validator } from 'ata-validator'
 
-const userSchema = new Validator({
+const user = new Validator({
   type: 'object',
   properties: {
     id: { type: 'integer', minimum: 1 },
     name: { type: 'string', minLength: 1 },
-    email: { type: 'string' },
+    email: { type: 'string', format: 'email' },
     role: { type: 'string', enum: ['admin', 'user', 'guest'] },
   },
   required: ['id', 'name', 'email'],
+  additionalProperties: false,
 })
 
-const app = new Elysia()
-  .post('/users', ({ body, set }) => {
-    const r = userSchema.validate(body)
-    if (!r.valid) {
-      set.status = 400
-      return { error: 'validation failed', errors: r.errors }
-    }
-    return { ok: true, id: (body as any).id }
-  })
+new Elysia()
+  .post('/users', ({ body }) => ({ ok: true, id: (body as { id: number }).id }), { body: user })
   .listen(3000)
 ```
 
-## As a reusable derive
+A body the schema refuses gets Elysia's 422 with the issues ata hands over
+(message and path for each error). The handler's `body` is typed `unknown`
+through this path; `defineSchema` and `Infer` from ata give it a type, or
+cast as above.
 
-Elysia's `derive` adds computed values to context. Wrap the validation there when multiple routes use the same schema:
+## The module from `ata build`
 
-```ts
-import { Elysia } from 'elysia'
-import { Validator } from 'ata-validator'
-
-const userSchema = new Validator({ /* ... */ })
-
-function validatedUser() {
-  return (app: Elysia) =>
-    app.derive(async ({ body, set }) => {
-      const r = userSchema.validate(body)
-      if (!r.valid) {
-        set.status = 400
-        throw new Error(JSON.stringify({ errors: r.errors }))
-      }
-      return { user: body as { id: number; name: string; email: string } }
-    })
-}
-
-new Elysia()
-  .use(validatedUser())
-  .post('/users', ({ user }) => ({ ok: true, id: user.id }))
-```
-
-## Buffer path
-
-Elysia exposes `request` for raw access. For high-throughput endpoints, validate the raw body buffer with simdjson before parsing:
-
-```ts
-import { Validator } from 'ata-validator'
-
-const v = new Validator(schema)
-
-new Elysia()
-  .post('/ingest', async ({ request, set }) => {
-    const buf = Buffer.from(await request.arrayBuffer())
-    if (!v.isValid(buf)) { set.status = 400; return { ok: false } }
-    return { ok: true, data: JSON.parse(buf.toString()) }
-  })
-```
-
-## Build-time compile for edge deploys
-
-Elysia on Bun + edge runtimes benefits from pre-compiled validators. Run `ata compile` during build and import the generated module directly:
+For an executable or an edge deploy, write the module at build time and put
+it in the slot through `fromCompiled`, which carries Standard Schema too:
 
 ```bash
-npx ata compile schemas/user.json -o src/user.validator.mjs --name User
+ata build schemas/user.schema.json --target bun
 ```
 
 ```ts
 import { Elysia } from 'elysia'
-import { isValid, type User } from './schemas/user.validator.mjs'
+import { fromCompiled } from 'ata-validator/compiled'
+import * as mod from './schemas/user.schema.compiled.mjs'
+import schema from './schemas/user.schema.json'
 
-new Elysia()
-  .post('/users', ({ body, set }) => {
-    if (!isValid(body)) { set.status = 400; return { ok: false } }
-    const user: User = body
-    return { ok: true, id: user.id }
-  })
+new Elysia().post('/users', ({ body }) => ({ ok: true }), { body: fromCompiled(mod, schema) })
 ```
 
-No `ata-validator` in the runtime bundle, around 1 KB per schema.
+`--target bun` writes the module in the form Bun's ahead-of-time compiler
+runs fastest (plain JavaScript either way), and beside it a `.bun.ts` with
+the schema as a TypeScript type; `ata build` without it is the same module
+for Node. Nothing in the module calls `new Function`.
+
+## Measured, inside a request
+
+Elysia 1.4.30, `app.handle` in process with no socket, one ten-item order
+body, 1024 distinct bodies, 10% of them invalid, five routes, nanoseconds per
+request (`benchmark/proof/aot/RESULTS.md` in the repository, "Inside an
+Elysia request"). The compiler column is the pull request build of Bun's
+`bun build --compile --aot` of 2026-10-25, which runs code that a library
+hands to `new Function` through an interpreter.
+
+| route | Bun 1.4 JIT | validation's share | compiled ahead of time | share |
+|---|---|---|---|---|
+| no schema | 1,705 to 1,726 | | 1,906 to 1,969 | |
+| Elysia `t` (TypeBox) | 4,453 to 4,581 | 2,750 | 9,663 to 9,759 | 7,750 |
+| zod 4 | 3,970 to 4,018 | 2,280 | 5,900 to 6,073 | 4,050 |
+| ata, runtime `Validator` | 2,170 to 2,214 | 480 | 3,468 to 3,517 | 1,550 |
+| ata, module from `ata build` | 2,008 to 2,049 | 310 | 2,494 to 2,553 | 580 |
+
+Two things the table does not say by itself. Elysia's own route refuses 78
+of the 1024 bodies where the other three refuse 103: Elysia normalizes a body
+against its own schema before checking it, and its default strips the
+unknown key one of the invalid cases adds, so that case passes there. And
+Elysia composes its handlers with `new Function` as well, which is in every
+row of the compiled column, the no-schema row included.
 
 ## Notes
 
-- TypeBox integration in Elysia remains the idiomatic path for schemas defined in code. Use ata for schemas that live in JSON files.
-- Standard Schema V1 support in Elysia is tracked upstream; once available, `userSchema` can be passed directly to Elysia's schema slot without the inline check.
-- For type-safe `body` inside the handler, either cast manually or use the build-time compile path which gives `isValid` as a type predicate.
+- Schemas written in code with Elysia's `t` stay idiomatic; ata is for
+  schemas that exist as JSON Schema, from an OpenAPI document, a registry or
+  a file, and for a validator that costs the same when the program is
+  compiled ahead of time.
+- `query`, `params` and `headers` arrive as strings; a schema for them wants
+  `coerceTypes: true` on the `Validator`.
+- The `.bun.ts` beside a module is a type for the program, not a faster
+  path; the measured numbers above are the module's.

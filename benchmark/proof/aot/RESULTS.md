@@ -429,3 +429,29 @@ name (161)". Declaring the type at the parse changed nothing measurable, in
 the parse or in the reads after it. The file is a type for the program; the
 speed is the module's, and the module's form (`jsc-aot`) and the one-pass
 error function are the whole of what `--target bun` buys today.
+
+## Inside an Elysia request (2026-10-25, PR build e52f869, app.handle in process, no socket)
+
+Elysia 1.4.30, the same 1024 Order bodies (10% invalid), five routes: no
+schema; Elysia's own `t` (TypeBox, its default); zod 4, the ata runtime
+`Validator` and the module from `ata build --target bun` (the last three as
+Standard Schema, the module behind a ten-line `~standard` wrapper). Harness:
+`bun-aot-kit/elysia-aot/`. ns per request, the median of 5 rounds of 10,240
+requests, two passes; "over none" is the validation's share.
+
+| route | JIT (bun run) | over none | --aot | over none |
+|---|---|---|---|---|
+| none | 1,705 to 1,726 | | 1,906 to 1,969 | |
+| Elysia t (TypeBox) | 4,453 to 4,581 | +2,750 | 9,663 to 9,759 | +7,750 |
+| zod 4 | 3,970 to 4,018 | +2,280 | 5,900 to 6,073 | +4,050 |
+| ata, runtime Validator | 2,170 to 2,214 | +480 | 3,468 to 3,517 | +1,550 |
+| ata, built module | 2,008 to 2,049 | +310 | 2,494 to 2,553 | +580 |
+
+Statuses: zod, the ata runtime and the ata module each answer 422 to the
+same 103 bodies; Elysia's `t` route to 78, since Elysia normalizes a body
+against its own schema before checking it (its `normalize` default strips
+the unknown key the "extra" case adds). Under the compiler, Elysia's own
+validator costs 13x what the ata module costs and zod 7x; the ata runtime
+takes its interpreted engine there (3x the module). On the JIT the gap is
+9x and 7x against the module. Elysia composes its handlers with `new
+Function` as well (its own `aot` option), which is in every row.

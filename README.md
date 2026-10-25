@@ -845,7 +845,7 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 | Vite (build-time compile) | dedicated plugin | [`ata-vite`](https://github.com/ata-core/ata-vite), the Vite entry of the plugin above |
 | Next.js (build-time compile) | webpack entry of the plugin above | `@ata-project/unplugin/webpack` in `next.config.js` |
 | Hono | async middleware | [docs/integrations/hono.md](docs/integrations/hono.md) |
-| Elysia | direct handler check | [docs/integrations/elysia.md](docs/integrations/elysia.md) |
+| Elysia | Standard Schema V1 in the `body` slot | [docs/integrations/elysia.md](docs/integrations/elysia.md) |
 | tRPC | Standard Schema V1 input | [docs/integrations/trpc.md](docs/integrations/trpc.md) |
 | TanStack Form | Standard Schema V1 validator | [docs/integrations/tanstack-form.md](docs/integrations/tanstack-form.md) |
 | Express | sync middleware | [docs/integrations/express.md](docs/integrations/express.md) |
