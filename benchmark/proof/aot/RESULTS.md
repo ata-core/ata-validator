@@ -290,3 +290,18 @@ per document (1024 parsed documents):
 
 Order module, paired in one executable, 1.60.0 emission against `--target
 bun`: AOT 223 -> 105 accepted, 218 -> 101 refused; JIT 65 -> 53, 59 -> 46.
+
+## Through the plugin (2026-10-25, unplugin feat/schema-of fad20e2, ata master)
+
+`Bun.build({ compile: { aot: true }, plugins: [ata()] })` on a TypeScript
+entry with `new Validator(schema)`, 1024 mixed-traffic documents, isValid
+through the compiled-away wrapper, two executables, two runs each:
+
+| schema | plain module (`bunTarget: false`) | typed check (default under aot) |
+|---|---|---|
+| ten-item order | 125.9, 120.8 ns | 114.1, 106.5 ns |
+| three fields with `format: email` | 38.6, 34.3 ns | 36.6, 32.6 ns |
+
+The wrapper (`fromCompiled` -> isValidObject) and the document generator in
+the same program put these above the bare-module figures (108 / 96); the
+ratio is the one the bare modules showed.
