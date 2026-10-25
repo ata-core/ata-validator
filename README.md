@@ -752,14 +752,10 @@ So, in order of preference:
    root the type says nothing about) gets a warning and the plain module
    alone.
 
-The pull request carried its own typed validator, `validate<T>` from
-`bun:bundle`, until 2026-10-25, and `--target bun` wrote the schema's rules
-as a type for it: on the ten-item order 96 to 105 ns against the module's
-105 to 107. It left the pull request to return as a change of its own, and
-ata writes nothing for it now; `bunTarget.schemaToBunType(schema, { tags:
-true })` in `ata-validator/build` still makes that split.
-
-A schema's `pattern` is a `new RegExp` at run time in the runtime
+The pull request carried its own typed validator until 2026-10-25, and
+`--target bun` wrote the schema's rules as a type for it; it left the pull
+request to return as a change of its own. `docs/API.md` has what ata keeps
+for it. A schema's `pattern` is a `new RegExp` at run time in the runtime
 `Validator`, which that compiler runs through its regular expression
 interpreter; the module writes each pattern as a literal, which it compiles.
 `--aot` makes TypeScript errors fatal; ata's declarations say `message?:

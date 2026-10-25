@@ -127,6 +127,13 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // with a type gets a Bun target) and `ata verify` (lib/verify.js: documents
 // made from a schema, samples read, module held against the runtime, stale
 // modules reported). Measured 480.2 KB.
-assert.ok(manifest.size < 486 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 492 KB with generated code written in one form per target engine
+// (lib/js-compiler.js: setTargetEngine, the jsc-aot form for an executable
+// compiled ahead of time), the Node entry warming the engine once the loop is
+// free (index.js: a server's first verdict 3.3 to 0.6 ms), the error
+// collector reading each property once behind helper functions that read no
+// flag of their caller (lib/js-compiler-errors.js), and the Bun section of
+// the README. Measured 486.1 KB.
+assert.ok(manifest.size < 492 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

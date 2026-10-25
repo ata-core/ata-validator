@@ -12,6 +12,7 @@ const assert = require('assert')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+const { pathToFileURL } = require('url')
 const { execFileSync, spawnSync } = require('child_process')
 const { schemaToBunType, toBunModule, Declined } = require('../lib/bun-target')
 
@@ -256,8 +257,8 @@ const tagged = (s, opts) => schemaToBunType(s, { ...opts, tags: true })
   const stripped = src.replace(/^export type .*$/mg, '').replace(/^type .*$/mg, '').replace(/\(d: unknown\): d is Order/g, '(d)').replace(/\(d: unknown\)/g, '(d)').replace(/\(text: string\): Order \| null/, '(text)').replace(/const d: Order =/, 'const d =')
   fs.writeFileSync(path.join(dir, 'order.bun.mjs'), stripped)
   const ran = spawnSync(process.execPath, ['--input-type=module', '-e', `
-    import * as m from ${JSON.stringify(path.join(dir, 'order.bun.mjs'))}
-    import * as plain from ${JSON.stringify(path.join(dir, 'order.compiled.mjs'))}
+    import * as m from ${JSON.stringify(pathToFileURL(path.join(dir, 'order.bun.mjs')).href)}
+    import * as plain from ${JSON.stringify(pathToFileURL(path.join(dir, 'order.compiled.mjs')).href)}
     const good = { customer: { id: 1, name: 'A', email: 'a@b.co' }, items: [{ sku: 'x', quantity: 1, unitCents: 5 }] }
     const bad = { customer: { id: 0, name: 'A', email: 'a@b.co' }, items: [] }
     const out = [m.isValid(good), m.isValid(bad), m.validate(bad).errors.map((e) => e.keyword).join(','), plain.validate(bad).errors.map((e) => e.keyword).join(','), JSON.stringify(m.parse(JSON.stringify(good))) === JSON.stringify(good), m.parse(JSON.stringify(bad)), m.parse('nope')]
