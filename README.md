@@ -667,6 +667,38 @@ first request, so counting only registration would overstate the gap. The first 
 here comes in the same tick as setup; a server that listens first has the code generator
 loaded by then. Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
+### Bun, compiled ahead of time
+
+Bun's ahead-of-time compiler (`bun build --compile --aot`, an open pull
+request as of October 2026) runs code that a library hands to `new Function`
+through an interpreter. Measured with its pull request build on one schema
+and 1024 parsed documents, nanoseconds per document (`benchmark/proof/aot`):
+
+| | JIT | ahead of time |
+|---|---|---|
+| a module from `ata build` | 26 | 34 |
+| `new Validator(schema)`, generated code | 26 | 525 |
+| `new Validator(schema)`, interpreted engine | 49 | 75 |
+
+So, in order of preference:
+
+1. Compile the schema at build time. `@ata-project/unplugin/bun` does it in
+   `Bun.build`, including `Bun.build({ compile })`; `ata build` writes the
+   module by hand. The module is plain JavaScript and compiles with the
+   program: 34 ns, the same errors as the runtime.
+2. Where the runtime `Validator` stays, let it take the interpreted engine.
+   It does so by itself when Bun reports `Bun.isAOT`, when the executable is
+   built with `--disallow-code-generation-from-strings` (the program then
+   counts as closed for the compiler, too), or when `ATA_ENGINE=interpreter`
+   is set: 75 ns against 525 for the generated code there.
+
+A schema's `pattern` is a `new RegExp` at run time in the runtime
+`Validator`, which that compiler runs through its regular expression
+interpreter; the module writes each pattern as a literal, which it compiles.
+`--aot` makes TypeScript errors fatal; ata's declarations say `message?:
+string` on an error, so read it as such. The numbers are from a pull request
+build on one machine and will be run again when the compiler ships.
+
 ### Standard Schema V1
 
 ```javascript

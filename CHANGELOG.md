@@ -9,6 +9,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 - A validator built without `engine` takes the interpreted engine where the process runs code compiled ahead of time: when Bun reports `Bun.isAOT`, or when `ATA_ENGINE=interpreter` is set. Under Bun's ahead-of-time compiler (pull request build) the generated code is interpreted and the interpreted engine is compiled: 80 against 530 ns a document for the same schema, measured in `benchmark/proof/aot`. `engine: 'auto'` by name keeps the generated code, and a module from `ata build` is unaffected, since it is compiled either way (34 ns there). `tests/test_aot_engine.js`.
 - `schemaOf<T>()`: a placeholder for the JSON Schema of a TypeScript type, written in at build time by `@ata-project/unplugin` from the type and the JSDoc tags on its properties, so `new Validator(schemaOf<User>())` compiles like any static schema. It has no run-time form: a call that reaches the runtime throws with a message naming the plugin, rather than returning an empty schema that accepts everything. Exported from every entry.
 
+### Fixed
+
+- The standalone emitters required `lib/aot-order.js` and `lib/error-runtime.js` through a name held in a constant, to keep bundlers for runtimes without `fs` from following them. An executable compiled ahead of time (Bun) cannot load a module from a computed path and warned about each such require at build time. They are literal requires now, and the package's `browser` field keeps `lib/aot-order.js` out of browser and edge bundles instead; the browser, edge and lite bundles and the Workers proof are unchanged. The native engine's loader still tries its optional packages by name, inside a try, which is one warning left under that compiler.
+
 ## 1.60.0 - 2026-10-24
 
 ### Added

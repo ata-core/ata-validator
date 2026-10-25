@@ -88,7 +88,8 @@
     "./lib/native-load.js": "./lib/native-load.browser.js",
     "./lib/aot.js": "./lib/aot.browser.js",
     "./lib/buffer-gate.js": "./lib/buffer-gate.browser.js",
-    "./lib/interpreter.js": "./lib/interpreter.browser.js"
+    "./lib/interpreter.js": "./lib/interpreter.browser.js",
+    "./lib/aot-order.js": false
   },
   "scripts": {
     "prepublishOnly": "node tests/test_pack_purity.js && ATA_ALLOW_DOC_PLACEHOLDERS=1 node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js && node tests/test_safe_regex_embed.js && node tests/test_version_sync.js",
