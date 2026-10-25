@@ -372,3 +372,23 @@ opt-in for browser builds because it is larger: over 60 SchemaStore schemas
 gzipped 1,341,514 against 1,617,278 bytes (1.21x; 53 larger by more than 5%,
 worst act3.json 2,010 to 3,164). `--target bun` and the plugin under
 `compile.aot` take it by default, with no frames.
+
+## Inside a Hono request (2026-10-25, plugin feat/schema-of, app.fetch in process, no socket)
+
+Four POST routes over the same 1024 bodies (10% invalid): parse only; parse +
+ata `isValidObject`; parse + ata `validate()` with the error list in the 400
+body; parse + zod `safeParse`. Built three ways with the plugin (harness
+hono-aot/). ns per request, two passes:
+
+| route | `--aot`, plain module | `--aot`, typed target | JIT (`--compile`) |
+|---|---|---|---|
+| /none | 1229, 1221 | 1209, 1241 | 1583, 1579 |
+| /ata | 1337, 1391 | 1347, 1354 | 1679, 1736 |
+| /ata-errors | 1508, 1494 | 1513, 1447 | 1811, 1773 |
+| /zod | 4522, 4554 | 4788, 4817 | 3440, 3339 |
+
+The check costs a Hono request about 120 to 170 ns of 1,350 under the
+compiler; zod costs it 3,300. Typed against plain is inside the run's noise
+here. Two bugs found on the way, both in the plugin's aot path and both fixed:
+a strict project (`@types/bun`) failed the type check on the inlined module
+(TS7006), then on the virtual module's missing declaration (TS2307).
