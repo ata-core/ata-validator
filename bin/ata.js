@@ -65,6 +65,9 @@ Build options:
   --cache-file <path>     Cache file for incremental builds (default: cache disabled)
   --max-size <bytes>      Fail build if any compiled module exceeds this gzipped size
   --strict                Treat any AOT-incompatible schema as a build error (default: skip + warn)
+  --target bun            Also write a .bun.ts module for bun build --compile --aot: the
+                          schema's rules as a type that Bun checks in machine code, the
+                          plain module deciding and supplying the errors where the type refuses
   --strict-schema         Fail the build on schema authoring mistakes: unknown
                           keywords (with a spelling suggestion), keywords the
                           node's type makes inert, unresolvable local $refs,
@@ -117,6 +120,7 @@ function parseArgs(argv) {
     if (a === '--check') { out.opts.check = true; continue; }
     if (a === '--strict') { out.opts.strict = true; continue; }
     if (a === '--strict-schema') { out.opts.strictSchema = true; continue; }
+    if (a === '--target') { out.opts.target = argv[++i]; continue; }
     if (a === '--out-dir') { out.opts.outDir = argv[++i]; continue; }
     if (a === '--suffix') { out.opts.suffix = argv[++i]; continue; }
     if (a === '--cache-file') { out.opts.cacheFile = argv[++i]; continue; }
@@ -277,6 +281,34 @@ function cmdCompile(args) {
   const sizeBytes = Buffer.byteLength(src, 'utf8');
   process.stdout.write(`ata: compiled ${input} -> ${output} (${sizeBytes.toLocaleString()} bytes, ${format}${abortEarly ? ', abort-early' : ''})\n`);
 
+  if (args.opts.target !== undefined) {
+    if (args.opts.target !== 'bun') {
+      reportCompileError(input, `--target must be bun (got ${JSON.stringify(args.opts.target)})`);
+      process.exit(1);
+    }
+    const { schemaToBunType, toBunModule, Declined } = require('../lib/bun-target');
+    const tn = (args.opts.name || path.basename(input, path.extname(input)).replace(/[^A-Za-z0-9_]/g, '_').replace(/^([a-z])/, (m) => m.toUpperCase())) || 'Data';
+    let mapped = null;
+    try {
+      mapped = schemaToBunType(schema, { name: tn });
+    } catch (e) {
+      if (!(e instanceof Declined)) throw e;
+      // A type that left this rule out would accept what the schema refuses;
+      // the plain module stands alone.
+      const msg = `--target bun: the schema is not carried as a type, ${e.message}; the plain module stands alone`;
+      if (args.opts.strict) { reportCompileError(input, msg); process.exit(1); }
+      process.stderr.write(`ata: warning: ${input}: ${msg}\n`);
+    }
+    if (mapped) {
+      const ext = path.extname(output);
+      const bunPath = output.slice(0, output.length - ext.length) + '.bun.ts';
+      const moduleImport = './' + path.basename(output);
+      const bunSrc = toBunModule({ schemaFile, moduleImport, typeName: mapped.name, typeSource: mapped.type, aliases: mapped.aliases });
+      fs.writeFileSync(bunPath, bunSrc);
+      process.stdout.write(`ata: wrote bun target  -> ${bunPath} (for bun build --compile --aot; ${mapped.aliases.length} definition type${mapped.aliases.length === 1 ? '' : 's'})\n`);
+    }
+  }
+
   // Emit paired declaration file unless --no-types.
   // TypeScript resolution: .mjs -> .d.mts, .cjs -> .d.cts, .js -> .d.ts.
   const emitTypes = args.opts.types !== false;
@@ -298,6 +330,10 @@ function cmdCompile(args) {
 }
 
 function cmdBuild(args) {
+  if (args.opts.target !== undefined && args.opts.target !== 'bun') {
+    process.stderr.write(`error: --target must be bun (got ${JSON.stringify(args.opts.target)})\n`);
+    process.exit(1);
+  }
   if (args._.length === 0) {
     process.stderr.write('error: missing <glob>\n\n');
     usage();
@@ -323,6 +359,7 @@ function cmdBuild(args) {
     check: !!args.opts.check,
     maxSize: args.opts.maxSize,
     strict: !!args.opts.strict,
+    target: args.opts.target,
     types: args.opts.types,
     cacheFile: args.opts.cacheFile,
     // Forward the explicit user choice (true / false / undefined). The
@@ -337,6 +374,8 @@ function cmdBuild(args) {
     }
     for (const c of report.compiled) {
       process.stdout.write(`ata: ${c.input} -> ${c.output} (${c.bytes.toLocaleString()} bytes${c.errors === 'compact' ? ', shared errors' : c.errors === 'schema' ? ', schema module' : ''})\n`);
+      for (const t of (report.bunTargets || []).filter((t) => t.input === c.input)) process.stdout.write(`ata: bun target -> ${t.output} (for bun build --compile --aot${t.definitions ? `, ${t.definitions} definition type${t.definitions === 1 ? '' : 's'}` : ''})\n`);
+      for (const d of (report.bunDeclined || []).filter((d) => d.input === c.input)) process.stderr.write(`ata: warning: ${d.input}: ${d.reason}\n`);
     }
     if (report.runtime) {
       process.stdout.write(`ata: error runtime -> ${report.runtime.output} (${report.runtime.bytes.toLocaleString()} bytes, shared by the modules above)\n`);

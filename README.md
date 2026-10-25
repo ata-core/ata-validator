@@ -676,21 +676,36 @@ and 1024 parsed documents, nanoseconds per document (`benchmark/proof/aot`):
 
 | | JIT | ahead of time |
 |---|---|---|
-| a module from `ata build` | 26 | 34 |
-| `new Validator(schema)`, generated code | 26 | 525 |
-| `new Validator(schema)`, interpreted engine | 49 | 75 |
+| a module from `ata build` | 27 | 32 |
+| `new Validator(schema)`, generated code | 28 | 513 |
+| `new Validator(schema)`, interpreted engine | 52 | 82 |
 
 So, in order of preference:
 
 1. Compile the schema at build time. `@ata-project/unplugin/bun` does it in
    `Bun.build`, including `Bun.build({ compile })`; `ata build` writes the
    module by hand. The module is plain JavaScript and compiles with the
-   program: 34 ns, the same errors as the runtime.
+   program: 32 ns, the same errors as the runtime.
 2. Where the runtime `Validator` stays, let it take the interpreted engine.
    It does so by itself when Bun reports `Bun.isAOT`, when the executable is
    built with `--disallow-code-generation-from-strings` (the program then
    counts as closed for the compiler, too), or when `ATA_ENGINE=interpreter`
-   is set: 75 ns against 525 for the generated code there.
+   is set: 82 ns against 513 for the generated code there.
+3. For the last factor, let Bun's compiler check the rules itself. `ata build
+   schema.json --target bun` also writes `schema.compiled.bun.ts`: the schema's
+   rules as a type with Bun's `Schema` tags, `validate<T>` for the verdict and
+   `JSON.parse<T>` for text, with the plain module deciding and supplying the
+   errors wherever the type refuses. The type is never looser than the schema;
+   a keyword it cannot carry exactly (`format`, `oneOf`, `patternProperties`,
+   a remote `$ref`, among others) declines the whole schema with a warning,
+   and the plain module stands alone. On a ten-item order with 1024 distinct
+   documents, 10% of them invalid: the generated `isValid` 96 to 99 ns against
+   90 to 105 for a type written by hand, the plain module 108; text to object,
+   `parse` 425 ns against 546 for `JSON.parse` plus the module. The file is
+   for executables built with `--aot`; everywhere else import the plain
+   module. Checked against the official suite: of the schema groups the type
+   carries (108 of 384 on draft 2020-12, 97 of 258 on draft 7) none accepts a
+   document the suite refuses.
 
 A schema's `pattern` is a `new RegExp` at run time in the runtime
 `Validator`, which that compiler runs through its regular expression

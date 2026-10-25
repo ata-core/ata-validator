@@ -198,3 +198,36 @@ builds the typed object directly; `JSON.parse` + the ata module 542 to 551.
 On the parsed object the module is within 35 ns of the typed validator; on
 the text path the fused parse is 1.44x ahead of parse plus module, and it is
 the engine's own parser, which no library can be.
+
+## `ata build --target bun` (2026-10-25, ata master)
+
+The build writes `order.compiled.bun.ts` beside the plain module: the schema's
+rules as a type with Bun's `Schema` tags, `validate<T>` for the verdict,
+`JSON.parse<T>` from "bun" for text, and the plain module deciding and
+supplying the errors wherever the type refuses. The type is never looser than
+the schema; a keyword the type cannot carry exactly declines the whole schema
+(the plain module stands alone, a warning says which keyword).
+
+Official suite, the groups the mapping carries, checked by `validate<T>` in
+one `--aot` executable against the suite's answers (benchmark/proof/aot/suite-differential.mjs):
+draft 2020-12 108 of 384 groups (28%), 374 tests, 0 where the type accepts
+what the suite refuses, 1 stricter (vocabulary.json, where ata itself differs
+from the suite by design); draft 7 97 of 258 groups (38%), 343 tests, 0 and 0.
+Declined most often: remote $ref, unevaluated*, contains, if, format, oneOf,
+not, patternProperties. Patterns are carried only when the unicode flag cannot
+change their answer (Bun runs them without it).
+
+The 1024 mixed-traffic orders, one `--aot` executable, no zod in it, ns per document:
+
+| | |
+|---|---|
+| validate<Order>, Bun's own type | 90 to 105 |
+| generated isValid | 96 to 99 |
+| generated validate (Result object) | 165 to 166 |
+| plain module isValid | 108 to 109 |
+| plain module validate | 173 to 176 |
+| generated parse, text to object | 423 to 429 |
+| JSON.parse + plain module, text to object | 546 to 549 |
+
+0 disagreements between the generated file and the plain module on the 1024
+documents, isValid, validate and parse alike.

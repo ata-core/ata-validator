@@ -298,6 +298,26 @@ registered beside it, any option but the defaults) always gets the
 self-contained module. `toCompactModule(validator, { errorRuntime })` and
 `errorRuntimeSource(format)` in `ata-validator/aot` do the same by hand.
 
+`ata build --target bun` writes, beside each module, a `.bun.ts` for
+executables built with `bun build --compile --aot`: the schema's rules as a
+TypeScript type with Bun's `Schema` tags (`Min`, `MaxLength`, `Pattern`,
+`MinItems`, `Strict` and the rest), `isValid` and `validate` through Bun's
+`validate<T>()`, and `parse(text)` through `JSON.parse<T>()` from `"bun"`, so
+the compiler checks the rules in machine code. Wherever the type refuses, the
+plain module decides and supplies the errors, so every answer is the module's.
+The type is never looser than the schema: a keyword the type cannot carry
+exactly (`format`, `oneOf`, `not`, `if`, `patternProperties`,
+`unevaluatedProperties`, `uniqueItems`, `contains`, a remote `$ref`, a
+non-integer `multipleOf`, an object literal in `enum`, a `prefixItems` tuple
+without `items: false` and a matching `minItems`) declines the whole schema
+with a warning naming it and its pointer, an error with `--strict`, and the
+plain module stands alone. A `pattern` is carried only where Bun's reading of
+it, without the unicode flag, cannot accept what the schema's reading refuses:
+ASCII only, no `\p`, `\u`, `\x`, `\b`, `\k`, and `.`, a negated class,
+`\W`, `\S`, `\D` only under a greedy `+` or `*`. Under plain `bun run` and
+everywhere else, import the plain module. The suite check behind this is
+`benchmark/proof/aot/suite-differential.mjs`, which needs a Bun with `--aot`.
+
 `ata build --mode schema` goes one step further, for pages where the bytes
 shipped matter more than the time per check: every module that can be is
 its schema and a few lines, and the verdict comes from the same runtime as
