@@ -104,3 +104,31 @@ code the compiler cannot follow. Closing that gap means rewriting the plan
 compiler's hot closures in a closed style, for about 1.5x on a path whose
 alternative, the module from `ata build`, is already 2.2x faster and needs no
 option. Not done now; this file and bench.ts are the method when it is.
+
+## A typed copy of the module (typed-bench.ts)
+
+The same module with its helpers given TypeScript signatures (`_cpLen(s:
+string)`, `_h(o: any, k: string)`, `isValid(data: any)`), built `--aot`:
+33.0 against 32.1 to 32.2 ns for the JavaScript one, three runs. The data is
+`unknown` by nature, so the types that would matter cannot be written; no
+typed emission.
+
+## Bun's own order (test/aot/servers), validation alone, --aot
+
+The order body of Bun's server benchmarks (customer, ten items, coupon),
+the zod 4 schema from its `shared.ts`, Bun's `validate<Order>` from
+`bun:bundle` (the type carries the same rules), and the module from `ata
+build` of the same rules as JSON Schema. One executable, ns per call,
+medians of 7 rounds, two runs:
+
+| validator | accepted order | refused order (last item wrong) |
+|---|---|---|
+| zod 4.6.7 safeParse | 4,593 to 4,716 | 5,228 to 5,278 |
+| validate<Order> (bun:bundle) | 91 to 92 | 133 to 136 |
+| ata module, isValid | 174 | 165 to 166 |
+
+The ata module agrees with Bun's `answers.ts` on all 60 accepted, refused
+and invalid orders. Alone in an executable the same module takes 110 ns; next
+to zod, whose parsers go through `new Function` and so leave the program
+open, 174. Before the engine-selected prototype read and key count (ata
+1.60.0's emission) the module took 212 alone and 430 with pricing.
