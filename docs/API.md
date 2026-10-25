@@ -329,6 +329,12 @@ says nothing about (`{ "format": "email" }` alone), a rule the type cannot
 carry that refers to the root with `$ref: "#"`. Under plain `bun run` and
 everywhere else, import the plain module. The suite check behind this is
 `benchmark/proof/aot/suite-differential.mjs`, which needs a Bun with `--aot`.
+With `--target bun` every module the build writes, the plain one included, is
+written for JavaScriptCore: a closed object's keys are walked with
+`Object.keys`, the cheaper form there, where a module written on Node for V8
+uses for...in. The runtime compiler writes for the engine it runs on, and
+`setTargetEngine('jsc' | 'v8' | null)` from `ata-validator/lib/js-compiler`
+changes that for a build script.
 
 `ata verify <glob>` holds each schema's module against the runtime: it loads
 the module `ata build` wrote (`--out-dir`, `--suffix` and `--format` as given

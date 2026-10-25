@@ -13,7 +13,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
-- Generated code, in modules from `ata build` and in the runtime, reads an object's prototype and counts its keys by engine, decided once where the code loads: on V8 as before (the `__proto__` accessor and a for-in count, the cheaper forms there), on JavaScriptCore through `Object.getPrototypeOf` and `Object.keys().length`. The walk over a closed object's keys follows the same rule: for...in on V8, an indexed loop over `Object.keys` on JavaScriptCore, where for...in is a slow path. Measured on a ten-item order, the two emissions side by side in one executable: Bun 1.4.4's JIT 65 to 53 ns a document, Bun's ahead-of-time compiler (pull request build) 227 to 108, Node 25 unchanged at 83 to 85. Warm compile on V8 pays for the second form, 60.4 to 61.4 us a schema.
+- Generated code walks and counts a closed object's keys in the form of the engine it is written for: for...in on V8, where it is the cheaper form, an indexed loop over `Object.keys` on JavaScriptCore, where for...in is a slow path. The runtime writes for the engine it runs on; `ata build --target bun` and the plugin's Bun entry write for JavaScriptCore. One form is written, so neither engine pays a branch per object (an earlier form with a load-time flag cost V8 5 to 7% on small schemas). The prototype read picks `__proto__` on V8 and `Object.getPrototypeOf` on JavaScriptCore at load. Measured on a ten-item order: Bun 1.4.4's JIT 65 to 53 ns a document, Bun's ahead-of-time compiler (pull request build) 227 to 108, Node 25 unchanged.
 
 ### Fixed
 
