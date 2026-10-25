@@ -180,3 +180,21 @@ All four agree on all 1024 verdicts. The single-object numbers above
 (validate<Order> 85 to 90, module 108 to 122) flattered everyone by the same
 amount; the ranking and the ratios (zod 24x behind the module under the
 compiler, the module 1.37x behind the typed validator) hold on traffic.
+
+## Two more doors, both measured shut (2026-10-25, --aot)
+
+Typed emission. The Order rules written as the emitter would but in
+TypeScript, each object cast to a type derived from the schema after its
+typeof test, so the property reads are typed: fields `unknown` 135 to 136 ns,
+fields typed 124 to 128, the plain module 118 to 119, `validate<Order>` 84 to
+85. The casts change nothing for data the compiler did not see born; nine
+wrong-shape probes (a string item, a numeric sku, a getter, an extra key, a
+`__proto__` key from JSON) were refused by all three the same way.
+
+End to end, text to object and verdict, the 1024 mixed-traffic texts:
+`JSON.parse` alone 422 to 428; `JSON.parse` + `validate<Order>` 522 to 523;
+`JSON.parse<Order>` fused 378 to 382, faster than the plain parse because it
+builds the typed object directly; `JSON.parse` + the ata module 542 to 551.
+On the parsed object the module is within 35 ns of the typed validator; on
+the text path the fused parse is 1.44x ahead of parse plus module, and it is
+the engine's own parser, which no library can be.
