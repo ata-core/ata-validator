@@ -76,6 +76,7 @@ hands to `new Function` through an interpreter.
 | no schema | 1,705 to 1,726 | | 1,906 to 1,969 | |
 | Elysia `t` (TypeBox) | 4,453 to 4,581 | 2,750 | 9,663 to 9,759 | 7,750 |
 | zod 4 | 3,970 to 4,018 | 2,280 | 5,900 to 6,073 | 4,050 |
+| zod 4 with `z.compile()` | 2,266 to 2,317 | 600 to 660 | 4,319 | 2,406 |
 | ata, runtime `Validator` | 2,170 to 2,214 | 480 | 3,468 to 3,517 | 1,550 |
 | ata, module from `ata build` | 2,008 to 2,049 | 310 | 2,494 to 2,553 | 580 |
 
@@ -84,7 +85,11 @@ of the 1024 bodies where the other three refuse 103: Elysia normalizes a body
 against its own schema before checking it, and its default strips the
 unknown key one of the invalid cases adds, so that case passes there. And
 Elysia composes its handlers with `new Function` as well, which is in every
-row of the compiled column, the no-schema row included.
+row of the compiled column, the no-schema row included. zod's `z.compile()`
+(4.6) wraps a schema in a generated fast path, also from a string, with the
+runtime parser behind it for a refused body; it takes zod's share to about a
+third on the JIT, and under the compiler that fast path is interpreted like
+the rest.
 
 ## Notes
 

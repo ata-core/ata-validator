@@ -467,3 +467,24 @@ were: JIT, ata runtime +13, module +98, zod +1,762, Elysia t +1,797; compiled,
 module +240, runtime +1,137, zod +3,481, Elysia t +6,799. The rest of the 10%
 run's shares is Elysia building its 422 response for the refused tenth, paid
 by every row alike. Nothing on ata's side is left to take out of the request.
+
+### zod 4.6 `z.compile()` in the same Elysia route (2026-10-25, evening)
+
+Asked on X after the chart went out. zod 4.6.7 has `compile(schema)`: a clone
+whose `_zod.run` tries a generated fast path first (built with `new Function`,
+ten sites in `v4/core/compile.js`) and falls back to the runtime parser where
+the fast path returns INVALID. Same harness, a `/zod-compiled` route with
+`body: z.compile(ZodOrder)`, two JIT runs and one `--aot` run; ns added over
+the no-schema route of the same run:
+
+| route | JIT run 1 | JIT run 2 | --aot |
+|---|---|---|---|
+| zod 4 | +2,122 | +2,145 | +3,888 |
+| zod 4, `z.compile()` | +660 | +598 | +2,406 |
+| ata, runtime Validator | +340 | +485 | +1,588 |
+| ata, built module | +179 | +325 | +517 |
+
+Statuses identical (103 refused). `compile()` takes zod's share to about a
+third on the JIT, about twice the ata module; under the compiler its fast path
+is code from a string and is interpreted, so the gap there stays 4.7x. A
+refused body runs the fast path and then the runtime parser, by design.
