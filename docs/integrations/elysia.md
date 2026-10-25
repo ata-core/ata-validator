@@ -30,14 +30,40 @@ const user = new Validator({
 })
 
 new Elysia()
-  .post('/users', ({ body }) => ({ ok: true, id: (body as { id: number }).id }), { body: user })
+  .post('/users', ({ body }) => ({ ok: true, id: body.id }), { body: user })
   .listen(3000)
 ```
 
 A body the schema refuses gets Elysia's 422 with the issues ata hands over
-(message and path for each error). The handler's `body` is typed `unknown`
-through this path; `defineSchema` and `Infer` from ata give it a type, or
-cast as above.
+(message and path for each error). The handler's `body` is typed from the
+schema: `new Validator(schema)` infers the document type from a schema
+written inline or through `defineSchema`, and Elysia reads it off the
+Standard Schema, so `body.id` is a `number` and `body.missing` is a type
+error. Eden clients get the same type. `@elysiajs/openapi` documents the
+route from the same validator: ata exposes its schema as Standard JSON
+Schema (`~standard.jsonSchema`), and the plugin writes it into the request
+body of the OpenAPI document as it does for zod.
+
+## Keeping schemas written with `t`
+
+A TypeBox schema is a JSON Schema object with a few symbol-keyed extras, so
+one written with Elysia's `t` goes into a `Validator` as it is:
+
+```ts
+const order = t.Object({ id: t.Integer({ minimum: 1 }), tags: t.Array(t.String(), { maxItems: 4 }) }, { additionalProperties: false })
+
+new Elysia().post('/orders', ({ body }) => body, { body: new Validator(order) })
+```
+
+Checked on the ten-item order schema of the measurement below: `new
+Validator(t.Object(...))` answers the same as zod's schema on all 1024
+bodies. Two things change. Elysia's own check normalizes a body first, which
+by default strips keys the schema does not name; ata checks the body as it
+arrives, so `additionalProperties: false` refuses such a body (103 refused
+against Elysia's 78 on those bodies), and `removeAdditional: true` on the
+`Validator` strips instead. And the Elysia-only types that are not JSON
+Schema (`t.File`, `t.Files`, `t.Numeric`, `t.Date`, `t.Cookie`) have no
+meaning to a JSON Schema validator; routes that use them keep `t`.
 
 ## The module from `ata build`
 
