@@ -317,9 +317,13 @@ and `const` of primitives, `anyOf` as a union, `allOf` as an intersection,
 a local `$ref` as a named type; in draft-07 and before, keywords beside
 `$ref` are ignored, as the dialect says), `isValid` as a type guard and
 `validate` with the type on them, and `parse(text)`, which declares the type
-where it parses (`const d: T = JSON.parse(text)`): the compiler makes the
-objects with that layout, which keeps the code that reads them on its fast
-path, and the module checks the content. Every check is the module's. A
+where it parses (`const d: T = JSON.parse(text)`, the form the compiler's
+documentation gives for a parse that makes objects with the type's layout)
+and has the module check the content. Every check is the module's, and the
+file is a type for the program, not a faster path: on a ten-item order under
+the pull request build of 2026-10-25, `parse` 564 to 574 ns against 570 to
+578 for a plain parse and the module, and reading the object after the typed
+parse 593 to 595 against 587 to 591. A
 schema no type can be written for declines with a warning naming the reason
 and its pointer, an error with `--strict`, and the plain module stands alone:
 a remote `$ref`, `$dynamicRef` or `$dynamicAnchor`, a root the type says

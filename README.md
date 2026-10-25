@@ -723,10 +723,14 @@ So, in order of preference:
    `schema.compiled.bun.ts`: the schema as a TypeScript type (kinds,
    properties and which are required, items and fixed tuples, literals,
    local definitions as named types), `validate` and `isValid` with that
-   type on them, and `parse(text)`, which declares the type where it parses,
-   so the compiler makes the objects with that layout and the code that
-   reads them stays on its fast path, and the module checks the content.
-   Every check is the module's. The file is for executables built with
+   type on them, and `parse(text)`, which declares the type where it parses
+   and has the module check the content. Every check is the module's, and
+   the file is a type for the program, not a faster path: on that order,
+   with the pull request build of 2026-10-25, `isValid` 118 ns through the
+   file against 118 to 121 through the module, `parse` 564 to 574 against
+   570 to 578 for a plain parse and the module, and reading the parsed
+   object after a typed parse 593 to 595 against 587 to 591 after a plain
+   one. The file is for executables built with
    `--aot`; a project points that compiler at it with an `"aot"` condition
    in its `package.json` `imports`, which nothing else reads:
 

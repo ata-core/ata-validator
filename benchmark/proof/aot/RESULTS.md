@@ -405,3 +405,27 @@ compiler; zod costs it 3,300. Typed against plain is inside the run's noise
 here. Two bugs found on the way, both in the plugin's aot path and both fixed:
 a strict project (`@types/bun`) failed the type check on the inlined module
 (TS7006), then on the virtual module's missing declaration (TS2307).
+
+## The plain Bun target (2026-10-25, PR build of 16:54 local, "aot" condition in)
+
+`order.plain.bun.ts` as `ata build --target bun` writes it since this
+afternoon (plain type, `isValid` and `validate` through the module, `parse`
+with `const d: Order = JSON.parse(text)`), one `--aot` executable
+(`plain-target.ts` in the kit), the 1024 mixed-traffic orders, ns per
+document, two passes:
+
+| | pass 0 | pass 1 |
+|---|---|---|
+| generated isValid | 139 | 118 |
+| plain module isValid | 118 | 121 |
+| generated parse (text) | 564 | 574 |
+| JSON.parse + plain module (text) | 578 | 570 |
+| typed parse, then read the object | 595 | 593 |
+| untyped parse, then read the object | 587 | 591 |
+
+0 disagreements with the plain module on the 1024 documents. The build's
+report: "49.6% of property accesses are one load: 80 free, 58 tested, 23 by
+name (161)". Declaring the type at the parse changed nothing measurable, in
+the parse or in the reads after it. The file is a type for the program; the
+speed is the module's, and the module's form (`jsc-aot`) and the one-pass
+error function are the whole of what `--target bun` buys today.

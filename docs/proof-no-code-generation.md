@@ -70,9 +70,11 @@ On a ten-item order with closed objects that is 227 against 108 ns under the
 compiler and 65 against 53 on Bun's JIT; the module Node gets is unchanged.
 
 `ata build --target bun` also writes the schema as a TypeScript type beside
-the module, with `parse(text)` declaring that type where it parses, so the
-compiler makes the objects with the type's layout and the module checks the
-content. Until 2026-10-25 the pull request carried its own typed validator,
+the module, with `parse(text)` declaring that type where it parses and the
+module checking the content; on the pull request build of 2026-10-25 that
+is level with a plain parse and the module (564 to 574 ns against 570 to
+578), so the file is a type for the program and nothing faster. Until
+2026-10-25 the pull request carried its own typed validator,
 `validate<T>` from `bun:bundle`, which checks an object's hidden structure in
 one comparison, and the target wrote the schema's rules as a type with Bun's
 `Schema` tags for it, with a second module for the rules a type cannot carry:
