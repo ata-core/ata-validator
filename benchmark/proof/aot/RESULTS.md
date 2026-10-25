@@ -231,3 +231,38 @@ The 1024 mixed-traffic orders, one `--aot` executable, no zod in it, ns per docu
 
 0 disagreements between the generated file and the plain module on the 1024
 documents, isValid, validate and parse alike.
+
+## The split: type plus residual (2026-10-25, ata master)
+
+The whole-schema rule was too coarse: `format` on one property declined the
+whole target. Now each node's keywords are split, the ones a type carries
+exactly into the type, the rest into a residual schema that keeps only the
+structure needed to reach them, compiled by ata into `X.compiled.rest.mjs`.
+Accept = Bun's check and the residual module; refuse = the plain module's
+errors. Groups that see each other stay whole in the residual (`if/then/else`,
+`unevaluated*` with its node, `additionalProperties` beside
+`patternProperties`, the `contains` family, `anyOf` with any residual
+branch). Definitions travel whole beside their residuals (`__rest__<name>`).
+
+Suite, type and residual together against the suite's answers, in one `--aot`
+executable: draft 2020-12 122 of 384 groups get a target (96 carried whole by
+the type), 417 tests, 416 agree, 0 looser, 1 stricter (vocabulary.json, where
+ata itself differs from the suite by design); draft 7 105 of 258 (90 whole),
+383 of 383. The groups without a target are the ones whose root the type
+cannot say anything about (`{"format": ...}`, `{"oneOf": ...}` alone: 201 and
+122), remote `$ref` (53, 28), `$dynamicRef` (3).
+
+The order with `format: email` on the customer's address (the residual holds
+that one keyword), 1024 mixed-traffic documents, ns per document:
+
+| | |
+|---|---|
+| validate<Order>, Bun's own type (no format) | 88 to 91 |
+| generated isValid (type, then residual) | 111 to 112 |
+| plain module isValid | 117 to 119 |
+| generated parse, text to object | 446 to 448 |
+| JSON.parse + plain module, text to object | 570 to 579 |
+
+0 disagreements with the plain module on the 1024 documents. The residual
+costs about 14 ns here against the type alone (97); the text path keeps its
+1.28x.

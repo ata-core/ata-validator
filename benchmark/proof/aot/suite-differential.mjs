@@ -7,9 +7,11 @@
 //   node benchmark/proof/aot/suite-differential.mjs [draft2020-12] [path/to/bun]
 //
 // Prints how many schema groups the mapping carried and the disagreements.
-// The one disagreement that would be a bug is a type accepting a document
-// the suite calls invalid; a type refusing a valid one costs time, since the
-// generated module then asks the plain module, and is listed too.
+// Where the type does not carry the whole schema, the residual schema is
+// checked by ata beside it, as the generated module does. The one
+// disagreement that would be a bug is the pair accepting a document the suite
+// calls invalid; a pair refusing a valid one costs time, since the generated
+// module then asks the plain module, and is listed too.
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -20,6 +22,15 @@ const { schemaToBunType, Declined } = require('../../../lib/bun-target.js')
 const { Validator } = require('../../..')
 
 const dialect = process.argv[2] || 'draft2020-12'
+const DIALECTS = {
+  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
+  draft7: 'http://json-schema.org/draft-07/schema#',
+  draft6: 'http://json-schema.org/draft-06/schema#',
+  draft4: 'http://json-schema.org/draft-04/schema#',
+  'draft2019-09': 'https://json-schema.org/draft/2019-09/schema',
+}
+// The suite's schemas carry no $schema; the runner gives them the dialect's.
+const withDialect = (s) => (typeof s === 'object' && s !== null && !Array.isArray(s) && s.$schema === undefined) ? { $schema: DIALECTS[dialect], ...s } : s
 const bun = process.argv[3] || process.env.BUN || 'bun'
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..')
 const suiteDir = path.join(root, 'tests/suite/tests', dialect)
@@ -32,13 +43,14 @@ for (const file of fs.readdirSync(suiteDir).filter((f) => f.endsWith('.json')).s
   for (const g of list) {
     groups++
     let mapped
-    try { mapped = schemaToBunType(g.schema, { name: `T${cases.length}` }) } catch (e) {
+    const schema = withDialect(g.schema)
+    try { mapped = schemaToBunType(schema, { name: `T${cases.length}`, aliasPrefix: `D${cases.length}_` }) } catch (e) {
       if (!(e instanceof Declined)) throw e
       const key = /^keyword /.test(e.reason) ? e.reason : e.reason.replace(/"[^"]*"/g, '"…"')
       declined.set(key, (declined.get(key) || 0) + 1)
       continue
     }
-    cases.push({ id: cases.length, mapped, tests: g.tests, group: g.description, file, schema: g.schema })
+    cases.push({ id: cases.length, mapped, tests: g.tests, group: g.description, file, schema, residual: mapped.residual })
   }
 }
 
@@ -49,8 +61,8 @@ lines.push("import { validate } from 'bun:bundle'")
 lines.push("import type { Schema } from 'bun'")
 const docs = []
 for (const c of cases) {
-  for (const [n, src] of c.mapped.aliases) lines.push(`type ${n}_${c.id} = ${src.replace(/\b([A-Z][A-Za-z0-9_$]*)\b(?=\s*[;}|&)\],]|\s*$)/g, (m) => c.mapped.aliases.some((a) => a[0] === m) || m === c.mapped.name ? `${m}_${c.id}` : m)}`)
-  lines.push(`type ${c.mapped.name} = ${c.mapped.type.replace(/\b([A-Z][A-Za-z0-9_$]*)\b/g, (m) => c.mapped.aliases.some((a) => a[0] === m) ? `${m}_${c.id}` : m)}`)
+  for (const [n, src] of c.mapped.aliases) lines.push(`type ${n} = ${src}`)
+  lines.push(`type ${c.mapped.name} = ${c.mapped.type}`)
   lines.push(`function check${c.id} (d: unknown): boolean { try { validate<${c.mapped.name}>(d); return true } catch (e) { if (e instanceof RangeError) throw e; return false } }`)
   for (let i = 0; i < c.tests.length; i++) docs.push({ id: c.id, i, data: c.tests[i].data, valid: c.tests[i].valid })
 }
@@ -73,29 +85,35 @@ const answers = JSON.parse(fs.readFileSync(path.join(dir, 'out.json'), 'utf8'))
 
 // Compare with the suite and with ata's runtime engine, which answers as the
 // plain module the generated file falls back to (tests/test_compiled_parity.js).
-let tests = 0, agree = 0
+let tests = 0, agree = 0, whole = 0
 const looser = [], stricter = [], moduleDiff = []
 const modules = new Map()
-for (const [id, i, got] of answers) {
+const residuals = new Map()
+// The suite runner's options: format and default as annotations.
+const suiteOptions = { assertFormat: false, useDefaults: false }
+for (const [id, i, typeOk] of answers) {
   const c = cases[id]
   const t = c.tests[i]
   tests++
   if (!modules.has(id)) {
-    // The suite runner's options: format and default as annotations.
-    try { modules.set(id, new Validator(c.schema, { assertFormat: false, useDefaults: false })) } catch { modules.set(id, null) }
+    try { modules.set(id, new Validator(c.schema, suiteOptions)) } catch { modules.set(id, null) }
+    try { residuals.set(id, c.residual === null ? null : new Validator(c.residual, suiteOptions)) } catch (e) { residuals.set(id, undefined); console.log('RESIDUAL DOES NOT COMPILE', c.file, '/', c.group, e.message) }
   }
   const m = modules.get(id)
   const mv = m ? m.isValidObject(t.data) : null
   if (mv !== null && mv !== t.valid) moduleDiff.push(`${c.file} / ${c.group} / ${t.description}: module ${mv}, suite ${t.valid}`)
+  const r = residuals.get(id)
+  const got = typeOk && (r === null ? true : r === undefined ? false : r.isValidObject(t.data))
   if (got === t.valid) { agree++; continue }
   const line = `${c.file} / ${c.group} / ${t.description}`
   if (got && !t.valid) looser.push(line); else stricter.push(line)
 }
-console.log(`${dialect}: ${groups} schema groups, ${cases.length} carried as types (${(100 * cases.length / groups).toFixed(1)}%), ${tests} tests of those`)
-console.log(`validate<T> agrees with the suite on ${agree} of ${tests}`)
-console.log(`type accepts what the suite refuses (a bug in the mapping): ${looser.length}`)
+whole = cases.filter((c) => c.residual === null).length
+console.log(`${dialect}: ${groups} schema groups, ${cases.length} get a Bun target (${(100 * cases.length / groups).toFixed(1)}%), ${whole} of them carried whole by the type, ${tests} tests of those`)
+console.log(`type and residual agree with the suite on ${agree} of ${tests}`)
+console.log(`type and residual accept what the suite refuses (a bug in the split): ${looser.length}`)
 for (const l of looser) console.log('  LOOSER  ' + l)
-console.log(`type refuses what the suite accepts (costs a module call): ${stricter.length}`)
+console.log(`type and residual refuse what the suite accepts (costs a module call): ${stricter.length}`)
 for (const l of stricter.slice(0, 40)) console.log('  stricter ' + l)
 if (moduleDiff.length) { console.log(`ata disagrees with the suite: ${moduleDiff.length}`); for (const l of moduleDiff) console.log('  MODULE ' + l) }
 console.log('declined, by reason:')

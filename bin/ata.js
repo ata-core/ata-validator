@@ -286,26 +286,17 @@ function cmdCompile(args) {
       reportCompileError(input, `--target must be bun (got ${JSON.stringify(args.opts.target)})`);
       process.exit(1);
     }
-    const { schemaToBunType, toBunModule, Declined } = require('../lib/bun-target');
+    const { writeBunTarget, Declined } = require('../lib/bun-target');
     const tn = (args.opts.name || path.basename(input, path.extname(input)).replace(/[^A-Za-z0-9_]/g, '_').replace(/^([a-z])/, (m) => m.toUpperCase())) || 'Data';
-    let mapped = null;
     try {
-      mapped = schemaToBunType(schema, { name: tn });
+      const w = writeBunTarget({ schema, input, output, typeName: tn, format });
+      process.stdout.write(`ata: bun target -> ${w.bunPath} (for bun build --compile --aot${w.residualPath ? `; ${w.residualKeywords} keyword${w.residualKeywords === 1 ? '' : 's'} the type cannot carry in ${w.residualPath}` : ''})\n`);
     } catch (e) {
       if (!(e instanceof Declined)) throw e;
-      // A type that left this rule out would accept what the schema refuses;
-      // the plain module stands alone.
-      const msg = `--target bun: the schema is not carried as a type, ${e.message}; the plain module stands alone`;
+      // The split cannot be made; the plain module stands alone.
+      const msg = `--target bun: ${e.message}; the plain module stands alone`;
       if (args.opts.strict) { reportCompileError(input, msg); process.exit(1); }
       process.stderr.write(`ata: warning: ${input}: ${msg}\n`);
-    }
-    if (mapped) {
-      const ext = path.extname(output);
-      const bunPath = output.slice(0, output.length - ext.length) + '.bun.ts';
-      const moduleImport = './' + path.basename(output);
-      const bunSrc = toBunModule({ schemaFile, moduleImport, typeName: mapped.name, typeSource: mapped.type, aliases: mapped.aliases });
-      fs.writeFileSync(bunPath, bunSrc);
-      process.stdout.write(`ata: wrote bun target  -> ${bunPath} (for bun build --compile --aot; ${mapped.aliases.length} definition type${mapped.aliases.length === 1 ? '' : 's'})\n`);
     }
   }
 
@@ -374,7 +365,7 @@ function cmdBuild(args) {
     }
     for (const c of report.compiled) {
       process.stdout.write(`ata: ${c.input} -> ${c.output} (${c.bytes.toLocaleString()} bytes${c.errors === 'compact' ? ', shared errors' : c.errors === 'schema' ? ', schema module' : ''})\n`);
-      for (const t of (report.bunTargets || []).filter((t) => t.input === c.input)) process.stdout.write(`ata: bun target -> ${t.output} (for bun build --compile --aot${t.definitions ? `, ${t.definitions} definition type${t.definitions === 1 ? '' : 's'}` : ''})\n`);
+      for (const t of (report.bunTargets || []).filter((t) => t.input === c.input)) process.stdout.write(`ata: bun target -> ${t.output} (for bun build --compile --aot${t.residual ? `; ${t.residualKeywords} keyword${t.residualKeywords === 1 ? '' : 's'} the type cannot carry in ${t.residual}` : ''})\n`);
       for (const d of (report.bunDeclined || []).filter((d) => d.input === c.input)) process.stderr.write(`ata: warning: ${d.input}: ${d.reason}\n`);
     }
     if (report.runtime) {

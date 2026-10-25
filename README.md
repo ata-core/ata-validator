@@ -692,20 +692,24 @@ So, in order of preference:
    counts as closed for the compiler, too), or when `ATA_ENGINE=interpreter`
    is set: 82 ns against 513 for the generated code there.
 3. For the last factor, let Bun's compiler check the rules itself. `ata build
-   schema.json --target bun` also writes `schema.compiled.bun.ts`: the schema's
-   rules as a type with Bun's `Schema` tags, `validate<T>` for the verdict and
-   `JSON.parse<T>` for text, with the plain module deciding and supplying the
-   errors wherever the type refuses. The type is never looser than the schema;
-   a keyword it cannot carry exactly (`format`, `oneOf`, `patternProperties`,
-   a remote `$ref`, among others) declines the whole schema with a warning,
-   and the plain module stands alone. On a ten-item order with 1024 distinct
-   documents, 10% of them invalid: the generated `isValid` 96 to 99 ns against
-   90 to 105 for a type written by hand, the plain module 108; text to object,
-   `parse` 425 ns against 546 for `JSON.parse` plus the module. The file is
-   for executables built with `--aot`; everywhere else import the plain
-   module. Checked against the official suite: of the schema groups the type
-   carries (108 of 384 on draft 2020-12, 97 of 258 on draft 7) none accepts a
-   document the suite refuses.
+   schema.json --target bun` also writes `schema.compiled.bun.ts`: the rules a
+   type can carry exactly (kinds, properties, closed objects, items, lengths,
+   bounds, literals, local definitions) as a type with Bun's `Schema` tags,
+   checked by `validate<T>` and `JSON.parse<T>`; the rules a type cannot carry
+   (`format`, `oneOf`, `not`, `if`, `patternProperties`, among others) in a
+   residual schema compiled beside it as `schema.compiled.rest.mjs`; and the
+   plain module deciding and supplying the errors wherever either refuses, so
+   every answer is the module's. A schema the split cannot be made for (a
+   remote `$ref`, `$dynamicRef`, a root the type says nothing about) gets a
+   warning and the plain module alone. On a ten-item order with 1024 distinct
+   documents, 10% of them invalid: `isValid` 96 to 99 ns against 108 for the
+   plain module and 90 to 105 for a type written by hand; with `format: email`
+   on the address, which only the residual checks, 111 against 117; text to
+   object, `parse` 425 ns against 546. The file is for executables built with
+   `--aot`; everywhere else import the plain module. Checked against the
+   official suite with the type and the residual together: of the schema
+   groups that get a target (122 of 384 on draft 2020-12, 105 of 258 on draft
+   7) none accepts a document the suite refuses.
 
 A schema's `pattern` is a `new RegExp` at run time in the runtime
 `Validator`, which that compiler runs through its regular expression

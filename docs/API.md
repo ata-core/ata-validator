@@ -299,22 +299,34 @@ self-contained module. `toCompactModule(validator, { errorRuntime })` and
 `errorRuntimeSource(format)` in `ata-validator/aot` do the same by hand.
 
 `ata build --target bun` writes, beside each module, a `.bun.ts` for
-executables built with `bun build --compile --aot`: the schema's rules as a
-TypeScript type with Bun's `Schema` tags (`Min`, `MaxLength`, `Pattern`,
-`MinItems`, `Strict` and the rest), `isValid` and `validate` through Bun's
-`validate<T>()`, and `parse(text)` through `JSON.parse<T>()` from `"bun"`, so
-the compiler checks the rules in machine code. Wherever the type refuses, the
-plain module decides and supplies the errors, so every answer is the module's.
-The type is never looser than the schema: a keyword the type cannot carry
-exactly (`format`, `oneOf`, `not`, `if`, `patternProperties`,
-`unevaluatedProperties`, `uniqueItems`, `contains`, a remote `$ref`, a
-non-integer `multipleOf`, an object literal in `enum`, a `prefixItems` tuple
-without `items: false` and a matching `minItems`) declines the whole schema
-with a warning naming it and its pointer, an error with `--strict`, and the
-plain module stands alone. A `pattern` is carried only where Bun's reading of
-it, without the unicode flag, cannot accept what the schema's reading refuses:
-ASCII only, no `\p`, `\u`, `\x`, `\b`, `\k`, and `.`, a negated class,
-`\W`, `\S`, `\D` only under a greedy `+` or `*`. Under plain `bun run` and
+executables built with `bun build --compile --aot`. The schema is split at
+every node: the keywords a type carries exactly (`type`, `properties`,
+`required`, `additionalProperties: false`, `items`, a fixed `prefixItems`
+tuple, `minItems`, `maxItems`, `minLength`, `maxLength`, `pattern`, `minimum`,
+`maximum`, `exclusiveMinimum`, `exclusiveMaximum`, an integer `multipleOf`,
+`enum` and `const` of primitives, `anyOf`, `allOf`, a local `$ref`) become a
+TypeScript type with Bun's `Schema` tags, and `isValid`, `validate` and
+`parse(text)` go through Bun's `validate<T>()` and `JSON.parse<T>()` from
+`"bun"`, so the compiler checks those rules in machine code. Every other
+keyword stays in a residual schema that keeps only the structure needed to
+reach it, written beside the type as `.rest.mjs` by the same compiler as the
+plain module; the generated `isValid` is Bun's check and the residual's.
+Wherever either refuses, the plain module decides and supplies the errors, so
+every answer is the module's. Keywords that see each other stay whole in the
+residual: `if`/`then`/`else`; `unevaluatedProperties` and `unevaluatedItems`
+with every sibling at their node; `additionalProperties` beside
+`patternProperties`, with the declared property names; the `contains` family;
+`anyOf` as soon as one branch has a residual; the draft-07 tuple form of
+`items`. In draft-07 and before, keywords beside `$ref` are ignored, as the
+dialect says. A `pattern` is carried only where Bun's reading of it, without
+the unicode flag, cannot accept what the schema's reading refuses: ASCII only,
+no `\p`, `\u`, `\x`, `\b`, `\k`, and `.`, a negated class, `\W`, `\S`,
+`\D` only under a greedy `+` or `*`; any other pattern goes to the residual.
+A schema the split cannot be made for declines with a warning naming the
+reason and its pointer, an error with `--strict`, and the plain module stands
+alone: a remote `$ref`, `$dynamicRef` or `$dynamicAnchor`, a root the type
+says nothing about (`{ "format": "email" }` alone), a rule the type cannot
+carry that refers to the root with `$ref: "#"`. Under plain `bun run` and
 everywhere else, import the plain module. The suite check behind this is
 `benchmark/proof/aot/suite-differential.mjs`, which needs a Bun with `--aot`.
 
