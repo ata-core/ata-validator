@@ -45,7 +45,8 @@ for (const file of fs.readdirSync(suiteDir).filter((f) => f.endsWith('.json')).s
     let mapped
     const schema = withDialect(g.schema)
     // The suite reads format as an annotation, as suiteOptions below say.
-    try { mapped = schemaToBunType(schema, { name: `T${cases.length}`, aliasPrefix: `D${cases.length}_`, assertFormat: false }) } catch (e) {
+    // The tagged split, for the pull request build of 2026-10-24 that had validate<T>.
+    try { mapped = schemaToBunType(schema, { name: `T${cases.length}`, aliasPrefix: `D${cases.length}_`, assertFormat: false, tags: true }) } catch (e) {
       if (!(e instanceof Declined)) throw e
       const key = /^keyword /.test(e.reason) ? e.reason : e.reason.replace(/"[^"]*"/g, '"…"')
       declined.set(key, (declined.get(key) || 0) + 1)

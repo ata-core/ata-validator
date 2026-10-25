@@ -69,18 +69,20 @@ takes one form per target engine, `ata build --target bun` for JavaScriptCore.
 On a ten-item order with closed objects that is 227 against 108 ns under the
 compiler and 65 against 53 on Bun's JIT; the module Node gets is unchanged.
 
-What a module cannot do is what Bun's own `validate<T>()` does, check an
-object's hidden structure in one comparison. So `ata build --target bun` also
-writes the schema's rules as a type with Bun's `Schema` tags for `validate<T>`
-and `JSON.parse<T>`, a second module for the rules a type cannot carry, and
-keeps the plain module behind both for the errors. On 1024 distinct ten-item
-orders, 10% of them invalid, the generated `isValid` runs at 96 to 99 ns
-against 90 to 105 for a type written by hand and 108 for the plain module;
-text to object, 425 against 546 for `JSON.parse` plus the module. Against the
-official suite, type and residual together never accept a document the suite
-refuses (`benchmark/proof/aot/suite-differential.mjs`). `ata verify` holds the
-written module against the runtime on a project's own schemas; the plugin
-does the same inside the bundler and writes the typed target under
+`ata build --target bun` also writes the schema as a TypeScript type beside
+the module, with `parse(text)` declaring that type where it parses, so the
+compiler makes the objects with the type's layout and the module checks the
+content. Until 2026-10-25 the pull request carried its own typed validator,
+`validate<T>` from `bun:bundle`, which checks an object's hidden structure in
+one comparison, and the target wrote the schema's rules as a type with Bun's
+`Schema` tags for it, with a second module for the rules a type cannot carry:
+on 1024 distinct ten-item orders, 10% of them invalid, that `isValid` ran at
+96 to 99 ns against 90 to 105 for a type written by hand and 108 for the
+plain module, and against the official suite never accepted a document the
+suite refuses (`benchmark/proof/aot/suite-differential.mjs`). That validator
+left the pull request to return as a change of its own. `ata verify` holds
+the written module against the runtime on a project's own schemas; the
+plugin does the same inside the bundler and writes the target under
 `Bun.build({ compile: { aot: true } })` without a command.
 
 What this does not show:

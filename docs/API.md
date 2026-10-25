@@ -298,50 +298,42 @@ registered beside it, any option but the defaults) always gets the
 self-contained module. `toCompactModule(validator, { errorRuntime })` and
 `errorRuntimeSource(format)` in `ata-validator/aot` do the same by hand.
 
-`ata build --target bun` writes, beside each module, a `.bun.ts` for
-executables built with `bun build --compile --aot`. The schema is split at
-every node: the keywords a type carries exactly (`type`, `properties`,
-`required`, `additionalProperties: false`, `items`, a fixed `prefixItems`
-tuple, `minItems`, `maxItems`, `minLength`, `maxLength`, `pattern`, `minimum`,
-`maximum`, `exclusiveMinimum`, `exclusiveMaximum`, an integer `multipleOf`,
-`enum` and `const` of primitives, `anyOf`, `allOf`, a local `$ref`) become a
-TypeScript type with Bun's `Schema` tags, and `isValid`, `validate` and
-`parse(text)` go through Bun's `validate<T>()` and `JSON.parse<T>()` from
-`"bun"`, so the compiler checks those rules in machine code. Every other
-keyword stays in a residual schema that keeps only the structure needed to
-reach it, written beside the type as `.rest.mjs` by the same compiler as the
-plain module; the generated `isValid` is Bun's check and the residual's.
-Wherever either refuses, the plain module decides and supplies the errors, so
-every answer is the module's. Keywords that see each other stay whole in the
-residual: `if`/`then`/`else`; `unevaluatedProperties` and `unevaluatedItems`
-with every sibling at their node; `additionalProperties` beside
-`patternProperties`, with the declared property names; the `contains` family;
-`anyOf` as soon as one branch has a residual; the draft-07 tuple form of
-`items`. In draft-07 and before, keywords beside `$ref` are ignored, as the
-dialect says. A `pattern` is carried only where Bun's reading of it, without
-the unicode flag, cannot accept what the schema's reading refuses: ASCII only,
-no `\p`, `\u`, `\x`, `\b`, `\k`, and `.`, a negated class, `\W`, `\S`,
-`\D` only under a greedy `+` or `*`; any other pattern goes to the residual.
-A schema the split cannot be made for declines with a warning naming the
-reason and its pointer, an error with `--strict`, and the plain module stands
-alone: a remote `$ref`, `$dynamicRef` or `$dynamicAnchor`, a root the type
-says nothing about (`{ "format": "email" }` alone), a rule the type cannot
-carry that refers to the root with `$ref: "#"`. Under plain `bun run` and
-everywhere else, import the plain module. The suite check behind this is
-`benchmark/proof/aot/suite-differential.mjs`, which needs a Bun with `--aot`.
-With `--target bun` every module the build writes, the plain one included, is
-written for JavaScriptCore: a closed object's keys are walked with
-`Object.keys`, the cheaper form there, where a module written on Node for V8
-uses for...in. The runtime compiler writes for the engine it runs on, and
-`setTargetEngine('v8' | 'jsc' | 'jsc-aot' | null)` from `ata-validator/lib/js-compiler`
-(also `bunTarget.setTargetEngine` in `ata-validator/build`) changes that for a
-build script. `jsc-aot` is the form `--target bun` writes: made for an
-executable compiled ahead of time, where it is level with Bun's own
-`validate<T>` on closed objects, and 5 to 15 ns a document slower than the
-`jsc` form on Bun's JIT. `--target bun` also takes the one-pass error function
-(`onePass`) and leaves schema-source frames out unless `--source` asks for
-them: in an executable the one-pass form's size costs nothing and a rejection
-with its error list costs 3.8x less.
+`ata build --target bun` writes every module for executables built with
+`bun build --compile --aot`, and beside each a `.bun.ts`. The module takes
+the form for JavaScriptCore compiled ahead of time: a closed object's keys
+are read once with `Object.keys` and compared with the declared list in
+order, where a module written on Node for V8 uses for...in. The runtime
+compiler writes for the engine it runs on, and `setTargetEngine('v8' | 'jsc'
+| 'jsc-aot' | null)` from `ata-validator/lib/js-compiler` (also
+`bunTarget.setTargetEngine` in `ata-validator/build`) changes that for a
+build script; the `jsc-aot` form is 5 to 15 ns a document slower than the
+`jsc` form on Bun's JIT, which is why the JIT gets its own. `--target bun`
+also takes the one-pass error function (`onePass`) and leaves schema-source
+frames out unless `--source` asks for them: in an executable the one-pass
+form's size costs nothing and a rejection with its error list costs 3.8x
+less. The `.bun.ts` holds the schema as a TypeScript type (`type`,
+`properties` and `required`, `items`, a fixed `prefixItems` tuple, `enum`
+and `const` of primitives, `anyOf` as a union, `allOf` as an intersection,
+a local `$ref` as a named type; in draft-07 and before, keywords beside
+`$ref` are ignored, as the dialect says), `isValid` as a type guard and
+`validate` with the type on them, and `parse(text)`, which declares the type
+where it parses (`const d: T = JSON.parse(text)`): the compiler makes the
+objects with that layout, which keeps the code that reads them on its fast
+path, and the module checks the content. Every check is the module's. A
+schema no type can be written for declines with a warning naming the reason
+and its pointer, an error with `--strict`, and the plain module stands alone:
+a remote `$ref`, `$dynamicRef` or `$dynamicAnchor`, a root the type says
+nothing about (`{ "format": "email" }` alone). A project points the compiler
+at the file with an `"aot"` condition in its `package.json` `imports`
+(`{ "imports": { "#schemas/*": { "aot": "./schemas/*.bun.ts", "default":
+"./schemas/*.js" } } }`), which `bun compile`, `bun run --aot` and `bun check
+--aot` read and nothing else does. The compiler's pull request carried its own
+typed validator, `validate<T>` from `bun:bundle`, until 2026-10-25;
+`bunTarget.schemaToBunType(schema, { tags: true })` makes the split written
+for it, a type with Bun's `Schema` tags and a residual schema of every rule
+the tags do not carry, and `benchmark/proof/aot/suite-differential.mjs` is
+its check against the official suite on the pull request build of 2026-10-24.
+Nothing in ata writes that form until the validator returns.
 
 `ata verify <glob>` holds each schema's module against the runtime: it loads
 the module `ata build` wrote (`--out-dir`, `--suffix` and `--format` as given

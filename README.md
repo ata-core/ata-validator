@@ -711,41 +711,47 @@ So, in order of preference:
    built with `--disallow-code-generation-from-strings` (the program then
    counts as closed for the compiler, too), or when `ATA_ENGINE=interpreter`
    is set: 80 ns against 492 for the generated code there.
-3. For the last factor, let Bun's compiler check the rules itself. `ata build
-   schema.json --target bun` also writes `schema.compiled.bun.ts`: the rules a
-   type can carry exactly (kinds, properties, closed objects, items, lengths,
-   bounds, literals, local definitions) as a type with Bun's `Schema` tags,
-   checked by `validate<T>` and `JSON.parse<T>`; the rules a type cannot carry
-   (`format`, `oneOf`, `not`, `if`, `patternProperties`, among others) in a
-   residual schema compiled beside it as `schema.compiled.rest.mjs`; and the
-   plain module deciding and supplying the errors wherever either refuses, so
-   every answer is the module's. A schema the split cannot be made for (a
-   remote `$ref`, `$dynamicRef`, a root the type says nothing about) gets a
-   warning and the plain module alone. On a ten-item order with 1024 distinct
-   documents, 10% of them invalid: `isValid` 96 to 99 ns against 108 for the
-   plain module and 90 to 105 for a type written by hand; with `format: email`
-   on the address, which only the residual checks, 111 against 117; text to
-   object, `parse` 425 ns against 546. The file is for executables built with
-   `--aot`; everywhere else import the plain module. With `--target bun` the
-   plain module is written for the compiler too: a closed object's keys are
-   read once and compared with the declared list in order, which on the
-   ten-item order puts the plain module level with Bun's own `validate<T>`
-   (105 to 107 ns against 96 to 105); on V8 the module keeps for...in, on
-   Bun's JIT a plain count, each the cheaper form there. The module also
-   answers a rejection with the one-pass error function there (189 ns with
-   the error list on that order, against 724 with the older collector), the
-   form every other build takes only with `--one-pass` since it is 20% larger
-   gzipped. Checked against the
-   official suite with the type and the residual together: of the schema
-   groups that get a target (122 of 384 on draft 2020-12, 105 of 258 on draft
-   7) none accepts a document the suite refuses.
+3. Write the module for the compiler. `ata build schema.json --target bun`
+   writes it with a closed object's keys read once and compared with the
+   declared list in order (on a ten-item order with 1024 distinct documents,
+   10% of them invalid, 105 to 107 ns under the compiler against 223 for the
+   form V8 gets; on V8 the module keeps for...in, on Bun's JIT a plain count,
+   each the cheaper form there), and answers a rejection with the one-pass
+   error function (189 ns with the error list on that order, against 724
+   with the older collector), the form every other build takes only with
+   `--one-pass` since it is 20% larger gzipped. Beside the module it writes
+   `schema.compiled.bun.ts`: the schema as a TypeScript type (kinds,
+   properties and which are required, items and fixed tuples, literals,
+   local definitions as named types), `validate` and `isValid` with that
+   type on them, and `parse(text)`, which declares the type where it parses,
+   so the compiler makes the objects with that layout and the code that
+   reads them stays on its fast path, and the module checks the content.
+   Every check is the module's. The file is for executables built with
+   `--aot`; a project points that compiler at it with an `"aot"` condition
+   in its `package.json` `imports`, which nothing else reads:
+
+   ```json
+   { "imports": { "#schemas/*": { "aot": "./schemas/*.bun.ts", "default": "./schemas/*.js" } } }
+   ```
+
+   A schema no type can be written for (a remote `$ref`, `$dynamicRef`, a
+   root the type says nothing about) gets a warning and the plain module
+   alone.
+
+The pull request carried its own typed validator, `validate<T>` from
+`bun:bundle`, until 2026-10-25, and `--target bun` wrote the schema's rules
+as a type for it: on the ten-item order 96 to 105 ns against the module's
+105 to 107. It left the pull request to return as a change of its own, and
+ata writes nothing for it now; `bunTarget.schemaToBunType(schema, { tags:
+true })` in `ata-validator/build` still makes that split.
 
 A schema's `pattern` is a `new RegExp` at run time in the runtime
 `Validator`, which that compiler runs through its regular expression
 interpreter; the module writes each pattern as a literal, which it compiles.
 `--aot` makes TypeScript errors fatal; ata's declarations say `message?:
-string` on an error, so read it as such. The numbers are from a pull request
-build on one machine and will be run again when the compiler ships.
+string` on an error, so read it as such. The numbers are from the pull
+request build of 2026-10-24 on one machine and will be run again when the
+compiler ships.
 
 ### Standard Schema V1
 

@@ -74,9 +74,9 @@ Build options:
   --cache-file <path>     Cache file for incremental builds (default: cache disabled)
   --max-size <bytes>      Fail build if any compiled module exceeds this gzipped size
   --strict                Treat any AOT-incompatible schema as a build error (default: skip + warn)
-  --target bun            Also write a .bun.ts module for bun build --compile --aot: the
-                          rules a type can carry as a type Bun checks in machine code, the
-                          rest in a .rest module beside it, the plain module behind both
+  --target bun            Write every module for Bun's ahead-of-time compiler, and beside
+                          each a .bun.ts with the schema as a TypeScript type and a typed
+                          parse(text); the plain module answers every check
   --strict-schema         Fail the build on schema authoring mistakes: unknown
                           keywords (with a spelling suggestion), keywords the
                           node's type makes inert, unresolvable local $refs,
@@ -311,11 +311,11 @@ function cmdCompile(args) {
     const { writeBunTarget, Declined } = require('../lib/bun-target');
     const tn = (args.opts.name || path.basename(input, path.extname(input)).replace(/[^A-Za-z0-9_]/g, '_').replace(/^([a-z])/, (m) => m.toUpperCase())) || 'Data';
     try {
-      const w = writeBunTarget({ schema, input, output, typeName: tn, format });
-      process.stdout.write(`ata: bun target -> ${w.bunPath} (for bun build --compile --aot${w.residualPath ? `; ${w.residualKeywords} keyword${w.residualKeywords === 1 ? '' : 's'} the type cannot carry in ${w.residualPath}` : ''})\n`);
+      const w = writeBunTarget({ schema, input, output, typeName: tn });
+      process.stdout.write(`ata: bun target -> ${w.bunPath} (for bun build --compile --aot)\n`);
     } catch (e) {
       if (!(e instanceof Declined)) throw e;
-      // The split cannot be made; the plain module stands alone.
+      // No type can be written; the plain module stands alone.
       const msg = `--target bun: ${e.message}; the plain module stands alone`;
       if (args.opts.strict) { reportCompileError(input, msg); process.exit(1); }
       process.stderr.write(`ata: warning: ${input}: ${msg}\n`);
@@ -387,7 +387,7 @@ function cmdBuild(args) {
     }
     for (const c of report.compiled) {
       process.stdout.write(`ata: ${c.input} -> ${c.output} (${c.bytes.toLocaleString()} bytes${c.errors === 'compact' ? ', shared errors' : c.errors === 'schema' ? ', schema module' : ''})\n`);
-      for (const t of (report.bunTargets || []).filter((t) => t.input === c.input)) process.stdout.write(`ata: bun target -> ${t.output} (for bun build --compile --aot${t.residual ? `; ${t.residualKeywords} keyword${t.residualKeywords === 1 ? '' : 's'} the type cannot carry in ${t.residual}` : ''})\n`);
+      for (const t of (report.bunTargets || []).filter((t) => t.input === c.input)) process.stdout.write(`ata: bun target -> ${t.output} (for bun build --compile --aot)\n`);
       for (const d of (report.bunDeclined || []).filter((d) => d.input === c.input)) process.stderr.write(`ata: warning: ${d.input}: ${d.reason}\n`);
     }
     if (report.runtime) {

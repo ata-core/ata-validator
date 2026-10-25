@@ -205,11 +205,18 @@ export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cj
  */
 export const compiledOptions: readonly string[];
 
-/** The Bun target, for a build plugin: the schema split into a type for Bun's validate<T> and a residual schema. */
+/**
+ * The Bun target, for a build plugin: the schema as a TypeScript type and the
+ * `.bun.ts` module `ata build --target bun` writes beside a compiled module.
+ * With `tags: true` the type carries Bun's `Schema` tags and `residual` holds
+ * the schema of every rule the tagged type does not carry, the split made for
+ * Bun's `validate<T>`, which left the compiler's pull request on 2026-10-25
+ * and is to return as a change of its own; without tags `residual` is null.
+ */
 export const bunTarget: {
-  schemaToBunType(schema: unknown, opts?: { name?: string; aliasPrefix?: string }): { name: string; type: string; aliases: Array<[string, string]>; residual: unknown | null; carried: string[] };
-  toBunModule(args: { schemaFile: string; moduleImport: string; residualImport?: string | null; typeName: string; typeSource: string; aliases: Array<[string, string]> }): string;
-  writeBunTarget(args: { schema: unknown; input: string; output: string; typeName: string; format?: 'esm' | 'cjs' }): { bunPath: string; residualPath: string | null; definitions: number; carried: number; residualKeywords: number };
+  schemaToBunType(schema: unknown, opts?: { name?: string; aliasPrefix?: string; tags?: boolean; assertFormat?: boolean }): { name: string; type: string; aliases: Array<[string, string]>; residual: unknown | null; carried: string[] };
+  toBunModule(args: { schemaFile: string; moduleImport: string; typeName: string; typeSource: string; aliases: Array<[string, string]> }): string;
+  writeBunTarget(args: { schema: unknown; input: string; output: string; typeName: string }): { bunPath: string; definitions: number; carried: number };
   Declined: new (reason: string, pointer: string) => Error & { reason: string; pointer: string };
 };
 

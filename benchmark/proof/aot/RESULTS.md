@@ -6,6 +6,19 @@ zod 4.6.7, hono 4. `bench.ts` built with `--compile` (JIT) and `--compile
 --aot`, three runs each, the median of 7 rounds of 300,000 documents per run,
 1024 parsed documents, three quarters valid. Nanoseconds per document:
 
+Note, 2026-10-25 afternoon: every `validate<Order>`, `JSON.parse<Order>` and
+`Schema` row below was measured on the pull request build named above (the
+CI artifact of 00:11 UTC). The pull request's commit of 02:10 UTC the same
+day took `validate<T>` from `bun:bundle`, `JSON` from `"bun"`, `Bun.Validator`
+and the `Schema` types out, "to come back as a change of their own", and
+added an `"aot"` condition for `exports` and `imports` that `bun compile`,
+`bun run --aot` and `bun check --aot` read. `ata build --target bun` now
+writes the type without the tags and a typed plain `JSON.parse`, with the
+module answering every check; the tagged split stays as
+`bunTarget.schemaToBunType(schema, { tags: true })`, and
+`suite-differential.mjs` and `traffic.ts` still use it, against that build.
+The module rows need no typed validator and stand.
+
 | validator | JIT | AOT | AOT / JIT |
 |---|---|---|---|
 | ata module from `ata build`, isValid | 25.9 | 34.2 | 1.3x |
