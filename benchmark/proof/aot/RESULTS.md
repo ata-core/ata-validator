@@ -332,3 +332,23 @@ list beside the key list measured 129 to 137: the proof has to replace them,
 not sit next to them. The three forms agree on 4730 suite answers including
 objects with other prototypes, inherited keys and reordered keys
 (tests/test_target_engines.js).
+
+## Accepted and refused apart, objects and text (2026-10-25, one --aot executable, ten candidates)
+
+1024 accepted and 1024 refused orders made separately, ns per document:
+
+| | accepted | refused |
+|---|---|---|
+| validate<Order> (bun:bundle), on the object | 120 | 121 (throws) |
+| ata module isValid, on the object | 149 | 78 |
+| ata module validate with the error list, on the object | | 724 |
+| BunJSON.parse<Order>, on text | 371 | 480 |
+| ata generated parse (`--target bun`), on text | 367 | 476 (was 999 before the second parse was dropped) |
+| JSON.parse + ata module, on text | 569 | |
+
+On refusal the module returns false where the typed check throws: 78 against
+121. The generated parse is Bun's own parse with the residual behind it, and
+level with it on both sides. The accepted-object column is 25% behind in this
+executable where the three-candidate one showed parity; the ten candidates
+and two document sets change the program, and the module's share of the
+compiler's budget with it. Both are reported.

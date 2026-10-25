@@ -222,6 +222,7 @@ const order = {
   assert.ok(withRest.includes('return true && _r.isValid(d)'))
   assert.ok(withRest.includes('if (!_r.isValid(d)) return _m.validate(d)'))
   assert.ok(withRest.includes('_r.isValid(d) ? d : null'))
+  assert.ok(!src.includes('JSON.parse(text)'), 'a refused typed parse is final; the text is not parsed twice')
 }
 
 // The CLI writes the files beside the module, the residual's module when the
