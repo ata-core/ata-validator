@@ -75,8 +75,8 @@ Build options:
   --max-size <bytes>      Fail build if any compiled module exceeds this gzipped size
   --strict                Treat any AOT-incompatible schema as a build error (default: skip + warn)
   --target bun            Also write a .bun.ts module for bun build --compile --aot: the
-                          schema's rules as a type that Bun checks in machine code, the
-                          plain module deciding and supplying the errors where the type refuses
+                          rules a type can carry as a type Bun checks in machine code, the
+                          rest in a .rest module beside it, the plain module behind both
   --strict-schema         Fail the build on schema authoring mistakes: unknown
                           keywords (with a spelling suggestion), keywords the
                           node's type makes inert, unresolvable local $refs,
