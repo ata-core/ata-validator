@@ -39,13 +39,36 @@ with the same four errors in the same order (`additionalProperties`,
 `format`, `minLength`, `minimum`) by every row and both validators. The
 script checks that and prints `All rows agree: true`.
 
+## Under Bun's ahead-of-time compiler
+
+The compiler is an open pull request (oven-sh/bun#45631). Its CI build of
+2026-10-25 (bun 1.4.4-canary.1+947fb6a47, installed with `bunx bun-pr 45631`)
+ran `benchmark/proof/aot/bench.ts`: the same validators
+on 1024 parsed documents inside an executable built with `bun build
+--compile` and with `bun build --compile --aot`, three runs each, nanoseconds
+per document (medians):
+
+| validator | JIT | AOT |
+|---|---|---|
+| module from `ata build`, isValid | 25.9 | 34.2 |
+| module from `ata build`, validate() | 59.5 | 60.2 |
+| runtime Validator, compiled at start with `new Function`, isValidObject | 25.5 | 538 |
+| runtime Validator, validate() | 30.7 | 552 |
+| zod 4, safeParse | 210 | 530 |
+
+Code generated at run time is interpreted under the compiler: ata's own
+run-time path and zod both land near 530 ns. The module written at build time
+is compiled with the program and stays at 34 ns. That is the whole case for
+`ata build` in one row. The module is 30% slower under the compiler than on
+the JIT, which the pull request's numbers for untyped npm code predict; a
+typed emission is a later experiment.
+
 What this does not show:
 
-- Nothing here ran under Bun's ahead-of-time compiler, which has not shipped.
-  Bun 1.4.0 also ignores Node's code-generation flag, so there is no "Bun,
-  refused" row. What the table shows for Bun is that the built module needs
-  neither `new Function` nor an import, which is what that compiler's authors
-  say decides the speed of a validator under it.
+- These are numbers from a pull request build on one machine, not from a
+  released Bun; they will be run again when the compiler ships. Bun 1.4
+  ignores Node's code-generation flag, so there is no "Bun, refused" row in
+  the table above.
 - The Worker row has no cold figure. Its isolate is warm by the time a request
   is answered, and a per-request time there is a different measurement
   ([docs/edge-runtimes.md](edge-runtimes.md) has one).

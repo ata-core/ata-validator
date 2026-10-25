@@ -1,0 +1,2 @@
+{ "name": "ata-proof-aot", "private": true, "type": "module",
+  "dependencies": { "ata-validator": "file:../../..", "hono": "^4", "@hono/standard-validator": "^0", "zod": "^4" } }
