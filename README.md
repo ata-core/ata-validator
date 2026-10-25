@@ -12,11 +12,17 @@ JSON Schema validation that compiles for speed and still runs where code generat
 
 ## Who uses ata
 
-Projects whose code depends on ata, from GitHub's dependency graph, and the framework that lists
-its plugin, with what each does with it:
+Projects whose code depends on ata, from GitHub's dependency graph, a framework that lists its
+plugin, a form library that ships its resolver, and one company whose use is not public code,
+with what each does with it:
 
+- [Trendyol](https://github.com/Trendyol) validates configuration with ata in Puzzle, its
+  internal config tooling. The package is internal, so it is not in the public dependency
+  graph; this line rests on its maintainer.
 - [Socket](https://github.com/SocketDev) uses ata, compiled ahead of time, in the shared build
   tooling of its repositories.
+- [React Hook Form](https://github.com/react-hook-form/resolvers) ships an ata resolver in
+  `@hookform/resolvers` (`@hookform/resolvers/ata-validator`), beside its other validators.
 - [Fastify](https://fastify.dev/ecosystem/) lists the
   [`fastify-ata`](https://github.com/ata-core/fastify-ata) plugin in its ecosystem.
 - [react-jsonschema-form](https://github.com/rjsf-team/react-jsonschema-form) ships an ata
@@ -844,6 +850,7 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 | Elysia | Standard Schema V1 in the `body` slot | [docs/integrations/elysia.md](docs/integrations/elysia.md) |
 | tRPC | Standard Schema V1 input | [docs/integrations/trpc.md](docs/integrations/trpc.md) |
 | TanStack Form | Standard Schema V1 validator | [docs/integrations/tanstack-form.md](docs/integrations/tanstack-form.md) |
+| React Hook Form | resolver | [`@hookform/resolvers/ata-validator`](https://github.com/react-hook-form/resolvers/tree/master/ata-validator) |
 | Express | sync middleware | [docs/integrations/express.md](docs/integrations/express.md) |
 | Koa | async ctx middleware | [docs/integrations/koa.md](docs/integrations/koa.md) |
 | NestJS | validation pipe | [docs/integrations/nestjs.md](docs/integrations/nestjs.md) |

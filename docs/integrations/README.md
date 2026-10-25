@@ -10,6 +10,7 @@
 | Elysia | direct handler check | [elysia.md](./elysia.md) |
 | tRPC | Standard Schema V1 | [trpc.md](./trpc.md) |
 | TanStack Form | Standard Schema V1 | [tanstack-form.md](./tanstack-form.md) |
+| React Hook Form | resolver in `@hookform/resolvers` | [`@hookform/resolvers/ata-validator`](https://github.com/react-hook-form/resolvers/tree/master/ata-validator) |
 | Express | middleware | [express.md](./express.md) |
 | Koa | middleware | [koa.md](./koa.md) |
 | NestJS | validation pipe | [nestjs.md](./nestjs.md) |
