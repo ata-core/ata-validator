@@ -115,7 +115,9 @@ const cases = [
   const rootBody = compileToJSCodegen(schema, null, null)._source
   // A key the walk does not expect is then checked as the object's own,
   // which a non-ordinary object's inherited keys are not.
-  assert.ok(/for\s*\(var _k in d\)if\(_k!=="id"(?:&&|\))/.test(rootBody), `the root's key walk should be its own, got:\n${rootBody}`)
+  // The walk is emitted twice, an Object.keys loop for JavaScriptCore and
+  // for...in for V8; the for...in form is the one read here.
+  assert.ok(/for\s*\(var _k in d\)\{?if\(_k!=="id"(?:&&|\))/.test(rootBody), `the root's key walk should be its own, got:\n${rootBody}`)
   assert.ok(!/_k!=="not"/.test(rootBody), `the def's key set leaked into the root, got:\n${rootBody}`)
 
   // And with no `additionalProperties` on the root at all, the root body must

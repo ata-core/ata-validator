@@ -132,3 +132,32 @@ and invalid orders. Alone in an executable the same module takes 110 ns; next
 to zod, whose parsers go through `new Function` and so leave the program
 open, 174. Before the engine-selected prototype read and key count (ata
 1.60.0's emission) the module took 212 alone and 430 with pricing.
+
+## The floor for untyped JavaScript, and what the compiler's own validator does
+
+Hand-written validators of the Order rules, `any` input, one executable
+built `--compile --aot`, accepted order, ns per call: Bun's own style
+(`parseOrder` + `isValidOrder` from shared.ts, merged) 235; a keys-loop
+version 151; hasOwn + for...in switch 180; the ata module 122;
+`validate<Order>` 85. No hand-written untyped code reached the module.
+
+Per item: with 1 item the module and `validate<Order>` are equal (40 vs 42);
+at 10 items 116 vs 85; at 100 items 921 vs 638. `validate<Order>` slows when
+items carry the same keys in three different orders (85 to 96, 638 to 790);
+the module does not. So the typed validator dispatches on the objects' hidden
+structure, which JavaScript cannot observe.
+
+Pricing the module's checks by removing them one at a time (108 base): the
+key count of each closed object 10 in total, the root's for...in walk over
+its optional-key closed object 9, prototype check, Number.isInteger, _cpLen,
+pattern and one-versus-two typeof chains each 0 to 1.
+
+After the engine-selected key loop (ata master): 1.60.0 emission against the
+working tree, side by side: AOT 227 to 108 accepted, 223 to 103 refused; JIT
+65 to 53, 62 to 49. Beside zod in the same executable (open program) 174 to
+157, `validate<Order>` 89.
+
+A type written from the schema with Bun's `Schema` tags and checked by
+`validate<T>`, the plain module as its error path: accepted 83 (the same
+compiler, the same number as Bun's own type), refused 120, refused with the
+error list 923 (module alone 808); 60 of 60 answers.ts orders agree.
