@@ -142,7 +142,10 @@ const esbuild = require('esbuild')
 // shared with the wrapper around a module written ahead of time
 // (lib/compiled.js), which now carries `~standard` too; the bytes are the
 // module boundary, the code moved as it was.
-const BUDGET = 57700
+// 57800 (57706 measured): schemaOf(), the build-time placeholder whose run-time
+// form is an error naming the plugin, and aotHost(), which picks the
+// interpreted engine where code is compiled ahead of time.
+const BUDGET = 57800
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
