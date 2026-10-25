@@ -455,3 +455,15 @@ validator costs 13x what the ata module costs and zod 7x; the ata runtime
 takes its interpreted engine there (3x the module). On the JIT the gap is
 9x and 7x against the module. Elysia composes its handlers with `new
 Function` as well (its own `aot` option), which is in every row.
+
+Decomposition of the ata share (same harness, 2026-10-25). A Standard Schema
+that accepts everything without looking costs Elysia's own path +34 ns on the
+JIT and +87 compiled, over no schema. ata's `~standard.validate` alone on a
+ten-item order: runtime 58 accepted / 93 refused on the JIT, module wrapper 62
+/ 107; compiled, module wrapper 74 / 217, runtime 1,249 / 1,950 (this build
+has no `Bun.isAOT`, so the runtime keeps generated code there; with `engine:
+'interpreter'` 669 / 1,424). With 0% invalid bodies the shares over no schema
+were: JIT, ata runtime +13, module +98, zod +1,762, Elysia t +1,797; compiled,
+module +240, runtime +1,137, zod +3,481, Elysia t +6,799. The rest of the 10%
+run's shares is Elysia building its 422 response for the refused tenth, paid
+by every row alike. Nothing on ata's side is left to take out of the request.
