@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- `ata verify` also tries, for every bound a schema states (`minimum`, `maximum`, the exclusive ones, `multipleOf`, `minLength`, `maxLength`), a value on either side of it, on a document the runtime accepts. Its random documents rarely land on a bound, so a module that read one off by one (a minimum of 13 written as `< 12`) answered all 200 of them as the runtime did and passed; it is now caught, with the runtime saying invalid and the module valid. `tests/test_verify.js` holds the case.
+
 ## 1.61.0 - 2026-10-26
 
 ### Added

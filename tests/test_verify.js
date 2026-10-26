@@ -62,8 +62,10 @@ assert.ok(fs.existsSync(modulePath))
   // A fresh module agrees on everything.
   const fresh = await verifyOne({ schemaFile: schemaPath, moduleFile: modulePath, schema: order, generate: 300, seed: 3 })
   assert.ok(ok(fresh), JSON.stringify(fresh.disagreements.slice(0, 3), null, 2))
-  assert.strictEqual(fresh.documents, 300)
-  assert.strictEqual(fresh.agree, 300)
+  // 300 made, plus the documents on either side of each bound the schema states.
+  assert.ok(fresh.documents > 300 && fresh.documents <= 600, `documents ${fresh.documents}`)
+  assert.strictEqual(fresh.generated, fresh.documents)
+  assert.strictEqual(fresh.agree, fresh.documents)
   assert.ok(fresh.valid > 50 && fresh.valid < 250, `mix of verdicts, got ${fresh.valid} valid`)
   assert.strictEqual(fresh.stale, false)
   assert.ok(typeof fresh.ataVersion === 'string')
@@ -75,7 +77,7 @@ assert.ok(fs.existsSync(modulePath))
   fs.writeFileSync(path.join(samples, 'many.jsonl'), ['{"customer":{"id":0,"name":"","email":"x"},"items":[]}', '{"items":[{"sku":"A","quantity":1}]}', ''].join('\n'))
   const withSamples = await verifyOne({ schemaFile: schemaPath, moduleFile: modulePath, schema: order, generate: 10, seed: 1, samples: [samples] })
   assert.strictEqual(withSamples.samples, 3)
-  assert.strictEqual(withSamples.documents, 13)
+  assert.strictEqual(withSamples.documents, withSamples.generated + 3)
   assert.ok(ok(withSamples))
 
   // A module tampered with to accept everything is caught, with the documents.
@@ -109,7 +111,7 @@ assert.ok(fs.existsSync(modulePath))
   // 1 after the schema changes under the module; --json gives the same.
   const run = spawnSync(process.execPath, [bin, 'verify', schemaPath, '--generate', '50', '--samples', samples], { encoding: 'utf8' })
   assert.strictEqual(run.status, 0, run.stdout + run.stderr)
-  assert.ok(/order\.schema\.json: 53 documents \(50 generated, 3 from samples\)/.test(run.stdout), run.stdout)
+  assert.ok(/order\.schema\.json: \d+ documents \(\d+ generated, 3 from samples\)/.test(run.stdout), run.stdout)
   assert.ok(/every module answers as the runtime does/.test(run.stdout), run.stdout)
   fs.writeFileSync(schemaPath, JSON.stringify(changed))
   const staleRun = spawnSync(process.execPath, [bin, 'verify', schemaPath, '--generate', '20', '--json'], { encoding: 'utf8' })
@@ -117,6 +119,26 @@ assert.ok(fs.existsSync(modulePath))
   const parsed = JSON.parse(staleRun.stdout)
   assert.strictEqual(parsed.ok, false)
   assert.strictEqual(parsed.schemas[0].stale, true)
+  // A bound written one off in the module (a minimum of 1 read as 0) is
+  // caught: random documents rarely land on it, the documents on either side
+  // of each stated bound do, on a base the runtime accepts, so the verdicts
+  // differ and not only the error lists.
+  {
+    const bounded = { type: 'object', required: ['n', 's'], properties: { n: { type: 'integer', minimum: 13, maximum: 130 }, s: { type: 'string', minLength: 2, maxLength: 5 } } }
+    const bp = path.join(dir, 'bounded.schema.json')
+    fs.writeFileSync(bp, JSON.stringify(bounded))
+    execFileSync(process.execPath, [bin, 'build', bp], { stdio: 'ignore' })
+    const mp = path.join(dir, 'bounded.compiled.mjs')
+    const good = await verifyOne({ schemaFile: bp, moduleFile: mp, schema: bounded, generate: 40, seed: 2 })
+    assert.ok(ok(good), JSON.stringify(good.disagreements.slice(0, 2)))
+    const src = fs.readFileSync(mp, 'utf8')
+    assert.ok(/<13\b/.test(src), 'the module states the minimum as <13')
+    fs.writeFileSync(mp, src.replace(/<13\b/g, '<12'))
+    const off = await verifyOne({ schemaFile: bp, moduleFile: mp, schema: bounded, generate: 40, seed: 2 })
+    assert.ok(!ok(off), 'a minimum read one off is caught')
+    assert.ok(off.disagreements.some((d) => /"n":12\b/.test(d.document) && d.moduleIsValid === true && d.runtimeIsValid === false), JSON.stringify(off.disagreements.slice(0, 2)))
+  }
+
   const none = spawnSync(process.execPath, [bin, 'verify', path.join(dir, 'nothing-here.json')], { encoding: 'utf8' })
   assert.notStrictEqual(none.status, 0)
   fs.rmSync(dir, { recursive: true, force: true })

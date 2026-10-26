@@ -693,7 +693,8 @@ npx ata verify 'schemas/*.json' --samples test/fixtures
 ```
 
 For each schema it loads the module `ata build` wrote beside it, makes
-documents from the schema (200 by default, half of them with one rule broken),
+documents from the schema (200 by default, half of them with one rule broken,
+then a document on either side of each bound the schema states),
 reads the project's sample documents (JSON files, JSON Lines, or a directory
 of them), and has both the module and a `Validator` built from the schema now
 answer every one. Verdicts and error lists have to agree; a module whose

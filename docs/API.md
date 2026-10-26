@@ -342,7 +342,8 @@ Nothing in ata writes that form until the validator returns.
 `ata verify <glob>` holds each schema's module against the runtime: it loads
 the module `ata build` wrote (`--out-dir`, `--suffix` and `--format` as given
 to the build), makes documents from the schema (`--generate <n>`, 200 by
-default, half of them with one rule broken, `--seed <n>` to repeat a run),
+default, half of them with one rule broken, then a document on either side of
+each bound the schema states, `--seed <n>` to repeat a run),
 reads the project's samples (`--samples <path>`, a JSON file, a JSON Lines
 file or a directory of them, repeatable), and has both the module and a
 `Validator` built from the schema now answer every document. The verdict and
