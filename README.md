@@ -656,6 +656,13 @@ defaults with the compiled module's own `applyDefaults`. A form app with one val
 errors and one that asks for a boolean went from 16.7 to 13.9 KB gzipped (esbuild, minified),
 ata 1.61.0 against master with `@ata-project/unplugin` 0.11.0 and the change. The wrappers on
 their own: full 13.8 to 12.8 KB, without JSON entry points 10.9, verdict only 2.7 to 1.6.
+A validator built with `{ richErrors: false }` is compiled away as well: the module writes its
+errors in that plain shape (`compiledModuleFor(schema, { plainErrors: true })`) and
+`fromCompiledPlain()` from `ata-validator/compiled-plain` hands them out as they are, with no
+error pipeline in the bundle, 2.6 KB gzipped for the wrapper. The same form app with
+`richErrors: false` on the validator that reads errors bundles to 6.1 KB gzipped. The errors
+then carry `keyword`, `instancePath`, `schemaPath`, `params` and `message`, as that option has
+always given them, without `received`, `suggestion` or `docUrl`.
 
 Programmatic API if you prefer to script it:
 

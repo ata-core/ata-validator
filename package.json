@@ -65,6 +65,11 @@
       "import": "./compiled-object.mjs",
       "require": "./compiled-object.js"
     },
+    "./compiled-plain": {
+      "types": "./compiled-plain.d.ts",
+      "import": "./compiled-plain.mjs",
+      "require": "./compiled-plain.js"
+    },
     "./lite": {
       "types": "./lite.d.ts",
       "import": "./lite.mjs",
@@ -95,7 +100,8 @@
     "./lib/buffer-gate.js": "./lib/buffer-gate.browser.js",
     "./lib/interpreter.js": "./lib/interpreter.browser.js",
     "./lib/aot-order.js": false,
-    "./lib/compiled-defaults.js": "./lib/compiled-defaults.browser.js"
+    "./lib/compiled-defaults.js": "./lib/compiled-defaults.browser.js",
+    "./lib/native-message.js": "./lib/native-message.browser.js"
   },
   "scripts": {
     "prepublishOnly": "node tests/test_pack_purity.js && ATA_ALLOW_DOC_PLACEHOLDERS=1 node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js && node tests/test_safe_regex_embed.js && node tests/test_version_sync.js",
@@ -182,6 +188,9 @@
     "compiled-object.js",
     "compiled-object.mjs",
     "compiled-object.d.ts",
+    "compiled-plain.js",
+    "compiled-plain.mjs",
+    "compiled-plain.d.ts",
     "lite.js",
     "lite.mjs",
     "lite.d.ts",
