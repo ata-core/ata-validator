@@ -54,7 +54,14 @@ resolves to an entry without the code generator through the `workerd` and `edge-
 conditions: the same names and answers, and a Worker bundled by wrangler goes from 179.1 to
 70.4 KiB gzipped.
 
-In a browser bundle the code generator is not part of the page. Every schema starts on the
+In a browser, compile with the bundler plugin. [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata)
+turns each `new Validator(schema)` whose schema it can read at build time into a compiled
+validator that gives the same answers, and the runtime stays out of the page. A form with two
+validators, one reading errors and one asking only for a verdict, bundles to 10.7 KB gzipped,
+or 3.1 KB with `richErrors: false` on the one that reads errors, against 53.2 KB for the same
+code on the runtime (esbuild, minified, the runtime with code splitting).
+
+Without the plugin, the code generator is still not part of the page. Every schema starts on the
 interpreted engine, which gives the same answers, and a validator called a thousand times within
 a second loads the generator in the background, through a dynamic import that Vite, webpack and
 Rollup put in a chunk of their own, and is rebuilt on generated code when the page is idle. A
