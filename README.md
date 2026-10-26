@@ -649,7 +649,13 @@ checks takes 1.12 ms where the runtime takes 6.63 ms (median of 15 fresh process
 SchemaStore's 977 schemas, 725 can be compiled away; the rest stay on the runtime. Where the code only calls `isValidObject()` or `isValidJSON()`, the plugin uses
 `fromCompiledVerdict()` from `ata-validator/compiled-verdict` instead, which carries no error pipeline: a
 small app that only asks for a boolean bundles to 2.6 KB gzipped, against 12.1 KB with the full wrapper, on
-ata 1.40.0 with `@ata-project/unplugin` 0.5.0.
+ata 1.40.0 with `@ata-project/unplugin` 0.5.0. Where it reads errors but never validates JSON text, the plugin
+uses `fromCompiledObject()` from `ata-validator/compiled-object`, the full wrapper without
+`validateJSON()` and `isValidJSON()` and the position map behind them; and the wrappers fill
+defaults with the compiled module's own `applyDefaults`. A form app with one validator that reads
+errors and one that asks for a boolean went from 16.7 to 13.9 KB gzipped (esbuild, minified),
+ata 1.61.0 against master with `@ata-project/unplugin` 0.11.0 and the change. The wrappers on
+their own: full 13.8 to 12.8 KB, without JSON entry points 10.9, verdict only 2.7 to 1.6.
 
 Programmatic API if you prefer to script it:
 

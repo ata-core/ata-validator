@@ -17,6 +17,7 @@ const { Validator } = require('..')
 const { compiledModuleFor, compiledEligible, compiledSchemaFor } = require('../build')
 const { fromCompiled } = require('../lib/compiled')
 const { fromCompiledVerdict } = require('../lib/compiled-verdict')
+const { fromCompiledObject } = require('../lib/compiled-object')
 
 const DIALECTS = {
   'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
@@ -50,6 +51,8 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
       const compiled = fromCompiled(mod, compiledSchemaFor(schema))
       // The verdict-only wrapper a plugin uses when code never reads errors.
       const verdict = fromCompiledVerdict(mod, compiledSchemaFor(schema))
+      // The wrapper without the JSON entry points, for code that never calls them.
+      const object = fromCompiledObject(mod, compiledSchemaFor(schema))
       for (const t of group.tests) {
         const text = JSON.stringify(t.data)
         const checks = [
@@ -58,6 +61,8 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
           ['isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(compiled.isValidObject(JSON.parse(text)))],
           ['validateJSON', () => show(runtime.validateJSON(text)), () => show(compiled.validateJSON(text))],
           ['isValidJSON', () => String(runtime.isValidJSON(text)), () => String(compiled.isValidJSON(text))],
+          ['object.validate', () => show(runtime.validate(JSON.parse(text))), () => show(object.validate(JSON.parse(text)))],
+          ['object.isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(object.isValidObject(JSON.parse(text)))],
           ['verdict.isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(verdict.isValidObject(JSON.parse(text)))],
           ['verdict.isValidJSON', () => String(runtime.isValidJSON(text)), () => String(verdict.isValidJSON(text))],
           ['verdict, input after', () => { const d = JSON.parse(text); runtime.isValidObject(d); return JSON.stringify(d) }, () => { const d = JSON.parse(text); verdict.isValidObject(d); return JSON.stringify(d) }],
@@ -113,15 +118,19 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
       const runtime = new Validator(schema, opts)
       const compiled = fromCompiled(mod, normalized, opts)
       const verdict = fromCompiledVerdict(mod, normalized, opts)
+      const object = fromCompiledObject(mod, normalized, opts)
       const label = opts ? 'useDefaults: false' : 'nested defaults'
       for (let j = 0; j < 5; j++) {
         const text = JSON.stringify(docFor(schema, 3))
         for (const [name, a, b] of [
           ['validate', () => show(runtime.validate(JSON.parse(text))), () => show(compiled.validate(JSON.parse(text)))],
           ['validate, input after', () => { const d = JSON.parse(text); runtime.validate(d); return JSON.stringify(d) }, () => { const d = JSON.parse(text); compiled.validate(d); return JSON.stringify(d) }],
+          ['object.validate, input after', () => { const d = JSON.parse(text); runtime.validate(d); return JSON.stringify(d) }, () => { const d = JSON.parse(text); object.validate(d); return JSON.stringify(d) }],
           ['isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(compiled.isValidObject(JSON.parse(text)))],
           ['validateJSON', () => show(runtime.validateJSON(text)), () => show(compiled.validateJSON(text))],
           ['isValidJSON', () => String(runtime.isValidJSON(text)), () => String(compiled.isValidJSON(text))],
+          ['object.validate', () => show(runtime.validate(JSON.parse(text))), () => show(object.validate(JSON.parse(text)))],
+          ['object.isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(object.isValidObject(JSON.parse(text)))],
           ['verdict.isValidObject', () => String(runtime.isValidObject(JSON.parse(text))), () => String(verdict.isValidObject(JSON.parse(text)))],
           ['verdict.isValidJSON', () => String(runtime.isValidJSON(text)), () => String(verdict.isValidJSON(text))],
           ['verdict, input after', () => { const d = JSON.parse(text); runtime.isValidObject(d); return JSON.stringify(d) }, () => { const d = JSON.parse(text); verdict.isValidObject(d); return JSON.stringify(d) }],

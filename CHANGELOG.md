@@ -4,6 +4,14 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Added
+
+- `ata-validator/compiled-object`: `fromCompiledObject(mod, schema)`, the compiled-module wrapper without `validateJSON()` and `isValidJSON()`, for code that reads errors but never validates JSON text. The position map those entry points use to frame an error in the text stays out of the bundle: 10.9 KB gzipped against 12.8 for the full wrapper. `@ata-project/unplugin` picks it where the replaced validator is never asked to validate JSON text. `tests/test_compiled_parity.js` holds it to the runtime over the suite.
+
+### Changed
+
+- The compiled wrappers fill defaults with the module's own `applyDefaults` (exported by modules from 1.58.0 on when the schema has a default, the same pass as the runtime's), so the defaults engine is no longer in a bundle that wraps current modules: the verdict wrapper went from 2.7 to 1.6 KB gzipped, the full one from 13.8 to 12.8. A module from before 1.58.0, or without its version stamp, takes the runtime's pass as before; in the browser build such a module with defaults is refused with an error that says to rebuild it rather than run without its defaults. `tests/test_compiled_defaults_source.js`.
+
 ### Fixed
 
 - `ata verify` also tries, for every bound a schema states (`minimum`, `maximum`, the exclusive ones, `multipleOf`, `minLength`, `maxLength`), a value on either side of it, on a document the runtime accepts. Its random documents rarely land on a bound, so a module that read one off by one (a minimum of 13 written as `< 12`) answered all 200 of them as the runtime did and passed; it is now caught, with the runtime saying invalid and the module valid. `tests/test_verify.js` holds the case.
