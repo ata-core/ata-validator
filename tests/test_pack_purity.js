@@ -134,6 +134,13 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // collector reading each property once behind helper functions that read no
 // flag of their caller (lib/js-compiler-errors.js), and the Bun section of
 // the README. Measured 486.1 KB.
-assert.ok(manifest.size < 492 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 496 KB with the wrappers a bundler plugin puts in place of a validator
+// it can see whole (compiled-object, compiled-plain, compiled-bare,
+// compiled-bare-rich), the browser stubs that keep the native engine's
+// tables out of a page (lib/native-message, lib/native-codes) and the JSON
+// rejection apart from validate()'s (lib/json-rejections.js). A two-validator
+// form app went from 16.7 to 10.7 KB gzipped, or 3.1 with richErrors: false.
+// Measured 493.7 KB.
+assert.ok(manifest.size < 496 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

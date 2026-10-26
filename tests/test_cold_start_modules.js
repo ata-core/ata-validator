@@ -9,6 +9,9 @@
 // lib/error-messages.js loads only for a schema with `errorMessage`, which
 // the third half checks; loading it to ask cost 0.1 ms of a ten-route boot.
 //
+// lib/diagnostic-source.js left it with lib/json-rejections.js, which carries
+// the only use: the rejection validateJSON returns loads both on first need.
+//
 // When this fails because a module was added on purpose, measure the cold
 // start against the previous tag and update the list.
 
@@ -23,7 +26,6 @@ const EXPECTED = [
   // (index.edge.js) can leave them out.
   'lib/codegen-engine.js',
   'lib/combined-runtime.js',
-  'lib/diagnostic-source.js',
   'lib/dialect.js',
   'lib/enrich-error.js',
   'lib/error-codes.js',

@@ -11,7 +11,8 @@
 const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
-const { fromNative, NATIVE_KEYWORDS, CODES } = require('../lib/error-codes')
+const { CODES } = require('../lib/error-codes')
+const { fromNative, NATIVE_KEYWORDS } = require('../lib/native-codes')
 const { enrich } = require('../lib/enrich-error')
 
 let pass = 0

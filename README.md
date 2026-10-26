@@ -662,8 +662,9 @@ errors in that plain shape (`compiledModuleFor(schema, { plainErrors: true })`) 
 error pipeline in the bundle, 2.6 KB gzipped for the wrapper. Where the plugin sees a
 validator only ever called (`v.validate(x)`, `v.isValidObject(x)`), never handed to other code,
 it uses the bare wrappers of `ata-validator/compiled-bare` instead, which leave out Standard
-Schema and the extension hook nothing can reach there: 0.7 KB gzipped for both. The same form
-app with `richErrors: false` on the validator that reads errors bundles to 3.5 KB gzipped. The errors
+Schema and the extension hook nothing can reach there: 0.3 KB gzipped for both, and
+`ata-validator/compiled-bare-rich` for one that reads ata's own errors. The same form app
+bundles to 10.7 KB gzipped, or 3.1 KB with `richErrors: false` on the validator that reads errors. The errors
 then carry `keyword`, `instancePath`, `schemaPath`, `params` and `message`, as that option has
 always given them, without `received`, `suggestion` or `docUrl`.
 
