@@ -11,6 +11,8 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
+- A compiled module that checks `format: email` reads an address literal (`a@[IPv6:...]`, `a@[1.2.3.4]`) with two regular expressions instead of the IPv6 and IPv4 parsers it carried inline, which were 72% of the check's source: an email schema's module went from 1,743 to 1,524 bytes gzipped. The answers are the same (`tests/test_ipv6_expression.js`: the expressions against `ipv6()` and `ipv4()` on 400,000 near-addresses each, the emitted check against `formats.email` on 100,000 literals); the expression lives with the code generator, so the interpreted engine and `ata-validator/lite` do not carry it.
+
 - The compiled wrappers fill defaults with the module's own `applyDefaults` (exported by modules from 1.58.0 on when the schema has a default, the same pass as the runtime's), so the defaults engine is no longer in a bundle that wraps current modules: the verdict wrapper went from 2.7 to 1.6 KB gzipped, the full one from 13.8 to 12.8. A module from before 1.58.0, or without its version stamp, takes the runtime's pass as before; in the browser build such a module with defaults is refused with an error that says to rebuild it rather than run without its defaults. `tests/test_compiled_defaults_source.js`.
 
 ### Fixed
