@@ -32,7 +32,8 @@ for (const [dialect, uri] of [['draft2020-12', 'https://json-schema.org/draft/20
       const runtime = new Validator(schema, { richErrors: false })
       const mod = load(src)
       const plain = barePlain(mod)
-      const verdict = bareVerdict(load(compiledModuleFor(schema, { format: 'cjs' }) || src))
+      // The module a plugin writes for a verdict wrapper: no error collector.
+      const verdict = bareVerdict(load(compiledModuleFor(schema, { format: 'cjs', verdictOnly: true }) || src))
       for (const t of group.tests) {
         const text = JSON.stringify(t.data)
         for (const [name, a, b] of [
