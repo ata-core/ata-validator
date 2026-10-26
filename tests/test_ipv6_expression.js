@@ -1,12 +1,12 @@
 'use strict'
 // The email check a compiled module carries reads an address literal
 // (`a@[IPv6:...]`, `a@[1.2.3.4]`) with two expressions, IPV6_RE in
-// lib/formats-source.js and IPV4 in lib/formats.js, where the runtime uses the ipv6() and ipv4() parsers. Held
+// lib/email-literal.js and IPV4 in lib/formats.js, where the runtime uses the ipv6() and ipv4() parsers. Held
 // here to the same answers: the expressions against the parsers on generated
 // near-addresses, and the emitted email check against formats.email() on
 // literals built from them.
 const assert = require('assert')
-const f = { ...require('../lib/formats'), IPV6_RE: require('../lib/formats-source').IPV6_RE }
+const f = { ...require('../lib/formats'), IPV6_RE: require('../lib/email-literal').IPV6_RE }
 const { compiledModuleFor } = require('../build')
 const fs = require('fs')
 const os = require('os')
@@ -50,5 +50,14 @@ for (let i = 0; i < 100000; i++) {
 }
 for (const s of corners) for (const addr of [`a@[IPv6:${s}]`, `a@[${s}]`]) assert.strictEqual(mod.isValid(addr), f.email(addr), addr)
 assert.strictEqual(mod.isValid('a@[IPv6:' + '1:'.repeat(400) + '1]'), false)
+
+// A browser's generator checks the literal with the parsers instead
+// (lib/email-literal.js maps to nothing there): both forms, on a literal's inside.
+const node = new Function('_in', require('../lib/email-literal')() + ';return true')
+const browser = new Function('_in', require('../lib/formats-source')._literalByParsers() + ';return true')
+for (let i = 0; i < 100000; i++) {
+  const inside = rnd() < 0.5 ? `IPv6:${v6like()}` : rnd() < 0.5 ? v4like() : `ipv6:${v6like()}`
+  assert.strictEqual(browser(inside), node(inside), `the two literal checks differ on ${JSON.stringify(inside)}`)
+}
 fs.rmSync(dir, { recursive: true, force: true })
 console.log(`ok: IPV6_RE and IPV4 answer as ipv6() and ipv4() on ${n} pairs each; the emitted email check as formats.email on ${m} literals`)

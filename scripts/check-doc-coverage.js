@@ -3,7 +3,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { all } = require('../lib/error-codes');
+const { CODES } = require('../lib/error-codes');
+const all = () => Object.keys(CODES).sort();
 
 const doc = fs.readFileSync(path.join(__dirname, '..', 'docs', 'error-codes.md'), 'utf8');
 

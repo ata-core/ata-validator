@@ -3,7 +3,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { CODES, all } = require('../lib/error-codes');
+const { CODES } = require('../lib/error-codes');
+const all = () => Object.keys(CODES).sort();
 
 const out = {};
 for (const c of all()) {

@@ -14,6 +14,9 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
+- A browser build carries no code for the native engine: `lib/native-positions.js`, `lib/native-codes.js` and `lib/native-message.js` map to one stub (`lib/native.browser.js`), since the native loader returns null there. The runtime's code generator chunk went from 78,733 to 78,237 bytes gzipped and the whole runtime from 139,438 to 138,944; the first load is unchanged at 54,383.
+- A browser's generator checks an email address literal with the IPv6 and IPv4 parsers it carries, and the expression a compiled module uses (`lib/email-literal.js`) maps to nothing there. The same answers on either form (`tests/test_ipv6_expression.js`).
+- The format codes in `lib/error-codes.js` are written by one loop; `get()` and `all()`, which only tests and scripts read, are gone from it. The table is unchanged, key order included.
 - `ata-validator/compiled-bare` is an ES module of its own rather than a re-export of the CommonJS file, so a bundler adds no interop code: 662 to 315 bytes gzipped.
 - The rejection `validateJSON()` returns moved to `lib/json-rejections.js`, loaded with the first rejection that carries JSON text, so `validate()` through a compiled wrapper does not bundle it (532 bytes gzipped) and a process that never rejects JSON text no longer loads `lib/diagnostic-source.js`. The native engine's ordinal table moved to `lib/native-codes.js`, which a browser build maps to a stub. `ata-validator/lite` went from 57,790 to 57,769 bytes gzipped.
 - A built-in format under `type: string` is no longer repeated in the branch for a value of another type, where it could never fire.

@@ -110,8 +110,10 @@
     "./lib/interpreter.js": "./lib/interpreter.browser.js",
     "./lib/aot-order.js": false,
     "./lib/compiled-defaults.js": "./lib/compiled-defaults.browser.js",
-    "./lib/native-message.js": "./lib/native-message.browser.js",
-    "./lib/native-codes.js": "./lib/native-codes.browser.js"
+    "./lib/native-message.js": "./lib/native.browser.js",
+    "./lib/native-codes.js": "./lib/native.browser.js",
+    "./lib/email-literal.js": false,
+    "./lib/native-positions.js": "./lib/native.browser.js"
   },
   "scripts": {
     "prepublishOnly": "node tests/test_pack_purity.js && ATA_ALLOW_DOC_PLACEHOLDERS=1 node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js && node tests/test_safe_regex_embed.js && node tests/test_version_sync.js",

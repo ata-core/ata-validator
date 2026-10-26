@@ -7,7 +7,8 @@
 // produced, and the lookup must not walk the table again per call.
 
 const assert = require('assert');
-const { CODES, all, codeFor } = require('../lib/error-codes');
+const { CODES, codeFor } = require('../lib/error-codes');
+const all = () => Object.keys(CODES).sort();
 
 // Reference implementation: the original linear scan over sorted codes.
 function referenceCodeFor (keyword, format) {

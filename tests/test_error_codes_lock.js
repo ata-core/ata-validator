@@ -3,7 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
-const { CODES, all } = require('../lib/error-codes');
+const { CODES } = require('../lib/error-codes');
+const all = () => Object.keys(CODES).sort();
 
 const lock = JSON.parse(fs.readFileSync(path.join(__dirname, 'error-codes.lock.json'), 'utf8'));
 
