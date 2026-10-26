@@ -70,6 +70,11 @@
       "import": "./compiled-plain.mjs",
       "require": "./compiled-plain.js"
     },
+    "./compiled-bare": {
+      "types": "./compiled-bare.d.ts",
+      "import": "./compiled-bare.mjs",
+      "require": "./compiled-bare.js"
+    },
     "./lite": {
       "types": "./lite.d.ts",
       "import": "./lite.mjs",
@@ -191,6 +196,9 @@
     "compiled-plain.js",
     "compiled-plain.mjs",
     "compiled-plain.d.ts",
+    "compiled-bare.js",
+    "compiled-bare.mjs",
+    "compiled-bare.d.ts",
     "lite.js",
     "lite.mjs",
     "lite.d.ts",
