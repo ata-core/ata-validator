@@ -1,3 +1,24 @@
+# Bun ahead-of-time, pull request build, 2026-10-27
+
+bun 1.4.4-canary.1+d0b27e983 (oven-sh/bun#45631, CI artifact of 2026-10-27
+05:50, installed with `bunx bun-pr 45631`, 45 commits past the build of
+2026-10-25 below), Apple M4 Pro, ata-validator 1.61.1, zod 4.6.7. The same
+`bench.ts`, built with `--compile` and `--compile --aot`, three runs each,
+the median shown. Nanoseconds per document:
+
+| validator | JIT | AOT | AOT / JIT |
+|---|---|---|---|
+| ata module from `ata build`, isValid | 24.3 | 32.9 | 1.4x |
+| ata module, validate() | 56.4 | 50.2 | 0.9x |
+| ata runtime Validator (compiled at start with new Function), isValidObject | 25.1 | 480.9 | 19x |
+| ata runtime, validate() | 31.9 | 490.8 | 15x |
+| zod 4 safeParse | 210.4 | 483.8 | 2.3x |
+
+The picture of 2026-10-25 holds on the newer build and on 1.61.1: the module
+written at build time is compiled with the program, 33 ns against 484 for zod
+under AOT; code generated at run time is interpreted there. The module's
+`validate()` is faster under AOT than on the JIT, 50.2 against 56.4 ns.
+
 # Bun ahead-of-time, pull request build, 2026-10-25
 
 bun 1.4.4-canary.1+947fb6a47 (oven-sh/bun#45631, CI artifact of 2026-10-25
