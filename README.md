@@ -748,10 +748,12 @@ So, in order of preference:
    module by hand. The module is plain JavaScript and compiles with the
    program: 24 ns, the same errors as the runtime.
 2. Where the runtime `Validator` stays, let it take the interpreted engine.
-   It does so by itself when Bun reports `Bun.isAOT`, when the executable is
-   built with `--disallow-code-generation-from-strings` (the program then
-   counts as closed for the compiler, too), or when `ATA_ENGINE=interpreter`
-   is set: 80 ns against 492 for the generated code there.
+   It does so by itself under `bun build --compile --aot` and `bun run --aot`,
+   where Bun resolves the package's `"aot"` export condition to an entry that
+   says so; also when the executable is built with
+   `--disallow-code-generation-from-strings` (the program then counts as
+   closed for the compiler, too), or when `ATA_ENGINE=interpreter` is set:
+   78 ns against 487 for the generated code there.
 3. Write the module for the compiler. `ata build schema.json --target bun`
    writes it with a closed object's keys read once and compared with the
    declared list in order (on a ten-item order with 1024 distinct documents,

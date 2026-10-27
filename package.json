@@ -8,6 +8,11 @@
   "types": "index.d.ts",
   "exports": {
     ".": {
+      "aot": {
+        "types": "./index.d.ts",
+        "import": "./index.aot.mjs",
+        "require": "./index.aot.js"
+      },
       "workerd": {
         "types": "./index.d.ts",
         "import": "./index.edge.mjs",
@@ -98,7 +103,10 @@
   },
   "sideEffects": [
     "./codegen.js",
-    "./codegen.mjs"
+    "./codegen.mjs",
+    "./lib/aot-mark.js",
+    "./index.aot.js",
+    "./index.aot.mjs"
   ],
   "bin": {
     "ata": "bin/ata.js"
@@ -170,6 +178,8 @@
   },
   "files": [
     "index.js",
+    "index.aot.js",
+    "index.aot.mjs",
     "index.mjs",
     "index.node.mjs",
     "index.bundle.mjs",

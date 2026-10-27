@@ -14,6 +14,12 @@ the median shown. Nanoseconds per document:
 | ata runtime, validate() | 31.9 | 490.8 | 15x |
 | zod 4 safeParse | 210.4 | 483.8 | 2.3x |
 
+With the `"aot"` export condition (unreleased after 1.61.1; 1.61.1 still
+looked for `Bun.isAOT`, which this build no longer has), the runtime rows
+take the interpreted engine under AOT, three runs, median: isValidObject
+78.4 ns, validate() 93.8 ns, against 480.9 and 490.8 above; the JIT build
+keeps generated code (26.2 ns).
+
 The picture of 2026-10-25 holds on the newer build and on 1.61.1: the module
 written at build time is compiled with the program, 33 ns against 484 for zod
 under AOT; code generated at run time is interpreted there. The module's

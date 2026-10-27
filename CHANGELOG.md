@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- Under Bun's ahead-of-time compiler a runtime `Validator` took generated code again, which the compiler interprets: 487 ns a document against 78 on the interpreted engine. ata told the two apart by `Bun.isAOT`, which the compiler's pull request has since removed in favour of an `"aot"` export condition. The package now leads its exports with that condition, naming `index.aot.js` and `index.aot.mjs`, which mark the process before the package loads (`lib/aot-mark.js`), and lists them as side effects so a bundler keeps them. Measured on the pull request's build of 2026-10-27; `tests/test_aot_entry.js` holds the condition, the entries and the mark.
+
 ## 1.61.1 - 2026-10-26
 
 ### Added
