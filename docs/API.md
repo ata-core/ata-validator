@@ -353,6 +353,17 @@ missing module says to run `ata build`. The exit code is 1 on any
 disagreement, stale or missing module; `--json` writes the report as JSON. The
 `.bun.ts` target is not run, since it needs Bun's compiler.
 
+`ata diff <old> <new>` reports what a change to a schema does to documents:
+the ones the old schema accepts and the new one rejects, and the reverse,
+grouped by the rule that decides them (the first error's keyword and instance
+path) with one example each. The documents are made from both schemas as
+`ata verify` makes them (`--generate <n>`, `--seed <n>`), plus the project's
+samples (`--samples <path>`, repeatable), which are preferred as examples. The
+exit code is 1 when the new schema rejects a document the old one accepts, 2
+on a schema that cannot be read; `--json` writes the report as JSON. The same
+is `diffSchemas(oldSchema, newSchema, { generate, seed, samples })` and
+`renderDiff(report, { json })` from `ata-validator/lib/schema-diff`.
+
 `ata build --mode schema` goes one step further, for pages where the bytes
 shipped matter more than the time per check: every module that can be is
 its schema and a few lines, and the verdict comes from the same runtime as

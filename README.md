@@ -732,6 +732,37 @@ works as a CI step. This is the check that found the two silent divergences
 fixed in 1.59.0 and 1.60.0, now in a form a project can run on every change.
 It does not run the `.bun.ts` target, which needs Bun's compiler.
 
+### What a schema change does (`ata diff`)
+
+Reading two versions of a schema side by side says which keywords changed. It
+does not say which documents change verdict, and that is the question before
+a deploy: which requests that pass today get a 400 tomorrow. `ata diff` answers
+it with documents:
+
+```bash
+npx ata diff schemas/user.json schemas/user-v2.json --samples test/fixtures
+```
+
+```
+401 documents: 102 accepted by both, 293 rejected by both, 6 rejected only by user-v2.json, 0 accepted only by user-v2.json
+
+Rejected by user-v2.json, accepted by user.json (a client sending these gets a rejection after the change):
+  minimum@/age: 4 documents, 1 of them the project's own, must be >= 18
+    {"email":"kid@example.com","name":"Kid","age":15}  (test/fixtures/signup-teen.json)
+  maxLength@/name: 2 documents, must NOT have more than 40 characters
+    {"email":"a@b.co","name":"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij...
+```
+
+The documents are the ones `ata verify` makes, from both schemas (200 each by
+default, half with one rule broken, then a value on either side of every
+bound), plus the project's own samples. Each one is checked by a `Validator`
+built from each schema, and the ones that change verdict are grouped by the
+rule that decides them, with one example each, the project's own document
+when there is one. The exit code is 1 when a document the old schema accepts
+is rejected by the new one, so a pull request that tightens a schema fails
+the check until someone looks. Generated documents are a sample, not a proof:
+a change this reports is real, one it does not report may still exist.
+
 ### Bun, compiled ahead of time
 
 Bun's ahead-of-time compiler (`bun build --compile --aot`, an open pull

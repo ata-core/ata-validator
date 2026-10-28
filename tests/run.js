@@ -210,6 +210,7 @@ const FILES = [
   "tests/test_lazy_codegen.js",
   "tests/test_bundle_preprocess.js",
   "tests/test_compiled_standard.js",
+  "tests/test_schema_diff.js",
   "tests/test_schema_of.js",
   "tests/test_aot_engine.js",
   "tests/test_bun_target.js",

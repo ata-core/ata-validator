@@ -15,6 +15,8 @@ Usage:
   ata migrate  [dir]         [options]  Report what switching from ajv would change; --write applies it.
   ata verify   <glob>...     [options]  Check that each schema's compiled module answers as the runtime
                                         does, on generated documents and the project's samples.
+  ata diff     <old> <new>   [options]  What a change to a schema does: the documents the old schema
+                                        accepts and the new one rejects, and the reverse, by rule.
 
 Verify options:
   --generate <n>          Documents made from each schema, half with one rule broken. Default: 200
@@ -22,6 +24,13 @@ Verify options:
   --seed <n>              Seed for the generated documents. Default: 1
   --json                  Report as JSON
   --out-dir, --suffix, --format    Where the modules are, as given to ata build
+
+Diff options:
+  --generate <n>          Documents made from each schema. Default: 200
+  --samples <path>        The project's own documents, checked too (repeatable)
+  --seed <n>              Seed for the generated documents. Default: 1
+  --json                  Report as JSON
+  Exit status 1 when a document the old schema accepts is rejected by the new one.
 
 Validate options:
   --pretty                Render errors with source frames (default on TTY)
@@ -487,6 +496,24 @@ function cmdVerify (args) {
   })().catch((e) => { process.stderr.write(`error: ${e.message}\n`); process.exit(1); });
 }
 
+function cmdDiff (args) {
+  if (args._.length < 2) {
+    process.stderr.write('error: ata diff <old-schema> <new-schema>\n');
+    process.exit(2);
+  }
+  const buildLib = require('../lib/aot-build');
+  const { diffSchemas, renderDiff, breaking } = require('../lib/schema-diff');
+  let oldSchema, newSchema;
+  try { oldSchema = buildLib.parseSchemaFile(args._[0]); newSchema = buildLib.parseSchemaFile(args._[1]); } catch (e) { process.stderr.write(`error: ${e.message}\n`); process.exit(2); }
+  const samples = args.opts.samples === undefined ? [] : [].concat(args.opts.samples);
+  let report;
+  try {
+    report = diffSchemas(oldSchema, newSchema, { generate: Number.isFinite(args.opts.generate) ? args.opts.generate : 200, seed: Number.isFinite(args.opts.seed) ? args.opts.seed : 1, samples });
+  } catch (e) { process.stderr.write(`error: ${e.message}\n`); process.exit(2); }
+  process.stdout.write(renderDiff(report, { json: !!args.opts.json, oldName: path.basename(args._[0]), newName: path.basename(args._[1]) }) + '\n');
+  process.exit(breaking(report) ? 1 : 0);
+}
+
 function cmdValidate (args) {
   if (args._.length < 2) {
     process.stderr.write('error: ata validate <schema> <data-file>\n');
@@ -589,6 +616,11 @@ function main() {
 
   if (cmd === 'verify') {
     cmdVerify(args);
+    return;
+  }
+
+  if (cmd === 'diff') {
+    cmdDiff(args);
     return;
   }
 
