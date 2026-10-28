@@ -1,6 +1,6 @@
 # ata-validator
 
-JSON Schema validation that compiles for speed and still runs where code generation is blocked. The compiled and interpreted engines answer identically, at 100% of the official suite in both modes, across Draft 2020-12, draft 7 and the [JSON Schema v1 dialect](#dialects). First-class TypeScript inference, and `ata build` emits a standalone module that imports nothing.
+JSON Schema validation where the TypeScript type comes from the schema, or the schema from the type. Write the schema once and `validate` narrows to it; write the type once and the bundler plugin writes its schema in at build time. The compiled and interpreted engines answer identically, at 100% of the official suite in both modes, across Draft 2020-12, 2019-09, drafts 7, 6 and 4 and the [JSON Schema v1 dialect](#dialects), and `ata build` emits a standalone module that imports nothing, with its `.d.mts` beside it.
 
 [![npm](https://img.shields.io/npm/v/ata-validator)](https://www.npmjs.com/package/ata-validator)
 [![License](https://img.shields.io/npm/l/ata-validator)](LICENSE)
@@ -9,6 +9,60 @@ JSON Schema validation that compiles for speed and still runs where code generat
 [![Socket Badge](https://badge.socket.dev/npm/package/ata-validator)](https://socket.dev/npm/package/ata-validator)
 
 1.0 is a stability commitment: see [docs/STABILITY.md](docs/STABILITY.md) for the semver, deprecation, and error-code guarantees.
+
+## The type and the schema
+
+One source of truth, in either direction. A schema written with `defineSchema` carries its
+type: `validate` narrows `data` to it, and `Infer` pulls the type out for a signature.
+
+```ts
+import { defineSchema, Validator, type Infer } from 'ata-validator'
+
+const User = defineSchema({
+  type: 'object',
+  properties: {
+    id: { type: 'integer', minimum: 1 },
+    email: { type: 'string', format: 'email' },
+    role: { enum: ['admin', 'user'] },
+  },
+  required: ['id', 'email'],
+})
+
+const users = new Validator(User)
+const r = users.validate(JSON.parse(body))
+if (r.valid) {
+  r.data.id    // number
+  r.data.role  // 'admin' | 'user' | undefined
+  r.data.name  // a type error: the schema has no name
+}
+
+type User = Infer<typeof User>
+```
+
+Or start from the type. `schemaOf<T>()` has no run-time form; the bundler plugin reads `T`
+with the TypeScript checker and writes its JSON Schema in place of the call, with the JSDoc
+tags carrying what a type cannot say, and the `new Validator(...)` then compiles away like any
+static schema.
+
+```ts
+import { Validator, schemaOf } from 'ata-validator'
+
+interface Account {
+  /** @minimum 1 */
+  id: number
+  /** @format email */
+  email: string
+  role?: 'admin' | 'user'
+}
+
+const accounts = new Validator(schemaOf<Account>())
+```
+
+`ata build` writes a `.d.mts` next to every compiled module, with the inferred type and an
+`isValid` predicate on it, so a module that imports nothing still narrows. The chainable
+builder in `ata-validator/t`, `Infer` on `anyOf`, `allOf`, tuples and recursive `$ref`, and
+the async `t.refine` are in [Type-safe schemas](#type-safe-schemas); the plugin's type reading
+is in [its README](https://github.com/ata-core/unplugin-ata#a-schema-from-a-typescript-type-schemaofuser).
 
 ## Who uses ata
 
@@ -399,31 +453,7 @@ v.countValid(ndjson);        // number
 
 ### Type-safe schemas
 
-ata infers TypeScript types straight from plain JSON Schema. Write the schema once with `defineSchema`, and both runtime validation and the static type come from it, with no builder DSL and no second type declaration to keep in sync.
-
-```ts
-import { defineSchema, Validator } from 'ata-validator'
-
-const userSchema = defineSchema({
-  type: 'object',
-  properties: {
-    id: { type: 'integer', minimum: 1 },
-    role: { type: 'string', enum: ['admin', 'user'] },
-  },
-  required: ['id'],
-})
-
-const v = new Validator(userSchema)
-const result = v.validate(data)
-if (result.valid) {
-  result.data.id   // number
-  result.data.role // 'admin' | 'user' | undefined
-} else {
-  // result.errors: ValidationError[]
-}
-```
-
-`defineSchema` returns the schema untouched at runtime; in TypeScript it gives keyword autocomplete and an error when a value has the wrong shape, with no `as const` needed. `new Validator(schema)` carries the inferred type, so a successful `validate` narrows `result.data` with no manual annotation.
+ata infers TypeScript types straight from plain JSON Schema, as in [the opening example](#the-type-and-the-schema): `defineSchema` returns the schema untouched at runtime and, in TypeScript, gives keyword autocomplete and an error when a value has the wrong shape, with no `as const` needed. `new Validator(schema)` carries the inferred type, so a successful `validate` narrows `result.data` with no manual annotation.
 
 #### Extracting the type: `Infer`
 

@@ -145,6 +145,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // for a validator a bundler plugin sees handed only to a Standard Schema
 // consumer: a Hono route on Workers 21.0 to 12.2 KB gzipped), the tier-0
 // format check and the "aot" entries. Measured 497.3 KB.
-assert.ok(manifest.size < 500 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 501 KB with the README opening on the type and the schema: the typed
+// `defineSchema` example and `schemaOf<T>()`, the two directions in one place.
+// Measured 500.2 KB.
+assert.ok(manifest.size < 501 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
