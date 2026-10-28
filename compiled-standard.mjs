@@ -4,11 +4,9 @@
 // through lib/standard-schema.js; tests/test_compiled_standard.js holds the
 // two to the same issues and the same schema documents.
 
-const VALID = Object.freeze({ valid: true, errors: Object.freeze([]) });
-const VERDICT_DISAGREES = Object.freeze({
-  valid: false,
-  errors: Object.freeze([Object.freeze({ keyword: 'validation', instancePath: '', schemaPath: '#', params: Object.freeze({}), message: 'schema validation failed' })]),
-});
+// When the module's error function answers valid where its verdict said no,
+// the disagreement is reported rather than turned into an acceptance.
+const DISAGREES = [{ message: 'schema validation failed', instancePath: '' }];
 const EMPTY_PATH = Object.freeze([]);
 
 // A JSON pointer as a Standard Schema path: an all-digit segment without a
@@ -53,7 +51,7 @@ export function bareStandard(mod, schema, useDefaults) {
         if (fill !== null) fill(value);
         if (isValid(value)) return { value };
         const r = errFn(value);
-        const errors = r && r.valid === false ? r.errors : VERDICT_DISAGREES.errors;
+        const errors = r && r.valid === false ? r.errors : DISAGREES;
         const issues = new Array(errors.length);
         for (let i = 0; i < errors.length; i++) {
           const e = errors[i];
