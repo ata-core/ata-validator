@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Added
+
+- `ata-validator/compiled-standard`: `bareStandard(mod, schema)`, the compiled-module wrapper for a validator that is only ever handed to a Standard Schema consumer (a router's validator middleware, a form library, an RPC layer) and never called by its own code. Such a consumer reads `~standard` alone, and an issue is a message and a path, so the wrapper is built on a module written with `plainErrors: true` and carries no error pipeline: 782 bytes gzipped, standing alone as an ES module. The issues, the input after defaults and the Standard JSON Schema document are the runtime's on every suite case the compiler takes (`tests/test_compiled_standard.js`). `@ata-project/unplugin` uses it where it sees that handover; a Hono route bundled for Cloudflare Workers goes from 21.0 to 12.2 KB gzipped, against 7.7 KB for Hono alone.
+
 ## 1.61.2 - 2026-10-28
 
 ### Changed

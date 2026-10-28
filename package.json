@@ -84,6 +84,11 @@
       "types": "./compiled-bare-rich.d.ts",
       "default": "./lib/compiled-bare-rich.js"
     },
+    "./compiled-standard": {
+      "types": "./compiled-standard.d.ts",
+      "import": "./compiled-standard.mjs",
+      "default": "./lib/compiled-standard.js"
+    },
     "./lite": {
       "types": "./lite.d.ts",
       "import": "./lite.mjs",
@@ -217,6 +222,8 @@
     "compiled-bare.mjs",
     "compiled-bare.d.ts",
     "compiled-bare-rich.d.ts",
+    "compiled-standard.mjs",
+    "compiled-standard.d.ts",
     "lite.js",
     "lite.mjs",
     "lite.d.ts",

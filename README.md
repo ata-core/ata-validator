@@ -671,7 +671,11 @@ validator only ever called (`v.validate(x)`, `v.isValidObject(x)`), never handed
 it uses the bare wrappers of `ata-validator/compiled-bare` instead, which leave out Standard
 Schema and the extension hook nothing can reach there: 0.3 KB gzipped for both, and
 `ata-validator/compiled-bare-rich` for one that reads ata's own errors. The same form app
-bundles to 10.7 KB gzipped, or 3.1 KB with `richErrors: false` on the validator that reads errors. The errors
+bundles to 10.7 KB gzipped, or 3.1 KB with `richErrors: false` on the validator that reads errors.
+A validator handed only to a Standard Schema consumer the plugin knows (Hono's
+`sValidator`, `hono-openapi`, TanStack Form, oRPC) takes `ata-validator/compiled-standard`, which
+carries `~standard` alone on a module with plain errors: a Hono route on Cloudflare Workers goes
+from 21.0 to 12.2 KB gzipped, 4.4 KB over Hono by itself. The errors
 then carry `keyword`, `instancePath`, `schemaPath`, `params` and `message`, as that option has
 always given them, without `received`, `suggestion` or `docUrl`.
 
