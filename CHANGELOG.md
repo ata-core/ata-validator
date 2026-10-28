@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Changed
+
+- Tier 0, the shared verdict for flat object schemas, checks `format` on a string property with the table the interpreted engine reads (`formats.formatChecks`, moved out of `lib/interpreter-core.js`) or the caller's own function, so a schema with an email field stays on it; and on the interpreted engine it answers the verdict whether or not `validate()` came first, which `validate()`'s own verdict-first path then uses too. On Node's interpreted engine, the ten-field user schema with `format: email`: an accepted document 86 to 70 ns, a rejected one 33 to 17, `validate()` 91 to 75 and 35 to 19. Under Bun's ahead-of-time compiler, with the fix below, `isValidObject()` 78 to 48 ns and `validate()` 94 to 51, against 483 for zod 4 there. `tests/test_tier0_format.js` holds tier 0, the interpreted engine and the generated code to the same verdicts on the 6,558 format cases of the official suite. `ata-validator/lite` grows by 85 bytes gzipped.
+
 ### Fixed
 
 - Under Bun's ahead-of-time compiler a runtime `Validator` took generated code again, which the compiler interprets: 487 ns a document against 78 on the interpreted engine. ata told the two apart by `Bun.isAOT`, which the compiler's pull request has since removed in favour of an `"aot"` export condition. The package now leads its exports with that condition, naming `index.aot.js` and `index.aot.mjs`, which mark the process before the package loads (`lib/aot-mark.js`), and lists them as side effects so a bundler keeps them. Measured on the pull request's build of 2026-10-27; `tests/test_aot_entry.js` holds the condition, the entries and the mark.

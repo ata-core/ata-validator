@@ -20,6 +20,10 @@ take the interpreted engine under AOT, three runs, median: isValidObject
 78.4 ns, validate() 93.8 ns, against 480.9 and 490.8 above; the JIT build
 keeps generated code (26.2 ns).
 
+With tier 0 checking `format` and answering the verdict on the interpreted
+engine as well (unreleased), the runtime rows come to 48.3 ns
+(isValidObject) and 51.3 ns (validate()) under AOT, three runs, median.
+
 The picture of 2026-10-25 holds on the newer build and on 1.61.1: the module
 written at build time is compiled with the program, 33 ns against 484 for zod
 under AOT; code generated at run time is interpreted there. The module's

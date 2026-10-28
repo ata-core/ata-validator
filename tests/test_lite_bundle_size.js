@@ -145,7 +145,14 @@ const esbuild = require('esbuild')
 // 57800 (57706 measured): schemaOf(), the build-time placeholder whose run-time
 // form is an error naming the plugin, and aotHost(), which picks the
 // interpreted engine where code is compiled ahead of time.
-const BUDGET = 57800
+// 57900 (57828 measured): tier 0, the shared verdict for flat object schemas,
+// checks `format` on strings with the table the interpreted engine reads
+// (formats.formatChecks), and answers the verdict on the interpreted engine
+// too, not only on a first isValidObject(). A schema with an email field
+// stays on it: 86 to 70 ns a valid document on Node's interpreted engine, and
+// under Bun's ahead-of-time compiler 78 to 48. 85 bytes for this, 113 over
+// 1.61.1 (57715) with the "aot" entry's mark in the core.
+const BUDGET = 57900
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
