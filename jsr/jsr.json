@@ -1,6 +1,6 @@
 {
   "name": "@ata/validator",
-  "version": "1.61.2",
+  "version": "1.61.3",
   "license": "MIT",
   "exports": {
     ".": "./mod.ts",
