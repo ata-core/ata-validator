@@ -49,3 +49,15 @@ person can keep, and they are stated so you can hold the project to them.
 ## ReDoS
 
 Patterns run on ata's own regular expression engine, which matches in linear time. The platform RegExp takes a pattern only when it is shown to run in linear time there too. A pattern the linear engine cannot represent, one with a backreference or a lookaround, runs on the platform RegExp as written, which can backtrack: if your schemas come from untrusted sources, keep those constructs out of them. If you find a slow pattern that uses neither, please report it.
+
+## What a package scanner reports
+
+Socket and similar scanners flag the published package for the following. Each is in the code on purpose; this is where and why.
+
+- **Dynamic code execution.** The code generator builds a validator for a schema with `new Function` (`lib/js-compiler.js`, `lib/plan-compiler.js` and the modules around them). The input is the schema, never the document being validated, and schema property names are escaped before they reach generated code (fixed in 1.40.1, with a test that holds). Where `new Function` is blocked, by a Content-Security-Policy, a Manifest V3 extension, Cloudflare Workers or Bun's ahead-of-time compiler, the package takes its interpreted engine, which scores the same on the official suite; `tests/test_no_eval.js` runs the whole suite with `eval` and `new Function` disabled.
+- **Dynamic require.** `lib/native-load.js` loads the optional native accelerator by a package name built from the platform and architecture (`@ata-validator/darwin-arm64` and six others), and the name is not a literal so a bundler does not try to resolve a package that is not installed. The candidates are the seven names the project publishes, nothing read from the environment or the schema. `ATA_NO_NATIVE=1` skips the lookup.
+- **Environment variables.** The ones a user sets: `ATA_NO_NATIVE` (skip the native addon), `ATA_NO_WARM` (skip the engine warm-up on Node), `ATA_ENGINE` and `ATA_FORCE_NAPI` (choose an engine, for the project's own tests), and `ATA_DEBUG`, `ATA_DEBUG_ERRGEN`, `ATA_DUMP_CODEGEN`, `ATA_DUMP_PARTS`, `ATA_CHECK_SORT` (diagnostics that print to stderr). The command line reads `NO_COLOR`, `FORCE_COLOR` and `NODE_ENV` for its output. Each is read, never written, and none of their values leaves the process.
+- **Filesystem access.** The `ata` command line reads schema files and writes compiled modules (`bin/ata.js`, `lib/aot-build.js`, `lib/verify.js`, `lib/migrate.js`). `validate()` and the `Validator` class do not touch the filesystem.
+- **URL strings.** The meta-schema identifiers of the dialects (`https://json-schema.org/draft/2020-12/schema` and the others), which are names, not addresses the package fetches, and the documentation prefix for error codes (`https://ata-validator.com/e/`), which is written into error objects as text. The package makes no network requests.
+
+The pack purity test (`tests/test_pack_purity.js`) holds the core tarball to pure JavaScript and a size ceiling, so a native binary or an unexpected file cannot enter it unnoticed.
