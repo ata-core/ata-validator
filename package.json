@@ -89,6 +89,11 @@
       "import": "./compiled-standard.mjs",
       "default": "./lib/compiled-standard.js"
     },
+    "./stream": {
+      "types": "./stream.d.ts",
+      "import": "./stream.mjs",
+      "default": "./stream.js"
+    },
     "./lite": {
       "types": "./lite.d.ts",
       "import": "./lite.mjs",
@@ -224,6 +229,9 @@
     "compiled-bare-rich.d.ts",
     "compiled-standard.mjs",
     "compiled-standard.d.ts",
+    "stream.js",
+    "stream.mjs",
+    "stream.d.ts",
     "lite.js",
     "lite.mjs",
     "lite.d.ts",

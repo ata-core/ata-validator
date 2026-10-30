@@ -509,6 +509,13 @@ export interface Validator<T = unknown> {
   /** Validate a JSON string. Uses simdjson fast path for large documents. */
   validateJSON(jsonString: string): ValidationResult<T>;
 
+  /**
+   * Validation as the body arrives: a record stream over this validator for a
+   * JSON array or NDJSON fed in chunks, reporting the first failing record the
+   * moment it is complete. See `ata-validator/stream` for the types.
+   */
+  stream(opts?: import('./stream').StreamOptions): import('./stream').RecordStream;
+
   /** Fast boolean check for a JSON string */
   isValidJSON(jsonString: string): boolean;
 

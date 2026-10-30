@@ -224,6 +224,18 @@ Single-thread NDJSON batch validation. Returns array of booleans.
 
 Zero-copy path for pre-padded buffers (simdjson requires 64 bytes padding).
 
+### v.stream(options), ata-validator/stream
+
+Validation as the body arrives. `v.stream(opts)` (the Node entry; the lite, edge and browser entries do not carry the method) or `streamValidator(v, opts)` from `ata-validator/stream` returns a record stream: `push(chunk)` takes a
+string, Buffer or Uint8Array and returns `null` while every record so far is valid, or the first
+failure `{ valid: false, record, errors }` the moment its record is complete; `end()` returns
+`{ valid, records, errors }`. Options: `format` (`'ndjson'`, `'array'` or `'auto'`, the default,
+decided from the first non-blank character), `stopOnFirst` (default true), `onRecord(doc, index)`
+for each record that passed, parsed. A record that is not JSON fails with keyword `__parse__`, as
+`validateJSON()` reports it. `validateStream(v, source, opts)` from `ata-validator/stream` reads a
+Node Readable, a Web ReadableStream or any iterable of chunks and stops the source at the first
+failure. Memory does not grow with the body; see the README for the measured figures.
+
 ## Standalone Pre-compilation
 
 Skip compilation at startup by saving compiled validators to disk.

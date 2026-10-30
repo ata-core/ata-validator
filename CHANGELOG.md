@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Added
+
+- `ata-validator/stream` and `v.stream(opts)`: validation as the body arrives. A JSON array or NDJSON fed in chunks is split without being parsed as a whole, a scan that tracks strings and nesting for the array, newlines for NDJSON, and each record is parsed and validated the moment its last byte lands; the first failing record is reported then, with the errors `validate()` gives for it, and `validateStream(v, source)` stops a Node Readable or a Web ReadableStream there instead of reading it to the end. On a 100 MB body of 128,419 order documents with the third invalid: 517 ms and 783 MB (read it all, `JSON.parse`, validate the array) to 13.5 ms and 122 MB, having read 0.1 MB; with the last record invalid the time is the same and the memory a third. `onRecord` hands each passing record over parsed; `stopOnFirst: false` lists every failure. `tests/test_stream.js` holds the stream to whole-document validation under every chunk cut.
+
 ### Changed
 
 - The `uuid` format reads two class tables, the class of a character and the class each of the 36 positions wants, and ORs the mismatches instead of branching on every character; the generated code hoists the same tables once per compiled function (`_uu`) and the standalone modules carry them. On the 900 ids of the order body in validator-benchmarks: 85 to 35 ns a check; the order body's verdict 269 to 229 ns a document on the runtime, 270 to 232 in the module from `ata build`. `tests/test_uuid_table.js` holds the runtime, the hoisted and the inline forms to the 8-4-4-4-12 rule for every code point at every position.

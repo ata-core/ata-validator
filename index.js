@@ -6,6 +6,16 @@
 // lib/codegen-engine.js, so that the edge entry (index.edge.js) and
 // ata-validator/lite can load the core without it.
 const core = require('./lib/validator-core.js');
+
+// Validation as the body arrives: `v.stream(opts)` is a record stream over the
+// validator (lib/stream.js), loaded on first use. Defined here, on the Node
+// entry, and not in the core: the lite, edge and browser builds are measured
+// to the byte and a static require from the core would put the stream into
+// every one of them; there `ata-validator/stream` is imported where it is used.
+Object.defineProperty(core.Validator.prototype, 'stream', {
+  configurable: true, writable: true,
+  value: function stream (opts) { return require('./lib/stream.js').streamValidator(this, opts); },
+});
 // The code generator loads on first need, or once the event loop is free,
 // not with the package: it is most of what requiring the package parsed. The
 // timer is unref'd, so a script that has finished does not stay to load it.

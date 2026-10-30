@@ -795,6 +795,47 @@ is rejected by the new one, so a pull request that tightens a schema fails
 the check until someone looks. Generated documents are a sample, not a proof:
 a change this reports is real, one it does not report may still exist.
 
+### Validation as the body arrives
+
+A request that carries many documents, a JSON array or NDJSON, is usually read to the end,
+parsed as a whole and then validated, so a bad third record is reported after the last byte.
+`ata-validator/stream` validates each record the moment its last byte lands and stops the
+source at the first failure, with memory that does not grow with the body.
+
+```js
+import { validateStream } from 'ata-validator/stream'
+
+app.post('/orders/import', async (c) => {
+  const r = await validateStream(orders, c.req.raw.body)   // a Web ReadableStream, or a Node Readable
+  if (!r.valid) return c.json({ record: r.errors[0].record, errors: r.errors[0].errors }, 400)
+  return c.json({ imported: r.records })
+})
+```
+
+`v.stream(opts)` on Node, or `streamValidator(v, opts)` from `ata-validator/stream` anywhere (the lite, edge and browser entries do not carry the method, so their bundles stay what they were), is the same thing fed by hand: `push(chunk)` takes strings or bytes and returns
+the first failure as soon as its record is complete, `end()` returns `{ valid, records, errors }`.
+`onRecord(doc, index)` hands over each record that passed, parsed, so an import does not parse
+twice; `stopOnFirst: false` lists every failing record instead of stopping. The format is read
+from the first character (`[` is an array, anything else NDJSON) or set with `format`. A JSON
+array is split by a scan that tracks strings and nesting, not by parsing it, so the elements are
+parsed one at a time.
+
+Measured on a 100 MB body of 128,419 order documents, read in 64 KB chunks, Node 25, Apple M4
+Pro, one process per row:
+
+| | invalid record 3 | invalid last record |
+|---|---|---|
+| read it all, `JSON.parse`, validate the array | 517 ms, 783 MB | 571 ms, 845 MB |
+| read it all, split lines, parse and validate each | 237 ms, 553 MB | 462 ms, 660 MB |
+| `ata-validator/stream`, JSON array | 13.5 ms, 122 MB, 0.1 MB read | 577 ms, 195 MB |
+| `ata-validator/stream`, NDJSON | 19.6 ms, 122 MB, 0.1 MB read | 461 ms, 197 MB |
+
+Peak RSS; the 100 MB figure is the process without the body. A body that is valid to the end
+costs the same time as before and a third of the memory. `tests/test_stream.js` holds the stream
+to whole-document validation under every way of cutting the bytes into chunks, including inside
+multi-byte characters, strings with brackets and escaped quotes, nested arrays, scalars, CRLF
+and blank lines, and checks that a failing source is destroyed or cancelled rather than read on.
+
 ### Bun, compiled ahead of time
 
 Bun's ahead-of-time compiler (`bun build --compile --aot`, an open pull
