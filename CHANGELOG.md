@@ -2,6 +2,13 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- The `uuid` format reads two class tables, the class of a character and the class each of the 36 positions wants, and ORs the mismatches instead of branching on every character; the generated code hoists the same tables once per compiled function (`_uu`) and the standalone modules carry them. On the 900 ids of the order body in validator-benchmarks: 85 to 35 ns a check; the order body's verdict 269 to 229 ns a document on the runtime, 270 to 232 in the module from `ata build`. `tests/test_uuid_table.js` holds the runtime, the hoisted and the inline forms to the 8-4-4-4-12 rule for every code point at every position.
+- The generated code's email check (`_em`) reads the local part's character class from a table built once per compiled function, as the runtime already did, instead of a chain of thirteen comparisons a character: 62 to 52 ns on the order body's addresses. The set is the runtime's, checked over every code point.
+
 ## 1.61.3 - 2026-10-29
 
 ### Added
