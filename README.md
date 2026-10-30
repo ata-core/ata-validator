@@ -209,7 +209,13 @@ documents, Node 24:
 | zod | 436,632 | 230,808 |
 
 Run of 2026-10-30 with typia 15.2.2, which reuses a pattern's RegExp and shortcuts length
-checks after a report from this benchmark; its order figure doubled. Where ata is behind is
+checks after a report from this benchmark; its order figure doubled.
+
+The same repository runs every SchemaStore schema that ships sample documents, 446 of them,
+against the default validator on those samples: ata ahead on 430, median 1.83x, 2.82x on
+schemas of 50 to 200 KB, and never below 0.74x on the 16 where it is behind
+([RESULTS-schemastore.md](https://github.com/ata-core/validator-benchmarks/blob/main/RESULTS-schemastore.md),
+Node 24, ata 1.61.3). Where ata is behind is
 in the same tables: on a four-field body that fails, ajv answers the verdict faster (15.5M
 against 10.4M), and with every error read it does 7.1M a second against ata's 3.6M with rich
 errors, 5.2M with `richErrors: false`.
