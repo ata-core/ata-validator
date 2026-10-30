@@ -201,16 +201,18 @@ documents, Node 24:
 
 | | documents a second, the verdict | same, `new Function` refused |
 |---|---:|---:|
-| ata | 3,295,880 | 607,614 |
-| ata, compiled module | 3,319,594 | 3,344,948 |
-| typebox | 1,638,813 | EvalError |
-| ajv | 1,285,492 | EvalError |
-| typia | 939,572 | 964,507 |
-| zod | 440,473 | 237,176 |
+| ata | 3,274,803 | 1,109,881 |
+| ata, compiled module | 3,270,947 | 3,353,351 |
+| typia | 1,957,392 | 1,931,134 |
+| typebox | 1,615,239 | EvalError |
+| ajv | 1,245,508 | EvalError |
+| zod | 436,632 | 230,808 |
 
-Where ata is behind is in the same tables: on a four-field body that fails, ajv answers the
-verdict faster, and with every error read it does 6.6M a second against ata's 2.9M with rich
-errors (7.6M with `richErrors: false`).
+Run of 2026-10-30 with typia 15.2.2, which reuses a pattern's RegExp and shortcuts length
+checks after a report from this benchmark; its order figure doubled. Where ata is behind is
+in the same tables: on a four-field body that fails, ajv answers the verdict faster (15.5M
+against 10.4M), and with every error read it does 7.1M a second against ata's 3.6M with rich
+errors, 5.2M with `richErrors: false`.
 
 ## Why AOT
 
