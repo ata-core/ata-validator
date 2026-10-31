@@ -151,4 +151,37 @@ for (const dialect of ['draft2020-12', 'draft7']) {
 }
 assert.ok(bundled > 500, `only ${bundled} suite groups bundled`);
 
+// The pass a module embeds tests patternProperties keys as validation does,
+// on the linear engine for the patterns validation runs there. It was called
+// without a matcher and took the platform RegExp, so a key that backtracks
+// cost seconds in applyDefaults. Standalone, bundled and schema modules.
+{
+  const os = require('os');
+  const aot = require('../lib/aot-impl');
+  const schema = { type: 'object', patternProperties: { '^(a+)+$': { type: 'object', properties: { x: { type: 'number', default: 1 } } } } };
+  const key = 'a'.repeat(28) + '!';
+  const load = (src) => { const m = { exports: {} }; new Function('module', 'exports', 'require', src)(m, m.exports, require); return m.exports; };
+  const fills = {};
+  fills.standalone = load(aot.toStandaloneModule(new Validator(schema), { format: 'cjs' })).applyDefaults;
+  fills.bundle = load(bundleStandalone([schema], { format: 'cjs' }))[0].applyDefaults;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-aot-defaults-key-'));
+  try {
+    const v = new Validator(schema);
+    fs.writeFileSync(path.join(dir, 'rt.cjs'), aot.errorRuntimeSource('cjs', [v], true));
+    const src = aot.toSchemaModule(v, { format: 'cjs', runtime: './rt.cjs' });
+    if (src) { fs.writeFileSync(path.join(dir, 's.cjs'), src); fills.schemaModule = require(path.join(dir, 's.cjs')).applyDefaults; }
+  } catch (e) { fs.rmSync(dir, { recursive: true, force: true }); throw e; }
+  for (const [name, fill] of Object.entries(fills)) {
+    const d = { aaa: {}, b: {} };
+    fill(d);
+    assert.deepStrictEqual(d, { aaa: { x: 1 }, b: {} }, `${name}: the pattern still decides`);
+    const t0 = process.hrtime.bigint();
+    fill({ [key]: {} });
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+    assert.ok(ms < 200, `${name}: a key of 28 a's took ${ms.toFixed(0)} ms in applyDefaults`);
+  }
+  for (const name of ['standalone', 'bundle', 'schemaModule']) assert.strictEqual(typeof fills[name], 'function', `${name} carries applyDefaults`);
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
 console.log(`ok: applyDefaults is the runtime's pass, order: true is the runtime's order; ${groups} suite groups, ${cases} cases agree; ${bundled} bundled groups in order`);

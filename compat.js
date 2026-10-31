@@ -129,7 +129,9 @@ class Ata {
     const formatNames = Object.keys(this._formats);
     if (formatNames.length > 0) out.formats = { ...this._formats };
     const keywordNames = Object.keys(this._keywords);
-    const kws = {};
+    // Null prototype: a keyword named __proto__ written into a plain object
+    // would set its prototype and never reach the validator.
+    const kws = Object.create(null);
     for (const name of keywordNames) if (this._keywords[name] !== true) kws[name] = this._keywords[name];
     if (Object.keys(kws).length > 0) out.keywords = kws;
     const registry = this._registrySnapshot();
@@ -646,8 +648,16 @@ function referencedDefaults(rootDoc, registry) {
     }
     return node;
   };
+  // `done`, per call: the schemas already applied to each object. A second
+  // application fills nothing new, and following every edge of a chain such
+  // as n_i = allOf [n_(i-1), n_(i-1)] applied the bottom schema 2^n times.
+  let done = null;
   const fill = (schema, data, active) => {
     if (schema === null || typeof schema !== 'object' || data === null || typeof data !== 'object' || active.has(schema)) return;
+    let applied = done.get(data);
+    if (applied === undefined) done.set(data, (applied = new Set()));
+    if (applied.has(schema)) return;
+    applied.add(schema);
     active.add(schema);
     if (typeof schema.$ref === 'string') fill(resolve(schema.$ref), data, active);
     if (Array.isArray(schema.allOf)) for (const sub of schema.allOf) fill(sub, data, active);
@@ -670,7 +680,10 @@ function referencedDefaults(rootDoc, registry) {
     }
     active.delete(schema);
   };
-  return (data) => fill(rootDoc, data, new Set());
+  return (data) => {
+    done = new Map();
+    try { fill(rootDoc, data, new Set()); } finally { done = null; }
+  };
 }
 
 // The registry id a fragment-only key is kept under: a `#...` string is not an

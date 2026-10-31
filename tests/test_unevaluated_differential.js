@@ -151,6 +151,40 @@ for (let i = 0; i < SCHEMAS; i++) {
     }
   }
 }
+// A literal property name that starts with '/' or equals the all-bit's key
+// shared the inline annotation table with the pattern entries ('/' + pattern)
+// and the all bit. `{"/x": 1, "axb": 1}` read the '/x' bit as the pattern
+// /x/, and 'axb' passed in the error path of a standalone module while its
+// isValid refused it.
+{
+  for (const [schema, text] of [
+    [{ type: 'object', anyOf: [{ properties: { '/x': { type: 'number' } } }], unevaluatedProperties: false }, '{"/x":1,"axb":1}'],
+    [{ type: 'object', anyOf: [{ properties: { '/x': { type: 'number' } } }], unevaluatedProperties: false }, '{"/x":1}'],
+    [{ type: 'object', anyOf: [{ properties: { '/x': { type: 'number' } } }], unevaluatedProperties: false }, '{"axb":1}'],
+    [{ type: 'object', properties: { '/x': { type: 'number' } }, anyOf: [{ required: ['/x'] }], unevaluatedProperties: false }, '{"/x":1,"axb":1}'],
+    [{ type: 'object', anyOf: [{ properties: { '\u0000all': { type: 'number' } } }], unevaluatedProperties: false }, '{"\\u0000all":1,"zzz":1}'],
+    [{ type: 'object', anyOf: [{ properties: { '\u0000all': { type: 'number' } } }], unevaluatedProperties: false }, '{"\\u0000all":1}'],
+    [{ type: 'object', allOf: [{ properties: { '/x': { type: 'number' } } }], anyOf: [{ patternProperties: { '^x': {} } }], unevaluatedProperties: false }, '{"/x":1,"axb":1}'],
+  ]) {
+    const doc = () => JSON.parse(text)
+    const want = new Validator(schema, { engine: 'interpreter' }).validate(doc()).valid
+    const label = `${JSON.stringify(schema)} on ${text}`
+    const v = new Validator(schema)
+    for (let i = 0; i < 70; i++) v.validate(doc())
+    assert.strictEqual(v.validate(doc()).valid, want, `validate(), ${label}`)
+    assert.strictEqual(v.validateJSON(text).valid, want, `validateJSON(), ${label}`)
+    assert.strictEqual(v.isValidObject(doc()), want, `isValidObject(), ${label}`)
+    for (const opts of [{}, { onePass: true }, { plainErrors: true }]) {
+      const src = toStandaloneModule(schema, { format: 'cjs', ...opts })
+      if (src === null) continue
+      const m = { exports: {} }
+      new Function('module', 'exports', src)(m, m.exports)
+      assert.strictEqual(m.exports.isValid(doc()), want, `standalone isValid ${JSON.stringify(opts)}, ${label}`)
+      assert.strictEqual(m.exports.validate(doc()).valid, want, `standalone validate ${JSON.stringify(opts)}, ${label}`)
+    }
+  }
+  console.log('ok: literal names that look like pattern or all-bit entries')
+}
 for (const x of diffs.slice(0, 5)) console.log('DIFF', x.path, JSON.stringify(x.schema), JSON.stringify(x.d), 'interpreter', x.want)
 assert.strictEqual(diffs.length, 0, diffs.length + ' verdicts differ from the interpreter')
 assert.ok(generated > SCHEMAS / 5, 'only ' + generated + ' of ' + SCHEMAS + ' schemas went through the generator, so the comparison says little')

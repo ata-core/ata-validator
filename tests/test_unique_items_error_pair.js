@@ -69,3 +69,59 @@ console.log(`ok: uniqueItems error pairs match the interpreter (${compared} docu
   }
   console.log(`ok: the hoisted and the module JSON equality agree on ${n} pairs`)
 }
+
+// The structural hash keyed numbers by their integer part and nine decimal
+// places, so every number below 1e-9 hashed alike and an array of such items
+// fell back to comparing each one with all the others before it: 16000
+// objects holding i * 1e-10 took seconds. Every bit of the number now goes
+// into the hash, which keeps distinct numbers apart, and equal numbers (0
+// and -0, 1 and 1.0) together.
+{
+  const { _uqh, _uq, _uqp } = require('../lib/unique-items')
+  const tiny = [1e-10, 2e-10, 3e-10, 1e-300, 5e-324, 1e-15, 0.1, 0.2, 1.5, -1.5, 2 ** 40, 2 ** 40 + 0.5, 2 ** 33, 2 ** 34, 1.7e12, 1.7e12 + 1]
+  assert.strictEqual(new Set(tiny.map(_uqh)).size, tiny.length, 'distinct numbers hash apart')
+  // Families that differ only in the bits one shortcut or another would drop.
+  const families = {
+    'n * 2^32 + 0.5': (n) => n * 2 ** 32 + 0.5, 'n * 2^96': (n) => n * 2 ** 96, '2^-30 (1 + n 2^-52)': (n) => 2 ** -30 * (1 + n * 2 ** -52),
+    '0.5 + n 2^-53': (n) => 0.5 + n * 2 ** -53, 'n * 5e-324': (n) => n * 5e-324, '1 + n 2^-52': (n) => 1 + n * 2 ** -52,
+    '-(2^40) - n': (n) => -(2 ** 40) - n, '1.7e12 + n': (n) => 1.7e12 + n, '2^40 + n / 1024': (n) => 2 ** 40 + n / 1024,
+  }
+  for (const [name, g] of Object.entries(families)) {
+    const hs = new Set()
+    for (let n = 1; n <= 4000; n++) hs.add(_uqh(g(n)))
+    assert.strictEqual(hs.size, 4000, name)
+  }
+  assert.strictEqual(_uqh(0), _uqh(-0))
+  assert.strictEqual(_uqh(1), _uqh(1.0))
+  assert.strictEqual(_uqh({ a: 1e-10 }), _uqh({ a: 1e-10 }))
+  assert.strictEqual(_uqh(Infinity), _uqh(Infinity))
+
+  const N = 16000
+  const data = Array.from({ length: N }, (_, i) => ({ a: (i + 1) * 1e-10 }))
+  let t0 = Date.now()
+  assert.strictEqual(_uq(data), true)
+  assert.strictEqual(_uqp(data), -1)
+  const direct = Date.now() - t0
+  assert.ok(direct < 500, `16000 tiny numbers took ${direct} ms`)
+  const dup = data.concat([{ a: 5e-10 }])
+  assert.strictEqual(_uq(dup), false)
+  assert.strictEqual(_uqp(dup), N)
+
+  // The same source is written into generated functions and standalone
+  // modules; the module answers alike and in time.
+  const schema = { type: 'array', uniqueItems: true, items: { type: 'object' } }
+  const v = new Validator(schema)
+  t0 = Date.now()
+  assert.strictEqual(v.validate(data).valid, true)
+  assert.strictEqual(v.validate(dup).valid, false)
+  const { toStandaloneModule } = require('../build')
+  const m = { exports: {} }
+  new Function('module', 'exports', toStandaloneModule(schema, { format: 'cjs' }))(m, m.exports)
+  assert.strictEqual(m.exports.isValid(data), true)
+  assert.strictEqual(m.exports.isValid(dup), false)
+  const r = m.exports.validate(dup)
+  assert.strictEqual(r.valid, false)
+  const ms = Date.now() - t0
+  assert.ok(ms < 1500, `validator and module on 16000 tiny numbers took ${ms} ms`)
+  console.log(`ok: numbers hash by their bits (${direct} ms direct, ${ms} ms validator and module)`)
+}

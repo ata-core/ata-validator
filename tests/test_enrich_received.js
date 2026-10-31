@@ -133,4 +133,32 @@ const largeCost = timed(() => enrich(rootErr, { data: deepDoc }));
 const growth = largeCost / smallCost;
 assert.ok(growth < 4, `enriching a document holding 1000 rows costs ${largeCost.toFixed(0)} ns against ${smallCost.toFixed(0)} ns for one holding 10, ${growth.toFixed(1)}x; enrichment is reading the whole document again`);
 
+// Reading the errors of one document must scale with the number of errors,
+// not with their number times the document's width. Every error that names
+// the same container (additionalProperties: false on an object with N
+// unknown keys gives N of them) counted that container's keys again for its
+// `received`, so N errors cost N times N key reads: 16000 extra keys took
+// 11.8 s to read. The count is kept per container for the one list.
+{
+  const { Validator } = require('..');
+  const v = new Validator({ type: 'object', properties: { a: { type: 'string' } }, additionalProperties: false });
+  const readErrors = (n) => {
+    const doc = {};
+    for (let i = 0; i < n; i++) doc['k' + i] = 1;
+    const r = v.validate(doc);
+    const t0 = process.hrtime.bigint();
+    const errs = r.errors;
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+    assert.strictEqual(errs.length, n);
+    assert.strictEqual(errs[0].received, `[object, ${n} keys]`);
+    return ms;
+  };
+  readErrors(1000);
+  for (const [small, large] of [[4000, 8000], [10000, 20000]]) {
+    const a = Math.max(readErrors(small), 1);
+    const b = readErrors(large);
+    assert.ok(b / a < 4, `reading ${large} errors cost ${b.toFixed(0)} ms against ${a.toFixed(0)} ms for ${small}, ${(b / a).toFixed(1)}x for 2x the errors`);
+  }
+}
+
 console.log(`ok: received resolution rules, enrich at ${cost.toFixed(0)} ns (${ratio.toFixed(2)}x reference), flat in document size (${growth.toFixed(2)}x over 100x the keys)`);

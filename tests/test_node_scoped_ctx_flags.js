@@ -143,6 +143,8 @@ function bothEngines (schema, cases, label) {
 // listed as allowed.
 {
   const ALLOWED = new Set([
+    // Closure name to caller format name, one map per program like closureVars (bindUserFormat).
+    'formatNames',
     // The error sites of one program and their keys in the reader's order (apOrd, assignOrdKeys).
     'ordSites',
     // A standalone module's one-pass program is written without counting copies (compileToJSCombined noCounting).

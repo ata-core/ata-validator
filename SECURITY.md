@@ -48,7 +48,7 @@ person can keep, and they are stated so you can hold the project to them.
 
 ## ReDoS
 
-Patterns run on ata's own regular expression engine, which matches in linear time. The platform RegExp takes a pattern only when it is shown to run in linear time there too. A pattern the linear engine cannot represent, one with a backreference or a lookaround, runs on the platform RegExp as written, which can backtrack: if your schemas come from untrusted sources, keep those constructs out of them. If you find a slow pattern that uses neither, please report it.
+Patterns run on ata's own regular expression engine, which matches in linear time. The platform RegExp takes a pattern only when it is shown to run in linear time there too. The linear engine does not take a pattern with a backreference, a lookaround, a Unicode property escape (`\p{...}`), `\B`, `\c` or `\k`, or with counted repeats that expand past its budget of 65,536 instructions (`a{100000}` does, and so does `((a|b){1000}){100}`). Such a pattern runs on the platform RegExp as written, which can backtrack: if your schemas come from untrusted sources, keep those constructs out of them. If you find a slow pattern that uses none of them, please report it.
 
 ## What a package scanner reports
 

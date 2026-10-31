@@ -94,6 +94,27 @@ for (const [pattern, yes, no] of [
   compared += 2
 }
 
+// A repeat count is checked against the 32-piece limit before it is
+// expanded, so `a{100000000}` is refused at once instead of pushing a
+// hundred million entries first (908 ms and 1.5 GB), and `a{2000000000}`
+// does not throw a RangeError out of validate().
+{
+  const { compilePatternInline } = require('../lib/js-compiler')._internal
+  const t = process.hrtime.bigint()
+  assert.strictEqual(compilePatternInline('^a{100000000}$', 'v'), null)
+  assert.strictEqual(compilePatternInline('^a{2000000000}$', 'v'), null)
+  assert.strictEqual(compilePatternInline('^a{99999999999999999999}$', 'v'), null)
+  assert.strictEqual(compilePatternInline('^a{33}$', 'v'), null)
+  assert.strictEqual(compilePatternInline('^ab{32}$', 'v'), null)
+  assert.ok(compilePatternInline('^a{32}$', 'v') !== null, '32 pieces are still unrolled')
+  assert.ok(Number(process.hrtime.bigint() - t) / 1e6 < 100, 'a huge repeat count must be refused before it is expanded')
+  for (const p of ['^a{100000000}$', '^a{2000000000}$']) {
+    const v = new Validator({ type: 'string', pattern: p })
+    assert.strictEqual(v.validate('a').valid, false, p)
+    assert.strictEqual(v.validate('aa').valid, false, p)
+  }
+}
+
 assert.strictEqual(bad, 0, `${bad} disagreements with the regex`)
 assert.ok(unrolled > 1000 && compared > 50000, `unrolled ${unrolled} patterns and compared ${compared} answers: too few`)
 console.log(`ok: unrolled patterns agree with the regex on ${compared} answers over ${unrolled} unrolled patterns`)

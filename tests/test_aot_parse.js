@@ -520,6 +520,56 @@ const compile = (schema) => {
   }
 }
 
+// The module's parse() never hands back a value its validate() refuses and
+// never shares a reference into the input, as the runtime's. Each shape here
+// once did one or the other; the module declines parse() for them, or gets
+// it right.
+{
+  const declined = (schema, name) => {
+    const m = compile(schema)
+    check(name + ': the module ships without parse()', m && typeof m.parse !== 'function')
+  }
+  declined({ type: 'object', properties: { a: { type: 'number' } }, required: ['b'] }, 'required undeclared')
+  declined({ type: 'object', properties: { a: { type: 'number' } }, dependentRequired: { a: ['b'] } }, 'dependentRequired undeclared')
+  declined({ type: 'object', properties: { a: { type: 'number' } }, dependentSchemas: { a: { required: ['b'] } } }, 'dependentSchemas required undeclared')
+  declined({ type: 'object', properties: { a: { type: 'number' } }, allOf: [{ required: ['b'] }] }, 'allOf required undeclared')
+  declined({ type: 'object', properties: { arr: { type: 'array', prefixItems: [{ type: 'object', properties: { a: { type: 'number' } } }], items: { type: 'number' } } }, required: ['arr'] }, 'prefixItems next to items')
+
+  // a default that fails the schema's own conditional once filled
+  const cond = compile({ type: 'object', properties: { a: { type: 'string', default: 'x' }, b: { type: 'number' } }, if: { required: ['a'] }, then: { required: ['b'] } })
+  if (cond && typeof cond.parse === 'function') {
+    let thrown = null
+    try { cond.parse({}) } catch (e) { thrown = e }
+    check('conditional on a default: parse refuses what the filled document fails', thrown && thrown.name === 'AtaValidationError')
+    check('conditional on a default: a document that passes is filled', JSON.stringify(cond.parse({ b: 1 })) === JSON.stringify({ a: 'x', b: 1 }))
+  }
+
+  // a default with an own __proto__ key stays an own key
+  const proto = compile({ type: 'object', properties: { a: { type: 'object', properties: { x: { type: 'number' } }, default: JSON.parse('{"__proto__":{"x":1}}') } } })
+  if (proto && typeof proto.parse === 'function') {
+    const out = proto.parse({})
+    check('a default with an own __proto__ key keeps it', Object.keys(out.a).join() === '__proto__' && Object.getPrototypeOf(out.a) === Object.prototype)
+  } else check('a default with an own __proto__ key: parse is emitted', false)
+
+  // a fragment $ref under an embedded $id
+  const embedded = compile({
+    type: 'object',
+    $defs: { x: { type: 'object', properties: { a: { type: 'string', default: 'outer' } } } },
+    properties: { inner: { $id: 'http://e/', type: 'object', $defs: { x: { type: 'object', properties: { b: { type: 'string', default: 'inner' } } } }, properties: { p: { $ref: '#/$defs/x' } } } },
+  })
+  if (embedded && typeof embedded.parse === 'function') {
+    const out = embedded.parse({ inner: { p: {} } })
+    check('a $ref under an embedded $id resolves in that resource', JSON.stringify(out) === JSON.stringify({ inner: { p: { b: 'inner' } } }))
+  }
+
+  // one large default referenced many times is written once
+  const big = { blob: 'x'.repeat(50 * 1024) }
+  const props = {}
+  for (let i = 0; i < 200; i++) props['p' + i] = { $ref: '#/$defs/D' }
+  const src = toStandaloneModule(new Validator({ type: 'object', properties: props, $defs: { D: { type: 'object', properties: { v: { type: 'object', properties: { s: { type: 'string' } }, default: big } } } } }), { format: 'cjs', parse: true })
+  check('a shared default is written once into the module', src && src.length < 4 * big.blob.length)
+}
+
 fs.rmSync(dir, { recursive: true, force: true })
 if (failed) process.exit(1)
 console.log('aot parse: strips, defaults, composed shapes under the subset proof; declines where it cannot prove the copy')

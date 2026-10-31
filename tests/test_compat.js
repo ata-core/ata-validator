@@ -90,5 +90,46 @@ test("error format matches ajv", () => {
   assert("params" in err);
 });
 
+test("a custom keyword named __proto__ reaches the validator", () => {
+  // The keyword map handed to the Validator was a plain object, so a keyword
+  // with that name set its prototype instead of being forwarded, and the
+  // keyword silently did nothing.
+  const ata = new Ata();
+  ata.addKeyword({ keyword: "__proto__", validate: () => false });
+  const forwarded = ata._validatorOptions().keywords || {};
+  assert(Object.prototype.hasOwnProperty.call(forwarded, "__proto__"), "forwarded as an own key");
+  const validate = ata.compile(JSON.parse('{"type":"number","__proto__":true}'));
+  assert(validate(1) === false, "the keyword rejects");
+});
+
+test("useDefaults applies a schema once per object, not once per path to it", () => {
+  // n_i = allOf [n_(i-1), n_(i-1)]: the referenced-defaults walk followed
+  // every edge and visited the bottom definition 2^n times on one object.
+  // The verdict on generated code follows every edge too (a separate cost,
+  // not this pass's), so the pass is held to the verdict: with defaults on, a
+  // call costs about what it costs with them off.
+  const defs = { n0: { type: "object", properties: { x: { type: "number", default: 1 } } } };
+  for (let i = 1; i <= 18; i++) defs["n" + i] = { allOf: [{ $ref: "#/$defs/n" + (i - 1) }, { $ref: "#/$defs/n" + (i - 1) }] };
+  const schema = { $ref: "#/$defs/n18", $defs: defs };
+  const time = (useDefaults) => {
+    const f = new Ata({ useDefaults }).compile(schema);
+    f({ x: 1 });
+    let best = Infinity;
+    let d;
+    for (let r = 0; r < 3; r++) {
+      d = {};
+      const t0 = process.hrtime.bigint();
+      assert(f(d) === true, "valid");
+      best = Math.min(best, Number(process.hrtime.bigint() - t0) / 1e6);
+    }
+    return { ms: best, d };
+  };
+  const on = time(true);
+  const off = time(false);
+  assert(on.d.x === 1, "the default is filled");
+  assert(off.d.x === undefined, "and not without useDefaults");
+  assert(on.ms < 2 * off.ms + 20, `with defaults ${on.ms.toFixed(0)} ms, without ${off.ms.toFixed(0)} ms`);
+});
+
 console.log(`\n${passed}/${passed + failed} tests passed.\n`);
 process.exit(failed > 0 ? 1 : 0);

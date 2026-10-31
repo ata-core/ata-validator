@@ -70,6 +70,33 @@ assert.strictEqual(globalThis.__ataHtml, undefined, 'nothing ran')
   assert.ok(!build.toStandaloneModule(plain, { format: 'cjs' }).includes('\\x3C'))
 }
 
+// The rewrite is linear in the module. It used to match `\\*<` and so re-read
+// a run of backslashes at every `<` after it: an enum value of 40000
+// backslashes and `<a` took 6.5 s to emit. Four times the run must cost well
+// under four times a quadratic step, and a long run before a `</script` is
+// still escaped with the right backslash count.
+{
+  const time = (n) => {
+    const schema = { type: 'string', enum: ['\\'.repeat(n) + '<a'] }
+    const t0 = Date.now()
+    const src = build.toStandaloneModule(schema, { format: 'cjs' })
+    assert.ok(!/<\/script/i.test(src))
+    return Date.now() - t0
+  }
+  time(1000)
+  const big = time(160000)
+  assert.ok(big < 1500, `160000 backslashes before < took ${big} ms`)
+  for (const n of [0, 1, 2, 3, 40000, 40001]) {
+    const enumValue = '\\'.repeat(n) + '</script>'
+    const src = build.toStandaloneModule({ type: 'string', enum: [enumValue] }, { format: 'cjs' })
+    assert.ok(!/<\/script/i.test(src), `run of ${n}`)
+    const m = { exports: {} }
+    new Function('module', 'exports', src)(m, m.exports)
+    assert.strictEqual(m.exports.isValid(enumValue), true, `run of ${n} still means the same string`)
+    assert.strictEqual(m.exports.isValid(enumValue.slice(1)), false, `run of ${n} still means the same string`)
+  }
+}
+
 fs.rmSync(dir, { recursive: true, force: true })
 assert.ok(outputs >= 20, `too few outputs checked: ${outputs}`)
 assert.ok(compared >= 150, `too few comparisons: ${compared}`)

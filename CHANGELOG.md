@@ -6,11 +6,48 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Added
 
-- `ata-validator/stream` and `v.stream(opts)`: validation as the body arrives. A JSON array or NDJSON fed in chunks is split without being parsed as a whole, a scan that tracks strings and nesting for the array, newlines for NDJSON, and each record is parsed and validated the moment its last byte lands; the first failing record is reported then, with the errors `validate()` gives for it, and `validateStream(v, source)` stops a Node Readable or a Web ReadableStream there instead of reading it to the end. On a 100 MB body of 128,419 order documents with the third invalid: 517 ms and 783 MB (read it all, `JSON.parse`, validate the array) to 13.5 ms and 122 MB, having read 0.1 MB; with the last record invalid the time is the same and the memory a third. `onRecord` hands each passing record over parsed; `stopOnFirst: false` lists every failure. `tests/test_stream.js` holds the stream to whole-document validation under every chunk cut.
+- `ata-validator/stream` and `v.stream(opts)`: validation as the body arrives. A JSON array or NDJSON fed in chunks is split without being parsed as a whole, a scan that tracks strings and nesting for the array, newlines for NDJSON, and each record is parsed and validated the moment its last byte lands; the first failing record is reported then, with the errors `validate()` gives for it, and `validateStream(v, source)` stops a Node Readable or a Web ReadableStream there instead of reading it to the end. A Node http request is left open and the rest of its body is read and dropped rather than destroyed, so the 400 the handler writes reaches the client: with the socket closed, Node's `fetch` saw `write EPIPE` and Chrome "Failed to fetch" instead of the answer; left open, Node's `fetch` read the 400 after 24 ms and 1 MB of a 100 MB upload. On a 100 MB body of 128,419 order documents with the third invalid: 517 ms and 783 MB (read it all, `JSON.parse`, validate the array) to 13.5 ms and 122 MB, having read 0.1 MB; with the last record invalid the time is the same and the memory a third. `onRecord` hands each passing record over parsed; `stopOnFirst: false` lists every failure. `tests/test_stream.js` holds the stream to whole-document validation under every chunk cut.
 
 ### Changed
 
 - The `uuid` format reads two class tables, the class of a character and the class each of the 36 positions wants, and ORs the mismatches instead of branching on every character; the generated code hoists the same tables once per compiled function (`_uu`) and the standalone modules carry them. On the 900 ids of the order body in validator-benchmarks: 85 to 35 ns a check; the order body's verdict 269 to 229 ns a document on the runtime, 270 to 232 in the module from `ata build`. `tests/test_uuid_table.js` holds the runtime, the hoisted and the inline forms to the 8-4-4-4-12 rule for every code point at every position.
+
+### Fixed
+
+An outside scan of the repository reported 104 findings. Each was reproduced before it was fixed; the ones below were real. Each has a test that fails on 1.61.3.
+
+Code ran or the validator accepted what it should reject:
+
+- A schema's numeric keyword given as a string (`minimum: '0||(...)'`) was written into generated code and ran when the validator was built, through `$ref` targets, the compat shim and `ata build` too. Such a schema is now declined by the code generator. `tests/test_schema_code_injection.js`.
+- A `type` inside `allOf` or `dependentSchemas` was dropped when the parent declared a different one: `{type: 'number', allOf: [{type: 'integer'}]}` accepted 1.5, in generated code and in standalone modules.
+- `unevaluatedProperties: false` beside `patternProperties` counted inherited names (`constructor`, `__proto__`) as evaluated; a `patternProperties` key such as `^a.b` was read as the literal prefix `a.b`; a property named `/x` or `__proto__` broke the standalone module's error path and the scanner.
+- Two caller formats whose names differ only in punctuation (`foo-bar`, `foo_bar`) shared one check; `format: ''`, an inherited name (`constructor`) and a caller format over a built-in name were answered differently by the engines.
+- The interpreted engine accepted, from its 1001st call, a document a `not` rejected when the schema listed required names next to `additionalProperties`.
+- Coercion to an array could turn an inherited `constructor` into an own property and satisfy `required`; `removeAdditional` and coercion reached into inherited objects.
+- `parse()` could return an object `validate()` rejects: a required name the copy dropped, defaults that completed an `if`, `prefixItems` positions, a default with a `__proto__` key, a `$ref` inside an embedded `$id`. It now declines the copy or checks the finished one.
+- The cold-start engine ignored a schema added with `addSchema()` for its first 64 calls; an extension check on `validateJSON` read the text instead of the defaulted document; `strictSchema` skipped schemas given as JSON text.
+- The native engine behind the buffer APIs (`isValid`, `isValidNDJSON`, `isValidParallel`, `countValid`, and `validateJSON` above 8 KB) accepted documents `validate()` rejects: a false schema let `null` through, an empty `enum` and a primitive `enum` let containers through, more than 64 required names saturated a bitmask, `$dynamicRef` was skipped on the On-Demand path, counts above 2^32 wrapped, patterns RE2 cannot take (lookaround, backreferences) were dropped, a property name with a quote matched across members, and `email`, `date`, `uri`, `ipv4`, `ipv6` and `hostname` were looser than the JavaScript checks (`ipv6` accepted any string with a colon). The six checks now follow `lib/formats.js` and agree with it on 34,000 strings in `tests/test_native_formats.js`; formats the engine has no check for, a caller's own formats and `propertyDependencies` go through `validate()`. `tests/test_native_findings.js`.
+
+The process crashed, hung or ran out of memory:
+
+- A `$ref` pointer segment such as `#/allOf/abc` aborted the process from the native engine.
+- Worker threads registering schemas at the same time corrupted the native registry, and the native thread pool could return before its work was done.
+- In first-error mode the native walker kept visiting every failing array item, each error carrying its own copy of the path: a 234 KB document took 3.9 GB.
+- `$dynamicRef` scopes across embedded resources made generated code grow as 2^n; sixteen layers overflowed the stack.
+- Patterns with very large counted repeats (`a{100000000}`) exhausted memory in the regular expression compiler; nested ones grew multiplicatively.
+- `uniqueItems` hashed numbers below 1e-9 alike, so crafted arrays compared every pair: 16,000 objects took 1.75 s, now 3 ms.
+- Reading `.errors` for an object with many unexpected properties counted its keys once per error: 20,000 keys took 19.6 s, now 5 ms. Sorting long error lists, the defaults pass over repeated `$ref`s, the scanner over wide `allOf`s, `describeSchema`, `toTypeScript`, the Bun target, `ata verify`, `ata migrate` and the HTML escaping of `ata build` output each had a quadratic or exponential case and are bounded now.
+- The defaults pass matched `patternProperties` keys with the backtracking RegExp even where validation used the linear engine: a 29-character key took 1.2 s.
+- `ata build` hung when its inputs shared only the filesystem root, and `--watch` rebuilt forever when the cache file sat in a watched directory.
+
+Output a caller or another tool reads:
+
+- A source map's line and column, a file name in the Bun target and in `ata migrate`'s report, and property names printed by the command line are escaped; a schema string in a `toTypeScript` comment can no longer end the comment.
+- A JSON error's `dataFrame.text` held the whole source line for every error; past 200 characters it is now an excerpt around the value, with `textCol` giving the value's column in it.
+- `ata build`'s cache reused a module built with `source: true` for a `source: false` build.
+- `validateStream(v, req)` destroyed a Node http request at the first failure, closing the socket under the response, so the client saw a network error instead of the 400. Reading now stops and the rest of the body is drained.
+
+Not fixed: the buffer APIs still accept malformed JSON inside a value the schema never reads (`{"a": tru}` under a schema about `b` only), because checking it costs every accepted document a full read of the text. The interpreted engine still runs a pattern with a `\p{...}` escape on the platform RegExp, which can backtrack; SECURITY.md lists it.
 
 ## 1.61.3 - 2026-10-29
 

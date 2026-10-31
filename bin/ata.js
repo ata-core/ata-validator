@@ -533,7 +533,8 @@ function cmdValidate (args) {
   try {
     schema = JSON.parse(schemaContent);
   } catch (e) {
-    process.stderr.write(`error: ${schemaPath} is not valid JSON: ${e.message}\n`);
+    // The parser quotes the text it stopped at, and the text is the file's.
+    process.stderr.write(`error: ${schemaPath} is not valid JSON: ${require('../lib/diagnose').term(e.message)}\n`);
     process.exit(2);
   }
 
@@ -550,7 +551,7 @@ function cmdValidate (args) {
   try {
     v = new Validator(schema, { source: { path: schemaPath, content: schemaContent } });
   } catch (e) {
-    process.stderr.write(`error: schema compile failed: ${e.message}\n`);
+    process.stderr.write(`error: schema compile failed: ${require('../lib/diagnose').term(e.message)}\n`);
     process.exit(2);
   }
 

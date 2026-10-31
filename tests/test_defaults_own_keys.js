@@ -95,4 +95,18 @@ ok('a __proto__ parent the instance does not carry is not walked', () => {
   console.log('  PASS  interpreter (codegen blocked): own-key defaults, nested fill, no pollution')
 }
 
+ok('an object default with an own __proto__ key is filled as JSON gives it', () => {
+  // The generated pass wrote the default as an object literal, where a
+  // "__proto__" key is the prototype slot: the filled value had no own key
+  // and inherited x from the default's inner object.
+  const s = { type: 'object', properties: { a: { type: 'object', properties: { x: { type: 'number' } }, default: JSON.parse('{"__proto__":{"x":1}}') } } }
+  for (const engine of [undefined, 'interpreter']) {
+    const r = new Validator(s, { useDefaults: true, engine }).validate({})
+    assert.strictEqual(r.valid, true)
+    assert.deepStrictEqual(Object.keys(r.data.a), ['__proto__'], (engine || 'codegen') + ': own keys')
+    assert.strictEqual(Object.getPrototypeOf(r.data.a), Object.prototype, (engine || 'codegen') + ': prototype')
+    assert.strictEqual(({}).x, undefined, 'nothing leaked onto Object.prototype')
+  }
+})
+
 console.log(`\n${pass} passed`)

@@ -227,4 +227,25 @@ assert.ok(fused > 450, `only ${fused} schema groups used the fused function`);
   assert.strictEqual(y.isValidObject({ n: 13 }), true);
 }
 
+// The JSON entry points hand the check the document validate() checks: the
+// parsed text after the preprocess pass, defaults included. They used to
+// re-parse the text and check that, so a default the check rejects was
+// accepted through validateJSON and isValidJSON while validate() refused it.
+{
+  const withDefault = { type: 'object', properties: { a: { type: 'string', default: 'bad' } } };
+  const ext = () => ({ check: (d) => d.a !== 'bad', errors: (d) => (d.a === 'bad' ? [{ keyword: 'ext', instancePath: '/a', schemaPath: '#', params: {}, message: 'a must not be bad' }] : null) });
+  for (const engine of [undefined, 'interpreter']) {
+    const v = new Validator(withDefault, { useDefaults: true, engine });
+    v._extendChecks(ext);
+    assert.strictEqual(v.validate({}).valid, false, `${engine || 'codegen'}: validate sees the default`);
+    assert.strictEqual(v.isValidObject({}), false, `${engine || 'codegen'}: isValidObject sees the default`);
+    const r = v.validateJSON('{}');
+    assert.strictEqual(r.valid, false, `${engine || 'codegen'}: validateJSON checks the defaulted document`);
+    assert.ok(r.errors.some((e) => e.keyword === 'ext'), `${engine || 'codegen'}: and reports the check's error`);
+    assert.strictEqual(v.isValidJSON('{}'), false, `${engine || 'codegen'}: isValidJSON checks the defaulted document`);
+    assert.strictEqual(v.validateJSON('{"a":"fine"}').valid, true);
+    assert.strictEqual(v.isValidJSON('{"a":"fine"}'), true);
+  }
+}
+
 console.log(`ok: extended verdict and validate agree with the schema on ${cases} suite cases, ${fused} groups fused`);

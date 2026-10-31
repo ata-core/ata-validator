@@ -17,10 +17,25 @@ const path = require('path');
 const { Validator, renderPretty, renderCompact } = require('..');
 const { compiledModuleFor, compiledSchemaFor, toStandaloneModule, bundleStandalone, bundleCompact } = require('../build');
 const { fromCompiled } = require('../lib/compiled');
+const { compileToJSCodegen, compileToJSCodegenWithErrors, compileToJSCombined } = require('../lib/js-compiler');
+const Ata = require('../compat');
 
 const MARK = '__ataInjected';
 const hit = () => globalThis[MARK] !== undefined;
 const set = `globalThis.${MARK}=1`;
+
+// Every keyword whose value is written into generated source as a number.
+const NUMERIC_KEYWORDS = ['minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'minLength', 'maxLength', 'minItems', 'maxItems', 'minProperties', 'maxProperties', 'minContains', 'maxContains'];
+// Strings shaped to read as an expression wherever the number is placed:
+// after `<`, inside a division, inside a parenthesis, and plain digits in a
+// string, which is not a number either.
+const NUMERIC_PAYLOADS = [`0||(${set})`, `1);${set};(1`, `-1||(${set})`, `1e9||(${set})`, '5'];
+function numericLeaf(kw, payload) {
+  const t = /Length/.test(kw) ? 'string' : /Items|Contains/.test(kw) ? 'array' : /Properties/.test(kw) ? 'object' : 'number';
+  const leaf = { type: t, [kw]: payload };
+  if (/Contains/.test(kw)) leaf.contains = { type: 'number' };
+  return leaf;
+}
 
 const PAYLOADS = [
   `'+(${set})+'`,
@@ -103,7 +118,7 @@ function load(src) {
   return require(f);
 }
 
-const count = { schemas: 0, codegen: 0, aot: 0, wrapper: 0, compared: 0, rendered: 0, refused: 0 };
+const count = { schemas: 0, codegen: 0, aot: 0, wrapper: 0, compared: 0, rendered: 0, refused: 0, numeric: 0 };
 const diffs = [];
 const shape = (r) => JSON.stringify(r.valid ? { valid: true } : { valid: false, n: r.errors.length, kw: r.errors.map((e) => e.keyword).sort() });
 
@@ -176,6 +191,69 @@ try {
     const docs = [{ k: `'"\`` }, { k: '${x}' }, { k: 'a/b' }, { k: '*/x' }, { k: 'ok' }, { k: '\\' }, { k: 1 }];
     check({ type: 'object', properties: { k: { type: 'string', pattern: re } } }, docs, `pattern ${re}`);
     check({ type: 'object', patternProperties: { [re]: { type: 'integer' } }, additionalProperties: false }, [{ [`'"\``]: 1 }, { ok: 'x' }, {}], `patternProperties ${re}`);
+  }
+  // Numeric keywords are written into generated source as literals, so a
+  // value that is not a finite number must never get there: the gate hands
+  // such a schema to the interpreted engine, at the root, under a property,
+  // behind a $ref, in another document, and in every ahead-of-time output.
+  for (const kw of NUMERIC_KEYWORDS) {
+    for (const payload of NUMERIC_PAYLOADS) {
+      const leaf = numericLeaf(kw, payload);
+      const docs = [5, 1.5, 'abc', [1, 2], { a: 1, b: 2 }, { a: 5 }, { a: 'abc' }, { a: [1] }, { a: { x: 1 } }, [5, 'abc']];
+      for (const [i, s] of [
+        leaf,
+        { type: 'object', properties: { a: leaf } },
+        { type: 'array', items: leaf },
+        { $defs: { n: leaf }, type: 'object', properties: { a: { $ref: '#/$defs/n' } } },
+        { type: 'object', properties: { a: { allOf: [leaf] } } },
+      ].entries()) {
+        const label = `numeric ${kw} ${JSON.stringify(payload)} schema ${i}`;
+        check(s, docs, label);
+        count.numeric++;
+        const v = new Validator(s);
+        v.validate(docs[0]);
+        assert.notStrictEqual(v.engine(), 'codegen', `${label}: the generators must decline a non-numeric bound`);
+        assert.strictEqual(compileToJSCodegen(s, null, undefined), null, `${label}: compileToJSCodegen must decline`);
+        assert.strictEqual(compileToJSCodegenWithErrors(s, null, undefined), null, `${label}: compileToJSCodegenWithErrors must decline`);
+        assert.strictEqual(compileToJSCombined(s, { valid: true, errors: [] }, null, undefined), null, `${label}: compileToJSCombined must decline`);
+        for (const make of [() => toStandaloneModule(s, { format: 'cjs' }), () => compiledModuleFor(s, { format: 'cjs' }), () => bundleStandalone([s], { format: 'cjs' }), () => bundleCompact([s], { format: 'cjs' })]) {
+          let src = null;
+          try { src = make(); } catch { src = null; }
+          if (typeof src === 'string') assert.ok(!src.includes(MARK), `${label}: the payload reached an ahead-of-time module`);
+        }
+      }
+      // A document in the schema map, reached through a reference from the
+      // schema being compiled, and the same through the compat shim.
+      const external = { $id: 'http://example.com/num', ...leaf };
+      check({ type: 'object', properties: { a: { $ref: 'http://example.com/num' } }, $defs: {} }, docs, `numeric ${kw} external`);
+      {
+        const v = new Validator({ type: 'object', properties: { a: { $ref: 'http://example.com/num' } } }, { schemas: [external] });
+        v.validate({ a: 5 });
+        assert.notStrictEqual(v.engine(), 'codegen', `numeric ${kw} ${JSON.stringify(payload)}: a referenced document with a non-numeric bound must decline`);
+        assert.ok(!hit(), `numeric ${kw}: code ran through a referenced document`);
+        const a = new Ata();
+        a.addSchema(external);
+        const f = a.compile({ $ref: 'http://example.com/num' });
+        f(5); f('abc'); f([1]); f({ a: 1 });
+        assert.ok(!hit(), `numeric ${kw}: code ran through the compat shim`);
+      }
+    }
+  }
+  // The interpreted engine, with code generation blocked, must read the same
+  // schemas without running anything either.
+  {
+    const script = `
+      process.env.ATA_NO_NATIVE = '1';
+      globalThis.eval = () => { throw new EvalError('blocked') };
+      const RealFunction = Function;
+      Object.defineProperty(globalThis, 'Function', { value: new Proxy(RealFunction, { construct() { throw new EvalError('blocked') }, apply(t, th, a) { if (a.length) throw new EvalError('blocked'); return Reflect.apply(t, th, a) } }), writable: true, configurable: true });
+      const { Validator } = require(${JSON.stringify(path.join(__dirname, '..'))});
+      const schemas = JSON.parse(${JSON.stringify(JSON.stringify(NUMERIC_KEYWORDS.flatMap((kw) => NUMERIC_PAYLOADS.map((p) => ({ type: 'object', properties: { a: numericLeaf(kw, p) } })))))});
+      for (const s of schemas) { const v = new Validator(s); for (const d of [{ a: 5 }, { a: 'abc' }, { a: [1] }, { a: { x: 1 } }]) { v.validate(d); v.isValidObject(d); v.validateJSON(JSON.stringify(d)) } }
+      console.log(globalThis[${JSON.stringify(MARK)}] === undefined ? 'clean' : 'RAN');
+    `;
+    const r = require('child_process').spawnSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+    assert.strictEqual(r.stdout.trim(), 'clean', `interpreter with codegen blocked: ${r.stdout} ${r.stderr}`);
   }
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });

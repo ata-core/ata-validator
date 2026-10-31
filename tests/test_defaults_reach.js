@@ -125,4 +125,91 @@ for (let i = 0; i < 300; i++) {
   }
 }
 
+// A fragment $ref under an embedded $id resolves against that resource, as
+// validation resolves it. The passes used to read it against the outer root
+// and filled the outer definition's default into a value the inner one
+// governs. Declining to fill is acceptable; filling the wrong default is not.
+{
+  const embedded = {
+    type: 'object',
+    $defs: { x: { type: 'object', properties: { a: { type: 'string', default: 'outer' } } } },
+    properties: { inner: { $id: 'http://e/', type: 'object', $defs: { x: { type: 'object', properties: { b: { type: 'string', default: 'inner' } } } }, properties: { p: { $ref: '#/$defs/x' } } } },
+  };
+  assert.strictEqual(new Validator(embedded).validate({ inner: { p: { b: 1 } } }).valid, false, 'validation applies the inner definition');
+  for (const [path, fill] of Object.entries(fills(embedded))) {
+    const d = fill({ inner: { p: {} } });
+    assert.ok(d.inner.p.a === undefined, `${path}: the outer definition's default was filled under the embedded resource`);
+    assert.ok(d.inner.p.b === undefined || d.inner.p.b === 'inner', `${path}: an unexpected value ${JSON.stringify(d.inner.p)}`);
+  }
+}
+
+// The closure pass tests document keys against patternProperties with the
+// engine validation uses, linear for the patterns it can take, not the
+// backtracking one: with useDefaults on by default, a key the validator
+// refuses in no time used to take seconds in the defaults pass first.
+{
+  const schema = { type: 'object', patternProperties: { '^(a+)+$': { type: 'object', properties: { x: { type: 'number', default: 1 } } } } };
+  const key = 'a'.repeat(28) + '!';
+  for (const engine of [undefined, 'interpreter']) {
+    const v = new Validator(schema, { engine });
+    v.validate({ a: {} });
+    const t0 = process.hrtime.bigint();
+    const r = v.validate({ [key]: {} });
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+    assert.strictEqual(r.valid, true);
+    assert.ok(ms < 200, `${engine || 'codegen'}: a key of 28 a's took ${ms.toFixed(0)} ms through the defaults pass`);
+  }
+  // the matcher still answers as the pattern says
+  const d = new Validator(schema).validate({ aaa: {}, b: {} }).data;
+  assert.deepStrictEqual(d, { aaa: { x: 1 }, b: {} });
+}
+
+// A schema applied to the same object through two edges is applied once per
+// call: n_i = allOf [n_(i-1), n_(i-1)] with a default at the bottom cost 2^n
+// visits of one object. The passes are timed on their own: the verdict on
+// generated code follows every edge as well, which is not this pass's cost.
+{
+  const build = (n) => {
+    const defs = { n0: { type: 'object', properties: { x: { type: 'number', default: 1 } } } };
+    for (let i = 1; i <= n; i++) defs['n' + i] = { allOf: [{ $ref: '#/$defs/n' + (i - 1) }, { $ref: '#/$defs/n' + (i - 1) }] };
+    return { $ref: '#/$defs/n' + n, $defs: defs };
+  };
+  const schema = build(22);
+  // The runtime's two passes, as the validator builds them; the generated
+  // one declines a schema this size and leaves it to the closure pass, which
+  // a compiled module embeds as its text.
+  const passes = { closure: require('../lib/defaults').buildDefaultsApplier(schema) };
+  const gen = require('../lib/codegen-engine').buildPreprocess(schema, { useDefaults: true });
+  if (gen) passes.generated = gen;
+  for (const [path, pass] of Object.entries(passes)) {
+    const fill = (d) => { pass(d); return d; };
+    fill({ x: 1 });
+    const t0 = process.hrtime.bigint();
+    const d = fill({});
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+    assert.deepStrictEqual(d, { x: 1 }, path);
+    assert.ok(ms < 200, `${path}: a 22-deep allOf chain took ${ms.toFixed(0)} ms in the defaults pass`);
+  }
+  const r = new Validator(build(12), { engine: 'interpreter' }).validate({});
+  assert.strictEqual(r.valid, true);
+  assert.deepStrictEqual(r.data, { x: 1 });
+}
+
+// A shared definition with a large default, referenced many times: the
+// generated pass wrote the default out at every reference, 10 MB of source
+// for 200 references to a 50 KB default. It leaves such a schema to the
+// closure pass, which holds the default once, and the fills are unchanged.
+{
+  const big = { blob: 'x'.repeat(50 * 1024) };
+  const props = {};
+  for (let i = 0; i < 200; i++) props['p' + i] = { $ref: '#/$defs/D' };
+  const schema = { type: 'object', properties: props, $defs: { D: { type: 'object', properties: { v: { type: 'object', default: big } } } } };
+  const src = require('../lib/codegen-engine').preprocessSource(schema, { useDefaults: true });
+  assert.ok(src === null || src.length < 4 * big.blob.length, `the generated pass is ${src && src.length} characters`);
+  const r = new Validator(schema).validate({ p0: {}, p7: {} });
+  assert.strictEqual(r.valid, true);
+  assert.strictEqual(r.data.p0.v.blob, big.blob);
+  assert.notStrictEqual(r.data.p0.v, r.data.p7.v, 'each fill is a fresh value');
+}
+
 console.log(`ok: defaults filled where ajv fills them, ${MATRIX.length} constructs; ${schemas} seeded schemas, ${docs} documents agree on the generated, closure and module passes`);

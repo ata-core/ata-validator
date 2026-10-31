@@ -151,6 +151,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 507 KB with `ata-validator/stream` (stream.js, stream.mjs, stream.d.ts,
 // lib/stream.js): validation as the body arrives, a JSON array or NDJSON
 // split and validated record by record as the chunks land. Measured 506.1 KB.
-assert.ok(manifest.size < 507 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 525 KB with the fixes from an outside scan of 104 findings: the native
+// engine's format checks ported from lib/formats.js and its On-Demand and
+// walker fixes (src/ata.cpp and the single-header copy both ship), the
+// numeric-literal guard and shared-definition pass in the code generator,
+// the bounded passes in the tools. Measured 524.0 KB.
+assert.ok(manifest.size < 525 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

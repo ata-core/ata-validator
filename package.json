@@ -123,6 +123,7 @@
   },
   "browser": {
     "./lib/native-load.js": "./lib/native-load.browser.js",
+    "./lib/native-attach.js": "./lib/native-attach.browser.js",
     "./lib/aot.js": "./lib/aot.browser.js",
     "./lib/buffer-gate.js": "./lib/buffer-gate.browser.js",
     "./lib/interpreter.js": "./lib/interpreter.browser.js",

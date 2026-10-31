@@ -178,4 +178,20 @@ const MISTYPED = { type: 'object', properties: { a: { type: 'string', maxLenght:
   ok('AOT error-detail degradation is loud, and only when it is a degradation');
 }
 
+// --- a schema given as JSON text is checked after parsing ----------------------
+{
+  // The check used to run on the constructor argument as given, so a string
+  // schema skipped it: a string has no keywords to inspect, and the mistyped
+  // keyword went through as an annotation with strictSchema on.
+  assert.throws(
+    () => new Validator(JSON.stringify(MISTYPED), { strictSchema: true }),
+    (e) => e.message.includes('unknown keyword "maxLenght"'),
+  );
+  const seen = [];
+  const v = new Validator(JSON.stringify(MISTYPED), { strictSchema: 'log', logger: { warn: (m) => seen.push(m) } });
+  assert.strictEqual(seen.length, 1, 'the log mode reports once for a text schema');
+  assert.strictEqual(v.isValidObject({ a: 'way too long' }), true, 'and validation continues');
+  ok('a schema passed as JSON text goes through the same strict check');
+}
+
 console.log(`\n${passed} passed, 0 failed`);

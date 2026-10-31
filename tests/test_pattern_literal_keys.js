@@ -3,13 +3,15 @@
 // A pattern that only names keys (`^name$`, `^(a|b)$`) or matches everything
 // (`.*`) is answered by comparing strings instead of running a regex. The
 // answers must be the regex's own, in patternProperties, propertyNames and
-// with additionalProperties, on generated code and the interpreter.
+// with additionalProperties, on generated code and the interpreter. A prefix
+// pattern with a dot in it, `^a.b`, is a wildcard, not the literal `a.b`: it
+// was read as the literal and 'axb' skipped the value schema.
 
 const assert = require('assert');
 const { Validator } = require('..');
 
-const pats = ['^cdn$', '^(cdn|Cdn)$', '^(a|b-c|d_e|F9)$', '.*', '^(x)$', '^x-$', '^(a|b)c$', '^a|b$', '^(a|b)$x'];
-const keys = ['cdn', 'Cdn', 'CDN', 'cdnx', 'xcdn', 'a', 'b-c', 'd_e', 'F9', 'f9', 'x', 'x-', 'ac', 'bc', 'b', 'ab', '', 'cdn\n', 'a\nb', 'b\n'];
+const pats = ['^cdn$', '^(cdn|Cdn)$', '^(a|b-c|d_e|F9)$', '.*', '^(x)$', '^x-$', '^(a|b)c$', '^a|b$', '^(a|b)$x', '^a.b', '^a.b.c', '^v.', '^a/b', '^a-b'];
+const keys = ['cdn', 'Cdn', 'CDN', 'cdnx', 'xcdn', 'a', 'b-c', 'd_e', 'F9', 'f9', 'x', 'x-', 'ac', 'bc', 'b', 'ab', '', 'cdn\n', 'a\nb', 'b\n', 'axb', 'a.b', 'axbxc', 'a.b.c', 'a.bxc', 'v1', 'v.', 'v', 'a/b', 'a-b', 'a-bx'];
 let checked = 0;
 for (const p of pats) {
   const re = new RegExp(p);

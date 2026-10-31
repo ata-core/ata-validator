@@ -75,6 +75,7 @@ struct schema_node {
   std::vector<pattern_prop> pattern_properties;
 
   std::vector<std::string> enum_values_minified;
+  bool has_enum = false;
   std::optional<std::string> const_value_raw;
 
   std::optional<std::string> format;
@@ -462,7 +463,7 @@ static void validate_napi(const schema_node_ptr& node,
   }
 
   // enum — compare against pre-minified canonical values
-  if (!node->enum_values_minified.empty()) {
+  if (node->has_enum) {
     std::string val_json = napi_to_json(env, value);
     bool found = false;
     for (const auto& ev : node->enum_values_minified) {
@@ -1086,13 +1087,15 @@ public:
   }
 
   void submit(std::function<void(std::unordered_map<uint32_t, ata::schema_ref>&)> task) {
-    {
-      std::unique_lock<std::mutex> lock(mtx_);
-      tasks_.push(std::move(task));
-    }
+    // Counted before it can run: a task that finished before it was counted
+    // let another caller's wait() return while its work was still pending.
     {
       std::unique_lock<std::mutex> lock(done_mtx_);
       pending_++;
+    }
+    {
+      std::unique_lock<std::mutex> lock(mtx_);
+      tasks_.push(std::move(task));
     }
     cv_.notify_one();
   }
@@ -1131,7 +1134,13 @@ static ThreadPool& pool() {
 static constexpr size_t MAX_FAST_SLOTS = 4096;
 static ata::schema_ref g_fast_schemas[MAX_FAST_SLOTS];
 static std::string g_fast_schema_jsons[MAX_FAST_SLOTS];
-static uint32_t g_fast_slot_count = 0;
+static std::atomic<uint32_t> g_fast_slot_count{0};
+// Registration from worker threads: each has its own env and calls
+// FastRegister concurrently, and the scan, the capacity check and the slot
+// write raced; slots were overwritten and answered false for everything.
+// Readers load the count relaxed: a caller holds a slot number only from
+// FastRegister, whose mutex already orders the slot's contents before it.
+static std::mutex g_fast_registry_mutex;
 
 // Register a compiled schema in a fast slot, returns slot ID.
 // Deduplicates: same schema JSON string returns existing slot.
@@ -1142,6 +1151,7 @@ Napi::Value FastRegister(const Napi::CallbackInfo& info) {
     return env.Undefined();
   }
   std::string schema_json = info[0].As<Napi::String>().Utf8Value();
+  std::lock_guard<std::mutex> lock(g_fast_registry_mutex);
   // Deduplicate: return existing slot for identical schema JSON
   for (uint32_t i = 0; i < g_fast_slot_count; i++) {
     if (g_fast_schema_jsons[i] == schema_json) {
@@ -1157,16 +1167,19 @@ Napi::Value FastRegister(const Napi::CallbackInfo& info) {
     Napi::Error::New(env, "Failed to compile schema").ThrowAsJavaScriptException();
     return env.Undefined();
   }
-  uint32_t slot = g_fast_slot_count++;
+  // The slot is published after its contents are written, so a reader that
+  // sees the count sees the schema.
+  uint32_t slot = g_fast_slot_count.load();
   g_fast_schemas[slot] = std::move(schema);
   g_fast_schema_jsons[slot] = schema_json;
+  g_fast_slot_count.store(slot + 1);
   return Napi::Number::New(env, slot);
 }
 
 // Fast validation: slot + raw buffer → bool
 // Routes through is_valid_buf → is_valid_prepadded → On-Demand od_plan fast path
 static bool FastValidateImpl(uint32_t slot, const uint8_t* data, size_t length) {
-  if (slot >= g_fast_slot_count) return false;
+  if (slot >= g_fast_slot_count.load(std::memory_order_relaxed)) return false;
   return ata::is_valid_buf(g_fast_schemas[slot], data, length);
 }
 
@@ -1175,7 +1188,7 @@ static bool FastValidateImpl(uint32_t slot, const uint8_t* data, size_t length) 
 // document is not there to read, and short of REQUIRED_PADDING before it the
 // padding is not, so that case takes the copying path.
 static bool FastValidatePrepadded(uint32_t slot, const uint8_t* data, size_t length, size_t capacity) {
-  if (slot >= g_fast_slot_count) return false;
+  if (slot >= g_fast_slot_count.load(std::memory_order_relaxed)) return false;
   if (length > capacity) return false;
   if (capacity - length < ata::REQUIRED_PADDING) return FastValidateImpl(slot, data, length);
   return ata::is_valid_prepadded(g_fast_schemas[slot],
@@ -1302,7 +1315,7 @@ static napi_value RawBatchValidate(napi_env env, napi_callback_info info) {
 
   uint32_t slot;
   napi_get_value_uint32(env, args[0], &slot);
-  if (slot >= g_fast_slot_count) {
+  if (slot >= g_fast_slot_count.load(std::memory_order_relaxed)) {
     napi_value r;
     napi_get_null(env, &r);
     return r;
@@ -1382,7 +1395,7 @@ static napi_value RawParallelValidate(napi_env env, napi_callback_info info) {
 
   uint32_t slot;
   napi_get_value_uint32(env, args[0], &slot);
-  if (slot >= g_fast_slot_count) {
+  if (slot >= g_fast_slot_count.load(std::memory_order_relaxed)) {
     napi_value r; napi_get_null(env, &r); return r;
   }
 
@@ -1483,7 +1496,7 @@ static napi_value RawParallelCount(napi_env env, napi_callback_info info) {
 
   uint32_t slot;
   napi_get_value_uint32(env, args[0], &slot);
-  if (slot >= g_fast_slot_count) {
+  if (slot >= g_fast_slot_count.load(std::memory_order_relaxed)) {
     napi_value r; napi_create_uint32(env, 0, &r); return r;
   }
 
@@ -1570,7 +1583,7 @@ static napi_value RawNDJSONValidate(napi_env env, napi_callback_info info) {
 
   uint32_t slot;
   napi_get_value_uint32(env, args[0], &slot);
-  if (slot >= g_fast_slot_count) {
+  if (slot >= g_fast_slot_count.load(std::memory_order_relaxed)) {
     napi_value r; napi_get_null(env, &r); return r;
   }
 
@@ -1621,6 +1634,10 @@ static napi_value RawNDJSONValidate(napi_env env, napi_callback_info info) {
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
+  if (ata::schema_node_layout_size() != sizeof(schema_node)) {
+    Napi::Error::New(env, "ata native engine: schema_node layout differs between src/ata.cpp and the binding").ThrowAsJavaScriptException();
+    return exports;
+  }
   CompiledSchema::Init(env, exports);
   exports.Set("validate", Napi::Function::New(env, ValidateOneShot));
   exports.Set("version", Napi::Function::New(env, GetVersion));

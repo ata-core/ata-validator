@@ -1,4 +1,4 @@
-/* auto-generated on 2026-10-24 17:45:44 +0300. Do not edit! */
+/* auto-generated on 2026-10-31 00:37:58 +0300. Do not edit! */
 /* begin file include/ata.h */
 #pragma once
 
@@ -110,6 +110,9 @@ bool is_valid_buf(const schema_ref& schema, const uint8_t* data, size_t length);
 
 // Required padding size for is_valid_prepadded
 inline constexpr size_t REQUIRED_PADDING = 64;
+
+// sizeof the internal schema node, for the binding's layout check.
+size_t schema_node_layout_size();
 
 }  // namespace ata
 /* end file include/ata.h */

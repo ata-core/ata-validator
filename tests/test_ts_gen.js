@@ -76,7 +76,37 @@ function compile(fixture) {
   return { code: result.status, out: (result.stdout || '') + (result.stderr || '') };
 }
 
+// Checks on the generator's text that need no compiler.
+function directChecks() {
+  const assert = require('assert');
+  // The JSDoc block carries pattern, format, default and example values from
+  // the schema. A `*/` inside one of them closed the comment and the rest of
+  // the value was read as a declaration.
+  const evil = '*/ declare const __ataDoc: 1; /*';
+  const out = toTypeScript({ type: 'object', properties: { a: { type: 'string', description: evil, pattern: evil, format: evil, default: evil, examples: [evil] } } }, { name: 'Doc' });
+  assert.ok(!out.includes('__ataDoc: 1; /*') || !/\*\/\s*declare const __ataDoc/.test(out), 'a value cannot close the comment');
+  for (const block of out.match(/\/\*\*[\s\S]*?\*\//g) || []) assert.ok(!block.slice(3, -2).includes('*/'), 'no */ inside a comment block: ' + block);
+
+  // Each property is rendered once. The index signature repeats a nested
+  // object's type, so a chain of objects with additionalProperties doubled
+  // per level (2^levels characters, 2^levels renders): 22 levels did not
+  // finish. The index signature is `unknown` where a property is an object
+  // literal, and the output grows with the schema.
+  const nest = (d) => { let s = { type: 'string' }; for (let i = 0; i < d; i++) s = { type: 'object', properties: { a: s }, additionalProperties: { type: 'string' } }; return s; };
+  const t0 = Date.now();
+  const d8 = toTypeScript(nest(8)).length;
+  const d24 = toTypeScript(nest(24)).length;
+  const ms = Date.now() - t0;
+  assert.ok(ms < 1000, `nested objects took ${ms} ms`);
+  assert.ok(d24 < d8 * 4, `output for 24 levels is ${d24} chars against ${d8} for 8`);
+  // A scalar property keeps the typed index signature.
+  const flat = toTypeScript({ type: 'object', properties: { a: { type: 'number' } }, additionalProperties: { type: 'string' } });
+  assert.ok(flat.includes('[key: string]: string | number | undefined;'), flat);
+  process.stdout.write('direct checks: comment escaping, nested output size\n');
+}
+
 function main() {
+  directChecks();
   const fixtures = discoverFixtures();
   if (fixtures.length === 0) {
     process.stdout.write('no fixtures found under tests/ts_fixtures\n');

@@ -62,28 +62,54 @@ static bool is_hex(char c) {
   return is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
-static bool fast_check_email(std::string_view s) {
-  auto at = s.find('@');
-  if (at == std::string_view::npos || at == 0 || at == s.size() - 1)
-    return false;
-  auto dot = s.find('.', at + 1);
-  if (dot == std::string_view::npos || dot == at + 1 ||
-      dot == s.size() - 1)
-    return false;
-  // Check TLD has at least 2 chars
-  return (s.size() - dot - 1) >= 2;
+// Character tables for the format checks, built at compile time.
+struct fmt_tables {
+  uint8_t C[256] = {}, H[256] = {}, P[256] = {}, Q[256] = {}, E[256] = {};
+  constexpr fmt_tables() {
+    for (int i = 48; i < 58; ++i) C[i] = 3;
+    for (int i = 65; i < 91; ++i) C[i] = 3;
+    for (int i = 97; i < 123; ++i) C[i] = 3;
+    C[43] = 3; C[45] = 3; C[46] = 3; C[95] = 1; C[126] = 1;
+    C[33] = 1; C[36] = 1; C[38] = 1; C[39] = 1; C[40] = 1; C[41] = 1; C[42] = 1; C[44] = 1; C[59] = 1; C[61] = 1;
+    for (int i = 48; i < 58; ++i) H[i] = 1;
+    for (int i = 65; i < 71; ++i) H[i] = 1;
+    for (int i = 97; i < 103; ++i) H[i] = 1;
+    for (int i = 0; i < 128; ++i) P[i] = C[i] & 1;
+    P[58] = 1; P[64] = 1; P[47] = 1;
+    for (int i = 0; i < 128; ++i) Q[i] = P[i];
+    Q[63] = 1;
+    for (int i = 48; i <= 57; ++i) E[i] = 1;
+    for (int i = 97; i <= 122; ++i) E[i] = 1;
+    for (int i = 65; i <= 90; ++i) E[i] = 1;
+    for (int i = 35; i <= 39; ++i) E[i] = 1;
+    for (int i = 94; i <= 96; ++i) E[i] = 1;
+    for (int i = 123; i <= 126; ++i) E[i] = 1;
+    E[46] = 1; E[33] = 1; E[42] = 1; E[43] = 1; E[45] = 1; E[47] = 1; E[61] = 1; E[63] = 1;
+  }
+};
+static constexpr fmt_tables FT{};
+
+// The checks below follow lib/formats.js rule for rule, so the buffer path
+// answers as validate() does; tests/test_native_formats.js holds the two to
+// the same answers on the official suite's strings and mutations of them.
+// They were looser: a date of 2020-02-30, an address with a doubled dot or a
+// bad domain, a URI with a non-ASCII host, an IPv4 octet with a leading zero.
+static int days_in_month(int y, int m) {
+  if (m == 2) return ((y % 4 == 0 && y % 100 != 0) || y % 400 == 0) ? 29 : 28;
+  return (m == 4 || m == 6 || m == 9 || m == 11) ? 30 : 31;
 }
 
 static bool fast_check_date(std::string_view s) {
-  // YYYY-MM-DD with range validation
-  if (s.size() != 10 || !is_digit(s[0]) || !is_digit(s[1]) ||
-      !is_digit(s[2]) || !is_digit(s[3]) || s[4] != '-' ||
-      !is_digit(s[5]) || !is_digit(s[6]) || s[7] != '-' ||
-      !is_digit(s[8]) || !is_digit(s[9]))
-    return false;
-  int month = (s[5] - '0') * 10 + (s[6] - '0');
-  int day = (s[8] - '0') * 10 + (s[9] - '0');
-  return month >= 1 && month <= 12 && day >= 1 && day <= 31;
+  if (s.size() != 10) return false;
+  for (int i = 0; i < 10; ++i) {
+    if (i == 4 || i == 7) { if (s[i] != '-') return false; }
+    else if (!is_digit(s[i])) return false;
+  }
+  int y = (s[0] - '0') * 1000 + (s[1] - '0') * 100 + (s[2] - '0') * 10 + (s[3] - '0');
+  int m = (s[5] - '0') * 10 + (s[6] - '0');
+  int d = (s[8] - '0') * 10 + (s[9] - '0');
+  if (m < 1 || m > 12 || d < 1) return false;
+  return d <= days_in_month(y, m);
 }
 
 static bool fast_check_time(std::string_view s) {
@@ -104,33 +130,172 @@ static bool fast_check_datetime(std::string_view s) {
 }
 
 static bool fast_check_ipv4(std::string_view s) {
-  int parts = 0, val = 0, digits = 0;
-  for (size_t i = 0; i <= s.size(); ++i) {
-    if (i == s.size() || s[i] == '.') {
-      if (digits == 0 || val > 255) return false;
-      ++parts;
-      val = 0;
-      digits = 0;
-    } else if (is_digit(s[i])) {
-      val = val * 10 + (s[i] - '0');
-      ++digits;
-      if (digits > 3) return false;
+  const size_t n = s.size();
+  if (n < 7 || n > 15) return false;
+  int octets = 0, value = 0, digits = 0;
+  for (size_t i = 0; i <= n; ++i) {
+    char c = i < n ? s[i] : '.';
+    if (c == '.') {
+      if (digits == 0 || value > 255) return false;
+      ++octets; value = 0; digits = 0;
+      if (octets > 4) return false;
+    } else if (is_digit(c)) {
+      if (digits == 1 && value == 0) return false;  // a leading zero
+      value = value * 10 + (c - '0');
+      if (++digits > 3) return false;
     } else {
       return false;
     }
   }
-  return parts == 4;
+  return octets == 4;
 }
 
+// RFC 4291: up to eight groups of one to four hex digits, at most one "::"
+// standing in for the zero groups, an optional dotted IPv4 tail counting as
+// two groups. The same rules as lib/formats.js, which the test holds it to;
+// the check it replaces accepted any string with a colon in it.
+static bool fast_check_ipv6(std::string_view s) {
+  const size_t n = s.size();
+  if (n < 2 || n > 45) return false;
+  size_t end = n;
+  int groups = 0;
+  size_t dot = s.find('.');
+  if (dot != std::string_view::npos) {
+    size_t last_colon = s.rfind(':', dot);
+    if (last_colon == std::string_view::npos) return false;
+    if (!fast_check_ipv4(s.substr(last_colon + 1))) return false;
+    end = last_colon + 1;  // keep the colon: the group scan ends on it
+    groups = 2;
+  }
+  bool compressed = false;
+  int digits = 0;
+  size_t i = 0;
+  if (s[0] == ':' && s[1] != ':') return false;
+  while (i < end) {
+    char c = s[i];
+    if (c == ':') {
+      if (digits > 0) { groups++; digits = 0; }
+      if (i + 1 < n && s[i + 1] == ':') {
+        if (compressed) return false;
+        compressed = true;
+        i += 2;
+        if (i < n && s[i] == ':') return false;
+        continue;
+      }
+      i++;
+      if (i == end && end == n) return false;
+      continue;
+    }
+    if (is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+      if (++digits > 4) return false;
+      i++;
+      continue;
+    }
+    return false;
+  }
+  if (digits > 0) groups++;
+  if (groups > 8) return false;
+  return compressed ? groups < 8 : groups == 8;
+}
+
+// lib/uri-core.js's walk with mode 1 (a scheme is required, nothing past
+// ASCII). Out-of-range reads give 256, which no table admits, as the JS
+// side's NaN does not either.
 static bool fast_check_uri(std::string_view s) {
-  if (s.size() < 3) return false;
-  // Must start with alpha, then scheme chars, then ':'
-  if (!is_alpha(s[0])) return false;
-  size_t i = 1;
-  while (i < s.size() && (is_alnum(s[i]) || s[i] == '+' || s[i] == '-' ||
-                           s[i] == '.'))
-    ++i;
-  return i < s.size() && s[i] == ':' && i + 1 < s.size();
+  const fmt_tables& t = FT;
+  const size_t n = s.size();
+  auto at = [&](size_t i) -> int { return i < n ? static_cast<unsigned char>(s[i]) : 256; };
+  auto pct = [&](size_t i) { int a = at(i + 1), b = at(i + 2); return a < 128 && b < 128 && t.H[a] && t.H[b]; };
+  auto literal = [&](size_t from, size_t to) -> bool {
+    if (from >= to) return false;
+    int f = at(from);
+    if (f == 'v' || f == 'V') {
+      size_t i = from + 1; int h = 0;
+      for (; i < to; ++i) { int c = at(i); if (c < 128 && t.H[c]) ++h; else break; }
+      if (h == 0 || at(i) != '.' || i + 1 >= to) return false;
+      for (++i; i < to; ++i) { int c = at(i); if (!(c < 128 && ((t.C[c] & 1) || c == ':'))) return false; }
+      return true;
+    }
+    size_t z = to;
+    for (size_t i = from; i < to; ++i) if (at(i) == '%') { z = i; break; }
+    if (z == to) return fast_check_ipv6(s.substr(from, to - from));
+    if (at(z + 1) != '2' || at(z + 2) != '5' || z + 3 >= to) return false;
+    for (size_t i = z + 3; i < to; ++i) {
+      int c = at(i);
+      if (c == '%') { if (!pct(i)) return false; i += 2; continue; }
+      if (!(c < 128 && (t.C[c] & 1))) return false;
+    }
+    return fast_check_ipv6(s.substr(from, z - from));
+  };
+  size_t i = 0;
+  int c = at(0);
+  bool scheme = false;
+  if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+    size_t j = 1;
+    while (j < n) { c = at(j); if (c == ':' || c > 127 || (t.C[c] & 2) == 0) break; ++j; }
+    if (j < n && c == ':') { scheme = true; i = j + 1; }
+  }
+  if (!scheme) return false;
+  if (at(i) == '/' && at(i + 1) == '/') {
+    const size_t st = i + 2;
+    size_t end = n; long atpos = -1, colon = -1; bool br = false, brAt = false;
+    for (size_t k = st; k < n; ++k) {
+      c = at(k);
+      if (c == '/' || c == '?' || c == '#') { end = k; break; }
+      if (c < 128) {
+        if (t.C[c] & 1) continue;
+        if (c == '%') { if (!pct(k)) return false; k += 2; continue; }
+        if (c == ':') { if (colon == -1) colon = (long)k; continue; }
+        if (c == '@') { if (atpos != -1) return false; atpos = (long)k; brAt = br; colon = -1; continue; }
+        if (c == '[' || c == ']') { br = true; continue; }
+        return false;
+      }
+      return false;  // not wide: nothing past ASCII
+    }
+    if (brAt) return false;
+    size_t hs = atpos == -1 ? st : (size_t)atpos + 1;
+    if (at(hs) == '[') {
+      size_t close = end;
+      for (size_t k = hs + 1; k < end; ++k) if (at(k) == ']') { close = k; break; }
+      if (close == end || !literal(hs + 1, close)) return false;
+      if (close + 1 < end) {
+        if (at(close + 1) != ':') return false;
+        for (size_t k = close + 2; k < end; ++k) { c = at(k); if (c < '0' || c > '9') return false; }
+      }
+    } else {
+      if (br) return false;
+      if (colon != -1) for (size_t k = (size_t)colon + 1; k < end; ++k) { c = at(k); if (c < '0' || c > '9') return false; }
+    }
+    i = end;
+  }
+  for (; i < n; ++i) {
+    c = at(i);
+    if (c < 128 ? t.P[c] == 0 : true) {
+      if (c == '?' || c == '#') break;
+      if (c == '%') { if (!pct(i)) return false; i += 2; continue; }
+      return false;
+    }
+  }
+  if (i >= n) return true;
+  if (c == '?') {
+    for (++i; i < n; ++i) {
+      c = at(i);
+      if (c < 128 ? t.Q[c] == 0 : true) {
+        if (c == '#') break;
+        if (c == '%') { if (!pct(i)) return false; i += 2; continue; }
+        return false;
+      }
+    }
+    if (i >= n) return true;
+  }
+  for (++i; i < n; ++i) {
+    c = at(i);
+    if (c < 128 ? t.Q[c] == 0 : true) {
+      if (c == '%') { if (!pct(i)) return false; i += 2; continue; }
+      return false;
+    }
+  }
+  return true;
 }
 
 static bool fast_check_uuid(std::string_view s) {
@@ -148,19 +313,63 @@ static bool fast_check_uuid(std::string_view s) {
 
 static bool fast_check_hostname(std::string_view s) {
   if (s.empty() || s.size() > 253) return false;
-  size_t label_len = 0;
-  for (size_t i = 0; i < s.size(); ++i) {
-    if (s[i] == '.') {
-      if (label_len == 0) return false;
-      label_len = 0;
-    } else if (is_alnum(s[i]) || s[i] == '-') {
-      ++label_len;
-      if (label_len > 63) return false;
-    } else {
-      return false;
+  size_t label = 0;
+  char prev = '.';  // so a leading hyphen is refused like a leading dot
+  for (char c : s) {
+    if (c == '.') {
+      if (label == 0 || prev == '-') return false;
+      label = 0; prev = c; continue;
     }
+    if (!is_alnum(c) && c != '-') return false;
+    if (c == '-' && prev == '.') return false;
+    if (++label > 63) return false;
+    prev = c;
   }
-  return label_len > 0;
+  return label != 0 && prev != '-';
+}
+
+static bool fast_check_email(std::string_view s) {
+  const uint8_t* L = FT.E;
+  const size_t n = s.size();
+  if (n < 3) return false;
+  size_t at;
+  if (s[0] == '"') {
+    size_t p = s.rfind('@');
+    if (p == std::string_view::npos || p < 2 || p == n - 1 || p > 64) return false;
+    at = p;
+    if (s[at - 1] != '"') return false;
+    for (size_t i = 1; i < at - 1; ++i) {
+      unsigned char c = static_cast<unsigned char>(s[i]);
+      if (c == '\\') {
+        unsigned char q = i + 1 < n ? static_cast<unsigned char>(s[i + 1]) : 0;
+        if (q < 32 || q > 126 || i + 1 >= at - 1) return false;
+        ++i; continue;
+      }
+      if (c < 32 || c > 126 || c == '"') return false;
+    }
+  } else {
+    if (s[0] == '.') return false;
+    long p = -1;
+    bool after_dot = false;
+    for (size_t i = 0; i < n; ++i) {
+      unsigned char c = static_cast<unsigned char>(s[i]);
+      if (c == '@') { p = (long)i; break; }
+      if (c > 127 || L[c] == 0) return false;
+      if (c == '.') { if (after_dot) return false; after_dot = true; }
+      else after_dot = false;
+    }
+    if (p <= 0 || (size_t)p == n - 1 || p > 64) return false;
+    at = (size_t)p;
+    if (s[at - 1] == '.') return false;
+  }
+  if (s[at + 1] == '[') {
+    if (s[n - 1] != ']' || n - at - 1 <= 2) return false;
+    if (n > at + 6 && (s[at + 2] | 32) == 'i' && (s[at + 3] | 32) == 'p' && (s[at + 4] | 32) == 'v' &&
+        s[at + 5] == '6' && s[at + 6] == ':')
+      return fast_check_ipv6(s.substr(at + 7, n - 1 - (at + 7)));
+    return fast_check_ipv4(s.substr(at + 2, n - 1 - (at + 2)));
+  }
+  return fast_check_hostname(s.substr(at + 1));
 }
 
 // Check format by pre-resolved numeric ID — no string comparisons.
@@ -171,7 +380,7 @@ static bool check_format_by_id(std::string_view sv, uint8_t fid) {
     case 2: return fast_check_datetime(sv);
     case 3: return fast_check_time(sv);
     case 4: return fast_check_ipv4(sv);
-    case 5: return sv.find(':') != std::string_view::npos;
+    case 5: return fast_check_ipv6(sv);
     case 6: return fast_check_uri(sv);
     case 7: return fast_check_uuid(sv);
     case 8: return fast_check_hostname(sv);
@@ -441,6 +650,7 @@ struct schema_node {
 
   // enum / const
   std::vector<std::string> enum_values_minified;  // pre-minified enum values
+  bool has_enum = false;  // an `enum` keyword was present, even an empty one
   std::optional<std::string> const_value_raw;  // raw JSON value string
 
   // format
@@ -481,6 +691,7 @@ enum class op : uint8_t {
   ARRAY_ITEMS, CHECK_REQUIRED, CHECK_MIN_PROPS, CHECK_MAX_PROPS,
   OBJ_PROPS_START, OBJ_PROP, OBJ_PROPS_END, CHECK_NO_ADDITIONAL,
   CHECK_ENUM_STR, CHECK_ENUM, CHECK_CONST, COMPOSITION,
+  FAIL,  // rejects every value: a false schema, an empty enum
 };
 struct ins { op o; uint32_t a=0, b=0; };
 struct plan {
@@ -766,6 +977,12 @@ static schema_node_ptr compile_node(dom::element el,
       auto re = std::make_shared<re2::RE2>(node->pattern.value(), ata_quiet_re2_options());
       if (re->ok()) {
         node->compiled_pattern = std::move(re);
+      } else {
+        // A pattern RE2 cannot take (lookaround, a backreference) must not
+        // become "no pattern": the schema fails to compile here, and the
+        // JavaScript engines, which do run it, keep the validator.
+        ctx.compile_error = "pattern not supported by the native engine: " + node->pattern.value();
+        return node;
       }
 #endif
     }
@@ -896,6 +1113,9 @@ static schema_node_ptr compile_node(dom::element el,
       auto re = std::make_shared<re2::RE2>(pp.pattern, ata_quiet_re2_options());
       if (re->ok()) {
         pp.compiled = std::move(re);
+      } else {
+        ctx.compile_error = "patternProperties pattern not supported by the native engine: " + pp.pattern;
+        return node;
       }
       node->pattern_properties.push_back(std::move(pp));
     }
@@ -916,6 +1136,8 @@ static schema_node_ptr compile_node(dom::element el,
   dom::element enum_el;
   if (obj["enum"].get(enum_el) == SUCCESS) {
     if (enum_el.is<dom::array>()) {
+      // An empty enum rejects every value; it must not read as "no enum".
+      node->has_enum = true;
       dom::array enum_arr; type_checked(enum_el.get(enum_arr)); for (auto e : enum_arr) {
         node->enum_values_minified.push_back(canonical_json(e));
       }
@@ -1085,6 +1307,20 @@ static std::string decode_pointer_segment(const std::string& seg) {
   return out;
 }
 
+// An array-index segment of a JSON Pointer: decimal digits only, in range.
+// std::stoul threw on anything else, and the exception left the C entry
+// points as a process abort (a `$ref` of `#/allOf/abc` did it).
+static bool parse_index_segment(const std::string& seg, size_t& out) {
+  if (seg.empty() || seg.size() > 18) return false;
+  size_t v = 0;
+  for (char c : seg) {
+    if (c < '0' || c > '9') return false;
+    v = v * 10 + (size_t)(c - '0');
+  }
+  out = v;
+  return true;
+}
+
 // Walk a JSON Pointer (without leading #) within a given schema node.
 // Returns the resolved node, or nullptr if not found.
 static schema_node_ptr walk_json_pointer(const schema_node_ptr& root_node,
@@ -1121,7 +1357,7 @@ static schema_node_ptr walk_json_pointer(const schema_node_ptr& root_node,
       } else { return nullptr; }
     } else if (key == "allOf" || key == "anyOf" || key == "oneOf") {
       if (si + 1 < segments.size()) {
-        size_t idx = std::stoul(segments[++si]);
+        size_t idx; if (!parse_index_segment(segments[++si], idx)) return nullptr;
         auto& vec = (key == "allOf") ? current->all_of
                   : (key == "anyOf") ? current->any_of
                   : current->one_of;
@@ -1141,7 +1377,7 @@ static schema_node_ptr walk_json_pointer(const schema_node_ptr& root_node,
       current = current->additional_properties_schema;
     } else if (key == "prefixItems") {
       if (si + 1 < segments.size()) {
-        size_t idx = std::stoul(segments[++si]);
+        size_t idx; if (!parse_index_segment(segments[++si], idx)) return nullptr;
         if (idx < current->prefix_items.size()) { current = current->prefix_items[idx]; }
         else { return nullptr; }
       } else { return nullptr; }
@@ -1189,6 +1425,36 @@ static bool validate_fast(const schema_node_ptr& node,
 
 // Macro for early termination
 #define ATA_CHECK_EARLY() if (!all_errors && !errors.empty()) return
+
+// A property name as a JSON string literal, so that it can be parsed and
+// validated as a string element. Putting the decoded name between quotes
+// unescaped turned a name with a quote in it into different JSON, or into
+// none, and the check was then skipped.
+static std::string json_quote(std::string_view s) {
+  std::string out;
+  out.reserve(s.size() + 2);
+  out += '"';
+  for (unsigned char c : s) {
+    switch (c) {
+      case '"': out += "\\\""; break;
+      case '\\': out += "\\\\"; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      case '\b': out += "\\b"; break;
+      case '\f': out += "\\f"; break;
+      default:
+        if (c < 0x20) {
+          static const char hex[] = "0123456789abcdef";
+          out += "\\u00"; out += hex[c >> 4]; out += hex[c & 15];
+        } else {
+          out += static_cast<char>(c);
+        }
+    }
+  }
+  out += '"';
+  return out;
+}
 
 using et = dom::element_type;
 
@@ -1527,7 +1793,7 @@ static void validate_node(const schema_node_ptr& node,
   }
 
   // enum — use pre-minified values (no re-parsing)
-  if (!node->enum_values_minified.empty()) {
+  if (node->has_enum) {
     std::string val_str = canonical_json(value);
     bool found = false;
     for (const auto& ev : node->enum_values_minified) {
@@ -1684,6 +1950,10 @@ static void validate_node(const schema_node_ptr& node,
     {
       uint64_t idx = 0;
       for (auto item : arr) {
+        // In first-error mode a failing item ends the walk here; every
+        // further item was still visited and given an error with its own
+        // copy of the path, memory a long key multiplied by the array.
+        if (!all_errors && !errors.empty()) break;
         if (idx < node->prefix_items.size()) {
           validate_node(node->prefix_items[idx], item,
                         path + "/" + std::to_string(idx), ctx, errors, all_errors, dynamic_scope);
@@ -1750,6 +2020,7 @@ static void validate_node(const schema_node_ptr& node,
 
     // properties + patternProperties + additionalProperties
     for (auto [key, val] : obj) {
+      if (!all_errors && !errors.empty()) break;
       std::string key_str(key);
       bool matched = false;
 
@@ -1786,6 +2057,17 @@ static void validate_node(const schema_node_ptr& node,
     // propertyNames — validate key as string directly when possible
     if (node->property_names_schema) {
       auto pn = node->property_names_schema;
+      if (pn->boolean_schema.has_value()) {
+        // `propertyNames: false` admits no name at all; it read as a string
+        // schema with no constraints and admitted every one.
+        if (!*pn->boolean_schema) {
+          for (auto [key, val] : obj) {
+            errors.push_back({error_code::additional_property_not_allowed, path,
+                              "propertyNames: no property name is allowed: " + std::string(key)});
+            if (!all_errors) break;
+          }
+        }
+      } else {
       bool string_only = pn->ref.empty() && pn->all_of.empty() &&
           pn->any_of.empty() && pn->one_of.empty() && !pn->not_schema &&
           !pn->if_schema && pn->enum_values_minified.empty() &&
@@ -1824,12 +2106,17 @@ static void validate_node(const schema_node_ptr& node,
       } else {
         // Fallback: parse key as JSON string element
         for (auto [key, val] : obj) {
-          std::string key_json = "\"" + std::string(key) + "\"";
+          std::string key_json = json_quote(key);
           auto key_result = tl_dom_key_parser().parse(key_json);
           if (!key_result.error()) {
             validate_node(pn, key_result.value_unsafe(), path, ctx, errors, all_errors, dynamic_scope);
+          } else {
+            errors.push_back({error_code::invalid_json, path,
+                              "propertyNames: property name could not be checked: " + std::string(key)});
           }
+          if (!all_errors && !errors.empty()) break;
         }
+      }
       }
     }
 
@@ -1975,7 +2262,7 @@ static bool validate_fast(const schema_node_ptr& node,
   }
 
   // enum
-  if (!node->enum_values_minified.empty()) {
+  if (node->has_enum) {
     auto val_str = canonical_json(value);
     bool found = false;
     for (const auto& ev : node->enum_values_minified) {
@@ -2117,6 +2404,15 @@ static bool validate_fast(const schema_node_ptr& node,
       }
     }
 
+    if (node->property_names_schema) {
+      auto pn = node->property_names_schema;
+      for (auto [key, val] : obj) {
+        if (pn->boolean_schema.has_value()) { if (!*pn->boolean_schema) return false; continue; }
+        auto kr = tl_dom_key_parser().parse(json_quote(key));
+        if (kr.error() || !validate_fast(pn, kr.value_unsafe(), ctx)) return false;
+      }
+    }
+
     for (const auto& [prop, deps] : node->dependent_required) {
       dom::element d;
       if (obj[prop].get(d) == SUCCESS) {
@@ -2181,13 +2477,20 @@ static void cg_compile(const schema_node* n, cg::plan& p,
                         std::vector<cg::ins>& out) {
   if (!n) return;
   if (n->boolean_schema.has_value()) {
-    if (!*n->boolean_schema) out.push_back({cg::op::EXPECT_NULL});
+    // A false schema rejects everything. It was lowered to EXPECT_NULL,
+    // which accepted null.
+    if (!*n->boolean_schema) out.push_back({cg::op::FAIL});
     return;
   }
-  // Composition fallback
+  if (n->has_enum && n->enum_values_minified.empty()) { out.push_back({cg::op::FAIL}); return; }
+  // Composition fallback. A count above what the 32-bit operand holds goes
+  // the same way: narrowing it wrapped minItems 4294967296 to 0.
+  auto wide = [](const std::optional<uint64_t>& o) { return o.has_value() && *o > 0xFFFFFFFFull; };
   if (!n->ref.empty() || !n->dynamic_ref.empty() || !n->all_of.empty() ||
       !n->any_of.empty() || !n->one_of.empty() || n->not_schema ||
-      n->if_schema) {
+      n->if_schema ||
+      wide(n->min_length) || wide(n->max_length) || wide(n->min_items) ||
+      wide(n->max_items) || wide(n->min_properties) || wide(n->max_properties)) {
     uintptr_t ptr = reinterpret_cast<uintptr_t>(n);
     out.push_back({cg::op::COMPOSITION, (uint32_t)(ptr & 0xFFFFFFFF),
                    (uint32_t)((ptr >> 32) & 0xFFFFFFFF)});
@@ -2369,6 +2672,7 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
       break;
     }
     case cg::op::CHECK_CONST: if(canonical_json(value)!=p.strings[c.a])return false; break;
+    case cg::op::FAIL: return false;
     case cg::op::COMPOSITION:
       if (undecidable) *undecidable = true;
       return false; // fallback to tree walker
@@ -2406,6 +2710,11 @@ static json_type od_type(simdjson::ondemand::value& v) {
   return json_type::string;
 }
 
+// Reads a value no check looks at, so that what the plan skips is still
+// checked to be JSON. On Demand's first stage finds the structure and
+// validates nothing inside a value nobody reads: `tru`, `01.2.3` or a bad
+// escape in a member the schema does not mention passed as valid, where
+// the JavaScript path, which parses the whole text, rejects them.
 static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
                      simdjson::ondemand::value value) {
   auto t = od_type(value);
@@ -2493,7 +2802,8 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
       for(auto field:o){
         simdjson::ondemand::raw_json_string rk; if(field.key().get(rk)!=SUCCESS) return false;
         std::string_view key;
-        if (field.unescaped_key().get(key)) continue;
+        // A key that does not unescape is not JSON; it was skipped as if absent.
+        if (field.unescaped_key().get(key)) return false;
         bool matched=false;
         for(auto& pp:props){
           if(key==pp.nm){
@@ -2514,6 +2824,7 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::CHECK_ENUM:
     case cg::op::CHECK_CONST:
     case cg::op::COMPOSITION:
+    case cg::op::FAIL:
       return false;
     }
   }
@@ -2522,6 +2833,13 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
 
 // Determine if a codegen plan can use On Demand (no enum/const/uniqueItems)
 static bool plan_supports_ondemand(const cg::plan& p) {
+  // Property names are matched against raw key bytes on this path
+  // (find_field_unordered), which is right only when a name is spelled the
+  // same escaped and unescaped. Strings here are otherwise only read by
+  // opcodes that already decline On Demand.
+  for (auto& str : p.strings)
+    for (unsigned char ch : str)
+      if (ch == '"' || ch == '\\' || ch < 0x20) return false;
   for (auto& c : p.code) {
     if (c.o == cg::op::CHECK_UNIQUE_ITEMS || c.o == cg::op::CHECK_ENUM_STR ||
         c.o == cg::op::CHECK_ENUM || c.o == cg::op::CHECK_CONST ||
@@ -2658,8 +2976,11 @@ static od_plan_ptr compile_od_plan(const schema_node_ptr& node) {
     return plan;
   }
 
-  // Unsupported features → fall back to DOM
-  if (!node->ref.empty() ||
+  // Unsupported features → fall back to DOM. $dynamicRef was missing from
+  // this list, so the plan answered without resolving it; more than 64
+  // required names overflowed the bitmask that tracks them.
+  if (!node->ref.empty() || !node->dynamic_ref.empty() ||
+      node->required.size() > 64 ||
       node->const_value_raw.has_value() ||
       node->unique_items ||
       !node->all_of.empty() ||
@@ -2677,9 +2998,20 @@ static od_plan_ptr compile_od_plan(const schema_node_ptr& node) {
     plan->supported = false;
     return plan;
   }
+  // The object plan compares raw key bytes with the decoded schema names
+  // (raw_json_string::unsafe_is_equal), which is only right when the two
+  // spellings are the same: a name with a quote, a backslash or a control
+  // character is left to the DOM path.
+  auto plain = [](const std::string& k) {
+    for (unsigned char c : k) if (c == '"' || c == '\\' || c < 0x20) return false;
+    return true;
+  };
+  for (const auto& r : node->required) if (!plain(r)) { plan->supported = false; return plan; }
+  for (const auto& kv : node->properties) if (!plain(kv.first)) { plan->supported = false; return plan; }
 
   // Enum: handle primitive enums on the on-demand path. Complex enum values
   // (objects, arrays, escaped strings) fall back to DOM.
+  if (node->has_enum && node->enum_values_minified.empty()) { plan->supported = false; return plan; }
   if (!node->enum_values_minified.empty()) {
     auto ec = std::make_shared<od_plan::enum_constraint>();
     for (const auto& ev : node->enum_values_minified) {
@@ -2981,6 +3313,8 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
     break;
   }
   case sjt::object: {
+    // The plan's enum holds primitives only, so a container never matches.
+    if (plan.enum_check) return false;
     if (!plan.object) break;
     auto& op = *plan.object;
     simdjson::ondemand::object obj;
@@ -2994,7 +3328,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
       // skipping the unescape pass. Schema keys are assumed to have no
       // unescaped quotes (true for any well-formed JSON Schema).
       simdjson::ondemand::raw_json_string raw_key;
-      if (field.key().get(raw_key) != SUCCESS) continue;
+      if (field.key().get(raw_key) != SUCCESS) return false;
       prop_count++;
 
       bool matched = false;
@@ -3148,6 +3482,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
     break;
   }
   case sjt::array: {
+    if (plan.enum_check) return false;
     if (!plan.array) break;
     auto& ap = *plan.array;
     simdjson::ondemand::array arr;
@@ -3183,7 +3518,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
   return true;
 }
 
-schema_ref compile(std::string_view schema_json) {
+static schema_ref compile_unguarded(std::string_view schema_json) {
   auto ctx = std::make_shared<compiled_schema>();
   ctx->raw_schema = std::string(schema_json);
 
@@ -3213,8 +3548,8 @@ schema_ref compile(std::string_view schema_json) {
   return ref;
 }
 
-validation_result validate(const schema_ref& schema, std::string_view json,
-                           const validate_options& opts) {
+static validation_result validate_unguarded(const schema_ref& schema, std::string_view json,
+                                            const validate_options& opts) {
   if (!schema.impl || !schema.impl->root) {
     return {false, {{error_code::invalid_schema, "", "schema not compiled"}}};
   }
@@ -3381,5 +3716,31 @@ bool is_valid_buf(const schema_ref& schema, const uint8_t* data, size_t length) 
 
   return is_valid_prepadded(schema, tl_buf.data(), length);
 }
+
+// compile() and validate() are a boundary for exceptions: the Node binding
+// calls them from raw N-API callbacks that have no handler, so an exception
+// took the process down (a $ref pointer segment std::stoul could not read,
+// now parsed without throwing). The verdict-only path is left unwrapped: the
+// wrapper cost it a few percent and nothing on it throws any more.
+schema_ref compile(std::string_view schema_json) {
+  try { return compile_unguarded(schema_json); }
+  catch (...) { return schema_ref{nullptr}; }
+}
+
+validation_result validate(const schema_ref& schema, std::string_view json,
+                           const validate_options& opts) {
+  try { return validate_unguarded(schema, json, opts); }
+  catch (const std::exception& e) {
+    return {false, {{error_code::invalid_schema, "", std::string("native validation failed: ") + e.what()}}};
+  } catch (...) {
+    return {false, {{error_code::invalid_schema, "", "native validation failed"}}};
+  }
+}
+
+// The Node binding keeps its own copy of schema_node and reads compiled
+// schemas through it, so the two layouts must match. It compares this size
+// with its copy's when it loads and refuses to run on a mismatch, which is a
+// crash otherwise (a field added on one side only did that).
+size_t schema_node_layout_size() { return sizeof(schema_node); }
 
 }  // namespace ata

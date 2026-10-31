@@ -152,7 +152,19 @@ const esbuild = require('esbuild')
 // stays on it: 86 to 70 ns a valid document on Node's interpreted engine, and
 // under Bun's ahead-of-time compiler 78 to 48. 85 bytes for this, 113 over
 // 1.61.1 (57715) with the "aot" entry's mark in the core.
-const BUDGET = 57900
+// 58800 (58722 measured): fixes from an outside scan, each with its test.
+// The regular expression compiler caps its program and refuses escapes it
+// would have read as literals (lib/safe-regex.js); the defaults pass keeps
+// a visited set against repeated $refs, resolves a $ref inside an embedded
+// $id against that resource, and matches patternProperties keys on the
+// linear engine (lib/defaults.js); uniqueItems hashes every bit of a number
+// (lib/unique-items.js); a long line's dataFrame is an excerpt
+// (lib/data-positions.js); long error lists sort stably (lib/rejections.js);
+// format lookups read own properties only (lib/tier0.js,
+// lib/interpreter-core.js); coercion and removal stay off inherited objects
+// (lib/validator-core.js). The native engine's setup moved out to
+// lib/native-attach.js, which the browser build maps to a stub.
+const BUDGET = 58800
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

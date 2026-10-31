@@ -101,6 +101,35 @@ const ok = (name, cond) => { assert.strictEqual(cond, true, name); checks++ }
   ok('the top level can be renamed', describeSchema({ type: 'string' }, { name: 'answer' }) === 'answer: string')
   const deep = (n) => (n === 0 ? { type: 'string' } : { type: 'object', properties: { x: deep(n - 1) } })
   ok('deep nesting terminates', typeof describeSchema(deep(40)) === 'string')
+
+  // An allOf that reaches its own schema merged the copy back in, allOf and
+  // all, and recursed until the stack ran out (RangeError).
+  let selfRef = null
+  try {
+    selfRef = describeSchema({ $ref: '#/$defs/A', $defs: { A: { type: 'object', allOf: [{ $ref: '#/$defs/A' }], properties: { a: { type: 'string' } } } } })
+  } catch (e) { selfRef = e.constructor.name + ': ' + e.message }
+  ok('an allOf that reaches itself is merged once', /a \(optional\): string/.test(selfRef))
+  const mutual = describeSchema({ $ref: '#/$defs/A', $defs: {
+    A: { allOf: [{ $ref: '#/$defs/B' }], properties: { a: { type: 'string' } } },
+    B: { allOf: [{ $ref: '#/$defs/A' }], properties: { b: { type: 'number' } } },
+  } })
+  ok('allOf through two definitions is merged once', /a \(optional\): string/.test(mutual) && /b \(optional\): number/.test(mutual))
+  ok('a reference to itself describes any', describeSchema({ $ref: '#/$defs/A', $defs: { A: { $ref: '#/$defs/A' } } }) === 'output: any')
+
+  // anyOf layers whose branches point at the same next definition describe
+  // width^layers lines: 4 wide and 12 deep is 16 million. The description
+  // stops at 2000 lines and says so.
+  const layered = (layers, k) => {
+    const defs = { n0: { type: 'object', properties: { a: { type: 'string' } } } }
+    for (let i = 1; i <= layers; i++) defs['n' + i] = { anyOf: Array.from({ length: k }, () => ({ $ref: '#/$defs/n' + (i - 1) })) }
+    return { $ref: '#/$defs/n' + layers, $defs: defs }
+  }
+  const t0 = Date.now()
+  const wide = describeSchema(layered(12, 4))
+  const ms = Date.now() - t0
+  const n = wide.split('\n').length
+  ok(`a description past 2000 lines is cut (${n} lines, ${ms} ms)`, n <= 2001 && ms < 2000 && /cut at 2000 lines/.test(wide.split('\n').pop()))
+  ok('a small one is not cut', !/cut at/.test(describeSchema(layered(3, 2))))
 }
 
 console.log(`describe schema: ${checks} checks passed`)

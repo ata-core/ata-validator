@@ -176,6 +176,41 @@ const tests = [
     assert(bad.length === 0, `${bad.length} differences, first:\n${bad.slice(0, 3).join('\n')}`);
   }],
 
+  ['the runtime keeps the pattern engine for a pattern that lives only in a registered schema', () => {
+    // The parts a runtime carries are decided on the schemas it is built for.
+    // A pattern reached through `schemas` (the registry) only was not seen
+    // when the validator had not compiled yet, so the runtime left the engine
+    // out and the module matched on the platform RegExp: ^(a+)+$ on 28 a's
+    // and a '!' took a second. And a module whose runtime lacks the engine
+    // fails loudly rather than falling back to that RegExp.
+    const dir = tmpDir();
+    const ext = { $id: 'https://x.test/ext', type: 'string', pattern: '^(a+)+$' };
+    const root = { $id: 'https://x.test/root', type: 'object', properties: { s: { $ref: 'https://x.test/ext' } } };
+    const v = new Validator(root, { schemas: [ext] });
+    const rt = aot.errorRuntimeSource('cjs', [v], true);
+    assert(!rt.includes("throw new Error('ata error runtime: built without the pattern engine')"), 'the runtime carries the pattern engine before the validator compiled');
+    fs.writeFileSync(path.join(dir, 'ata-schema.cjs'), rt);
+    fs.writeFileSync(path.join(dir, 'registry.cjs'), aot.registrySource([v, ext], 'cjs'));
+    const src = aot.toSchemaModule(v, { format: 'cjs', runtime: './ata-schema.cjs', registry: './registry.cjs' });
+    assert(src, 'schema module emitted: ' + aot.compactDecline(v, true));
+    fs.writeFileSync(path.join(dir, 'm.cjs'), src);
+    const m = require(path.join(dir, 'm.cjs'));
+    assert(m.isValid({ s: 'aaa' }) === true && m.isValid({ s: 'b' }) === false, 'answers');
+    const t0 = Date.now();
+    assert(m.isValid({ s: 'a'.repeat(28) + '!' }) === false, 'rejects');
+    const ms = Date.now() - t0;
+    assert(ms < 100, `linear on the hostile input: ${ms} ms`);
+
+    // A runtime built for schemas without a pattern, handed a module with one.
+    fs.writeFileSync(path.join(dir, 'ata-trimmed.cjs'), aot.errorRuntimeSource('cjs', [new Validator({ type: 'string' })], true));
+    const plain = new Validator({ type: 'string', pattern: '^(a+)+$' });
+    fs.writeFileSync(path.join(dir, 'p.cjs'), aot.toSchemaModule(plain, { format: 'cjs', runtime: './ata-trimmed.cjs' }));
+    const p = require(path.join(dir, 'p.cjs'));
+    let threw = null;
+    try { p.isValid('aaa'); } catch (e) { threw = e.message; }
+    assert(threw !== null && threw.includes('built without the pattern engine'), 'a trimmed runtime fails loudly: ' + threw);
+  }],
+
   ['ata build --mode schema writes schema modules and one runtime', async () => {
     const dir = tmpDir();
     fs.writeFileSync(path.join(dir, 'a.schema.json'), J({ type: 'object', properties: { id: { type: 'integer' }, tag: { type: 'string', pattern: '^[a-z]+$' } }, required: ['id'] }));

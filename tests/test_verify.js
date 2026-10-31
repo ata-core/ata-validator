@@ -12,6 +12,42 @@ const { execFileSync, spawnSync } = require('child_process')
 const { generate, mutate, verifyOne, ok } = require('../lib/verify')
 const { Validator } = require('..')
 
+// The generator on schemas that ask for a lot. A long minLength was padded
+// one character at a time with the whole string spread per character (32 s
+// for 100000); nested minItems made minItems^depth values and ran out of
+// memory at 20^6; a pattern the generator tries candidates against ran on the
+// platform RegExp, which backtracks.
+{
+  let t0 = Date.now()
+  const long = generate({ type: 'string', minLength: 100000 }, 1, 1)
+  assert.strictEqual([...long[0]].length, 100000)
+  const longMax = generate({ type: 'string', maxLength: 2, minLength: 0 }, 1, 1)
+  assert.ok([...longMax[0]].length <= 2)
+  let ms = Date.now() - t0
+  assert.ok(ms < 500, `minLength 100000 took ${ms} ms`)
+
+  let deep = { type: 'integer' }
+  for (let i = 0; i < 6; i++) deep = { type: 'array', minItems: 20, items: deep }
+  t0 = Date.now()
+  assert.throws(() => generate(deep, 2, 1, null), /100000/, 'a document past the budget is refused with the budget in the message')
+  ms = Date.now() - t0
+  assert.ok(ms < 2000, `the budget stops the walk: ${ms} ms`)
+  let shallow = { type: 'integer' }
+  for (let i = 0; i < 3; i++) shallow = { type: 'array', minItems: 10, items: shallow }
+  assert.strictEqual(generate(shallow, 1, 1, null)[0].length, 10, 'a document within the budget is made whole')
+
+  t0 = Date.now()
+  for (const pattern of ['^(((a+)+)+)+b$', '^(a|a?)+b$', '^(a*)*b$']) {
+    const docs = generate({ type: 'string', pattern }, 4, 1, null)
+    assert.ok(docs.length >= 4 && typeof docs[0] === 'string' && typeof docs[2] === 'string', 'odd documents are mutations and may change type')
+  }
+  ms = Date.now() - t0
+  assert.ok(ms < 500, `candidates against backtracking patterns took ${ms} ms`)
+  // A pattern the linear engine takes still steers the candidates.
+  const hex = generate({ type: 'string', pattern: '^#[0-9a-f]{6}$' }, 2, 1, null)
+  assert.strictEqual(hex[0], '#a1b2c3')
+}
+
 const order = {
   type: 'object',
   required: ['customer', 'items'],

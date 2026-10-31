@@ -88,7 +88,9 @@ function sampleChar (leaf) {
 }
 function probesFor (p) {
   const out = ['a'.repeat(20000) + '\u0000']
-  const ls = leaves(p).slice(0, 6).map(sampleChar)
+  // The leaves come from the linear engine's parser, which does not read a
+  // property escape; such a pattern gets runs of letters, digits and marks.
+  const ls = /\\[pP]\{/.test(p) ? ['a', '1', '\u00e9', ' '] : leaves(p).slice(0, 6).map(sampleChar)
   for (const ch of ls) out.push(ch.repeat(20000) + '\u0000')
   if (ls.length >= 2) {
     out.push((ls[0] + ls[1]).repeat(10000) + '\u0000')
@@ -102,11 +104,16 @@ let accepted = 0, compared = 0
 for (const p of patterns) {
   if (!nativeIsLinear(p)) continue
   accepted++
-  const safe = compileSafe(p)
-  const native = new RegExp(p)
-  for (const x of inputsFor(p)) {
-    assert.strictEqual(native.test(x), safe.test(x), `${JSON.stringify(p)} on ${JSON.stringify(x)}`)
-    compared++
+  // A pattern with a Unicode property escape has no linear engine to agree
+  // with and runs with the unicode flag; it is held to the time bound only.
+  const prop = /\\[pP]\{/.test(p)
+  const native = new RegExp(p, prop ? 'u' : '')
+  if (!prop) {
+    const safe = compileSafe(p)
+    for (const x of inputsFor(p)) {
+      assert.strictEqual(native.test(x), safe.test(x), `${JSON.stringify(p)} on ${JSON.stringify(x)}`)
+      compared++
+    }
   }
   // Linear on long inputs made of what the pattern accepts, with a failing
   // last character, which is what makes a backtracking engine retry: a run
@@ -132,6 +139,46 @@ for (const p of ['(a+)+$', '^(a+)+$', '^(a|aa)+$', '^a+a+$', '^a*a*$', 'a+b', '^
 // And the deterministic rule takes what the simple one cannot.
 for (const p of ['^[^/]+/[^/]+$', '^\\d+(\\.\\d+)*$', '^(?:ab)*$', '^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$', '^(a|b)*c$']) {
   assert.strictEqual(nativeIsLinear(p), true, p)
+}
+
+// Unicode property escapes read as one class under the u flag: exact on
+// ASCII, which the platform answers for each character, and everything above
+// it. A linear pattern that uses them keeps the platform RegExp; one that
+// nests a loop around them is declined, and the generators then hand the
+// schema to the interpreted engine instead of running the pattern as
+// written, where `^(\p{L}+)+$` on 28 letters and a '!' took a second.
+for (const p of ['^\\p{L}+$', '^[\\p{L}\\d]+$', '^\\p{Lu}\\p{Ll}*$', '^\\P{N}+$', '^(?:\\p{L}+-)*\\p{L}+$', '^\\p{L}+\\d+$', '^[^\\p{L}]+$',
+  // Unanchored and ending in a loop over one class: the loop never gives
+  // anything back, since the match succeeds when it stops.
+  '\\p{L}+', 'x\\p{L}*', '[\\p{L}\\d]+']) {
+  assert.strictEqual(nativeIsLinear(p), true, p)
+}
+for (const p of ['^(\\p{L}+)+$', '^(\\p{L}|\\p{Ll})*x$', '(\\p{L}+)+$', '^\\p{L}+\\p{L}+$', '^\\p{L}+\\w+$', '\\p{', '^\\p{Nope}$', '^(\\p{L}+\\s?)*$',
+  // Inside a negated class the escape takes characters away. These classes
+  // share no ASCII character, yet both match a run of euro signs, which
+  // takes the platform RegExp seconds on 20000 of them.
+  '^[^\\p{L}\\x00-\\x7f]*[^\\p{N}\\x00-\\x7f]*$', '^[^\\p{L}\\x00-\\x2f]*[^\\p{L}\\x30-\\x7f]*$']) {
+  assert.strictEqual(nativeIsLinear(p), false, p)
+}
+{
+  const { Validator } = require('..')
+  const { compileToJSCodegen, compileToJSCodegenWithErrors, compileToJSCombined } = require('../lib/js-compiler')
+  const VALID = { valid: true, errors: [] }
+  const docs = ['ab', 'ab1', '', 'éè', 'a!', { ab: 1 }, { ab: 'x' }, { a1: 1 }, { 'é': 2 }]
+  for (const [p, engine] of [['^\\p{L}+$', 'codegen'], ['\\p{L}+', 'codegen'], ['^(\\p{L}+)+$', 'interpreter'], ['^(\\p{L}+\\s?)*$', 'interpreter']]) {
+    for (const schema of [{ type: 'string', pattern: p }, { type: 'object', patternProperties: { [p]: { type: 'number' } } }, { type: 'object', propertyNames: { pattern: p } }, { type: 'object', properties: { a: { allOf: [{ pattern: p }] } } }]) {
+      const label = `${p} in ${JSON.stringify(schema)}`
+      const v = new Validator(schema)
+      v.validate('ab')
+      assert.strictEqual(v.engine(), engine, `${label}: engine`)
+      const declined = engine === 'interpreter'
+      assert.strictEqual(compileToJSCodegen(schema, null, undefined) === null, declined, `${label}: compileToJSCodegen`)
+      assert.strictEqual(compileToJSCodegenWithErrors(schema, null, undefined) === null, declined, `${label}: compileToJSCodegenWithErrors`)
+      assert.strictEqual(compileToJSCombined(schema, VALID, null, undefined) === null, declined, `${label}: compileToJSCombined`)
+      const ref = new Validator(schema, { engine: 'interpreter' })
+      for (const d of docs) assert.strictEqual(v.validate(d).valid, ref.validate(d).valid, `${label} on ${JSON.stringify(d)}`)
+    }
+  }
 }
 
 assert.ok(accepted >= 30, `only ${accepted} patterns compared`)

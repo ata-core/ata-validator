@@ -56,6 +56,14 @@ for (const options of [{ coerceTypes: true }, { useDefaults: true }, { removeAdd
     optionCases++
   }
 }
+// createPaddedBuffer takes text or bytes. An array-like with a declared
+// length used to allocate that many bytes: {length: 5e8} reserved 500 MB.
+assert.throws(() => createPaddedBuffer({ length: 1e8 }), TypeError)
+assert.throws(() => createPaddedBuffer(12), TypeError)
+assert.throws(() => createPaddedBuffer(null), TypeError)
+assert.strictEqual(createPaddedBuffer('{"a":1}').length, 7)
+assert.strictEqual(createPaddedBuffer(Buffer.from('{"a":1}')).length, 7)
+assert.strictEqual(createPaddedBuffer(new Uint8Array([123, 125])).length, 2)
 assert.ok(cases > 1000, 'only ' + cases + ' cases')
 console.log('ok: without the native addon the buffer APIs agree with validate() on ' + cases + ' suite cases over ' + schemas + ' schemas and ' + optionCases + ' cases under coercion, defaults, removal and a custom keyword')
 `

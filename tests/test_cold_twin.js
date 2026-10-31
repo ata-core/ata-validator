@@ -60,4 +60,34 @@ const shape = (r) => JSON.stringify({ valid: r.valid, errors: (r.errors || []).m
   assert.strictEqual(v.validate({ reject: true }).valid, false, 'the extension applies from the first call')
   assert.ok(!v._twin)
 }
+// The twin reads the live registry. It used to be built from the constructor
+// options alone, so a schema registered with addSchema() after construction
+// was unknown to it: the first 64 calls answered against the schema given at
+// construction and the answer flipped once the generated code took over.
+{
+  const props = {}
+  for (let i = 0; i < 500; i++) props['p' + i] = { type: 'string', minLength: 1, maxLength: 50, pattern: '^[a-z]+$' }
+  const root = { type: 'object', properties: Object.assign({ v: { $ref: 'http://x/a' } }, props), required: ['v'] }
+  const loose = { $id: 'http://x/a', type: ['number', 'string'] }
+  const strict = { $id: 'http://x/a', type: 'number' }
+  const doc = { v: 'str' }
+  const expect = new Validator(root, { schemas: [strict] }).validate(doc).valid
+  assert.strictEqual(expect, false, 'the stricter definition rejects the string')
+  // registered before the first call
+  const a = new Validator(root, { schemas: [loose] })
+  a.addSchema(strict)
+  const seen = []
+  for (let i = 0; i < 80; i++) seen.push(a.validate(doc).valid)
+  assert.ok(a._twin, 'the twin answered the first calls')
+  assert.deepStrictEqual([...new Set(seen)], [false], 'every call, twin and generated code alike, sees the registered schema')
+  // registered after a call the twin answered
+  const b = new Validator(root, { schemas: [loose] })
+  assert.strictEqual(b.validate(doc).valid, true, 'the loose definition accepts the string')
+  b.addSchema(strict)
+  const after = []
+  for (let i = 0; i < 80; i++) after.push(b.validate(doc).valid)
+  assert.deepStrictEqual([...new Set(after)], [false], 'the twin is rebuilt once the registry changes')
+  assert.strictEqual(new Validator(root, { schemas: [loose] }).isValidObject(doc), true, 'other instances are not affected')
+}
+
 console.log('ok: a large schema starts on its interpreted twin with the same answers, and compiles once it stays in use')

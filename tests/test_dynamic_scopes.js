@@ -100,4 +100,45 @@ assert.ok(dynamicOnCodegen >= dynamicGroups - 1, `expected every dynamic group b
   assert.strictEqual(v.validate({ child: { child: 1 } }).valid, false)
   assert.strictEqual(v.validate({ child: { child: {} } }).valid, true)
 }
+// Layers where two embedded resources, each with its own $id and
+// $dynamicAnchor, both apply the next layer, with one $dynamicRef at the
+// bottom. The unrolling hands both places the same copy of the next layer,
+// and the shared-definition count saw one reference where there were two,
+// so every layer was written out twice: 2^n code, and at 16 layers (4.1 KB of
+// schema) a verdict function too large for the stack threw a RangeError out
+// of validate(). Each layer is now one function in the preamble.
+{
+  function build (n) {
+    const defs = {}
+    for (let i = 0; i < n; i++) {
+      const next = i + 1 < n ? { $ref: 'https://x.test/root#/$defs/l' + (i + 1) } : { $dynamicRef: '#dyn' }
+      defs['l' + i] = { type: 'object', properties: {
+        a: { $id: 'https://x.test/a' + i, $dynamicAnchor: 'dyn', allOf: [next] },
+        b: { $id: 'https://x.test/b' + i, $dynamicAnchor: 'dyn', allOf: [next] },
+      } }
+    }
+    return { $schema: 'https://json-schema.org/draft/2020-12/schema', $id: 'https://x.test/root', $dynamicAnchor: 'dyn', $ref: '#/$defs/l0', $defs: defs }
+  }
+  const nest = (depth, leaf) => { let d = leaf; for (let i = 0; i < depth; i++) d = i % 2 ? { a: d } : { b: d, a: {} }; return d }
+  for (const n of [3, 8, 16, 24]) {
+    const schema = build(n)
+    const t = process.hrtime.bigint()
+    const v = new Validator(schema)
+    const ref = new Validator(schema, { engine: 'interpreter' })
+    const docs = ['x', 1, {}, [], null, { a: 1 }, { a: { b: 'x' } }]
+    for (const depth of [n - 1, n, n + 1, n + 2, 2 * n + 1]) for (const leaf of [1, {}, { a: 1 }]) docs.push(nest(depth, leaf))
+    for (const d of docs) {
+      assert.strictEqual(v.validate(d).valid, ref.validate(d).valid, `${n} layers on ${JSON.stringify(d)}`)
+      assert.strictEqual(v.isValidObject(d), ref.validate(d).valid, `${n} layers, isValidObject on ${JSON.stringify(d)}`)
+    }
+    const ms = Number(process.hrtime.bigint() - t) / 1e6
+    assert.strictEqual(v.engine(), 'codegen', `${n} layers: engine`)
+    assert.ok(ms < 1500, `${n} layers took ${ms.toFixed(0)} ms`)
+  }
+  // The unrolling itself keeps a budget of copies; past it, it declines.
+  const wide = { $id: 'https://x.test/w', $dynamicAnchor: 'dyn', type: 'object', properties: {} }
+  for (let i = 0; i < 5000; i++) wide.properties['p' + i] = { $id: 'https://x.test/w' + i, $dynamicAnchor: 'dyn', properties: { x: { $dynamicRef: '#dyn' } } }
+  assert.strictEqual(jc._expandDynamicScopes(wide, null), null, 'past the copy budget the unrolling declines')
+  console.log('ok: a definition applied from two places in each of 24 layers compiles once per layer')
+}
 console.log(`ok: $dynamicRef schemas unrolled by scope agree with the interpreter (${groups} groups, ${onCodegen} on generated code, ${compared} documents); the 2020-12 meta-schema runs on generated code`)

@@ -109,4 +109,40 @@ const schema = {
   assert.deepStrictEqual(keys(w.validate({ 'a/b': 'x', 'c~d': 'y' }).issues), [['a/b'], ['c~d']], 'escaped segments are unescaped');
 }
 
+// Sorting a long list is not quadratic. Every element reports `b` before
+// `a` (data order, as the document has them), and the list is put in declaration order with a stable
+// insertion sort that took seconds on tens of thousands of errors. The
+// rank sort the shared error runtime uses is held to the same.
+{
+  const { sortErrorsByRank } = require('../lib/error-sort-rank');
+  const s = { type: 'array', items: { type: 'object', properties: { a: { type: 'string' }, b: { type: 'string' } } } };
+  const docOf = (n) => { const d = []; for (let i = 0; i < n; i++) d.push({ b: 1, a: 1 }); return d; };
+  const timed = (fn) => { const t0 = process.hrtime.bigint(); const r = fn(); return [Number(process.hrtime.bigint() - t0) / 1e6, r]; };
+  for (const engine of [undefined, 'interpreter']) {
+    const v = new Validator(s, { engine });
+    v.validate(docOf(2)).errors;
+    const run = (n) => {
+      const r = v.validate(docOf(n));
+      const [ms, errs] = timed(() => r.errors);
+      assert.strictEqual(errs.length, 2 * n);
+      // Stable: every `a` first, in data order, then every `b`.
+      for (let i = 0; i < n; i++) {
+        assert.strictEqual(errs[i].instancePath, '/' + i + '/a');
+        assert.strictEqual(errs[n + i].instancePath, '/' + i + '/b');
+      }
+      return ms;
+    };
+    const small = Math.max(run(4000), 2);
+    const large = run(16000);
+    assert.ok(large / small < 10, `${engine || 'codegen'}: 32000 errors read in ${large.toFixed(0)} ms against ${small.toFixed(0)} ms for 8000`);
+  }
+  const raw = (n) => { const out = []; for (let i = 0; i < n; i++) out.push({ schemaPath: '#/items/properties/b/type', instancePath: '/' + i + '/b' }, { schemaPath: '#/items/properties/a/type', instancePath: '/' + i + '/a' }); return out; };
+  const [tSmall] = timed(() => sortErrorsByRank(s, raw(4000)));
+  const [tLarge, sorted] = timed(() => sortErrorsByRank(s, raw(16000)));
+  assert.strictEqual(sorted[0].instancePath, '/0/a');
+  assert.strictEqual(sorted[16000].instancePath, '/0/b', 'stable: all of a first, in data order, then all of b');
+  assert.strictEqual(sorted[16001].instancePath, '/1/b');
+  assert.ok(tLarge / Math.max(tSmall, 2) < 10, `rank sort: ${tLarge.toFixed(0)} ms for 32000 against ${tSmall.toFixed(0)} ms for 8000`);
+}
+
 console.log('ok: declaration order by compile-time ordinal, issue paths cached');

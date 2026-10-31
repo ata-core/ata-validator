@@ -1,12 +1,16 @@
 // Serves ./web, opens csp.html in a fresh headless Chrome and returns the
 // page's RESULT line. The CSP meta blocks eval and new Function; the page
 // reports that itself.
-import { createServer } from 'node:http'; import { readFile, mkdtemp, rm } from 'node:fs/promises'; import { spawn } from 'node:child_process'; import { tmpdir } from 'node:os'; import { join } from 'node:path'
+import { createServer } from 'node:http'; import { readFile, readdir, mkdtemp, rm } from 'node:fs/promises'; import { spawn } from 'node:child_process'; import { tmpdir } from 'node:os'; import { join } from 'node:path'
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const root = new URL('./web/', import.meta.url).pathname
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json' }
-const srv = createServer(async (q, s) => { try { const p = join(root, decodeURIComponent(new URL(q.url, 'http://x').pathname)); const b = await readFile(p); s.writeHead(200, { 'content-type': types[p.slice(p.lastIndexOf('.'))] || 'application/octet-stream' }); s.end(b) } catch { s.writeHead(404); s.end() } })
-await new Promise((r) => srv.listen(0, r)); const port = srv.address().port
+// Only the files in ./web, by name, and only on the loopback address. The
+// path was joined from the request as given, so '/%2e%2e/...' read any file
+// the user could, on every interface, while the run lasted.
+const served = new Set((await readdir(root, { withFileTypes: true })).filter((e) => e.isFile()).map((e) => '/' + e.name))
+const srv = createServer(async (q, s) => { try { const u = new URL(q.url, 'http://x').pathname; if (!served.has(u)) throw new Error('not served'); const b = await readFile(join(root, u.slice(1))); s.writeHead(200, { 'content-type': types[u.slice(u.lastIndexOf('.'))] || 'application/octet-stream' }); s.end(b) } catch { s.writeHead(404); s.end() } })
+await new Promise((r) => srv.listen(0, '127.0.0.1', r)); const port = srv.address().port
 const dir = await mkdtemp(join(tmpdir(), 'ata-proof-'))
 const ch = spawn(CHROME, ['--headless=new', `--user-data-dir=${dir}`, '--no-first-run', '--disable-extensions', '--remote-debugging-port=0', 'about:blank'])
 let buf = ''
@@ -21,7 +25,7 @@ const result = await new Promise((resolve, reject) => {
       ws.onmessage = (ev) => { const msg = JSON.parse(ev.data); if (msg.id && pend.has(msg.id)) { pend.get(msg.id)(msg.result); pend.delete(msg.id) } }
       const send = (method, params = {}) => new Promise((r) => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })) })
       await new Promise((r) => (ws.onopen = r))
-      await send('Page.navigate', { url: `http://localhost:${port}/csp.html` })
+      await send('Page.navigate', { url: `http://127.0.0.1:${port}/csp.html` })
       for (let k = 0; k < 400; k++) {
         const r = await send('Runtime.evaluate', { expression: 'document.body && document.body.textContent', returnByValue: true })
         const t = r && r.result && r.result.value

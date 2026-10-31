@@ -249,6 +249,12 @@ const tagged = (s, opts) => schemaToBunType(s, { ...opts, tags: true })
   assert.ok(src.includes('return _m.isValid(d) ? d : null'))
   const withAlias = toBunModule({ schemaFile: 'x.json', moduleImport: './x.compiled.mjs', typeName: 'List', typeSource: 'Node', aliases: [['Node', '{ "v": number; "next"?: Node }']] })
   assert.ok(withAlias.includes('type Node = { "v": number; "next"?: Node }\nexport type List = Node'))
+  // The schema file name and the import go into // comments. A line break in
+  // either ended the comment and made the rest of the name source.
+  const forged = toBunModule({ schemaFile: 's.json\nglobalThis.__ataBun = 1\n//', moduleImport: './m.js\u2028globalThis.__ataBun = 2\n//', typeName: 'T', typeSource: '{ a: string }', aliases: [] })
+  for (const line of forged.split(/\r\n|[\n\r\u2028\u2029]/)) assert.ok(/^(\/\/|import |export |type |  |\}|$)/.test(line), 'every line is a comment or a declaration: ' + JSON.stringify(line))
+  assert.ok(!/^globalThis/m.test(forged))
+  assert.ok(forged.includes('import * as _m from "./m.js\\u2028globalThis.__ataBun = 2\\n//"'), 'the import specifier is a JSON string')
   // The module runs as TypeScript strips it: the answers are the plain module's.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-bun-module-'))
   const { Validator } = require('..')
@@ -314,6 +320,31 @@ const tagged = (s, opts) => schemaToBunType(s, { ...opts, tags: true })
   const badTarget = spawnSync(process.execPath, [bin, 'build', schemaPath, '--target', 'deno'], { encoding: 'utf8' })
   assert.notStrictEqual(badTarget.status, 0)
   fs.rmSync(dir, { recursive: true, force: true })
+}
+
+// The intersection of two unions distributes, so allOf over n branches that
+// are each anyOf of two shapes is 2^n alternatives: 14 branches took 2.3 s and
+// 16 never finished. Past 256 alternatives for one kind the branch is kept in
+// the residual instead.
+{
+  const wide = (n) => {
+    const branches = []
+    for (let i = 0; i < n; i++) {
+      branches.push({ anyOf: [
+        { type: 'object', properties: { ['a' + i]: { type: 'string' } }, required: ['a' + i] },
+        { type: 'object', properties: { ['b' + i]: { type: 'number' } }, required: ['b' + i] },
+      ] })
+    }
+    return { type: 'object', allOf: branches }
+  }
+  const t0 = Date.now()
+  const r = schemaToBunType(wide(16), { name: 'Wide', tags: true })
+  const ms = Date.now() - t0
+  assert.ok(ms < 2000, `16 branches took ${ms} ms`)
+  assert.ok(r.type.length < 200000, `type is ${r.type.length} chars`)
+  assert.ok(r.residual && Array.isArray(r.residual.allOf) && r.residual.allOf.length > 0, 'the branches past the bound stay in the residual')
+  const small = schemaToBunType(wide(3), { name: 'Small', tags: true })
+  assert.strictEqual(small.residual, null, 'three branches are written as one type')
 }
 
 console.log('ok: bun target type, tagged split, residuals, declines, module and CLI')

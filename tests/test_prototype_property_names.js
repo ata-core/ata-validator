@@ -46,3 +46,53 @@ assert.strictEqual(Object.prototype.x, undefined)
 assert.strictEqual(({}).a, undefined)
 assert.ok(generated >= 80, `expected most of these validators on generated code, got ${generated} of ${schemas.length * 5}`)
 console.log(`ok: properties named like Object.prototype members agree with the interpreter (${compared} documents, ${generated} of ${schemas.length * 5} validators on generated code)`)
+
+// unevaluatedProperties: false where the evaluated names are tracked at run
+// time (a pattern beside declared names, branches, a lone if,
+// dependentSchemas): the map of evaluated names must not inherit from
+// Object.prototype, or a key named `constructor` reads as evaluated and the
+// document is accepted. Held to the interpreter on every path, standalone
+// modules included.
+{
+  const { toStandaloneModule } = require('../build')
+  const shapes = [
+    { type: 'object', properties: { a: {} }, patternProperties: { '^x': {} }, unevaluatedProperties: false },
+    { type: 'object', properties: { a: {} }, allOf: [{ patternProperties: { '^x': {} } }], unevaluatedProperties: false },
+    { type: 'object', properties: { a: {} }, if: { patternProperties: { '^x': {} } }, unevaluatedProperties: false },
+    { type: 'object', properties: { a: {} }, if: { properties: { b: {} } }, unevaluatedProperties: false },
+    { type: 'object', properties: { a: {} }, if: { required: ['a'] }, then: { patternProperties: { '^x': {} } }, else: { properties: { c: {} } }, unevaluatedProperties: false },
+    { type: 'object', properties: { a: {} }, anyOf: [{ patternProperties: { '^x': {} } }, { properties: { b: {} } }], unevaluatedProperties: false },
+    { type: 'object', oneOf: [{ properties: { a: {} }, required: ['a'] }, { properties: { b: {} }, required: ['b'] }], unevaluatedProperties: false },
+    { type: 'object', properties: { a: {} }, dependentSchemas: { a: { patternProperties: { '^x': {} } } }, unevaluatedProperties: false },
+    { type: 'object', properties: { a: {} }, dependentSchemas: { a: { properties: { b: {} } } }, unevaluatedProperties: false },
+    { type: 'object', properties: { a: {} }, allOf: [{ patternProperties: { '^x': {} } }], unevaluatedProperties: { type: 'string' } },
+    { type: 'object', properties: { o: { type: 'object', properties: { a: {} }, patternProperties: { '^x': {} }, unevaluatedProperties: false } } },
+  ]
+  const names = keys.concat(['__defineGetter__', 'isPrototypeOf', 'propertyIsEnumerable'])
+  let n = 0
+  let onCodegen = 0
+  for (const schema of shapes) {
+    const a = new Validator(schema)
+    const b = new Validator(schema, { engine: 'interpreter' })
+    let mod = null
+    try { const src = toStandaloneModule(schema, { format: 'cjs' }); if (src) { const m = { exports: {} }; new Function('module', 'exports', src)(m, m.exports); mod = m.exports } } catch { mod = null }
+    const texts = names.flatMap((k) => [`{"a":1,"${k}":1}`, `{"${k}":1}`, `{"x1":1,"${k}":1}`, `{"${k}":"s"}`, `{"o":{"a":1,"${k}":1}}`]).concat(['{"a":1,"x1":1}', '{"b":1}', '{"zz":1}'])
+    for (let r = 0; r < 70; r++) for (const t of texts) a.validate(JSON.parse(t))
+    if (a.engine() === 'codegen') onCodegen++
+    for (const t of texts) {
+      const want = b.validate(JSON.parse(t)).valid
+      const label = `${JSON.stringify(schema)} on ${t}`
+      assert.strictEqual(a.validate(JSON.parse(t)).valid, want, 'validate, ' + label)
+      assert.strictEqual(a.isValidObject(JSON.parse(t)), want, 'isValidObject, ' + label)
+      assert.strictEqual(a.isValidJSON(t), want, 'isValidJSON, ' + label)
+      assert.strictEqual(a.validateJSON(t).valid, want, 'validateJSON, ' + label)
+      if (mod) {
+        assert.strictEqual(mod.isValid(JSON.parse(t)), want, 'standalone isValid, ' + label)
+        assert.strictEqual(mod.validate(JSON.parse(t)).valid, want, 'standalone validate, ' + label)
+      }
+      n++
+    }
+  }
+  assert.ok(onCodegen >= shapes.length - 2, `expected these shapes on generated code, got ${onCodegen} of ${shapes.length}`)
+  console.log(`ok: unevaluatedProperties with run-time tracking agrees with the interpreter on prototype-named keys (${n} documents, ${onCodegen} of ${shapes.length} shapes on generated code)`)
+}

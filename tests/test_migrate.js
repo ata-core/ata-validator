@@ -36,6 +36,28 @@ fs.symlinkSync(root, path.join(tmp, 'node_modules', 'ata-validator'), 'dir')
   assert.ok(m.includes('a = ') && m.includes('b = '), m)
 }
 
+// The report is written to a terminal. A file name or a source line with a
+// control character in it forged lines and colours; they are written escaped.
+{
+  const text = formatReport({ root: '/r', scanned: 1, flagged: 1, written: 0, report: [{ file: 'x\ny\u001b[31m.js', findings: [{ kind: 'flag', line: 1, text: 'import of "a\r\nb\u2028c": no translation known' }] }] })
+  assert.strictEqual(text.split('\n').length, 5, text)
+  assert.ok(!/[\x00-\x09\x0b-\x1f\x7f\u2028\u2029]/.test(text), 'no control character reaches the terminal')
+  assert.ok(text.includes('x\\ny\\u001b[31m.js') && text.includes('a\\r\\nb\\u2028c'), text)
+}
+
+// Line numbers are counted once over the file, not from the start for each
+// match: 40000 requires took 16 s.
+{
+  const { specifiers } = require('../lib/migrate')
+  const src = Array.from({ length: 40000 }, (_, i) => `require('x${i}');`).join('\n')
+  const t0 = Date.now()
+  const found = specifiers(src)
+  const ms = Date.now() - t0
+  assert.strictEqual(found.length, 40000)
+  assert.strictEqual(found[39999].line, 40000)
+  assert.ok(ms < 1000, `40000 specifiers took ${ms} ms`)
+}
+
 // Dry run: the report, and nothing written.
 const before = {}
 for (const f of ['src/plain.js', 'src/esm.mjs', 'src/nested/typed.ts', 'src/nested/none.ts']) before[f] = fs.readFileSync(path.join(tmp, f), 'utf8')

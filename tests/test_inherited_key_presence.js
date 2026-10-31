@@ -104,6 +104,62 @@ for (const k of NAMES) {
   }
 }
 
+// The preprocess passes act on own properties only. An object the data
+// inherits is not part of the document: removeAdditional must not delete from
+// it and coerceTypes must not rewrite it, on either engine. The closure
+// passes used to descend through `key in o`, and the generated pass read the
+// value and descended whenever it was an object.
+{
+  const schema = { type: 'object', properties: { nested: { type: 'object', properties: { a: { type: 'number' } }, additionalProperties: false } } };
+  for (const engine of [undefined, 'interpreter']) {
+    for (const options of [{ removeAdditional: true }, { removeAdditional: true, coerceTypes: true }, { removeAdditional: 'all', coerceTypes: true }]) {
+      const shared = { a: 1, extra: 2 };
+      const data = Object.create({ nested: shared });
+      new Validator(schema, { ...options, engine }).validate(data);
+      compared++;
+      if (shared.extra !== 2) report(`${engine || 'codegen'} ${JSON.stringify(options)}: removeAdditional deleted from an inherited nested object`);
+      compared++;
+      if (Object.hasOwn(data, 'nested')) report(`${engine || 'codegen'} ${JSON.stringify(options)}: the pass created an own 'nested' key`);
+    }
+    for (const options of [{ coerceTypes: true }, { coerceTypes: 'array' }, { coerceTypes: true, removeAdditional: true }]) {
+      const shared = { a: '1' };
+      const data = Object.create({ nested: shared });
+      new Validator(schema, { ...options, engine }).validate(data);
+      compared++;
+      if (shared.a !== '1') report(`${engine || 'codegen'} ${JSON.stringify(options)}: coerceTypes rewrote a value inside an inherited nested object`);
+    }
+  }
+}
+
+// Coercion must not manufacture an own key out of an inherited name. With
+// coerceTypes 'array' the generated pass tested presence with `k in o`, so
+// `constructor` and `toString` read from Object.prototype were wrapped into
+// arrays and written as own keys, and required: ['constructor'] then passed
+// on {}.
+{
+  for (const engine of [undefined, 'interpreter']) {
+    for (const k of ['constructor', 'toString', 'valueOf', 'hasOwnProperty']) {
+      for (const sub of [{ type: 'array' }, { type: 'array', items: { type: 'number' } }, { type: 'string' }, { type: 'number' }, { type: 'boolean' }]) {
+        for (const coerceTypes of [true, 'array']) {
+          const schema = { type: 'object', properties: { [k]: sub }, required: [k] };
+          const want = new Validator(schema, { engine: 'interpreter' }).validate({}).valid;
+          const v = new Validator(schema, { coerceTypes, engine });
+          const d = {};
+          const r = v.validate(d).valid;
+          compared++;
+          if (Object.keys(d).length !== 0) report(`${engine || 'codegen'} coerceTypes ${coerceTypes}: ${JSON.stringify(schema)} wrote own keys ${JSON.stringify(Object.keys(d))} on {}`);
+          compared++;
+          if (r !== want) report(`${engine || 'codegen'} coerceTypes ${coerceTypes}: validate says ${r}, interpreter without coercion ${want} for ${JSON.stringify(schema)} on {}`);
+          compared++;
+          if (v.validateJSON('{}').valid !== want) report(`${engine || 'codegen'} coerceTypes ${coerceTypes}: validateJSON disagrees for ${JSON.stringify(schema)} on {}`);
+          compared++;
+          if (v.isValidObject({}) !== want) report(`${engine || 'codegen'} coerceTypes ${coerceTypes}: isValidObject disagrees for ${JSON.stringify(schema)} on {}`);
+        }
+      }
+    }
+  }
+}
+
 // The shape of the fix, not only its answers. Every node that asks about
 // presence reads its object's prototype once into a local, and every key test
 // in it reads that local. A key test that falls back to the shared helper,

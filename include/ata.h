@@ -109,4 +109,7 @@ bool is_valid_buf(const schema_ref& schema, const uint8_t* data, size_t length);
 // Required padding size for is_valid_prepadded
 inline constexpr size_t REQUIRED_PADDING = 64;
 
+// sizeof the internal schema node, for the binding's layout check.
+size_t schema_node_layout_size();
+
 }  // namespace ata

@@ -163,6 +163,87 @@ for (let i = 0; i < 600; i++) {
   assert.ok(e.errors.some((x) => x.keyword === 'instanceof'), 'and its error comes with the rejection');
 }
 
+// parse() never hands back a value validate() refuses, and never shares a
+// reference into the input. Each case here once did one or the other.
+{
+  const declines = (schema, msg) => {
+    let e = null;
+    try { new Validator(schema).parse({}); } catch (err) { e = err; }
+    assert.ok(e && e.name === 'TypeError', msg + ': parse should decline (TypeError), got ' + (e ? e.name + ' ' + e.message : 'a value'));
+  };
+  // A required name, a dependentRequired name or a dependentSchemas
+  // requirement the schema does not declare: the copy dropped the key the
+  // schema demands, so the returned value failed validate().
+  declines({ type: 'object', properties: { a: { type: 'number' } }, required: ['b'] }, 'required undeclared');
+  declines({ type: 'object', properties: { a: { type: 'number' } }, required: ['a', 'b'], additionalProperties: false }, 'required partly undeclared');
+  declines({ type: 'object', properties: { a: { type: 'number' } }, dependentRequired: { a: ['b'] } }, 'dependentRequired undeclared');
+  declines({ type: 'object', properties: { a: { type: 'number' } }, dependentSchemas: { a: { required: ['b'] } } }, 'dependentSchemas required undeclared');
+  declines({ type: 'object', properties: { a: { type: 'number' } }, dependentSchemas: { a: { properties: { b: { type: 'number' } } } } }, 'dependentSchemas declares a key');
+  declines({ type: 'object', properties: { a: { type: 'number' } }, allOf: [{ required: ['b'] }] }, 'allOf required undeclared');
+  declines({ type: 'object', properties: { a: { type: 'number' } }, allOf: [{ anyOf: [{ required: ['b'] }, { required: ['a'] }] }] }, 'nested applicator required undeclared');
+  declines({ type: 'object', properties: { o: { type: 'object', properties: { a: { type: 'number' } }, required: ['b'] } }, required: ['o'] }, 'required undeclared below');
+  // while a required name that is declared still parses
+  assert.deepStrictEqual(new Validator({ type: 'object', properties: { a: { type: 'number' }, b: {type: 'number' } }, required: ['b'], dependentRequired: { a: ['b'] } }).parse({ a: 1, b: 2, c: 3 }), { a: 1, b: 2 });
+
+  // prefixItems, or the array form of items: one copying strategy from
+  // `items` was applied to every position, and an object in a prefix slot
+  // came back as the input's own reference with its undeclared key kept.
+  const tuple = { type: 'object', properties: { arr: { type: 'array', prefixItems: [{ type: 'object', properties: { a: { type: 'number' } } }], items: { type: 'number' } } }, required: ['arr'] };
+  declines(tuple, 'prefixItems next to items');
+  declines({ $schema: 'http://json-schema.org/draft-07/schema#', type: 'object', properties: { arr: { type: 'array', items: [{ type: 'object', properties: { a: { type: 'number' } } }] } }, required: ['arr'] }, 'array-form items');
+
+  // A document that fails only once its defaults are filled: parse ran the
+  // verdict on the raw input and handed back the filled copy validate()
+  // refuses.
+  const cond = { type: 'object', properties: { a: { type: 'string', default: 'x' }, b: { type: 'number' } }, if: { required: ['a'] }, then: { required: ['b'] } };
+  const cv = new Validator(cond);
+  assert.strictEqual(cv.validate({}).valid, false, 'validate fills the default and refuses');
+  let thrown = null;
+  try { cv.parse({}); } catch (e) { thrown = e; }
+  assert.ok(thrown && thrown.name === 'AtaValidationError', 'parse refuses what validate refuses, got ' + (thrown ? thrown.name : 'a value'));
+  assert.deepStrictEqual(cv.parse({ b: 1 }), { a: 'x', b: 1 });
+
+  // A default with an own __proto__ key, as JSON gives it: emitted as an
+  // object literal it set the prototype of the filled value instead.
+  const proto = { type: 'object', properties: { a: { type: 'object', properties: { x: { type: 'number' } }, default: JSON.parse('{"__proto__":{"x":1}}') } } };
+  const out = new Validator(proto).parse({});
+  assert.deepStrictEqual(Object.keys(out.a), ['__proto__'], 'the default keeps its own __proto__ key');
+  assert.strictEqual(Object.getPrototypeOf(out.a), Object.prototype, 'and the filled value is a plain object');
+
+  // A fragment $ref under an embedded $id resolves against that resource,
+  // as validation resolves it, not against the outer root.
+  const embedded = {
+    type: 'object',
+    $defs: { x: { type: 'object', properties: { a: { type: 'string', default: 'outer' } } } },
+    properties: { inner: { $id: 'http://e/', type: 'object', $defs: { x: { type: 'object', properties: { b: { type: 'string', default: 'inner' } } } }, properties: { p: { $ref: '#/$defs/x' } } } },
+  };
+  const ev = new Validator(embedded);
+  let got = null, err = null;
+  try { got = ev.parse({ inner: { p: {} } }); } catch (e) { err = e; }
+  if (err) assert.strictEqual(err.name, 'TypeError', 'declining is acceptable, a wrong resolution is not');
+  else {
+    assert.deepStrictEqual(got, { inner: { p: { b: 'inner' } } }, 'the inner resource\'s definition applies');
+    assert.strictEqual(ev.validate(got).valid, true);
+  }
+
+  // One shared definition with a large default, referenced many times: the
+  // copier used to write the literal out once per reference. 200 references
+  // to a 50 KB default made 10 MB of source; it is written once.
+  const { cloneExprFor } = require('../lib/clone-emit');
+  const big = { blob: 'x'.repeat(50 * 1024) };
+  const props = {};
+  for (let i = 0; i < 200; i++) props['p' + i] = { $ref: '#/$defs/D' };
+  const shared = { type: 'object', properties: props, $defs: { D: { type: 'object', properties: { v: { type: 'object', properties: { s: { type: 'string' } }, default: big } } } } };
+  const src = cloneExprFor(shared);
+  assert.ok(src === null || src.length < 3 * big.blob.length, `the copier source is ${src ? src.length : 0} bytes for a 50 KB default referenced 200 times`);
+  if (src !== null) {
+    const sv = new Validator(shared);
+    const filled = sv.parse({ p0: {}, p1: {} });
+    assert.strictEqual(filled.p0.v.blob, big.blob);
+    assert.notStrictEqual(filled.p0.v, filled.p1.v, 'each fill is a fresh value');
+  }
+}
+
 assert.strictEqual(bad, 0, `${bad} disagreements with the module's parse()`);
 assert.ok(parsed > 200 && declined > 50, `parsed ${parsed}, declined ${declined}: too few of either to mean much`);
 console.log(`ok: runtime parse() matches the module's on ${compared} documents (${parsed} copies, ${declined} declines)`);

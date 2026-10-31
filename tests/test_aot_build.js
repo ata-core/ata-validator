@@ -77,6 +77,61 @@ console.log('\nata aot build tests\n');
       assert(r2.compiled.length === 0 && r2.cached.length === 1, `r2 compiled=${r2.compiled.length} cached=${r2.cached.length}`);
     }],
 
+    ['build: a cached module built without source frames is rebuilt when they are asked for', async () => {
+      // The cache entry did not record `source`, so a production build
+      // (no frames) followed by a development one kept the module without
+      // frames and reported it as up to date. With inline errors the other
+      // recorded settings do not change between the two.
+      const dir = tmpDir();
+      const cacheFile = path.join(dir, '.cache.json');
+      fs.copyFileSync(path.join(__dirname, 'fixtures/aot-build/simple.schema.json'), path.join(dir, 's.schema.json'));
+      const out = path.join(dir, 's.compiled.mjs');
+      const r1 = await build({ globs: [path.join(dir, '*.schema.json')], cacheFile, errors: 'inline', source: false });
+      assert(r1.compiled.length === 1, `r1 compiled=${r1.compiled.length}`);
+      assert(!fs.readFileSync(out, 'utf8').includes('schemaSource'), 'no frames without source');
+      const r2 = await build({ globs: [path.join(dir, '*.schema.json')], cacheFile, errors: 'inline', source: true });
+      assert(r2.compiled.length === 1 && r2.cached.length === 0, `r2 compiled=${r2.compiled.length} cached=${r2.cached.length}`);
+      assert(fs.readFileSync(out, 'utf8').includes('schemaSource'), 'frames after asking for them');
+      const r3 = await build({ globs: [path.join(dir, '*.schema.json')], cacheFile, errors: 'inline', source: true });
+      assert(r3.compiled.length === 0 && r3.cached.length === 1, `r3 compiled=${r3.compiled.length} cached=${r3.cached.length}`);
+      const r4 = await build({ globs: [path.join(dir, '*.schema.json')], cacheFile, errors: 'inline', source: false, check: true });
+      assert(r4.staleCount === 1, `check with the other source setting: staleCount=${r4.staleCount}`);
+    }],
+
+    ['build: the shared runtime goes to / when the outputs share nothing else', async () => {
+      // The walk up to a common directory compared against dir + '/', which
+      // for '/' is '//', so it never matched and the loop did not end.
+      const { _runtimePathFor } = require('../lib/aot-build');
+      const t0 = Date.now();
+      assert(_runtimePathFor(['/a/x.mjs', '/b/y.mjs'], {}, 'esm') === path.resolve('/ata-errors.mjs'), 'different roots');
+      assert(_runtimePathFor(['/x.mjs', '/a/y.mjs'], {}, 'cjs') === path.resolve('/ata-errors.cjs'), 'one at the root');
+      assert(_runtimePathFor(['/a/x.mjs', '/a/b/y.mjs'], {}, 'esm') === path.resolve('/a/ata-errors.mjs'), 'common parent');
+      assert(_runtimePathFor(['/ab/x.mjs', '/a/y.mjs'], {}, 'esm') === path.resolve('/ata-errors.mjs'), 'a name prefix is not a parent');
+      assert(Date.now() - t0 < 1000, 'ends');
+    }],
+
+    ['watch: writing its own cache file does not start another build', async () => {
+      // The cache file is JSON and usually sits beside the schemas, so each
+      // build's cache write woke the watcher and the builds never stopped.
+      const { watch } = require('../lib/aot-build');
+      const dir = tmpDir();
+      fs.copyFileSync(path.join(__dirname, 'fixtures/aot-build/simple.schema.json'), path.join(dir, 'w.schema.json'));
+      let builds = 0;
+      const w = await watch({ globs: [path.join(dir, '*.schema.json')], cacheFile: path.join(dir, '.ata-cache.json') }, () => { builds++; });
+      try {
+        await new Promise((r) => setTimeout(r, 300));
+        const before = builds;
+        const altered = JSON.parse(fs.readFileSync(path.join(dir, 'w.schema.json'), 'utf8'));
+        altered.properties.id.minimum = 5;
+        fs.writeFileSync(path.join(dir, 'w.schema.json'), JSON.stringify(altered));
+        await new Promise((r) => setTimeout(r, 1500));
+        const after = builds - before;
+        assert(after >= 1 && after <= 2, `builds after one edit: ${after}`);
+      } finally {
+        w.close();
+      }
+    }],
+
     ['build: re-compiles when input content changes', async () => {
       const dir = tmpDir();
       const cacheFile = path.join(dir, '.cache.json');

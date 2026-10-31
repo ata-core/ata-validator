@@ -130,6 +130,31 @@ for (let i = 0; i < 120; i++) {
   assert.deepStrictEqual(Object.keys(w).sort(), ['isValidJSON', 'isValidObject', 'validate', 'validateJSON'])
   assert.throws(() => w._extendChecks(null), TypeError)
 }
+// With useDefaults, the JSON entry points hand the check the defaulted
+// document, as the runtime does: a default the check rejects is refused
+// through validateJSON and isValidJSON, not only through validate().
+{
+  const withDefault = { type: 'object', properties: { a: { type: 'string', default: 'bad' } } }
+  const ext = () => ({ check: (d) => d.a !== 'bad', errors: (d) => (d.a === 'bad' ? [{ keyword: 'ext', instancePath: '/a', schemaPath: '#', params: {}, message: 'a must not be bad' }] : null) })
+  const runtime = new Validator(withDefault, { useDefaults: true })
+  runtime._extendChecks(ext)
+  assert.strictEqual(runtime.validateJSON('{}').valid, false, 'runtime validateJSON checks the defaulted document')
+  const mod = load(compiledModuleFor(withDefault, { format: 'cjs' }))
+  const full = fromCompiled(mod, compiledSchemaFor(withDefault), { useDefaults: true })
+  full._extendChecks(ext)
+  assert.strictEqual(full.validate({}).valid, false, 'fromCompiled validate sees the default')
+  const r = full.validateJSON('{}')
+  assert.strictEqual(r.valid, false, 'fromCompiled validateJSON checks the defaulted document')
+  assert.ok(r.errors.some((e) => e.keyword === 'ext'), 'and reports the check\'s error')
+  assert.strictEqual(full.isValidJSON('{}'), false, 'fromCompiled isValidJSON checks the defaulted document')
+  assert.strictEqual(full.isValidJSON('{"a":"fine"}'), true)
+  const verdict = fromCompiledVerdict(mod, compiledSchemaFor(withDefault), { useDefaults: true })
+  verdict._extendChecks(ext)
+  assert.strictEqual(verdict.isValidObject({}), false, 'fromCompiledVerdict isValidObject sees the default')
+  assert.strictEqual(verdict.isValidJSON('{}'), false, 'fromCompiledVerdict isValidJSON checks the defaulted document')
+  assert.strictEqual(verdict.isValidJSON('{"a":"fine"}'), true)
+}
+
 fs.rmSync(dir, { recursive: true, force: true })
 
 if (diffs.length) {

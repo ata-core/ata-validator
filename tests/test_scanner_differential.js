@@ -324,6 +324,26 @@ for (const schema of GEN_SCHEMAS.concat(PERMISSIVE)) {
   checkWired(v, '{"id":0,"id":5,"name":"ok"}');
   checkWired(v, '{"\\u0061":1}');
 }
+// A property named __proto__ in an allOf branch: the merged property map used
+// to be a plain object, so writing that name set its prototype and the
+// scanner silently lost the property's schema. The scanner travels with the
+// compile cache, so a fresh instance of the same schema answered wrong on its
+// very first isValidJSON.
+{
+  const protoProps = JSON.parse('{"__proto__":{"type":"string"}}');
+  const protoSchemas = [
+    { type: 'object', allOf: [{ properties: protoProps }, { properties: { a: { type: 'number' } } }] },
+    { type: 'object', allOf: [{ properties: protoProps, required: ['__proto__'] }, { properties: { a: {} } }] },
+    { type: 'object', allOf: [{ patternProperties: JSON.parse('{"__proto__":{"type":"string"}}') }, { properties: { a: { type: 'number' } } }] },
+  ];
+  for (const schema of protoSchemas) {
+    for (const text of ['{"__proto__":1,"a":1}', '{"__proto__":"s","a":1}', '{"a":1}', '{"__proto__":"s","a":"x"}']) {
+      checkWired(wiredValidator(schema), text);
+      const v = prepare(schema);
+      if (v) check('allOf/__proto__', text, v);
+    }
+  }
+}
 if (wiredFailures.length > 0) {
   console.error(`\n${wiredFailures.length} wiring disagreement(s):`);
   for (const f of wiredFailures.slice(0, 40)) console.error('  ' + f);

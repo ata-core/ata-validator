@@ -209,4 +209,31 @@ checkShape('declared key also matched by a pattern', { properties: { foo: { type
   [{ quux: 'x' }, false],
 ]);
 
+// A child whose `type` is narrower than, or different from, the type its
+// parent already proved is still checked. The generator took the parent's
+// type for the child's and dropped the child's check, so `{type: 'number',
+// allOf: [{type: 'integer'}]}` accepted 1.5 and `{type: 'string', allOf:
+// [{type: 'number'}]}` accepted 'x', through allOf, dependentSchemas, a
+// $ref, then/else and not. Only a type the parent's implies may be skipped.
+checkShape('allOf narrows number to integer', { type: 'number', allOf: [{ type: 'integer' }] }, [[1.5, false], [2, true], ['x', false]]);
+checkShape('allOf with a type the parent excludes', { type: 'string', allOf: [{ type: 'number' }] }, [['x', false], [1, false]]);
+checkShape('allOf with a type list', { type: 'number', allOf: [{ type: ['integer', 'string'] }] }, [[1.5, false], [2, true]]);
+checkShape('allOf widening integer to number', { type: 'integer', allOf: [{ type: 'number' }] }, [[2, true], [2.5, false], ['x', false]]);
+checkShape('narrower type under a property', { type: 'object', properties: { a: { type: 'number', allOf: [{ type: 'integer' }] } } }, [[{ a: 1.5 }, false], [{ a: 2 }, true], [{ a: 'x' }, false]]);
+checkShape('dependentSchemas with another type', { type: 'object', properties: { a: {} }, dependentSchemas: { a: { type: 'array' } } }, [[{ a: 1 }, false], [{}, true]]);
+checkShape('$ref to a narrower type', { type: 'number', $defs: { i: { type: 'integer' } }, allOf: [{ $ref: '#/$defs/i' }] }, [[1.5, false], [2, true]]);
+checkShape('then with a narrower type', { type: 'number', if: { minimum: 0 }, then: { type: 'integer' } }, [[1.5, false], [-1.5, true], [2, true]]);
+checkShape('not with a narrower type', { type: 'number', not: { type: 'integer' } }, [[1.5, true], [2, false]]);
+{
+  const { toStandaloneModule } = require('../build');
+  for (const [schema, doc] of [[{ type: 'number', allOf: [{ type: 'integer' }] }, 1.5], [{ type: 'string', allOf: [{ type: 'number' }] }, 'x'], [{ type: 'object', properties: { a: {} }, dependentSchemas: { a: { type: 'array' } } }, { a: 1 }]]) {
+    const src = toStandaloneModule(schema, { format: 'cjs' });
+    const m = { exports: {} };
+    new Function('module', 'exports', src)(m, m.exports);
+    assert.strictEqual(m.exports.isValid(doc), false, `standalone isValid: ${JSON.stringify(schema)} on ${JSON.stringify(doc)}`);
+    assert.strictEqual(m.exports.validate(doc).valid, false, `standalone validate: ${JSON.stringify(schema)} on ${JSON.stringify(doc)}`);
+  }
+  console.log('ok: narrower child types in standalone modules');
+}
+
 module.exports = { checkShape };

@@ -58,6 +58,27 @@ for (const options of OPTIONS) {
   }
 }
 
+// A property named after something on Object.prototype: the emitted array
+// wrap read `k in o`, so `constructor` from the prototype was wrapped into an
+// own key and required: ['constructor'] passed on {}. The runtime and the
+// bundle must agree, and neither may write a key the document did not carry.
+{
+  for (const k of ['constructor', 'toString']) {
+    const schema = { $id: 'proto-' + k, type: 'object', properties: { [k]: { type: 'array' } }, required: [k] }
+    for (const options of [{ coerceTypes: 'array' }, { coerceTypes: true }]) {
+      const f = load(bundleStandalone([schema], options))[0]
+      const runtime = new Validator(schema, { useDefaults: false, ...options })
+      const a = {}, b = {}
+      const ra = runtime.validate(a), rb = f(b)
+      assert.deepStrictEqual(b, a, `${k} ${JSON.stringify(options)}: data afterwards`)
+      assert.strictEqual(Object.keys(b).length, 0, `${k} ${JSON.stringify(options)}: the bundle wrote an own key`)
+      assert.strictEqual(shape(rb), shape(ra), `${k} ${JSON.stringify(options)}: answer`)
+      assert.strictEqual(rb.valid, false, `${k} ${JSON.stringify(options)}: {} does not carry ${k}`)
+      cases++
+    }
+  }
+}
+
 // toStandaloneModule: the validator's own coerceTypes and removeAdditional run
 // before the check, as the validator runs them. Defaults stay as they were:
 // validate() does not fill them, applyDefaults does.

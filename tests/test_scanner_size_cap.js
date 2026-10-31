@@ -89,4 +89,23 @@ process.stdout.write(String(n))
 const r = spawnSync(process.execPath, ['-e', child], { encoding: 'utf8', env: { ...process.env, ATA_NO_NATIVE: '1' } })
 assert.strictEqual(r.status, 0, `the process exited with ${r.status} ${r.signal || ''}: ${(r.stderr || '').split('\n').slice(-3).join(' ')}`)
 assert.strictEqual(r.stdout, '800')
+// Width is capped as depth is: allOf of two references to the same definition,
+// chained, expands to 2^n layers before any size check saw them. A 2.3 KB
+// schema took 25 s and 3.4 GB on its first isValidJSON. The merge declines
+// past a bounded number of layers and the caller parses instead.
+{
+  const defs = { n0: { type: 'object', properties: { a: { type: 'string' } } } }
+  for (let i = 1; i <= 22; i++) defs['n' + i] = { allOf: [{ $ref: '#/$defs/n' + (i - 1) }, { $ref: '#/$defs/n' + (i - 1) }] }
+  const wide = { type: 'object', properties: { x: { $ref: '#/$defs/n22' } }, $defs: defs }
+  const t0 = process.hrtime.bigint()
+  const sc = compileScanner(wide, {})
+  const ms = Number(process.hrtime.bigint() - t0) / 1e6
+  assert.strictEqual(sc, null, 'the scanner declines the schema')
+  assert.ok(ms < 500, `declining took ${ms.toFixed(0)} ms`)
+  const v = new Validator(wide)
+  if (typeof v._ensureScanner === 'function') v._ensureScanner(true)
+  assert.strictEqual(v.isValidJSON('{"x":{"a":"b"}}'), true)
+  assert.strictEqual(v.isValidJSON('{"x":{"a":1}}'), false)
+}
+
 console.log(`ok: large schemas get a scanner split into bounded functions that answers as validate() does (${scanners} schemas, ${compared} documents, duplicate keys included)`)

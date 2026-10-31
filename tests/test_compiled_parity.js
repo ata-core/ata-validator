@@ -160,4 +160,28 @@ if (diffs.length) {
 }
 assert.strictEqual(diffs.length, 0, 'the compiled wrapper and the runtime disagree')
 assert.ok(schemas > 500, `only ${schemas} schemas compared`)
+
+// Validator.fromStandalone with a module that carries no error function
+// compiles one. It used to compile from the schema as written, without the
+// normalization the runtime applies, and let that function's valid: true
+// replace the module's negative verdict: a draft-04 boolean exclusiveMinimum
+// read as a 2020-12 annotation, so {boolFn: rejects} answered valid.
+{
+  const cases = [
+    [{ $schema: 'http://json-schema.org/draft-04/schema#', type: 'number', minimum: 5, exclusiveMinimum: true }, 5],
+    [{ $schema: 'http://json-schema.org/draft-07/schema#', type: 'array', items: [{ type: 'number' }], additionalItems: false }, [1, 2]],
+    [{ $schema: 'http://json-schema.org/draft-07/schema#', type: 'object', dependencies: { a: ['b'] } }, { a: 1 }],
+    [{ $schema: 'https://json-schema.org/draft/2019-09/schema', type: 'object', properties: { c: { $recursiveRef: '#' } }, additionalProperties: false }, { c: { zz: 1 } }],
+    [{ type: 'string', format: 'odd' }, 'ab'],
+  ]
+  for (const [schema, doc] of cases) {
+    const opts = schema.format === 'odd' ? { formats: { odd: (s) => s.length % 2 === 1 } } : undefined
+    assert.strictEqual(new Validator(schema, opts).validate(doc).valid, false, 'the runtime rejects ' + JSON.stringify(doc))
+    const v = Validator.fromStandalone({ boolFn: () => false }, schema, opts)
+    const r = v.validate(doc)
+    assert.strictEqual(r.valid, false, `fromStandalone keeps the module's negative verdict for ${JSON.stringify(schema)}`)
+    assert.ok(Array.isArray(r.errors) && r.errors.length > 0, 'and reports at least one error')
+    assert.strictEqual(v.validateJSON(JSON.stringify(doc)).valid, false, 'validateJSON too')
+  }
+}
 console.log(`ok: fromCompiled answers as new Validator on ${compared} checks over ${schemas} schemas (${declined} declined as ineligible, ${unbuilt} left on the runtime because the emitter could not compile them or give their errors)`)

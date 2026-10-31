@@ -233,8 +233,12 @@ failure `{ valid: false, record, errors }` the moment its record is complete; `e
 decided from the first non-blank character), `stopOnFirst` (default true), `onRecord(doc, index)`
 for each record that passed, parsed. A record that is not JSON fails with keyword `__parse__`, as
 `validateJSON()` reports it. `validateStream(v, source, opts)` from `ata-validator/stream` reads a
-Node Readable, a Web ReadableStream or any iterable of chunks and stops the source at the first
-failure. Memory does not grow with the body; see the README for the measured figures.
+Node Readable, a Web ReadableStream or any iterable of chunks and stops reading at the first
+failure: a Readable is destroyed, a Web stream's reader cancelled, an iterator returned. A Node
+http request is the exception: it is left open and the rest of its body is read and dropped, so
+the response the handler writes next reaches the client instead of a closed socket (which Node's
+`fetch` reports as `write EPIPE` and Chrome as "Failed to fetch"). Memory does not grow with the
+body; see the README for the measured figures.
 
 ## Standalone Pre-compilation
 
@@ -491,8 +495,10 @@ question can be answered by reading it.
 
 With `positions: true` the module also exports `validateJSON(text)`: it
 parses the JSON text, validates, and on failure attaches a `dataFrame`
-(`byteOffset`, `length`, `line`, `col`, `text`, the same five fields the
-runtime's `validateJSON` attaches) to every error by walking the original
+(`byteOffset`, `length`, `line`, `col`, `text`, the same fields the
+runtime's `validateJSON` attaches; on a line longer than 200 characters
+`text` is an excerpt around the value and `textCol`, counted as `col` is, is where the value
+starts in it) to every error by walking the original
 text once. The mapping goes through the error's `instancePath`, so when the
 same key appears in several sections each error points at its own
 occurrence, which a string search for the first occurrence does not. A

@@ -100,7 +100,10 @@ const root = path.resolve(__dirname, '..');
     // (lib/defaults.js), a guard against a schema whose object default
     // refers back to an enclosing schema, and the lazy errors for a schema
     // with defaults: 58521 bytes.
-    assert.ok(size < 58 * 1024, `the Workers bundle is ${size} bytes gzipped, over 58 KB`);
+    // 60 KB with the fixes from an outside scan that land in the interpreted
+    // engine and the defaults pass (see tests/test_lite_bundle_size.js for
+    // the list): 60787 bytes.
+    assert.ok(size < 60 * 1024, `the Workers bundle is ${size} bytes gzipped, over 60 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
