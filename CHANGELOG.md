@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- 1.62.0 made a schema compile about 2% slower: the check that refuses a non-numeric value in a numeric keyword looked up thirteen keywords on every schema node. It now reads the node's own keys. A nine-field zod schema through `@ata-project/zod` compiles in 159.7 µs against 160 on 1.61.3 and 161.2 on 1.62.0, medians of 15 interleaved rounds.
+
 ## 1.62.0 - 2026-10-31
 
 ### Added
