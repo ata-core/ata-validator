@@ -141,5 +141,36 @@ for (const [text, why] of [['[{"id":1,"email":"a@b.co"},]', 'trailing comma'], [
   assert.strictEqual(r3.valid, true); assert.strictEqual(r3.records, 3);
   // The method on the validator.
   const s = v.stream(); s.push(ndjson(good)); assert.strictEqual(s.end().valid, true);
-  console.log('ok: record streams agree with whole validation under every chunk cut, stop at the first failure, and stop their source');
+
+  // A Node http request is not destroyed at the failure: the response must
+  // still reach the client, which a closed socket would turn into a network
+  // error. Reading stops, the rest of the body drains, the client gets the 400.
+  const http = require('http');
+  let seenAtAnswer = null; let drained = false; let destroyedAtAnswer = null;
+  const server = http.createServer(async (req, res) => {
+    let seen = 0; req.on('data', (c) => { seen += c.length; });
+    req.on('end', () => { drained = true; });
+    const r = await validateStream(v, req);
+    seenAtAnswer = seen; destroyedAtAnswer = req.destroyed;
+    res.writeHead(r.valid ? 200 : 400, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ record: r.errors[0].record, errors: r.errors[0].errors.length }));
+  });
+  await new Promise((resolve) => server.listen(0, resolve));
+  const port = server.address().port;
+  // A body of a few MB, the bad record second, handed over as it is produced.
+  const total = 4 * 1024 * 1024; let sent = 0; let n = 0;
+  const body = new ReadableStream({ pull (c) { if (sent >= total) { c.close(); return; } const lines = []; for (let k = 0; k < 500; k++, n++) lines.push(JSON.stringify(n === 1 ? bad : { ...good[0], id: n + 1 })); const chunk = Buffer.from(lines.join('\n') + '\n'); sent += chunk.length; c.enqueue(chunk); } });
+  const res = await fetch(`http://127.0.0.1:${port}/import`, { method: 'POST', body, duplex: 'half', headers: { 'content-type': 'application/x-ndjson' } });
+  const answer = await res.json();
+  assert.strictEqual(res.status, 400, 'the client reads the 400 while it is still uploading');
+  assert.strictEqual(answer.record, 1); assert.ok(answer.errors > 0);
+  assert.strictEqual(destroyedAtAnswer, false, 'the request was not destroyed at the failure');
+  assert.ok(seenAtAnswer < total / 4, `the handler answered after ${seenAtAnswer} of ${total} bytes`);
+  await new Promise((resolve) => server.close(resolve));
+  assert.ok(drained || sent < total, 'the rest of the body drained, or the client stopped sending');
+  // A Readable that is not a request is still destroyed.
+  const file = Readable.from(texts([good[0], bad, good[1]]).map((t) => t + '\n'));
+  await validateStream(v, file);
+  assert.strictEqual(file.destroyed, true, 'a plain Readable is destroyed at the failure');
+  console.log('ok: record streams agree with whole validation under every chunk cut, stop at the first failure, stop their source, and leave an http request alive for its response');
 })().catch((e) => { console.error(e); process.exit(1); });

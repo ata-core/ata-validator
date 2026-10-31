@@ -805,8 +805,8 @@ a change this reports is real, one it does not report may still exist.
 
 A request that carries many documents, a JSON array or NDJSON, is usually read to the end,
 parsed as a whole and then validated, so a bad third record is reported after the last byte.
-`ata-validator/stream` validates each record the moment its last byte lands and stops the
-source at the first failure, with memory that does not grow with the body.
+`ata-validator/stream` validates each record the moment its last byte lands and stops reading
+at the first failure, with memory that does not grow with the body.
 
 ```js
 import { validateStream } from 'ata-validator/stream'
@@ -841,6 +841,14 @@ costs the same time as before and a third of the memory. `tests/test_stream.js` 
 to whole-document validation under every way of cutting the bytes into chunks, including inside
 multi-byte characters, strings with brackets and escaped quotes, nested arrays, scalars, CRLF
 and blank lines, and checks that a failing source is destroyed or cancelled rather than read on.
+
+A Node http request handed to `validateStream` is not destroyed at the failure: closing the
+socket under the response turns the answer into a network error at the client (Node's `fetch`
+uploading 100 MB got `write EPIPE`, Chrome "Failed to fetch", neither the 400). Reading stops and
+the rest of the body is read and dropped, so the response goes out and memory stays flat. Node's
+`fetch` then had the 400 after 24 ms and 1 MB sent; Chrome, which reads only after its upload,
+after 58 ms for a 50 MB file over loopback; the Hono example above, whose Node adapter cancels
+the stream without closing the socket, after 28 ms. A plain `Readable` is still destroyed.
 
 ### Bun, compiled ahead of time
 
