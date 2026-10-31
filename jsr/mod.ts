@@ -18,5 +18,5 @@
  *
  * @module
  */
-export * from "npm:ata-validator@1.61.3";
-export { default } from "npm:ata-validator@1.61.3";
+export * from "npm:ata-validator@1.62.0";
+export { default } from "npm:ata-validator@1.62.0";
