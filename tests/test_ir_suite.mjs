@@ -15,9 +15,12 @@ const { compile: compileModule } = await import('../lib/ir/emit.mjs')
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const SUITE = path.join(here, 'suite/tests')
-const DIALECTS = { 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', 'draft2019-09': 'https://json-schema.org/draft/2019-09/schema', draft7: 'http://json-schema.org/draft-07/schema#', draft6: 'http://json-schema.org/draft-06/schema#', draft4: 'http://json-schema.org/draft-04/schema#' }
+const DIALECTS = { v1: 'https://json-schema.org/v1', 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', 'draft2019-09': 'https://json-schema.org/draft/2019-09/schema', draft7: 'http://json-schema.org/draft-07/schema#', draft6: 'http://json-schema.org/draft-06/schema#', draft4: 'http://json-schema.org/draft-04/schema#' }
 // What the IR must cover, so coverage cannot shrink unnoticed.
-const MIN_GROUPS = { 'draft2020-12': 378, 'draft2019-09': 362, draft7: 258, draft6: 233, draft4: 160 }
+// Every group, on both backends; the module writer refuses four v1 groups
+// (a $dynamicRef that resolves only on the scope needs the closures).
+const MIN_GROUPS = { v1: 348, 'draft2020-12': 384, 'draft2019-09': 373, draft7: 258, draft6: 233, draft4: 160 }
+const MIN_MODULES = { v1: 344 }
 
 const registry = {}
 ;(function collect (d, prefix) {
@@ -65,7 +68,8 @@ async function runDir (dir, dialect, assertFormat, backend) {
 for (const backend of ['closures', 'modules']) {
   for (const dialect of Object.keys(DIALECTS)) {
     const main = await runDir(path.join(SUITE, dialect), dialect, false, backend)
-    if (main.supported < MIN_GROUPS[dialect]) fail(`${backend} ${dialect}: ${main.supported} groups supported, expected at least ${MIN_GROUPS[dialect]}`)
+    const min = backend === 'modules' && MIN_MODULES[dialect] !== undefined ? MIN_MODULES[dialect] : MIN_GROUPS[dialect]
+    if (main.supported < min) fail(`${backend} ${dialect}: ${main.supported} groups supported, expected at least ${min}`)
     const fmtDir = path.join(SUITE, dialect, 'optional/format')
     const fmt = fs.existsSync(fmtDir) ? await runDir(fmtDir, dialect, true, backend) : { supported: 0, cases: 0, groups: 0 }
     console.log(`  ${backend.padEnd(8)} ${dialect.padEnd(13)} ${main.supported}/${main.groups} groups, ${main.cases} cases; formats ${fmt.supported}/${fmt.groups} groups, ${fmt.cases} cases`)
