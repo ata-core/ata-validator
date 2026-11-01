@@ -179,6 +179,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // coerceTypes and removeAdditional passes the IR runs. Measured 562.8 KB.
 // 567 KB with lib/kernels/custom.mjs and the IR's custom keywords, custom
 // formats and errorMessage. Measured 565.3 KB.
-assert.ok(manifest.size < 567 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 569 KB with the IR's verbose, abortEarly, unresolved references, option
+// values and relative schema names. Measured 567.6 KB.
+assert.ok(manifest.size < 569 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

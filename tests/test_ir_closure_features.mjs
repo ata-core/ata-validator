@@ -38,6 +38,11 @@ const CASES = [
   // without an $id.
   [{ $schema: 'http://json-schema.org/draft-07/schema#', definitions: { e: { $id: '#/definitions/e', type: 'string', minLength: 2 } }, properties: { a: { $ref: '#/definitions/e' }, b: { $ref: 'defs/x.json' }, c: { $ref: '#/nope' }, t: { $ref: '#noanchor' }, x: { $ref: 'https://other.example/y.json#/z' } } }, {}],
   [{ properties: { a: { $ref: 'defs/item.json' }, b: { $ref: 'defs/missing.json' } } }, { baseURI: 'https://ex.com/root.json', schemas: [{ $id: 'https://ex.com/defs/item.json', type: 'string', minLength: 2 }] }],
+  // The other values of coerceTypes and removeAdditional, and both with
+  // documents registered under relative names (Fastify's `shared`).
+  [{ type: 'object', properties: { tags: { type: 'array', items: { type: 'integer' } }, n: { type: 'number' }, o: { type: 'object', properties: { k: { type: 'boolean' } }, additionalProperties: false } }, additionalProperties: false }, { coerceTypes: 'array', removeAdditional: 'failing' }],
+  [{ $ref: 'shared#' }, { coerceTypes: true, removeAdditional: 'all', schemas: [{ $id: 'shared', type: 'object', properties: { n: { type: 'integer' }, b: { type: 'boolean' }, t: { type: 'array', items: { type: 'number' } } }, additionalProperties: false }] }],
+  [{ type: 'object', properties: { n: { $ref: 'shared#/properties/n' }, x: { type: 'string' }, s: { $ref: 'shared' } } }, { coerceTypes: 'array', schemas: { shared: { $id: 'shared', type: 'object', properties: { n: { type: 'integer' }, t: { type: 'array' } }, required: ['n'] } } }],
   // verbose and abortEarly, rich and plain, alone and together, with errorMessage.
   ...[{ verbose: true }, { verbose: true, richErrors: false }, { abortEarly: true }, { abortEarly: true, richErrors: false }, { abortEarly: true, verbose: true }, { abortEarly: true, verbose: true, richErrors: false }].map((o) => [{ type: 'object', properties: { a: { type: 'string', minLength: 3 }, b: { type: 'integer', errorMessage: 'b is whole' }, c: { anyOf: [{ type: 'string' }, { type: 'number', minimum: 5 }] }, list: { type: 'array', items: { type: 'object', properties: { q: { type: 'number' } }, required: ['q'] } } }, required: ['t', 'x'], additionalProperties: false }, o]),
 ]
@@ -70,4 +75,4 @@ for (const [schema, opts] of CASES) {
   }
 }
 if (failed) { console.log(`${failed} of ${checked} differ`); process.exit(1) }
-console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats, custom keywords, verbose, abortEarly, unresolved references and baseURI`)
+console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats, custom keywords, verbose, abortEarly, unresolved references, baseURI, option values and relative schema names`)

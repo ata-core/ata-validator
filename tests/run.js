@@ -162,6 +162,8 @@ const FILES = [
   "tests/test_kernels_custom_sync.js",
   "tests/test_compile_throw_repeats.js",
   "tests/test_verbose_collapse_plain.js",
+  "tests/test_option_values_engines.js",
+  "tests/test_relative_id_ref_order.js",
   "tests/test_error_codes_lock.js",
   "tests/test_error_code_lookup.js",
   "tests/test_error_order.js",
