@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- A module that imported only `defineSchema` carried the whole validator into a browser bundle. `defineSchema` returns its argument, but the bundler entries handed it out of the CommonJS core through a destructuring a bundler cannot prove pure, so the core stayed: a form whose `new Validator(...)` the build plugin had compiled away still shipped 54 KB gzipped of runtime plus the lazy code generator through the `defineSchema(...)` line beside it. `defineSchema` and `schemaOf` now live outside the core, and the browser, edge and bundler entries read every name through calls marked pure. Such a module now bundles to under 1 KB through each of them, against 200 to 490 KB before minification; an application that imports only `Validator` is 150 to 215 bytes gzipped smaller. `index.mjs` and `lite.mjs`, which Node before 22.10, Deno and Bun load at run time, are unchanged: an extra module there cost load time. `tests/test_define_schema_bundle.js`.
+
 ## 1.62.2 - 2026-11-01
 
 ### Fixed

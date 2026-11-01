@@ -160,6 +160,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // lib/error-runtime.js and its pure helpers in lib/error-runtime-features.js,
 // so esbuild bundles the entry and bundleStandalone compiles in a page.
 // Measured 525.2 KB.
-assert.ok(manifest.size < 526 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 527 KB with defineSchema and schemaOf outside the validator core and the
+// browser, edge and bundler entries reading their names through calls marked
+// pure: a module that imports only defineSchema had carried the whole runtime
+// into a bundle, 200 to 490 KB before minification, and now carries under
+// 1 KB. Measured 526.2 KB.
+assert.ok(manifest.size < 527 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

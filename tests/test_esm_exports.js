@@ -17,8 +17,10 @@ const cjs = Object.keys(require('..')).filter((k) => !INTERNAL.has(k))
 // lib/tools.mjs) and are checked by importing them, below.
 for (const file of ['index.mjs', 'index.node.mjs']) {
   const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
-  const m = src.match(/export const \{([^}]*)\}/)
-  const names = m ? m[1].split(',').map((s) => s.trim()).filter(Boolean) : []
+  // `export const { a, b } = mod`, `export const a = ...` and `export { a, b }`.
+  const names = []
+  for (const m of src.matchAll(/export (?:const )?\{([^}]*)\}/g)) names.push(...m[1].split(',').map((s) => s.trim()).filter(Boolean))
+  for (const m of src.matchAll(/export const ([\w$]+)\s*=/g)) names.push(m[1])
   assert.deepStrictEqual(cjs.filter((k) => !names.includes(k)), [], `${file} does not export everything index.js does`)
 }
 

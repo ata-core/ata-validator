@@ -15,12 +15,17 @@
 // where the size of what ships matters more than nanoseconds per call.
 const core = require('./lib/validator-core.js');
 
+// Loaded on first call, like the tools: a process that never calls them does
+// not read the file.
+function defineSchema (schema) { return require('./lib/schema-helpers.js').defineSchema(schema); }
+function schemaOf (...a) { return require('./lib/schema-helpers.js').schemaOf(...a); }
+
 module.exports = {
   Validator: core.Validator,
   validate: core.validate,
   validateAsync: core.validateAsync,
   parseAsync: core.parseAsync,
-  defineSchema: core.defineSchema,
-  schemaOf: core.schemaOf,
+  defineSchema,
+  schemaOf,
   version: core.version,
 };

@@ -136,6 +136,11 @@ function attachSuggestions (errors, data) {
   return errors;
 }
 
+// Loaded on first call, like the tools: a process that never calls them does
+// not read the file.
+function defineSchema (schema) { return require('./lib/schema-helpers.js').defineSchema(schema); }
+function schemaOf (...a) { return require('./lib/schema-helpers.js').schemaOf(...a); }
+
 module.exports = {
   Validator: core.Validator,
   compile: core.compile,
@@ -147,8 +152,8 @@ module.exports = {
   SIMDJSON_PADDING: core.SIMDJSON_PADDING,
   parseJSON: core.parseJSON,
   toTypeScript,
-  defineSchema: core.defineSchema,
-  schemaOf: core.schemaOf,
+  defineSchema,
+  schemaOf,
   renderPretty,
   renderCompact,
   toOutput,
