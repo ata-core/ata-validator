@@ -154,6 +154,7 @@ const FILES = [
   "tests/test_ir_suite.mjs",
   "tests/test_ir_differential.mjs",
   "tests/test_kernels_rank_sync.js",
+  "tests/test_kernels_formats_sync.js",
   "tests/test_error_codes_lock.js",
   "tests/test_error_code_lookup.js",
   "tests/test_error_order.js",

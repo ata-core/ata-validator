@@ -172,6 +172,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 556 KB with the IR's error order (the check for which schemas need sorting,
 // the skeleton it sorts against) and its list of keywords that carry a
 // meaning. Measured 554.8 KB.
-assert.ok(manifest.size < 556 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 562 KB with lib/kernels/formats.mjs and rank.mjs, the generated copies of
+// the format checks and the rank functions that IR modules import, so a page
+// split into chunks shares one copy of each. Measured 560.7 KB.
+assert.ok(manifest.size < 562 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
