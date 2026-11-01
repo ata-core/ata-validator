@@ -181,6 +181,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // formats and errorMessage. Measured 565.3 KB.
 // 569 KB with the IR's verbose, abortEarly, unresolved references, option
 // values and relative schema names. Measured 567.6 KB.
-assert.ok(manifest.size < 569 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 572 KB with the IR's walk for keywords that read their data's context.
+// Measured 570.5 KB.
+assert.ok(manifest.size < 572 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

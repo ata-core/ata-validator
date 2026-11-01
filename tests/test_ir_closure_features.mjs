@@ -43,6 +43,22 @@ const CASES = [
   [{ type: 'object', properties: { tags: { type: 'array', items: { type: 'integer' } }, n: { type: 'number' }, o: { type: 'object', properties: { k: { type: 'boolean' } }, additionalProperties: false } }, additionalProperties: false }, { coerceTypes: 'array', removeAdditional: 'failing' }],
   [{ $ref: 'shared#' }, { coerceTypes: true, removeAdditional: 'all', schemas: [{ $id: 'shared', type: 'object', properties: { n: { type: 'integer' }, b: { type: 'boolean' }, t: { type: 'array', items: { type: 'number' } } }, additionalProperties: false }] }],
   [{ type: 'object', properties: { n: { $ref: 'shared#/properties/n' }, x: { type: 'string' }, s: { $ref: 'shared' } } }, { coerceTypes: 'array', schemas: { shared: { $id: 'shared', type: 'object', properties: { n: { type: 'integer' }, t: { type: 'array' } }, required: ['n'] } } }],
+  // Keywords that read their data's context and change the value where it
+  // sits: the walk must run them where the current engine does and leave the
+  // document as it does.
+  ...((ctxKw) => [
+    [{ type: 'object', properties: { id: { type: 'integer', ro: true }, name: { type: 'string', minLength: 2 }, age: { type: 'number', toNum: true, minimum: 3 } }, required: ['id', 'name'], additionalProperties: false }, { keywords: ctxKw }],
+    [{ type: 'object', properties: { a: { dropSibling: 'b' }, b: { type: 'string' }, c: { type: 'integer' } }, required: ['b'], stamp: true }, { keywords: ctxKw }],
+    [{ type: 'array', items: { type: 'object', properties: { n: { toNum: true, type: ['string', 'number'] }, k: { ro: true } }, required: ['k'] } }, { keywords: ctxKw, richErrors: false }],
+    [{ anyOf: [{ type: 'object', properties: { x: { toNum: true, type: 'string' } } }, { type: 'number' }], not: { properties: { y: { ro: true, const: 1 } }, required: ['y'] } }, { keywords: ctxKw }],
+    [{ type: 'object', properties: { m: { big: 10 } }, patternProperties: { '^p': { toNum: true } }, additionalProperties: { type: 'boolean' } }, { keywords: ctxKw }],
+  ])({
+    ro: { dataContext: true, compile: (on) => on ? (data, c) => { delete c.parentData[c.parentDataProperty]; return true } : () => true },
+    toNum: { dataContext: true, type: 'string', compile: () => (data, c) => { if (c.parentData !== undefined) c.parentData[c.parentDataProperty] = Number(data); return true } },
+    dropSibling: { dataContext: true, validate: (name, data, schema, c) => { if (c.parentData && typeof c.parentData === 'object') delete c.parentData[name]; return true } },
+    stamp: { dataContext: true, post: true, compile: () => (data) => { if (data && typeof data === 'object' && !Array.isArray(data)) data.stamped = true; return true } },
+    big: { dataContext: true, validate: function big (n, data, schema, c) { if (typeof data !== 'number' || data >= n) return true; big.errors = [{ message: 'too small', instancePath: c.instancePath + '/v', params: { n } }]; return false } },
+  }),
   // verbose and abortEarly, rich and plain, alone and together, with errorMessage.
   ...[{ verbose: true }, { verbose: true, richErrors: false }, { abortEarly: true }, { abortEarly: true, richErrors: false }, { abortEarly: true, verbose: true }, { abortEarly: true, verbose: true, richErrors: false }].map((o) => [{ type: 'object', properties: { a: { type: 'string', minLength: 3 }, b: { type: 'integer', errorMessage: 'b is whole' }, c: { anyOf: [{ type: 'string' }, { type: 'number', minimum: 5 }] }, list: { type: 'array', items: { type: 'object', properties: { q: { type: 'number' } }, required: ['q'] } } }, required: ['t', 'x'], additionalProperties: false }, o]),
 ]
@@ -50,7 +66,7 @@ const CASES = [
 let seed = 7
 const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n }
 const ATOMS = [null, true, false, 0, 1, 2, 1.5, -3, '', 'a', 'ab', 'abcd', '5', '1.5', 'true', 'false', 'x', 'y', 'b', [], {}, [1, 'a']]
-const KEYS = ['a', 'b', 'c', 'k', 'x', 'y', 'n', 'f', 's', 't', 'p', 'q', 'm', 'list', 'inner', 'z']
+const KEYS = ['a', 'b', 'c', 'k', 'x', 'y', 'n', 'f', 's', 't', 'p', 'q', 'm', 'list', 'inner', 'z', 'id', 'name', 'age', 'p1', 'tags', 'o']
 function value (d) {
   const r = rnd(10)
   if (d < 3 && r === 0) { const o = {}; for (let i = rnd(5); i > 0; i--) o[KEYS[rnd(KEYS.length)]] = value(d + 1); return o }
@@ -75,4 +91,4 @@ for (const [schema, opts] of CASES) {
   }
 }
 if (failed) { console.log(`${failed} of ${checked} differ`); process.exit(1) }
-console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats, custom keywords, verbose, abortEarly, unresolved references, baseURI, option values and relative schema names`)
+console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats, custom keywords, verbose, abortEarly, unresolved references, baseURI, option values, relative schema names and keywords that change the data`)
