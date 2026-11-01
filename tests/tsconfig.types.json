@@ -1,16 +1,28 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "esModuleInterop": true,
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "ignoreDeprecations": "6.0",
-    "types": ["node"],
-    "lib": ["ES2022"]
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2022"
+    ]
   },
-  "include": ["test_typed_validator.ts", "test_define_schema.ts", "test_infer.ts", "test_t_infer.ts", "test_interop_types.ts", "test_lite_types.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "test_typed_validator.ts",
+    "test_define_schema.ts",
+    "test_infer.ts",
+    "test_t_infer.ts",
+    "test_interop_types.ts",
+    "test_lite_types.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
