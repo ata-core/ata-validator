@@ -158,6 +158,7 @@ const FILES = [
   "tests/test_ir_minified.mjs",
   "tests/test_kernels_preprocess_sync.js",
   "tests/test_remove_additional_array_root.js",
+  "tests/test_ir_closure_features.mjs",
   "tests/test_error_codes_lock.js",
   "tests/test_error_code_lookup.js",
   "tests/test_error_order.js",
