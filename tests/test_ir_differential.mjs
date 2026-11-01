@@ -220,12 +220,12 @@ const sameSet = (x, y) => x.valid === y.valid && (x.errors || []).length === (y.
 const show = (d) => { try { return JSON.stringify(d) } catch { return String(d) } }
 
 let total = 0
-async function run (backend, { DEFAULTS, PLAIN }) {
+async function run (backend, { DEFAULTS, PLAIN, COERCE = false, REMOVE = false }) {
   seed = 1
   let failures = 0; let known = 0; let orderOnly = 0; let checked = 0
-  const label = `${backend}, ${PLAIN ? 'plain' : 'rich'}${DEFAULTS ? ', defaults' : ''}`
+  const label = `${backend}, ${PLAIN ? 'plain' : 'rich'}${DEFAULTS ? ', defaults' : ''}${COERCE ? ', coerce' : ''}${REMOVE ? ', remove' : ''}`
   for (const [name, schema] of Object.entries(SCHEMAS)) {
-    const opts = { useDefaults: DEFAULTS, richErrors: !PLAIN }
+    const opts = { useDefaults: DEFAULTS, richErrors: !PLAIN, ...(COERCE ? { coerceTypes: true } : {}), ...(REMOVE ? { removeAdditional: true } : {}) }
     const ata = new Validator(schema, opts)
     const ir = backend === 'closures' ? compileClosures(schema, opts) : await compileModule(schema, opts)
     const docs = [GOOD[name], {}, null, '', 0, false, NaN, [], 'str', 5]
@@ -266,7 +266,10 @@ async function run (backend, { DEFAULTS, PLAIN }) {
 }
 
 for (const backend of ['closures', 'modules']) {
-  for (const mode of [{ DEFAULTS: false, PLAIN: false }, { DEFAULTS: false, PLAIN: true }, { DEFAULTS: true, PLAIN: false }]) await run(backend, mode)
+  for (const mode of [{ DEFAULTS: false, PLAIN: false }, { DEFAULTS: false, PLAIN: true }, { DEFAULTS: true, PLAIN: false }, { DEFAULTS: true, PLAIN: false, COERCE: true }, { DEFAULTS: true, PLAIN: false, REMOVE: true }, { DEFAULTS: true, PLAIN: false, COERCE: true, REMOVE: true }]) {
+    if (backend === 'modules' && (mode.COERCE || mode.REMOVE)) continue
+    await run(backend, mode)
+  }
 }
 if (total) { console.log(`\n${total} failed`); process.exit(1) }
 console.log('ok: the IR matches the current engine on every generated document, both backends')
