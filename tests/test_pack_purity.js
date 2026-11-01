@@ -156,6 +156,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // walker fixes (src/ata.cpp and the single-header copy both ship), the
 // numeric-literal guard and shared-definition pass in the code generator,
 // the bounded passes in the tools. Measured 524.0 KB.
-assert.ok(manifest.size < 525 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 526 KB with ata-validator/aot fixed for browser bundles: a browser twin of
+// lib/error-runtime.js and its pure helpers in lib/error-runtime-features.js,
+// so esbuild bundles the entry and bundleStandalone compiles in a page.
+// Measured 525.2 KB.
+assert.ok(manifest.size < 526 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

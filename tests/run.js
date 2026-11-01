@@ -31,6 +31,7 @@ const FILES = [
   "tests/test_user_format_precedence.js",
   "tests/test_native_findings.js",
   "tests/test_aot_registers_codegen.js",
+  "tests/test_eager_require_load.js",
   "tests/test_scanner_differential.js",
   "tests/test_validate_json_scanner_cost.js",
   "tests/test_buffer_reject_cost.js",
