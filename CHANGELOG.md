@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- ata loads from esm.sh but still threw on the first validator there: esm.sh hands `require()` a module whose exports are one function as `{ default: fn }`, and five internal modules of that shape were called directly (the native loader first). Each call site now takes the function from either form. `tests/test_eager_require_load.js` mimics that too, and runs the native, `validateJSON`, buffer and Standard Schema paths. `ata-validator/lite` grows by 46 bytes gzipped.
+
 ## 1.62.1 - 2026-11-01
 
 ### Fixed
