@@ -170,7 +170,10 @@ const esbuild = require('esbuild')
 // 58830 (58822 measured): under verbose and plain errors, a collapsed
 // anyOf/oneOf error keeps parentSchema, schema and data (lib/rejections.js
 // stripOrdinal dropped them).
-const BUDGET = 58830
+// 58900 (58891 measured): coerceTypes: 'array' wraps a lone top-level value
+// on the interpreted engine too, as the generated pass did, so the two
+// engines leave the same document (lib/validator-core.js buildCoercer).
+const BUDGET = 58900
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
