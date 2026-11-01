@@ -235,8 +235,13 @@ async function run (backend, { DEFAULTS, PLAIN }) {
       // Each engine gets its own copy: filling defaults changes the document.
       const da = clone(d); const db = clone(d)
       const ra = ata.validate(da); const rb = ir.validate(db)
-      const a = shape(ra) + (DEFAULTS ? dump(da) : '')
-      const b = shape(rb) + (DEFAULTS ? dump(db) : '')
+      // The result's surface as code reads it: `data` is the checked value
+      // itself on a valid document and absent otherwise; `valid` and
+      // `errors` are there either way (the current engine's errors may be a
+      // getter, so presence is asked with `in`, not Object.keys).
+      const surface = (r, input) => JSON.stringify([r.valid ? r.data === input : r.data === undefined, 'valid' in r, 'errors' in r, Array.isArray(r.errors)])
+      const a = shape(ra) + surface(ra, da) + (DEFAULTS ? dump(da) : '')
+      const b = shape(rb) + surface(rb, db) + (DEFAULTS ? dump(db) : '')
       // Known divergence: an infinite number under a union type or no type,
       // where the current engine skips the numeric bounds. Allowed only when
       // every differing error is a numeric bound.
