@@ -109,6 +109,12 @@
       "types": "./codegen.d.ts",
       "import": "./codegen.mjs",
       "require": "./codegen.js"
+    },
+    "./kernels": {
+      "import": "./lib/kernels/index.mjs"
+    },
+    "./ir": {
+      "import": "./lib/ir/index.mjs"
     }
   },
   "sideEffects": [
