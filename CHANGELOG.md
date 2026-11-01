@@ -11,6 +11,8 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Fixed
 
+- Under `verbose` with `richErrors: false`, a collapsed `anyOf`/`oneOf` error keeps `parentSchema`, `schema` and `data`, as every other error does. The plain shape copied that error's fields by name and left the three out.
+
 - A validator whose compile threw (a custom keyword's `compile` returning no function) now throws the same error on every later call. It stayed marked compiled, and the next call of `validate`, `isValidObject`, `validateJSON` or `isValidJSON` recursed until the stack ran out.
 
 - `removeAdditional` no longer empties an array given where the root schema describes an object. With code generation on, the pass deleted the array's items as if their indices were additional properties (`['1', 2]` became two empty slots); the interpreted engine left the array alone, and both now do. The document was rejected by `type` either way. Present in 1.62.1 and earlier.

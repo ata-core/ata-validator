@@ -167,7 +167,10 @@ const esbuild = require('esbuild')
 // 58820 (58813 measured): a compile that throws no longer leaves the
 // validator marked compiled, where the next call's lazy method called itself
 // until the stack ran out (lib/validator-core.js _ensureCompiled).
-const BUDGET = 58820
+// 58830 (58822 measured): under verbose and plain errors, a collapsed
+// anyOf/oneOf error keeps parentSchema, schema and data (lib/rejections.js
+// stripOrdinal dropped them).
+const BUDGET = 58830
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
