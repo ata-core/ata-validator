@@ -11,6 +11,9 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Fixed
 
+- `coerceTypes: 'array'` wraps a lone value of a top-level array property on the interpreted engine too (`'3'` becomes `[3]`), as code generation did. The two engines left different documents.
+- Errors behind a reference to a document registered under a relative `$id` (`schemas: [{ $id: 'shared', ... }]`, as Fastify registers them) come in schema order. With code generation on, `additionalProperties` came ahead of the properties declared before it; the order could not follow `shared#` from a root without `$id`.
+
 - Under `verbose` with `richErrors: false`, a collapsed `anyOf`/`oneOf` error keeps `parentSchema`, `schema` and `data`, as every other error does. The plain shape copied that error's fields by name and left the three out.
 
 - A validator whose compile threw (a custom keyword's `compile` returning no function) now throws the same error on every later call. It stayed marked compiled, and the next call of `validate`, `isValidObject`, `validateJSON` or `isValidJSON` recursed until the stack ran out.
