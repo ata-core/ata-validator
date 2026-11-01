@@ -6,6 +6,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Fixed
 
+- `ata-validator/aot` in a browser bundle. Since the browser build began loading the code generator on demand (1.56.0), `bundleStandalone()` called from a page before the generator had loaded compiled every schema to a null validator and returned a module of nulls without an error; the emitters now register the generator they need. The same entry pulled in `lib/error-runtime.js`, which reads the library's files with `fs`: esbuild refused to bundle it for the browser and Vite left an empty stand-in. That file now has a browser twin, and its pure helpers live in `lib/error-runtime-features.js`. `tests/test_aot_registers_codegen.js`.
 - 1.62.0 made a schema compile about 2% slower: the check that refuses a non-numeric value in a numeric keyword looked up thirteen keywords on every schema node. It now reads the node's own keys. A nine-field zod schema through `@ata-project/zod` compiles in 159.7 µs against 160 on 1.61.3 and 161.2 on 1.62.0, medians of 15 interleaved rounds.
 
 ## 1.62.0 - 2026-10-31
