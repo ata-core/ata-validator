@@ -2,7 +2,7 @@
 // writer, held to the current engine on generated documents: errorMessage
 // (custom messages over the finished errors), the discriminator (ignored, as
 // the Validator ignores it), OpenAPI's nullable, coerceTypes and
-// removeAdditional, custom formats. Verdict, every error with every field in order, and the
+// removeAdditional, custom formats, custom keywords. Verdict, every error with every field in order, and the
 // document after the passes.
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
@@ -21,6 +21,18 @@ const CASES = [
   // Custom formats: a new name, a built-in name replaced, a non-function ignored.
   [{ type: 'object', properties: { s: { format: 'short' }, a: { type: 'string', format: 'email' }, b: { format: 'email' }, c: { format: 'uuid' } } }, { formats: { short: (v) => v.length < 2, email: (v) => v !== 'x', uuid: /never/ } }],
   [{ type: 'object', properties: { s: { format: 'short' } } }, { formats: { short: () => 0 }, assertFormat: false }],
+  // Custom keywords: compile, validate (a bare function too), macro, type
+  // lists, errors a function writes (with and without its own paths), the
+  // order `before` and `post` give, and keywords under applicators.
+  [{ type: 'object', properties: { t: { type: 'string', maxWords: 2 }, n: { range: [1, 5] }, m: { atLeast: 3 }, e: { even: true }, u: { anyOf: [{ maxWords: 1 }, { type: 'number', even: true }] }, v: { not: { even: true } }, w: { if: { type: 'number' }, then: { atLeast: 0 } }, r: { $ref: '#/$defs/r' } }, $defs: { r: { type: ['string', 'number'], tagged: 'x', atLeast: 2, nothing: 1, never: true } } }, { keywords: {
+    maxWords: { type: 'string', compile: (n) => (s) => s.split(/\s+/).length <= n },
+    range: { macro: ([a, b]) => ({ minimum: a, maximum: b }) },
+    atLeast: { type: ['number', 'string'], validate: function check (limit, data) { if ((typeof data === 'string' ? data.length : data) >= limit) return true; check.errors = [{ message: 'must be at least ' + limit, params: { limit }, keyword: 'minimum' }, { message: 'second', instancePath: '/deep', schemaPath: '#/elsewhere' }]; return false } },
+    even: (v, d) => typeof d !== 'number' || d % 2 === 0,
+    tagged: { type: 'string', before: 'atLeast', validate: (v, d) => d !== 'bad' },
+    nothing: { macro: () => undefined },
+    never: { macro: (v) => v ? false : true, post: true },
+  } }],
 ]
 
 let seed = 7
@@ -51,4 +63,4 @@ for (const [schema, opts] of CASES) {
   }
 }
 if (failed) { console.log(`${failed} of ${checked} differ`); process.exit(1) }
-console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional and custom formats`)
+console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats and custom keywords`)
