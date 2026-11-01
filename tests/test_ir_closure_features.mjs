@@ -2,7 +2,7 @@
 // writer, held to the current engine on generated documents: errorMessage
 // (custom messages over the finished errors), the discriminator (ignored, as
 // the Validator ignores it), OpenAPI's nullable, coerceTypes and
-// removeAdditional. Verdict, every error with every field in order, and the
+// removeAdditional, custom formats. Verdict, every error with every field in order, and the
 // document after the passes.
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
@@ -18,6 +18,9 @@ const CASES = [
   [{ type: 'object', properties: { a: { type: 'string', nullable: true, minLength: 2 }, b: { type: 'integer', nullable: true }, c: { enum: ['x', 'y'], nullable: true } } }, {}],
   [{ type: 'object', properties: { n: { type: 'integer', minimum: 1 }, f: { type: 'number' }, b: { type: 'boolean' }, s: { type: 'string' }, inner: { type: 'object', properties: { m: { type: 'integer' } }, additionalProperties: false } }, additionalProperties: false }, { coerceTypes: true, removeAdditional: true }],
   [{ type: 'object', properties: { n: { type: 'integer', default: 3 }, t: { type: 'string', errorMessage: 'text' } }, required: ['t'] }, { coerceTypes: true }],
+  // Custom formats: a new name, a built-in name replaced, a non-function ignored.
+  [{ type: 'object', properties: { s: { format: 'short' }, a: { type: 'string', format: 'email' }, b: { format: 'email' }, c: { format: 'uuid' } } }, { formats: { short: (v) => v.length < 2, email: (v) => v !== 'x', uuid: /never/ } }],
+  [{ type: 'object', properties: { s: { format: 'short' } } }, { formats: { short: () => 0 }, assertFormat: false }],
 ]
 
 let seed = 7
@@ -48,4 +51,4 @@ for (const [schema, opts] of CASES) {
   }
 }
 if (failed) { console.log(`${failed} of ${checked} differ`); process.exit(1) }
-console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes and removeAdditional`)
+console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional and custom formats`)
