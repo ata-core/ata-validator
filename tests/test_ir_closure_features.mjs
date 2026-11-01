@@ -33,6 +33,11 @@ const CASES = [
     nothing: { macro: () => undefined },
     never: { macro: (v) => v ? false : true, post: true },
   } }],
+  // References that name nothing fail where they run (ATA5001); an $id with a
+  // pointer fragment opens no resource; baseURI is the base of a schema
+  // without an $id.
+  [{ $schema: 'http://json-schema.org/draft-07/schema#', definitions: { e: { $id: '#/definitions/e', type: 'string', minLength: 2 } }, properties: { a: { $ref: '#/definitions/e' }, b: { $ref: 'defs/x.json' }, c: { $ref: '#/nope' }, t: { $ref: '#noanchor' }, x: { $ref: 'https://other.example/y.json#/z' } } }, {}],
+  [{ properties: { a: { $ref: 'defs/item.json' }, b: { $ref: 'defs/missing.json' } } }, { baseURI: 'https://ex.com/root.json', schemas: [{ $id: 'https://ex.com/defs/item.json', type: 'string', minLength: 2 }] }],
   // verbose and abortEarly, rich and plain, alone and together, with errorMessage.
   ...[{ verbose: true }, { verbose: true, richErrors: false }, { abortEarly: true }, { abortEarly: true, richErrors: false }, { abortEarly: true, verbose: true }, { abortEarly: true, verbose: true, richErrors: false }].map((o) => [{ type: 'object', properties: { a: { type: 'string', minLength: 3 }, b: { type: 'integer', errorMessage: 'b is whole' }, c: { anyOf: [{ type: 'string' }, { type: 'number', minimum: 5 }] }, list: { type: 'array', items: { type: 'object', properties: { q: { type: 'number' } }, required: ['q'] } } }, required: ['t', 'x'], additionalProperties: false }, o]),
 ]
@@ -65,4 +70,4 @@ for (const [schema, opts] of CASES) {
   }
 }
 if (failed) { console.log(`${failed} of ${checked} differ`); process.exit(1) }
-console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats, custom keywords, verbose and abortEarly`)
+console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats, custom keywords, verbose, abortEarly, unresolved references and baseURI`)
