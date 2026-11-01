@@ -33,6 +33,8 @@ const CASES = [
     nothing: { macro: () => undefined },
     never: { macro: (v) => v ? false : true, post: true },
   } }],
+  // verbose and abortEarly, rich and plain, alone and together, with errorMessage.
+  ...[{ verbose: true }, { verbose: true, richErrors: false }, { abortEarly: true }, { abortEarly: true, richErrors: false }, { abortEarly: true, verbose: true }, { abortEarly: true, verbose: true, richErrors: false }].map((o) => [{ type: 'object', properties: { a: { type: 'string', minLength: 3 }, b: { type: 'integer', errorMessage: 'b is whole' }, c: { anyOf: [{ type: 'string' }, { type: 'number', minimum: 5 }] }, list: { type: 'array', items: { type: 'object', properties: { q: { type: 'number' } }, required: ['q'] } } }, required: ['t', 'x'], additionalProperties: false }, o]),
 ]
 
 let seed = 7
@@ -45,7 +47,7 @@ function value (d) {
   if (d < 3 && r === 1) { const a = []; for (let i = rnd(4); i > 0; i--) a.push(value(d + 1)); return a }
   return structuredClone(ATOMS[rnd(ATOMS.length)])
 }
-const shape = (r) => JSON.stringify([r.valid, (r.errors || []).map((e) => Object.keys(e).map((k) => [k, e[k] === undefined ? '<undef>' : e[k]]))])
+const shape = (r) => JSON.stringify([r.valid, Object.isFrozen(r), (r.errors || []).map((e) => [Object.isFrozen(e), e._s === true, Object.keys(e).map((k) => [k, e[k] === undefined ? '<undef>' : e[k]])])])
 const dump = (d) => { try { return JSON.stringify(d) } catch { return String(d) } }
 
 let failed = 0; let checked = 0
@@ -63,4 +65,4 @@ for (const [schema, opts] of CASES) {
   }
 }
 if (failed) { console.log(`${failed} of ${checked} differ`); process.exit(1) }
-console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats and custom keywords`)
+console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats, custom keywords, verbose and abortEarly`)
