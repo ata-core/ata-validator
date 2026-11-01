@@ -108,12 +108,7 @@ resolves to an entry without the code generator through the `workerd` and `edge-
 conditions: the same names and answers, and a Worker bundled by wrangler goes from 179.1 to
 70.4 KiB gzipped.
 
-In a browser, compile with the bundler plugin. [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata)
-turns each `new Validator(schema)` whose schema it can read at build time into a compiled
-validator that gives the same answers, and the runtime stays out of the page. A form with two
-validators, one reading errors and one asking only for a verdict, bundles to 10.7 KB gzipped,
-or 3.1 KB with `richErrors: false` on the one that reads errors, against 53.2 KB for the same
-code on the runtime (esbuild, minified, the runtime with code splitting).
+In a browser, compile with the bundler plugin: see [In the browser](#in-the-browser).
 
 Without the plugin, the code generator is still not part of the page. Every schema starts on the
 interpreted engine, which gives the same answers, and a validator called a thousand times within
@@ -162,7 +157,31 @@ if (isValid(req.body)) {
 
 The `.compiled.mjs` modules are self-contained: zero runtime dependency on ata-validator, fully tree-shakeable, with TypeScript types emitted alongside.
 
-Code already written with `new Validator(schema)` gets the same result from the bundler plugin, without changes: [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata) replaces each call whose schema is known at build time with a compiled validator that answers the same, and the runtime leaves the bundle. For the plugin's three-schema test entry a minified Vite build goes from 122.5 KB to 16.7 KB gzipped on ata 1.39.2. Schemas that arrive at runtime keep the runtime, which is the right tool for them.
+Code already written with `new Validator(schema)` gets the same result from the bundler plugin, without changes: [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata) replaces each call whose schema is known at build time with a compiled validator that answers the same, and the runtime leaves the bundle. The sizes are in [In the browser](#in-the-browser). Schemas that arrive at runtime keep the runtime, which is the right tool for them.
+
+## In the browser
+
+Add the bundler plugin. [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata) compiles each `new Validator(schema)` whose schema it can read at build time, so the page carries that schema's checks and not the compiler. Your code does not change, and the answers, the errors and the filled defaults are the same.
+
+```js
+// vite.config.js
+import ata from '@ata-project/unplugin/vite'
+
+export default { plugins: [ata()] }
+```
+
+Webpack, Rspack, Rollup, Rolldown, esbuild and Bun take the same plugin; see its [setup](https://github.com/ata-core/unplugin-ata#setup).
+
+An order form with six fields, an email format, a pattern and a default, its errors read on submit:
+
+| | gzipped | ready, phone profile | first submit |
+|---|---|---|---|
+| without the plugin (code split) | 55.2 KB | 764 ms | 13.5 ms |
+| with the plugin | 4.2 KB | 364 ms | 1.6 ms |
+
+The sizes are an esbuild build, minified, gzip level 9. The times are Chrome with Lighthouse's mobile throttling (CPU 4x slower, 1.6 Mbps, 150 ms round trip), the files served gzipped, medians of 11 runs; the submit is made as soon as the page has loaded, before the runtime warms itself up in idle time, so a later submit on the runtime takes less than that. Ten generated form schemas come to 7.2 KB with the plugin. Needs ata-validator 1.63.0 and the plugin's 0.12.0; with earlier versions the plugin's modules are larger (11.3 KB for this form).
+
+A schema the build cannot read, one fetched at run time, keeps the runtime, which is the right tool for it.
 
 ## Measured by others
 
