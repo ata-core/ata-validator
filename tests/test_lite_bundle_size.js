@@ -164,7 +164,10 @@ const esbuild = require('esbuild')
 // lib/interpreter-core.js); coercion and removal stay off inherited objects
 // (lib/validator-core.js). The native engine's setup moved out to
 // lib/native-attach.js, which the browser build maps to a stub.
-const BUDGET = 58800
+// 58820 (58813 measured): a compile that throws no longer leaves the
+// validator marked compiled, where the next call's lazy method called itself
+// until the stack ran out (lib/validator-core.js _ensureCompiled).
+const BUDGET = 58820
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

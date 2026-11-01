@@ -11,6 +11,8 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Fixed
 
+- A validator whose compile threw (a custom keyword's `compile` returning no function) now throws the same error on every later call. It stayed marked compiled, and the next call of `validate`, `isValidObject`, `validateJSON` or `isValidJSON` recursed until the stack ran out.
+
 - `removeAdditional` no longer empties an array given where the root schema describes an object. With code generation on, the pass deleted the array's items as if their indices were additional properties (`['1', 2]` became two empty slots); the interpreted engine left the array alone, and both now do. The document was rejected by `type` either way. Present in 1.62.1 and earlier.
 
 - Reading the errors threw `ReferenceError: _pk1 is not defined` for a schema with an `anyOf` or `oneOf` branch whose property holds another `anyOf`/`oneOf` with `additionalProperties: false` inside, such as SchemaStore's `prometheus.rules.json`. A branch is written as a function of its own and takes its value as `_bv`; the ordinary-object flag an enclosing branch declared for its own `_bv` was still on record while the nested branch was written, so the nested function named a variable outside its scope (and, had it been in scope, one describing another object). The verdict was right; the error path threw, in both the rich and the plain shape. Since 1.61.0 (7c7fb5e). Branch bodies, their verdict copies, and the combined function's hoisted properties and definitions now go through the same isolation as the error generator's other hoisted bodies. `tests/test_branch_plain_scope.js`.
