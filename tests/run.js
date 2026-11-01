@@ -150,6 +150,7 @@ const FILES = [
   "tests/test_typed_validator_runner.js",
   "tests/test_define_schema.js",
   "tests/test_define_schema_bundle.js",
+  "tests/test_branch_plain_scope.js",
   "tests/test_error_codes_lock.js",
   "tests/test_error_code_lookup.js",
   "tests/test_error_order.js",
