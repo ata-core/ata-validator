@@ -169,6 +169,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // built on one definition per keyword (lib/ir: a front end, a backend that
 // writes modules and one that builds closures) and the helpers its modules
 // import, so a page with several schemas carries them once. Measured 552.9 KB.
-assert.ok(manifest.size < 554 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 556 KB with the IR's error order (the check for which schemas need sorting,
+// the skeleton it sorts against) and its list of keywords that carry a
+// meaning. Measured 554.8 KB.
+assert.ok(manifest.size < 556 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

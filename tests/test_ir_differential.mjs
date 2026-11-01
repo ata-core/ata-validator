@@ -251,7 +251,8 @@ async function run (backend, { DEFAULTS, PLAIN }) {
       if (a === b) continue
       if (knownDiv) { known++; continue }
       // Known divergence in order only, and only in the schema whose errors
-      // come through a URI $ref into another resource.
+      // come through a URI $ref into another resource: the current engine's
+      // sort cannot place those paths and leaves them in its own walk order.
       if (name === 'dyn' && dump(da) === dump(db) && sameSet(ra, rb)) { orderOnly++; continue }
       failures++
       if (failures <= 3) {
@@ -260,7 +261,7 @@ async function run (backend, { DEFAULTS, PLAIN }) {
       }
     }
   }
-  console.log(`  ${label.padEnd(30)} ${checked} documents, ${failures} differ, ${known} infinite-number divergences, ${orderOnly} order-only`)
+  console.log(`  ${label.padEnd(30)} ${checked} documents, ${failures} differ, ${known} infinite-number divergences, ${orderOnly} order-only (URI $ref)`)
   total += failures
 }
 
