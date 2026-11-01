@@ -49,6 +49,27 @@ ata which wrote it is no longer the one installed. Both are needed: an
 upgrade with no schema change leaves the hash matching, so the hash on its
 own reads a module from an older ata as current.
 
+## The IR compiler
+
+`ata-validator/ir` and `ata-validator/kernels` are new in 1.63.0 and are
+experimental within 1.x: `specialize()` and `compileClosures()` are the
+documented entry points (see [docs/ir.md](ir.md)), and what they accept, the
+options they take and the schemas they refuse may change in a minor
+release. The intermediate representation itself (`front()`, `emitIR()`) is
+internal.
+
+A module that `specialize()` writes imports its helpers from
+`ata-validator/kernels` by name, and those names are a contract only with the
+version that wrote it. `@ata-project/unplugin` writes the modules at every
+build from the installed version, so they always match; a module written once
+and kept should be written again after an upgrade, as with any compiled
+output (it carries no `ataVersion` of its own yet).
+
+Both backends are held to the runtime `Validator` of the same version by the
+official test suite in every dialect, the SchemaStore differential and a
+generated-document differential, all in CI; the differences that remain are
+listed in docs/ir.md.
+
 ## Platform support
 
 Native prebuilds ship as `@ata-validator/native-*` optional packages for linux x64/arm64 (glibc and musl), macOS arm64, and windows x64. Every other platform runs the pure-JS engine. The core package contains no binaries.
