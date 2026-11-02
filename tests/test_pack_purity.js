@@ -189,6 +189,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 574 KB with the closures' walk over an object's own names for a verdict,
 // which took their median verdict on SchemaStore with code generation blocked
 // from 3.70x the interpreter's to 2.95x. Measured 573.2 KB.
-assert.ok(manifest.size < 574 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 577 KB with the module writer's verdict moves (a table of functions for an
+// object's names, large bodies as functions of their value, long enums as
+// Sets, no paths in calls that gather no errors), which took its median
+// verdict on SchemaStore from 1.28x the code generator's to 1.09-1.12x (three runs) and its
+// worst from 25x to 6x. Measured 575.9 KB.
+assert.ok(manifest.size < 577 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
