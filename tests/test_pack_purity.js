@@ -207,6 +207,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // properties have defaults inside (tslint 1034 to 616 ns), walked keys told
 // apart by length, and the default verdict on the interpreted engine where
 // code generation is blocked (670 to 365 ns). Measured 579.74 KB.
-assert.ok(manifest.size < 580 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 581 KB with a bit per default name for objects with 24 or more defaults,
+// set in one pass over the object's own names (10 SchemaStore schemas faster,
+// none slower; rustfmt 1371 to 751 ns). Measured 580.46 KB.
+assert.ok(manifest.size < 581 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

@@ -8,6 +8,7 @@ import assert from 'node:assert'
 import { createRequire } from 'node:module'
 import { specialize, functionBody } from '../lib/ir/emit.mjs'
 import * as K from '../lib/kernels/index.mjs'
+import { compileClosures } from '../lib/ir/index.mjs'
 const require = createRequire(import.meta.url)
 const { Validator } = require('../index.js')
 
@@ -73,4 +74,31 @@ for (const [name, make] of Object.entries(manyDocs)) {
   }
   const inh = Object.getPrototypeOf(y); if (inh && inh !== Object.prototype) assert.strictEqual(JSON.stringify(inh), JSON.stringify(Object.getPrototypeOf(x)), `twenty filled properties, ${name}: the prototype is left alone`)
 }
-console.log(`ok: the module's default fill matches the current engine on ${Object.keys(docs).length + Object.keys(manyDocs).length} kinds of object`)
+// Forty defaults on one object: the fill sets a bit per default name the
+// object has, in two 32-bit words, and writes the defaults whose bit is clear
+// (defaultsMask). Held to the current engine in both backends.
+const forty = { type: 'object', properties: Object.fromEntries([...Array(40)].map((_, i) => ['o' + i, { default: i % 3 === 0 ? { n: i } : i % 3 === 1 ? 'v' + i : [] }])) }
+const fortySrc = specialize(forty, { assertFormat: false, useDefaults: true, verdict: true })
+assert.ok(/\{let m0=0,m1=0\n/.test(fortySrc), 'forty defaults: the fill does not use the bit mask, so the case under test did not run')
+const fortyMod = new Function('K', functionBody(fortySrc))(K)
+const fortyClosures = compileClosures(forty, { assertFormat: false, useDefaults: true })
+const fortyAta = new Validator(forty, { useDefaults: true })
+const fortyDocs = {
+  'empty': () => ({}),
+  'all present': () => Object.fromEntries([...Array(40)].map((_, i) => ['o' + i, i])),
+  'some present, past the first word': () => ({ o0: 1, o31: 2, o32: 3, o39: 4, other: 5 }),
+  'explicit undefined': () => ({ o1: undefined, o35: undefined }),
+  'a non-enumerable own name': () => Object.defineProperty({}, 'o33', { value: 'hidden', enumerable: false, writable: true, configurable: true }),
+  'an inherited name': () => Object.create({ o2: 'inherited', o34: 'inherited' }),
+  'a null prototype': () => Object.assign(Object.create(null), { o3: 'x' }),
+}
+const dump = (o) => JSON.stringify(Object.getOwnPropertyNames(o).sort().map((k) => [k, o[k] === undefined ? '<undef>' : o[k], Object.prototype.propertyIsEnumerable.call(o, k)]))
+for (const [name, make] of Object.entries(fortyDocs)) {
+  const x = make(); const y = make(); const z = make()
+  fortyAta.validate(x); fortyMod.validate(y); fortyClosures.validate(z)
+  assert.strictEqual(dump(y), dump(x), `forty defaults, ${name}: module`)
+  assert.strictEqual(dump(z), dump(x), `forty defaults, ${name}: closures`)
+}
+// Each filled object value is a copy of its own.
+const a = {}; const b = {}; fortyMod.validate(a); fortyMod.validate(b); assert.notStrictEqual(a.o0, b.o0, 'forty defaults: an object default is shared between documents')
+console.log(`ok: the default fill matches the current engine on ${Object.keys(docs).length + Object.keys(manyDocs).length + Object.keys(fortyDocs).length} kinds of object`)
