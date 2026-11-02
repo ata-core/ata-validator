@@ -194,6 +194,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // Sets, no paths in calls that gather no errors), which took its median
 // verdict on SchemaStore from 1.28x the code generator's to 1.09-1.12x (three runs) and its
 // worst from 25x to 6x. Measured 575.9 KB.
-assert.ok(manifest.size < 577 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 578 KB with the kernels' bounded typo distance (the banded one of
+// lib/levenshtein.js) and branch keywords that build errors only when they
+// fail, which took the module writer's median errors read on SchemaStore
+// from 1.16x the code generator's to 0.91x and its p90 from 10.3x to 1.27x.
+// Measured 577.05 KB.
+assert.ok(manifest.size < 578 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
