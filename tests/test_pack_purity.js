@@ -202,6 +202,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 579 KB with verdicts that read unevaluatedProperties' evaluated names off
 // the schema and annotation sets made on first use (yamllint's verdict 1153
 // to 279 ns, vector's 47.9 to 24.6 us). Measured 578.45 KB.
-assert.ok(manifest.size < 579 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 580 KB with default fills that keep an object in V8's fast mode (htmlhint's
+// verdict 1465 to 394 ns), fills that walk an object's own names when many
+// properties have defaults inside (tslint 1034 to 616 ns), walked keys told
+// apart by length, and the default verdict on the interpreted engine where
+// code generation is blocked (670 to 365 ns). Measured 579.74 KB.
+assert.ok(manifest.size < 580 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

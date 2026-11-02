@@ -46,4 +46,31 @@ for (const [name, make] of Object.entries(docs)) {
   assert.strictEqual(show(y), show(x), `${name}: filled document`)
   if (x.nested && typeof x.nested === 'object') assert.strictEqual(show(y.nested), show(x.nested), `${name}: nested filled document`)
 }
-console.log(`ok: the module's default fill matches the current engine on ${Object.keys(docs).length} kinds of object`)
+// Twenty properties whose values have defaults inside: the fill walks the
+// object's own names and looks each up (fillWalk) instead of asking about all
+// twenty. Own non-enumerable names count, inherited ones do not.
+const rule = { type: 'object', properties: { on: { type: 'boolean', default: true }, level: { default: 'warn' } } }
+const many = { type: 'object', properties: Object.fromEntries([...Array(20)].map((_, i) => ['r' + i, rule])) }
+const manySrc = specialize(many, { assertFormat: false, useDefaults: true, verdict: true })
+assert.ok(manySrc.includes('getOwnPropertyNames'), 'twenty filled properties: the fill does not walk the object, so the case under test did not run')
+const manyMod = new Function('K', functionBody(manySrc))(K)
+const manyAta = new Validator(many, { useDefaults: true })
+const manyDocs = {
+  'two present': () => ({ r0: {}, r7: { on: false } }),
+  'none present': () => ({}),
+  'a present name holding undefined': () => ({ r1: undefined, r2: {} }),
+  'a non-enumerable own name': () => Object.defineProperty({ r3: {} }, 'r4', { value: {}, enumerable: false, writable: true, configurable: true }),
+  'an inherited name': () => Object.create({ r5: {} }),
+  'a null prototype': () => Object.assign(Object.create(null), { r6: {}, x: 1 }),
+  'a value that is not an object': () => ({ r8: 'text', r9: [1] }),
+}
+for (const [name, make] of Object.entries(manyDocs)) {
+  const x = make(); const y = make()
+  assert.strictEqual(manyMod.validate(y).valid, manyAta.validate(x).valid, `twenty filled properties, ${name}: verdict`)
+  for (const k of new Set([...Object.getOwnPropertyNames(x), ...Object.getOwnPropertyNames(y)])) {
+    const a = x[k]; const b = y[k]
+    assert.strictEqual(JSON.stringify(b), JSON.stringify(a), `twenty filled properties, ${name}: ${k}`)
+  }
+  const inh = Object.getPrototypeOf(y); if (inh && inh !== Object.prototype) assert.strictEqual(JSON.stringify(inh), JSON.stringify(Object.getPrototypeOf(x)), `twenty filled properties, ${name}: the prototype is left alone`)
+}
+console.log(`ok: the module's default fill matches the current engine on ${Object.keys(docs).length + Object.keys(manyDocs).length} kinds of object`)
