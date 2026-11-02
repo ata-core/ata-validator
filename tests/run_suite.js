@@ -12,9 +12,6 @@
 // expects them to behave and how the Bowtie harness configures ata.
 //
 // Usage: node tests/run_suite.js [draft2020-12|draft7|v1]
-// These answers compare the generated code with the interpreter: keep a small
-// schema's first calls on the generated code (see lib/codegen-engine.js coldTwin).
-process.env.ATA_NO_SMALL_TWIN = '1'
 
 const fs = require("fs");
 const path = require("path");
