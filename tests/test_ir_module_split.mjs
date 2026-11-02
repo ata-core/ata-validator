@@ -139,4 +139,22 @@ const closed = { type: 'object', properties: Object.fromEntries(['id', 'ab', 'na
   const docs = [{}, { id: 1, priority: 2 }, { ix: 1 }, { nama: 1 }, { colour: 1 }, { enable: 1 }, { enabled: 1, priorit: 1 }, { 'é': 1 }, { '': 1 }, { name: 1, mode: 2, kind: 3, size: 4 }, { 'name ': 1 }]
   for (const d of docs) { assert.strictEqual(m.isValid(d), ata.isValidObject(d), `closed: ${JSON.stringify(d)}`); checked++ }
 }
+// Thirty-one listed names, a third with no checks, and additionalProperties: false:
+// the verdict's walk over the object's names also rejects the names not
+// listed (an own, enumerable one), so no second pass runs.
+const shut = { type: 'object', required: ['id'], properties: Object.fromEntries([['id', { type: 'integer' }], ...[...Array(30)].map((_, i) => ['f' + i, i % 3 === 1 ? {} : { type: 'string' }])]), additionalProperties: false }
+{
+  const { src, m } = load(shut)
+  assert.ok(src.includes('Object.prototype.propertyIsEnumerable') && !/for\(const \w+ in d\)/.test(src.slice(src.indexOf('export function isValid'))), 'shut: the walk does not reject unknown names itself, so the path under test did not run')
+  const ata = new Validator(shut)
+  const docs = [
+    { id: 1 }, { id: 1, f0: 'a', f1: 5, f28: 1 }, { id: 1, f30: 1 }, { id: 1, f3: 5 }, { id: 1, fx: 1 }, { id: 'x' }, {},
+    Object.defineProperty({ id: 1 }, 'hidden', { value: 1, enumerable: false }),
+    Object.assign(Object.create({ inherited: 1 }), { id: 1 }),
+    JSON.parse('{"id":1,"__proto__":1}'),
+    Object.assign(Object.create(null), { id: 1, f2: 'b' }),
+    Object.assign(Object.create(null), { id: 1, other: 1 }),
+  ]
+  for (const d of docs) { assert.strictEqual(m.isValid(d), ata.isValidObject(d), `shut: ${JSON.stringify(d)}`); assert.strictEqual(m.validate(d).valid, ata.validate(d).valid, `shut validate(): ${JSON.stringify(d)}`); checked++ }
+}
 console.log(`ok: the module writer's tables, moved functions, enum sets and key loops answer as the current engine on ${checked} documents`)
