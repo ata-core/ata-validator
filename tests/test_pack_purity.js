@@ -183,6 +183,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // values and relative schema names. Measured 567.6 KB.
 // 572 KB with the IR's walk for keywords that read their data's context.
 // Measured 570.5 KB.
-assert.ok(manifest.size < 572 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 573 KB with lib/ir/emit-deps.mjs, the generated copy of the pattern
+// unrolling and the format hints that lets the module writer load in a
+// browser without the code generator. Measured 572.4 KB.
+assert.ok(manifest.size < 573 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

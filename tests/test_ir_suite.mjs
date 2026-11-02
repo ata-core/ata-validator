@@ -1,6 +1,6 @@
 // The IR compiler (lib/ir) against the official test suite, every dialect,
 // and its format tests with formats asserted, on both backends: generated
-// modules and closures. A group the IR refuses ("ir: ...") is counted, never
+// modules (also as functions of the kernels object) and closures. A group the IR refuses ("ir: ...") is counted, never
 // guessed; every group it accepts must give the suite's verdicts and the
 // current engine's full output (every error, every field, in order).
 import fs from 'node:fs'
@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url)
 const { Validator } = require('../index.js')
 const { METASCHEMAS } = require('../lib/metaschemas.js')
 const { compileClosures } = await import('../lib/ir/index.mjs')
-const { compile: compileModule } = await import('../lib/ir/emit.mjs')
+const { compile: compileModule, compileFunction } = await import('./ir-load-module.mjs')
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const SUITE = path.join(here, 'suite/tests')
@@ -46,7 +46,7 @@ async function runDir (dir, dialect, assertFormat, backend) {
       const schema = withDialect(g.schema)
       let eng
       try {
-        eng = backend === 'closures' ? compileClosures(schema, { ...opts, metaschemas: METASCHEMAS }) : await compileModule(schema, { ...opts, metaschemas: METASCHEMAS })
+        eng = backend === 'closures' ? compileClosures(schema, { ...opts, metaschemas: METASCHEMAS }) : backend === 'function' ? compileFunction(schema, { ...opts, metaschemas: METASCHEMAS }) : await compileModule(schema, { ...opts, metaschemas: METASCHEMAS })
       } catch (e) {
         if (!/^ir: /.test(e.message)) fail(`${dialect} ${file} "${g.description}": threw ${e.message}`)
         continue
@@ -65,10 +65,11 @@ async function runDir (dir, dialect, assertFormat, backend) {
   return { groups, supported, cases }
 }
 
-for (const backend of ['closures', 'modules']) {
+// 'function' is the modules' text run through functionBody: the same groups.
+for (const backend of ['closures', 'modules', 'function']) {
   for (const dialect of Object.keys(DIALECTS)) {
     const main = await runDir(path.join(SUITE, dialect), dialect, false, backend)
-    const min = backend === 'modules' && MIN_MODULES[dialect] !== undefined ? MIN_MODULES[dialect] : MIN_GROUPS[dialect]
+    const min = backend !== 'closures' && MIN_MODULES[dialect] !== undefined ? MIN_MODULES[dialect] : MIN_GROUPS[dialect]
     if (main.supported < min) fail(`${backend} ${dialect}: ${main.supported} groups supported, expected at least ${min}`)
     const fmtDir = path.join(SUITE, dialect, 'optional/format')
     const fmt = fs.existsSync(fmtDir) ? await runDir(fmtDir, dialect, true, backend) : { supported: 0, cases: 0, groups: 0 }
@@ -76,4 +77,4 @@ for (const backend of ['closures', 'modules']) {
   }
 }
 if (failed) { console.log(`\n${failed} failed`); process.exit(1) }
-console.log('ok: the IR matches the current engine on every suite group it accepts, both backends')
+console.log('ok: the IR matches the current engine on every suite group it accepts, both backends and the modules as functions')

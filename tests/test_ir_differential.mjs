@@ -12,7 +12,7 @@ const { Validator } = require('../index.js')
 const COUNT = Number(process.env.IR_DIFF_COUNT || 1500)
 
 const { compileClosures } = await import('../lib/ir/index.mjs')
-const { compile: compileModule } = await import('../lib/ir/emit.mjs')
+const { compile: compileModule } = await import('./ir-load-module.mjs')
 
 const SCHEMAS = {
   order: {
