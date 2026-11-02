@@ -214,6 +214,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // generated defaults pass handed to the module writer where its own fill
 // declines (ata-validator/build defaultsSource; 20 of the 22 SchemaStore
 // schemas it changes faster, none slower). Measured 581.1 KB.
-assert.ok(manifest.size < 582 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 583 KB with small schemas answered on the interpreted twin once a process
+// has met many schemas (2000 schemas compiled at 19 against 59 us each), and
+// the twin let go once a validator compiles. Measured 582.36 KB.
+assert.ok(manifest.size < 583 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

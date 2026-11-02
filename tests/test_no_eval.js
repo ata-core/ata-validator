@@ -1,4 +1,7 @@
 'use strict'
+// These answers compare the generated code with the interpreter: keep a small
+// schema's first calls on the generated code (see lib/codegen-engine.js coldTwin).
+process.env.ATA_NO_SMALL_TWIN = '1'
 
 // ata must validate correctly where code generation is unavailable.
 //
