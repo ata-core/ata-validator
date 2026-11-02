@@ -23,7 +23,7 @@ const nested = { type: 'object', properties: {} }
 for (let i = 0; i < 60; i++) nested.properties['n' + i] = { type: 'integer', minimum: i, maximum: 1000 }
 const props = {}
 for (let i = 0; i < 20; i++) props['s' + i] = { type: 'string', maxLength: 8 }
-for (let i = 0; i < 20; i++) props['r' + i] = { $ref: '#/$defs/pos' }
+for (let i = 0; i < 70; i++) props['r' + i] = { $ref: '#/$defs/pos' }
 for (let i = 0; i < 6; i++) props['a' + i] = { anyOf: [{ type: 'string', minLength: 2 }, { type: 'number', minimum: 0 }] }
 props.big = nested
 props.word = { enum: words }
@@ -35,6 +35,11 @@ const mixed = { type: 'object', properties: props, $defs: { pos: { type: 'intege
 // so the small ones move too.
 const many = { type: 'object', properties: {} }
 for (let i = 0; i < 300; i++) many.properties['p' + i] = { anyOf: [{ type: 'string' }, { type: 'integer', minimum: i }] }
+
+// Thirty entries that call one small function: a switch of direct calls,
+// which V8 can inline, rather than a table.
+const medium = { type: 'object', properties: {}, $defs: { pos: { type: 'integer', minimum: 1 } } }
+for (let i = 0; i < 30; i++) medium.properties['r' + i] = { $ref: '#/$defs/pos' }
 
 const good = (schema) => {
   const d = {}
@@ -76,9 +81,9 @@ const edges = (schema) => [
 ]
 
 let checked = 0
-for (const [name, schema, expect] of [['mixed', mixed, ['new Map(', 'new Set(', 'function L']], ['many', many, ['new Map(', 'function L']]]) {
+for (const [name, schema, expect] of [['mixed', mixed, ['new Map(', 'new Set(', 'function L']], ['many', many, ['new Map(', 'function L']], ['medium', medium, ['switch(ks[j])', '!new Map(']]]) {
   const { src, m } = load(schema)
-  for (const s of expect) assert.ok(src.includes(s), `${name}: the module has no ${s}, so the path under test did not run`)
+  for (const s of expect) assert.ok(s[0] === '!' ? !src.includes(s.slice(1)) : src.includes(s), `${name}: the module ${s[0] === '!' ? 'has ' + s.slice(1) : 'has no ' + s}, so the path under test did not run`)
   const ata = new Validator(schema)
   const docs = [good(schema), ...bad(schema), ...edges(schema)]
   let rejected = 0
@@ -91,4 +96,37 @@ for (const [name, schema, expect] of [['mixed', mixed, ['new Map(', 'new Set(', 
   }
   assert.ok(rejected > docs.length / 2 && rejected < docs.length, `${name}: documents not mixed enough, ${rejected} of ${docs.length} rejected`)
 }
-console.log(`ok: the module writer's tables, moved functions and enum sets answer as the current engine on ${checked} documents`)
+// A verdict's loops over an object's names for additionalProperties and
+// patternProperties leave inherited and non-enumerable names unvisited, also
+// when Object.prototype carries an enumerable name.
+const loops = { type: 'object', properties: { a: { type: 'string' } }, patternProperties: { '^x': { type: 'integer' } }, additionalProperties: { type: 'number' } }
+{
+  const { m } = load(loops)
+  const ata = new Validator(loops)
+  const hidden = { a: 'x' }
+  Object.defineProperty(hidden, 'b', { value: 'not a number', enumerable: false })
+  const docs = [
+    [{ a: 'x', x1: 2, n: 3 }, true],
+    [{ a: 'x', x1: 2.5 }, false],
+    [{ a: 'x', n: 'text' }, false],
+    [Object.assign(Object.create({ n: 'inherited' }), { a: 'x' }), true],
+    [Object.assign(Object.create({ x9: 'inherited' }), { a: 'x' }), true],
+    [hidden, true],
+    [Object.assign(Object.create(null), { a: 'x', x2: 1, m: 1 }), true],
+    [Object.assign(Object.create(null), { m: 'no' }), false],
+  ]
+  for (const pass of [false, true]) {
+    if (pass) Object.defineProperty(Object.prototype, 'zz', { value: 'text', enumerable: true, configurable: true, writable: true })
+    try {
+      for (const [d, want] of docs) {
+        // The current engine's own loops visit an inherited enumerable name
+        // (a polluted Object.prototype), so it is held to the answer only
+        // without one.
+        if (!pass) assert.strictEqual(ata.isValidObject(d), want, `current engine, loops, ${JSON.stringify(d)}`)
+        assert.strictEqual(m.isValid(d), want, `loops: isValid on ${JSON.stringify(d)}${pass ? ' with Object.prototype.zz' : ''}`)
+        checked++
+      }
+    } finally { if (pass) delete Object.prototype.zz }
+  }
+}
+console.log(`ok: the module writer's tables, moved functions, enum sets and key loops answer as the current engine on ${checked} documents`)
