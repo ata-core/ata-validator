@@ -210,6 +210,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 581 KB with a bit per default name for objects with 24 or more defaults,
 // set in one pass over the object's own names (10 SchemaStore schemas faster,
 // none slower; rustfmt 1371 to 751 ns). Measured 580.46 KB.
-assert.ok(manifest.size < 581 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 582 KB with known-name checks told apart by length, and the runtime's
+// generated defaults pass handed to the module writer where its own fill
+// declines (ata-validator/build defaultsSource; 20 of the 22 SchemaStore
+// schemas it changes faster, none slower). Measured 581.1 KB.
+assert.ok(manifest.size < 582 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

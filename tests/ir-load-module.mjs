@@ -8,6 +8,9 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { specialize, functionBody } from '../lib/ir/emit.mjs'
 import * as KERNELS from '../lib/kernels/index.mjs'
+import { createRequire } from 'node:module'
+// The runtime's generated defaults pass, as the build plugin hands it.
+const { defaultsSource } = createRequire(import.meta.url)('../lib/aot-build.js')
 
 const kernels = pathToFileURL(fileURLToPath(new URL('../lib/kernels/index.mjs', import.meta.url))).href
 let dir = null
@@ -15,7 +18,7 @@ let n = 0
 export async function compile (schema, opts = {}) {
   if (dir === null) dir = mkdtempSync(join(tmpdir(), 'ata-ir-'))
   const file = join(dir, 'm' + (++n) + '.mjs')
-  writeFileSync(file, specialize(schema, { from: kernels, verdict: opts.verdict === true, assertFormat: opts.assertFormat !== false, useDefaults: opts.useDefaults, schemas: opts.schemas, metaschemas: opts.metaschemas, richErrors: opts.richErrors }))
+  writeFileSync(file, specialize(schema, { from: kernels, verdict: opts.verdict === true, assertFormat: opts.assertFormat !== false, useDefaults: opts.useDefaults, schemas: opts.schemas, metaschemas: opts.metaschemas, richErrors: opts.richErrors, fillSource: opts.fillSource === false ? undefined : defaultsSource }))
   return import(pathToFileURL(file).href)
 }
 

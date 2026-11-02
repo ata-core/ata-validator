@@ -12,6 +12,7 @@ export const schemaHash = mod.schemaHash;
 export const compiledEligible = mod.compiledEligible;
 export const compiledSchemaFor = mod.compiledSchemaFor;
 export const compiledModuleFor = mod.compiledModuleFor;
+export const defaultsSource = mod.defaultsSource;
 export const bunTarget = mod.bunTarget;
 export const verify = mod.verify;
 export const compiledOptions = mod.compiledOptions;

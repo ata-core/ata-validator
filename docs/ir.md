@@ -44,6 +44,17 @@ Both take `richErrors`, `useDefaults`, `assertFormat`, `schemas` and
 cannot carry, the caller's functions: `keywords` (including those that read
 and change their data's context) and `formats`.
 
+`specialize` writes its own default fill. Where it declines one (defaults
+under `additionalProperties` or `patternProperties`, or behind a recursive
+reference), the module carries the shared interpreted pass, unless the
+caller passes `fillSource`, a function of the schema returning the body of
+a fill as source or `null`. `defaultsSource` from `ata-validator/build` is
+that function: the pass the `Validator` and the previous compiled modules
+run, written into the module. On the 22 SchemaStore schemas it changes, a
+valid document's check took 0.56 of the time at the geometric mean, faster
+on 20 and slower on none (codeclimate 976 to 328 ns). It is not used with
+`schemas`, whose documents the pass would not follow.
+
 ## What it refuses
 
 A schema or option outside what a backend covers throws an error whose

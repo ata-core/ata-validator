@@ -9,6 +9,7 @@ import { createRequire } from 'node:module'
 import { specialize, functionBody } from '../lib/ir/emit.mjs'
 import * as K from '../lib/kernels/index.mjs'
 import { compileClosures } from '../lib/ir/index.mjs'
+const { defaultsSource } = createRequire(import.meta.url)('../lib/aot-build.js')
 const require = createRequire(import.meta.url)
 const { Validator } = require('../index.js')
 
@@ -101,4 +102,20 @@ for (const [name, make] of Object.entries(fortyDocs)) {
 }
 // Each filled object value is a copy of its own.
 const a = {}; const b = {}; fortyMod.validate(a); fortyMod.validate(b); assert.notStrictEqual(a.o0, b.o0, 'forty defaults: an object default is shared between documents')
-console.log(`ok: the default fill matches the current engine on ${Object.keys(docs).length + Object.keys(manyDocs).length + Object.keys(fortyDocs).length} kinds of object`)
+// A fill the IR declines (defaults under additionalProperties) takes the
+// runtime's generated pass when the caller hands it (fillSource), as the
+// build plugin does; without it, the shared interpreted pass.
+const extra = { type: 'object', properties: { name: { default: 'n' } }, additionalProperties: { type: 'object', properties: { x: { default: 1 }, y: { type: 'object', default: { z: [] } } } } }
+const withPass = specialize(extra, { assertFormat: false, useDefaults: true, verdict: true, fillSource: defaultsSource })
+const withoutPass = specialize(extra, { assertFormat: false, useDefaults: true, verdict: true })
+assert.ok(withPass.includes('function FILL(d)') && !withPass.includes('buildDefaultsApplier'), 'additionalProperties defaults: the generated pass was not written in, so the case under test did not run')
+assert.ok(withoutPass.includes('buildDefaultsApplier'), 'additionalProperties defaults: without fillSource the shared pass should be used')
+const extraAta = new Validator(extra, { useDefaults: true })
+const extraMods = [withPass, withoutPass].map((src) => new Function('K', functionBody(src))(K))
+const extraDocs = [{}, { a: {} }, { a: { x: 5 }, b: { y: { z: [1] } } }, { a: 'text', b: null, c: [] }, Object.create({ a: {} }), Object.assign(Object.create(null), { a: {} }), Object.defineProperty({}, 'h', { value: {}, enumerable: false, writable: true, configurable: true })]
+extraDocs.forEach((d0, i) => {
+  const copy = () => { const c = Object.create(Object.getPrototypeOf(d0)); for (const k of Object.getOwnPropertyNames(d0)) Object.defineProperty(c, k, { ...Object.getOwnPropertyDescriptor(d0, k), value: structuredClone(d0[k]) }); return c }
+  const x = copy(); extraAta.validate(x)
+  extraMods.forEach((m, j) => { const y = copy(); m.validate(y); assert.strictEqual(dump(y), dump(x), `additionalProperties defaults, document ${i}, ${j === 0 ? 'generated pass' : 'shared pass'}`) })
+})
+console.log(`ok: the default fill matches the current engine on ${Object.keys(docs).length + Object.keys(manyDocs).length + Object.keys(fortyDocs).length + extraDocs.length} kinds of object`)
