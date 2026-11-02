@@ -158,6 +158,7 @@ const FILES = [
   "tests/test_ir_key_walk.mjs",
   "tests/test_ir_module_split.mjs",
   "tests/test_ir_error_path.mjs",
+  "tests/test_ir_static_unevaluated.mjs",
   "tests/test_kernels_formats_sync.js",
   "tests/test_ir_minified.mjs",
   "tests/test_kernels_preprocess_sync.js",

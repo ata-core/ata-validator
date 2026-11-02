@@ -199,6 +199,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // fail, which took the module writer's median errors read on SchemaStore
 // from 1.16x the code generator's to 0.91x and its p90 from 10.3x to 1.27x.
 // Measured 577.05 KB.
-assert.ok(manifest.size < 578 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 579 KB with verdicts that read unevaluatedProperties' evaluated names off
+// the schema and annotation sets made on first use (yamllint's verdict 1153
+// to 279 ns, vector's 47.9 to 24.6 us). Measured 578.45 KB.
+assert.ok(manifest.size < 579 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
