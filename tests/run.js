@@ -243,6 +243,7 @@ const FILES = [
   "tests/test_aot_entry.js",
   "tests/test_tier0_format.js",
   "tests/test_uuid_table.js",
+  "tests/test_format_char_masks.js",
   "tests/test_stream.js",
   "tests/test_compiled_standard.js",
   "tests/test_verify.js",
