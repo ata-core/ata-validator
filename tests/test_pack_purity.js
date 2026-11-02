@@ -186,6 +186,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 573 KB with lib/ir/emit-deps.mjs, the generated copy of the pattern
 // unrolling and the format hints that lets the module writer load in a
 // browser without the code generator. Measured 572.4 KB.
-assert.ok(manifest.size < 573 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 574 KB with the closures' walk over an object's own names for a verdict,
+// which took their median verdict on SchemaStore with code generation blocked
+// from 3.70x the interpreter's to 2.95x. Measured 573.2 KB.
+assert.ok(manifest.size < 574 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

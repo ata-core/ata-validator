@@ -155,6 +155,7 @@ const FILES = [
   "tests/test_ir_differential.mjs",
   "tests/test_kernels_rank_sync.js",
   "tests/test_ir_emit_deps_sync.js",
+  "tests/test_ir_key_walk.mjs",
   "tests/test_kernels_formats_sync.js",
   "tests/test_ir_minified.mjs",
   "tests/test_kernels_preprocess_sync.js",
