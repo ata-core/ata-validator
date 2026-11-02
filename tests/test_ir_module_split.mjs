@@ -129,4 +129,14 @@ const loops = { type: 'object', properties: { a: { type: 'string' } }, patternPr
     } finally { if (pass) delete Object.prototype.zz }
   }
 }
+// Twelve names and additionalProperties: false: a key is told from the names
+// by its length, then compared with the names of that length.
+const closed = { type: 'object', properties: Object.fromEntries(['id', 'ab', 'name', 'mode', 'kind', 'size', 'color', 'label', 'width', 'height', 'enabled', 'priority'].map((k) => [k, {}])), additionalProperties: false }
+{
+  const { src, m } = load(closed)
+  assert.ok(/switch\(k\.length\)\{case \d+:return k===/.test(src), 'closed: the known-name check is not told apart by length, so the path under test did not run')
+  const ata = new Validator(closed)
+  const docs = [{}, { id: 1, priority: 2 }, { ix: 1 }, { nama: 1 }, { colour: 1 }, { enable: 1 }, { enabled: 1, priorit: 1 }, { 'é': 1 }, { '': 1 }, { name: 1, mode: 2, kind: 3, size: 4 }, { 'name ': 1 }]
+  for (const d of docs) { assert.strictEqual(m.isValid(d), ata.isValidObject(d), `closed: ${JSON.stringify(d)}`); checked++ }
+}
 console.log(`ok: the module writer's tables, moved functions, enum sets and key loops answer as the current engine on ${checked} documents`)
