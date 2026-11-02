@@ -76,9 +76,12 @@ const shape = (r) => JSON.stringify({ valid: r.valid, errors: (r.errors || []).m
   // registered before the first call
   const a = new Validator(root, { schemas: [loose] })
   a.addSchema(strict)
-  const seen = []
-  for (let i = 0; i < 80; i++) seen.push(a.validate(doc).valid)
+  const seen = [a.validate(doc).valid]
+  // Checked after the first call: once the validator compiles it lets the
+  // twin go.
   assert.ok(a._twin, 'the twin answered the first calls')
+  for (let i = 1; i < 80; i++) seen.push(a.validate(doc).valid)
+  assert.strictEqual(a._twin, null, 'the twin is let go once the validator compiles')
   assert.deepStrictEqual([...new Set(seen)], [false], 'every call, twin and generated code alike, sees the registered schema')
   // registered after a call the twin answered
   const b = new Validator(root, { schemas: [loose] })

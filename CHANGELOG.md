@@ -12,6 +12,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Fixed
 
+- A validator for a large schema that answered its first calls on the interpreted twin kept the twin for its whole life after it compiled, an interpreted copy of the schema in memory beside its generated code. It is now let go: twenty validators of a 600-property schema, each called 70 times, held 18.1 MB and now hold 9.2.
 - With code generation blocked (a strict Content Security Policy, `--disallow-code-generation-from-strings`), `isValidObject()` on a default `Validator` answered through the closure compiler, about twice the time of the interpreted engine the rest of the validator uses there: 670 against 365 ns on an array of tagged-union objects. Its first call compiled a verdict alone, and that compile did not check whether code generation was available. It now leaves the verdict to the interpreted engine, as `engine: 'interpreter'` does. `tests/test_csp_verdict_engine.js`.
 - `coerceTypes: 'array'` wraps a lone value of a top-level array property on the interpreted engine too (`'3'` becomes `[3]`), as code generation did. The two engines left different documents.
 - Errors behind a reference to a document registered under a relative `$id` (`schemas: [{ $id: 'shared', ... }]`, as Fastify registers them) come in schema order. With code generation on, `additionalProperties` came ahead of the properties declared before it; the order could not follow `shared#` from a root without `$id`.
