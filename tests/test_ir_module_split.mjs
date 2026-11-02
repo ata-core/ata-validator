@@ -81,7 +81,7 @@ const edges = (schema) => [
 ]
 
 let checked = 0
-for (const [name, schema, expect] of [['mixed', mixed, ['new Map(', 'new Set(', 'function L']], ['many', many, ['new Map(', 'function L']], ['medium', medium, ['switch(ks[j])', '!new Map(']]]) {
+for (const [name, schema, expect] of [['mixed', mixed, ['new Map(', 'new Set(', 'function L']], ['many', many, ['new Map(', 'function L']], ['medium', medium, ['switch(k.length)', '!new Map(']]]) {
   const { src, m } = load(schema)
   for (const s of expect) assert.ok(s[0] === '!' ? !src.includes(s.slice(1)) : src.includes(s), `${name}: the module ${s[0] === '!' ? 'has ' + s.slice(1) : 'has no ' + s}, so the path under test did not run`)
   const ata = new Validator(schema)
