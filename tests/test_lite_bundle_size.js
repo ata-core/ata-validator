@@ -175,7 +175,10 @@ const esbuild = require('esbuild')
 // engines leave the same document (lib/validator-core.js buildCoercer).
 // 58920 (58913 measured): a resource's anchor maps and the pattern cache made
 // on first use, 0.54 KB less per interpreter of a small schema (7.83 to 7.29).
-const BUDGET = 58920
+// 58940 (58932 measured): the compile reuses the cache key the code
+// generator's twin check built for the same call, which kept ten route
+// schemas' readiness where it was (66.8 against 68.1 us; without it 75).
+const BUDGET = 58940
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

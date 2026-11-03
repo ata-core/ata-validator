@@ -1,4 +1,7 @@
 'use strict'
+// These answers compare the generated code with the interpreter: keep a small
+// schema's first calls on the generated code (lib/codegen-engine.js SmallTwin).
+process.env.ATA_NO_SMALL_TWIN = '1'
 
 // Runs every SchemaStore schema against SchemaStore's own sample documents and
 // requires three answers to agree on each: the default engine, the interpreted

@@ -20,6 +20,7 @@ const FILES = [
   "tests/test_no_native.js",
   "tests/test_no_eval.js",
   "tests/test_csp_verdict_engine.js",
+  "tests/test_small_twin.js",
   "tests/test_property_dependencies.js",
   "tests/test_v1_dialect.js",
   "tests/test_buffer_path_parity.js",
@@ -336,7 +337,12 @@ let ran = 0
 for (const file of FILES) {
   if (only && !file.includes(only)) continue
   ran++
-  const r = spawnSync(process.execPath, [file], { cwd: root, stdio: "inherit" })
+  // A process that meets many schemas answers a small one's first calls on
+  // the interpreted engine (lib/codegen-engine.js SmallTwin); the tests compare
+  // the generated code with the interpreter, so they turn that off, except
+  // the test of the twin itself.
+  const env = file.endsWith("test_small_twin.js") ? process.env : { ...process.env, ATA_NO_SMALL_TWIN: "1" }
+  const r = spawnSync(process.execPath, [file], { cwd: root, stdio: "inherit", env })
   if (r.status !== 0) failed.push(`${file} (${r.signal || "exit " + r.status})`)
 }
 if (failed.length) {
