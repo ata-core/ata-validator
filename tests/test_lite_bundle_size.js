@@ -173,7 +173,9 @@ const esbuild = require('esbuild')
 // 58900 (58891 measured): coerceTypes: 'array' wraps a lone top-level value
 // on the interpreted engine too, as the generated pass did, so the two
 // engines leave the same document (lib/validator-core.js buildCoercer).
-const BUDGET = 58900
+// 58920 (58913 measured): a resource's anchor maps and the pattern cache made
+// on first use, 0.54 KB less per interpreter of a small schema (7.83 to 7.29).
+const BUDGET = 58920
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
