@@ -217,6 +217,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 583 KB with a small schema's first calls answered on the interpreted engine
 // alone once a process has met many schemas (2000 schemas compiled at 13.6
 // against 59 us each, 8.37 against 8.57 KB per validator). Measured 582.94 KB.
-assert.ok(manifest.size < 583 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 584 KB with calls on a cycle cut in the IR's module and closures (an allOf
+// that refers back to its own node threw RangeError where the current engine
+// answers; SchemaStore's cloudify). Measured 583.87 KB.
+assert.ok(manifest.size < 584 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
