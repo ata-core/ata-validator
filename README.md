@@ -176,10 +176,10 @@ An order form with six fields, an email format, a pattern and a default, its err
 
 | | gzipped | ready, phone profile | first submit |
 |---|---|---|---|
-| without the plugin (code split) | 55.2 KB | 764 ms | 13.5 ms |
-| with the plugin | 4.2 KB | 364 ms | 1.6 ms |
+| without the plugin (code split) | 55.3 KB | 779 ms | 13.9 ms |
+| with the plugin | 4.5 KB | 372 ms | 1.6 ms |
 
-The sizes are an esbuild build, minified, gzip level 9. The times are Chrome with Lighthouse's mobile throttling (CPU 4x slower, 1.6 Mbps, 150 ms round trip), the files served gzipped, medians of 11 runs; the submit is made as soon as the page has loaded, before the runtime warms itself up in idle time, so a later submit on the runtime takes less than that. Ten generated form schemas come to 7.2 KB with the plugin. Needs ata-validator 1.63.0 and the plugin's 0.12.0; with earlier versions the plugin's modules are larger (11.3 KB for this form).
+The sizes are an esbuild build, minified, gzip level 9. The times are Chrome with Lighthouse's mobile throttling (CPU 4x slower, 1.6 Mbps, 150 ms round trip), the files served gzipped, medians of 11 runs; the submit is made as soon as the page has loaded, before the runtime warms itself up in idle time, so a later submit on the runtime takes less than that. Ten generated form schemas come to 8.4 KB with the plugin. Needs ata-validator 1.63.0 and the plugin's 0.12.0; with earlier versions the plugin's modules are larger (11.3 KB for this form).
 
 A schema the build cannot read, one fetched at run time, keeps the runtime, which is the right tool for it.
 
