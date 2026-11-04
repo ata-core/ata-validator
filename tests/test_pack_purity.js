@@ -227,6 +227,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 595 KB with the IR's table backend (lib/ir/table.mjs) and its interpreter
 // (lib/kernels/table.mjs): ten form validators in a Vite application, 2.37 KB
 // gzipped as plans against 5.35 as written modules. Measured 594.83 KB.
-assert.ok(manifest.size < 595 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 597 KB with the email, uri and uri-reference checks as regular expressions
+// for the plans (lib/kernels/formats-small.mjs): email with uri 2166 to 641
+// bytes gzipped in a bundle. Measured 596.84 KB.
+assert.ok(manifest.size < 597 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

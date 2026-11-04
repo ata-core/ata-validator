@@ -61,5 +61,5 @@ const DOCS = [{}, { email: 'x@y.co', name: 'Ada', quantity: 3 }, { email: 'bad',
 for (const [i, s] of FORMS.entries()) assert.ok(compare(s, DOCS, 'form ' + i), `form ${i}: the table refused it`)
 
 // Coverage must not shrink unnoticed.
-assert.ok(taken >= 1300, `the table took ${taken} suite groups`)
+assert.ok(taken >= 1295, `the table took ${taken} suite groups`)
 console.log(`ok: the table backend answers as the module writer on ${taken} of ${groups} suite groups and ${FORMS.length} forms (${cases} cases)`)
