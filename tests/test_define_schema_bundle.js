@@ -13,6 +13,7 @@
 
 const esbuild = require('esbuild')
 const path = require('path')
+const { pathToFileURL } = require('url')
 
 const root = path.join(__dirname, '..')
 
@@ -73,7 +74,8 @@ check(cjsMessage !== null && cjsMessage.includes('schemaOf<T>()'), 'schemaOf sti
 
 ;(async () => {
   for (const file of [...ENTRIES.map((e) => e[1]), 'index.mjs', 'lite.mjs']) {
-    const m = await import(path.join(root, file))
+    // A file URL: on Windows an absolute path is not an import specifier.
+    const m = await import(pathToFileURL(path.join(root, file)).href)
     check(m.defineSchema(schema) === schema, `${file} defineSchema returns its argument`)
     check(m.default.defineSchema(schema) === schema, `${file} default export defineSchema returns its argument`)
     check(message(m.schemaOf) === cjsMessage, `${file} schemaOf throws the CommonJS message`)
