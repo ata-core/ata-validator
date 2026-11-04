@@ -94,9 +94,10 @@ answers as the module writer does (`tests/test_ir_table.mjs`).
 It takes `richErrors`, `useDefaults` and `assertFormat`, and the keywords
 forms use: types, properties, required, additionalProperties, the leaf
 checks and formats, patternProperties, propertyNames, items, prefixItems,
-allOf, anyOf, oneOf, `$ref`, not, if and dependentRequired. Anything else
-(contains, dependentSchemas, unevaluated keywords, dynamic references,
-another option) returns `null`, and the caller writes the module instead.
+contains, allOf, anyOf, oneOf, `$ref`, not, if, dependentRequired and
+dependentSchemas. Anything else (a `$ref` to another document, unevaluated
+keywords, dynamic references, another option) returns `null`, and the
+caller writes the module instead.
 A default the specialized fill declines (under additionalProperties or a
 pattern schema, or in a cycle) is filled by the shared pass, which the
 module imports and a plan names, loaded only then. `@ata-project/unplugin` chooses
