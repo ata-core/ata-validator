@@ -9,6 +9,7 @@
 
 const assert = require('assert');
 const { createInterpreter } = require('../lib/interpreter.js');
+const { Validator } = require('../index.js');
 
 const leaves = [
   { type: 'string' },
@@ -82,3 +83,28 @@ for (const width of [1, 3, 8, 9, 32]) {
   for (const d of docs) { assert.strictEqual(tree.isValid(d), plain.isValid(d), `closed walk, ${width} names: ${JSON.stringify(d)}`); walks++; }
 }
 console.log(`ok: the closed walk answers as the plain walk on ${walks} documents`);
+
+// A name only properties lists is read by name on every path, enumerable or
+// not, as the generated code reads it; a name none lists counts for
+// patternProperties and additionalProperties only when for-in would meet it.
+// The walk of a long list read Object.keys, so a hidden listed property passed
+// there and failed on a short list.
+{
+  const hidden = (k, v) => Object.defineProperty({ a: 'x' }, k, { value: v, enumerable: false });
+  for (const width of [3, 9, 20]) {
+    const names = ['a', ...Array.from({ length: width - 1 }, (_, i) => 'p' + i)];
+    for (const extra of [{}, { additionalProperties: false }, { patternProperties: { '^z': { type: 'integer' } } }, { propertyNames: { maxLength: 3 } }]) {
+      const schema = { type: 'object', properties: Object.fromEntries(names.map((n) => [n, { type: 'string' }])), ...extra };
+      const tree = createInterpreter(schema, { tier: 0 });
+      const plain = createInterpreter(schema, { tier: Infinity });
+      const gen = new Validator(schema);
+      for (const d of [hidden('p0', 1), hidden('p0', 'ok'), hidden('zz', 'q'), hidden('unlisted', 1), hidden('toolong', 1)]) {
+        const want = gen.isValidObject(d);
+        assert.strictEqual(tree.isValid(d), want, `${width} names, ${JSON.stringify(extra)}, hidden ${Object.getOwnPropertyNames(d)[1]}: tree`);
+        assert.strictEqual(plain.isValid(d), want, `${width} names, ${JSON.stringify(extra)}: plain walk`);
+        assert.strictEqual(tree.validate(d).valid, want, `${width} names, ${JSON.stringify(extra)}: tree errors path`);
+      }
+    }
+  }
+}
+console.log('ok: hidden own properties are read alike on the short and long property walks, as the generated code reads them');

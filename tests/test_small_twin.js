@@ -63,14 +63,21 @@ assert.ok(onTwin(text), 'schema 100 did not start on the twin');
 assert.strictEqual(text.validateJSON(JSON.stringify(bad(100))).valid, false, 'validateJSON on a failing text');
 assert.strictEqual(text.isValidJSON(JSON.stringify(good(100))), true, 'isValidJSON on a valid text');
 
-// A registry changed while the validator is on the twin is read when it
-// compiles: the first failing document after addSchema() answers against it.
+// A schema added after any answer is refused: isValidObject() binds a
+// verdict over the registry as it was, and a definition added after it
+// reached validate() but not isValidObject(), which kept the old answer.
 const root = { type: 'object', properties: { v: { $ref: 'http://x/a' }, k: { type: 'string' } } };
+for (const use of [(v) => v.isValidObject({ v: 'str' }), (v) => v.validate({ v: 'str' }), (v) => v.isValidJSON('{"v":"str"}'), (v) => v.validateJSON('{"v":"str"}')]) {
+  const reg = new Validator(root, { schemas: [{ $id: 'http://x/a', type: ['number', 'string'] }] });
+  use(reg);
+  assert.throws(() => reg.addSchema({ $id: 'http://x/a', type: 'number' }), /before validate\(\)/, 'addSchema after an answer must throw');
+  assert.strictEqual(reg.isValidObject({ v: 'str' }), reg.validate({ v: 'str' }).valid, 'the two paths agree after the refused addSchema');
+}
+// Before any answer it is read by every path.
 const reg = new Validator(root, { schemas: [{ $id: 'http://x/a', type: ['number', 'string'] }] });
-assert.strictEqual(reg.isValidObject({ v: 'str' }), true, 'the loose definition accepts a string');
 reg.addSchema({ $id: 'http://x/a', type: 'number' });
-assert.strictEqual(reg.validate({ v: 'str' }).valid, false, 'after addSchema, the stricter definition rejects the string');
-assert.strictEqual(reg.isValidObject({ v: 'str' }), false, 'and keeps rejecting it');
+assert.strictEqual(reg.isValidObject({ v: 'str' }), false, 'the stricter definition rejects the string');
+assert.strictEqual(reg.validate({ v: 'str' }).valid, false, 'on validate() too');
 
 // A reference to another document keeps a schema off the twin (TWIN_DECLINES
 // in lib/codegen-engine.js), so the registry is read by the compile as it

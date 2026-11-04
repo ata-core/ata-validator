@@ -184,7 +184,13 @@ const esbuild = require('esbuild')
 // blocked. All of it is in the plan compiler, which a bundler that splits
 // loads on demand: lite's first load stays at 52237 bytes, the compiler's
 // chunk goes from 6331 to 6899.
-const BUDGET = 59500
+// 59900 (59784 measured): a property hidden from enumeration under a listed
+// name is read on every interpreter path, as the generated code reads it
+// (lib/interpreter-core.js eval, lib/plan-compiler.js both walks and the
+// closed walk's bitmask of names met), and addSchema() refuses a schema
+// after the verdict-only compile too (lib/validator-core.js). 314 bytes
+// gzipped across the three files for the same answer on every path.
+const BUDGET = 59900
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
