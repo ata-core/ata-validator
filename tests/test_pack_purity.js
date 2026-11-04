@@ -244,6 +244,13 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 607 KB with the interpreted engine's closed-object walk and its leaves
 // checked in place (lib/plan-compiler.js): an order form with codes blocked
 // 189 to 139 ns. Measured 606.14 KB.
-assert.ok(manifest.size < 607 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 611 KB with the IR module writer's verdict pass (lib/ir/emit.mjs,
+// lib/ir/front.mjs): small checks written in at their call, for-in key loops
+// with a module-local own test, defaults as literals, one loop for
+// patternProperties beside additionalProperties: false, unread flags
+// dropped. Against the compiled modules on SchemaStore, warmed, the verdict
+// geometric mean went from 1.018 to 0.878 and the schemas slower by a fifth
+// from 129 to 47. Measured 609.57 KB.
+assert.ok(manifest.size < 611 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

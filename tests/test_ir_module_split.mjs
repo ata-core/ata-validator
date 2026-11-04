@@ -29,7 +29,10 @@ props.big = nested
 props.word = { enum: words }
 props.toString = { type: 'boolean' }
 props.__proto__ = { type: 'number' }
-const mixed = { type: 'object', properties: props, $defs: { pos: { type: 'integer', minimum: 1 } } }
+// The definition the seventy names refer to is too large to be written in at
+// each name (emit.mjs inlineCall, INLINE_BODY), so the names go in a table.
+const bigPos = { type: 'integer', enum: [3, ...[...Array(80)].map((_, i) => 1000 + i)] }
+const mixed = { type: 'object', properties: props, $defs: { pos: bigPos } }
 
 // Hundreds of short entries of a few calls each: together past the budget,
 // so the small ones move too.
