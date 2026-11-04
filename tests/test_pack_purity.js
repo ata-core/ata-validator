@@ -226,7 +226,7 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // gzipped over the page where the form needs 4.1. Measured 587.86 KB.
 // 595 KB with the IR's table backend (lib/ir/table.mjs) and its interpreter
 // (lib/kernels/table.mjs): ten form validators in a Vite application, 2.37 KB
-// gzipped as plans against about 5.1 as written modules. Measured 594.83 KB.
+// gzipped as plans against 5.35 as written modules. Measured 594.83 KB.
 assert.ok(manifest.size < 595 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
