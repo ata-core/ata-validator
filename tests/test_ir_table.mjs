@@ -92,6 +92,24 @@ for (const [i, s] of FORMS.entries()) assert.ok(await compare(s, DOCS, 'form ' +
   for (const [why, f] of Object.entries(broken)) { const q = JSON.parse(JSON.stringify(good)); f(q); await assert.rejects(fromPlainPlan(q), (e) => e.message.includes(why), why) }
 }
 
+// enum and const with primitive values only are written with the === check, so
+// a bundle of them carries no deep equality; an object value keeps the deep
+// one, and so does a plan sent as data (ata-validator/plan reads that one).
+{
+  const prims = { type: 'object', properties: { e: { enum: [0, 'a', null, false, 1.5] }, c: { const: 0 }, n: { const: null } } }
+  const objs = { properties: { e: { enum: [{ a: 1 }, 'a'] }, c: { const: [0] } } }
+  for (const rich of [true, false]) {
+    const suffix = rich ? 'K' : 'P'
+    const p = tableModule(prims, { richErrors: rich }); const o = tableModule(objs, { richErrors: rich })
+    assert.ok(p.includes('enumPrim' + suffix) && p.includes('constPrim' + suffix) && !/\benum[PK]\b|\bconst[PK]\b/.test(p), `primitive enum and const take the === check (${suffix})`)
+    assert.ok(/\benum[PK]\b/.test(o) && /\bconst[PK]\b/.test(o) && !o.includes('Prim'), `object values keep the deep check (${suffix})`)
+    assert.ok(!tablePlan(prims, { richErrors: rich }).uses.some((u) => u.includes('Prim')), 'a plan sent as data names the general check')
+  }
+  const docs = [-0, 0, false, null, 'a', 'b', 1.5, 1, NaN, [0], { a: 1 }, {}, ''].flatMap((x) => [{ e: x }, { c: x }, { n: x }, { e: x, c: x, n: x }])
+  assert.ok(await compare(prims, docs, 'primitive enum and const'))
+  assert.ok(await compare(objs, docs.concat([{ e: { a: 1 } }, { c: [0] }, { e: { a: 2 } }, { c: [-0] }]), 'object enum and const'))
+}
+
 // Coverage must not shrink unnoticed.
 assert.ok(taken >= 1295, `the table took ${taken} suite groups`)
 console.log(`ok: the table backend, as a module and as a plan over the wire, answers as the module writer on ${taken} of ${groups} suite groups and ${FORMS.length} forms (${cases} cases)`)

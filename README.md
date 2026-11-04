@@ -193,8 +193,8 @@ What a page's validators add to its first load, gzipped, in applications built t
 | | ata 1.62.1, plugin 0.11.3 | ata 1.63.0, plugin 0.12.0 |
 |---|---|---|
 | Vite, one form | 2.33 KB | 1.41 KB |
-| Vite, ten forms | 8.02 KB | 2.26 KB |
-| Vite, ten forms with email and uri fields | 12.07 KB | 2.95 KB |
+| Vite, ten forms | 8.02 KB | 2.02 KB |
+| Vite, ten forms with email and uri fields | 12.07 KB | 2.70 KB |
 | Next.js with webpack, one form with rich errors | 10.71 KB | 4.63 KB |
 | Next.js with Turbopack, one form with rich errors | 67.52 KB (the plugin could not run) | 4.23 KB |
 
