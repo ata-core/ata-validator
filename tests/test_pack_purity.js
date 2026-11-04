@@ -220,6 +220,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 584 KB with calls on a cycle cut in the IR's module and closures (an allOf
 // that refers back to its own node threw RangeError where the current engine
 // answers; SchemaStore's cloudify). Measured 583.87 KB.
-assert.ok(manifest.size < 584 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 589 KB with ES module copies of lib/unique-items.js and lib/branch-collapse.js
+// in lib/kernels, so ata-validator/kernels reaches no CommonJS file: Next.js
+// with webpack kept six CommonJS files beside a compiled form, 11.6 KB
+// gzipped over the page where the form needs 4.1. Measured 587.86 KB.
+assert.ok(manifest.size < 589 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

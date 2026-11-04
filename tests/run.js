@@ -161,6 +161,8 @@ const FILES = [
   "tests/test_ir_module_split.mjs",
   "tests/test_ir_error_path.mjs",
   "tests/test_ir_self_cycle.mjs",
+  "tests/test_kernels_cjs_sync.js",
+  "tests/test_kernels_esm_only.js",
   "tests/test_ir_static_unevaluated.mjs",
   "tests/test_ir_default_fill.mjs",
   "tests/test_kernels_formats_sync.js",
