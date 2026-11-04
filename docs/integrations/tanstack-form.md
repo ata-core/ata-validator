@@ -8,6 +8,17 @@
 npm install ata-validator @tanstack/react-form
 ```
 
+## In the browser
+
+Add the build plugin, and the code below stays as it is: [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata) compiles `userFormSchema` at build time, the form still reads it through Standard Schema, and the validator runtime leaves the page. With Vite and React this form's validation adds 1.92 KB gzipped to the first load, against 51.08 KB for the runtime.
+
+```js
+// vite.config.js; for Next.js, withAta from '@ata-project/unplugin/next'
+import ata from '@ata-project/unplugin/vite'
+
+export default { plugins: [ata()] }
+```
+
 ## Form-level validation
 
 ```tsx
