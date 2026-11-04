@@ -178,7 +178,13 @@ const esbuild = require('esbuild')
 // 58940 (58932 measured): the compile reuses the cache key the code
 // generator's twin check built for the same call, which kept ten route
 // schemas' readiness where it was (66.8 against 68.1 us; without it 75).
-const BUDGET = 58940
+// 59500 (59481 measured): the interpreted engine walks a closed object of 3
+// to 32 names with for-in and checks its commonest leaves in place by code
+// (lib/plan-compiler.js), an order form 189 to 139 ns with code generation
+// blocked. All of it is in the plan compiler, which a bundler that splits
+// loads on demand: lite's first load stays at 52237 bytes, the compiler's
+// chunk goes from 6331 to 6899.
+const BUDGET = 59500
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

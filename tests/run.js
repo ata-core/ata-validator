@@ -200,6 +200,7 @@ const FILES = [
   "tests/test_uri_family_rules.js",
   "tests/test_compact_uri_walk.js",
   "tests/test_plan_compiles.js",
+  "tests/test_plan_leaf_codes.js",
   "tests/test_bundle_cplen.js",
   "tests/test_emitters_suite.js",
   "tests/test_browser_tiering.js",

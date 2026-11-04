@@ -22,6 +22,16 @@ for (const dialect of ['draft2020-12', 'draft7', 'draft2019-09', 'draft6', 'draf
   }
 }
 schemas.push(['hot bench', { type: 'object', properties: { id: { type: 'integer', minimum: 1 }, name: { type: 'string', minLength: 1, maxLength: 100 }, kind: { enum: ['a', 'b', 'c'] }, tags: { type: 'array', items: { type: 'string' }, maxItems: 10 }, address: { type: 'object', properties: { city: { type: 'string' }, zip: { type: 'string', pattern: '^[0-9]{5}$' } }, required: ['city'] }, oneOfField: { oneOf: [{ type: 'string' }, { type: 'integer' }] } }, required: ['id', 'name'], additionalProperties: false }]);
+// Closed objects of every width the object walks choose between, with and
+// without properties: one with no properties once threw in the compiler, so
+// cloudify's schema ran 22% slower on the plain walk with every test passing.
+for (const width of [0, 1, 8, 9, 32, 33]) {
+  const properties = Object.fromEntries(Array.from({ length: width }, (_, i) => ['p' + i, { type: 'string' }]));
+  const body = width ? { properties, required: ['p0'] } : {};
+  schemas.push([`closed object, ${width} properties`, { type: 'object', ...body, additionalProperties: false }]);
+  schemas.push([`closed object, ${width} properties, no type`, { ...body, additionalProperties: false }]);
+  schemas.push([`closed object, ${width} properties, nested`, { type: 'object', properties: { inner: { ...body, additionalProperties: false } } }]);
+}
 
 let compiled = 0;
 const failed = [];

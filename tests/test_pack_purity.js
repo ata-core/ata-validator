@@ -241,6 +241,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 605 KB with a plan checked step by step when it is read, its version
 // stamp, operation names from operationId and jsonSchemaDialect. Measured
 // 604.45 KB.
-assert.ok(manifest.size < 605 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 607 KB with the interpreted engine's closed-object walk and its leaves
+// checked in place (lib/plan-compiler.js): an order form with codes blocked
+// 189 to 139 ns. Measured 606.14 KB.
+assert.ok(manifest.size < 607 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
