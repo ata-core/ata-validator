@@ -1,4 +1,14 @@
-import { Validator, ValidationError } from './index';
+import { ValidationError, ValidationResult } from './index';
+
+/**
+ * What a record stream calls on its validator: a `Validator`, or a module
+ * `ata build` wrote, adapted as `{ isValidObject: isValid, validate }`, since a
+ * compiled module imports nothing and has no `Validator` to hand over.
+ */
+export interface RecordValidator {
+  isValidObject(data: unknown): boolean;
+  validate(data: unknown): ValidationResult<unknown>;
+}
 
 /** Options of a record stream. */
 export interface StreamOptions {
@@ -26,7 +36,7 @@ export interface StreamResult {
 
 /** A record stream: feed chunks as they arrive, get the first failure the moment its record is complete. */
 export class RecordStream {
-  constructor(validator: Validator<unknown>, opts?: StreamOptions);
+  constructor(validator: RecordValidator, opts?: StreamOptions);
   /** Records read so far. */
   readonly records: number;
   /** Failures so far. */
@@ -39,13 +49,13 @@ export class RecordStream {
   end(): StreamResult;
 }
 
-export function streamValidator(validator: Validator<unknown>, opts?: StreamOptions): RecordStream;
+export function streamValidator(validator: RecordValidator, opts?: StreamOptions): RecordStream;
 
 /**
  * Read an async source (a Node Readable, a Web ReadableStream, any iterable of
  * chunks) through a record stream. At the first failure the source is stopped:
  * a Node stream is destroyed, a Web stream's reader cancelled.
  */
-export function validateStream(validator: Validator<unknown>, source: AsyncIterable<string | Uint8Array> | Iterable<string | Uint8Array> | ReadableStream<Uint8Array | string>, opts?: StreamOptions): Promise<StreamResult>;
+export function validateStream(validator: RecordValidator, source: AsyncIterable<string | Uint8Array> | Iterable<string | Uint8Array> | ReadableStream<Uint8Array | string>, opts?: StreamOptions): Promise<StreamResult>;
 
 export const PARSE_KEYWORD: '__parse__';

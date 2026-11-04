@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- `ata-validator/stream` takes any object with `isValidObject()` and `validate()`, which a module `ata build` wrote provides as `{ isValidObject: isValid, validate }`: the declared parameter was the runtime `Validator`, so a Worker that validates an upload with a compiled module and no runtime needed a cast. Types only; the code already called just those two methods.
+
 ## 1.63.1 - 2026-11-04
 
 ### Changed
