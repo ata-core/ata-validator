@@ -55,6 +55,36 @@ valid document's check took 0.56 of the time at the geometric mean, faster
 on 20 and slower on none (codeclimate 976 to 328 ns). It is not used with
 `schemas`, whose documents the pass would not follow.
 
+### The table backend
+
+`tableModule(schema, options)` writes the schema as data instead of code: a
+plan of steps that name the keyword descriptors and step handlers they use,
+run by one interpreter in `ata-validator/kernels`. The module exports the
+same `isValid` and `validate`, with the same verdicts and errors, every
+field in order, rich or plain, and the same default fill. A bundle carries
+the interpreter once and only the handlers its plans name, so a page with
+many forms pays for each form about what its schema weighs: on six-field
+order forms about 90 bytes gzipped a form, where a written module costs about
+400. It is slower per call than written code (445 against 22 ns on a valid
+order form), which a form submission does not notice and a server would.
+
+```js
+import { tableModule } from 'ata-validator/ir'
+
+const source = tableModule(schema, { richErrors: false })
+// import {maxLengthP,tClosed,tLeaf,tProps,tReq,tType,tablePlain} from "ata-validator/kernels"
+// const P=[[[tType,"object"],[tProps,["name",1]],...]]
+// export const{isValid,validate}=tablePlain(P)
+```
+
+It takes `richErrors`, `useDefaults` and `assertFormat`, and the keywords
+forms use: types, properties, required, additionalProperties, the leaf
+checks and formats, items, prefixItems, allOf, `$ref`, not, if and
+dependentRequired. Anything else (anyOf, oneOf, patternProperties,
+unevaluated keywords, dynamic references, another option) returns `null`,
+and the caller writes the module instead. `@ata-project/unplugin` chooses
+between the two for a whole application by which bundle is smaller.
+
 ## What it refuses
 
 A schema or option outside what a backend covers throws an error whose
