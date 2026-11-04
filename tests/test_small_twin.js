@@ -72,11 +72,37 @@ reg.addSchema({ $id: 'http://x/a', type: 'number' });
 assert.strictEqual(reg.validate({ v: 'str' }).valid, false, 'after addSchema, the stricter definition rejects the string');
 assert.strictEqual(reg.isValidObject({ v: 'str' }), false, 'and keeps rejecting it');
 
-// The same with a verdict first after addSchema(), which the twin answers.
+// A reference to another document keeps a schema off the twin (TWIN_DECLINES
+// in lib/codegen-engine.js), so the registry is read by the compile as it
+// always was.
 const reg2 = new Validator(root, { schemas: [{ $id: 'http://x/a', type: ['number', 'string'] }] });
 assert.strictEqual(reg2.isValidObject({ v: 'str' }), true);
-assert.ok(onTwin(reg2), 'reg2 did not start on the twin');
-reg2.addSchema({ $id: 'http://x/a', type: 'number' });
-assert.strictEqual(reg2.isValidObject({ v: 'str' }), false, 'a verdict after addSchema answered against the old registry');
+assert.ok(!onTwin(reg2), 'a schema with a reference to another document took the twin');
+
+// Schemas that need what the compile prepares do not take the twin: a
+// reference to a meta-schema (resolved from the vendored copies the compile
+// registers), an `$id` fragment read as an anchor, an anchor, a reference to
+// another document. On the twin they answered false where the compiled
+// validator answers true, so isValidObject and validate() disagreed once a
+// process had met sixteen schemas (the official suite's defs, ref and
+// definitions groups, every dialect).
+const declined = [
+  [{ $schema: 'https://json-schema.org/draft/2020-12/schema', $ref: 'https://json-schema.org/draft/2020-12/schema' }, { $defs: { foo: { type: 'integer' } } }],
+  [{ $schema: 'https://json-schema.org/draft/2019-09/schema', $ref: 'https://json-schema.org/draft/2019-09/schema' }, { $defs: { foo: { type: 'integer' } } }],
+  [{ $ref: 'http://json-schema.org/draft-07/schema#' }, { definitions: { foo: { type: 'integer' } } }],
+  [{ allOf: [{ $ref: '#foo' }], definitions: { A: { $id: '#foo', type: 'integer' } } }, 1],
+  [{ $defs: { a: { $anchor: 'a', type: 'integer' } }, $ref: '#a' }, 1],
+];
+for (const [s, d] of declined) {
+  const v = new Validator(s);
+  assert.strictEqual(v.isValidObject(d), true, `first verdict on ${JSON.stringify(s)}`);
+  assert.ok(!onTwin(v), `${JSON.stringify(s)} took the twin`);
+  assert.strictEqual(v.validate(d).valid, true, `validate on ${JSON.stringify(s)}`);
+}
+// A reference into the document itself still takes it.
+const local = new Validator({ $defs: { n: { type: 'integer' } }, type: 'object', properties: { a: { $ref: '#/$defs/n' } } });
+assert.strictEqual(local.isValidObject({ a: 1 }), true);
+assert.ok(onTwin(local), 'a schema with only local references did not take the twin');
+assert.strictEqual(local.isValidObject({ a: 'x' }), false);
 
 console.log(`ok: small schemas start on the interpreted twin from number ${firstTwin} on and answer as the interpreter across the switch (${made.length} schemas)`);
