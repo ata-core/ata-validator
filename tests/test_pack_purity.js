@@ -251,9 +251,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // dropped. Against the compiled modules on SchemaStore, warmed, the verdict
 // geometric mean went from 1.018 to 0.878 and the schemas slower by a fifth
 // from 129 to 47. Measured 609.57 KB.
-// 613 KB with the tier-0 closure, untyped enum and const on tier 0 and the
-// keyword record (tests/test_lite_bundle_size.js has the note). Measured
-// 612.34 KB.
-assert.ok(manifest.size < 613 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 614 KB with anyOf and oneOf in plans (lib/kernels/table.mjs tAny and tOne,
+// lib/ir/table.mjs, lib/kernels/plan.mjs). Measured 613.36 KB.
+assert.ok(manifest.size < 614 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

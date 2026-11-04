@@ -6,6 +6,8 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
+- A plan (`tablePlan` in `ata-validator/ir`, read by `ata-validator/plan`) carries `anyOf` and `oneOf`: a branch is run as the module writer runs it, a verdict stopping at the first branch that passes, the errors of a failed keyword the one error the engine's collapse gives (the closest branch and its errors, or the branches a `oneOf` matched twice). Plans now cover 501 of SchemaStore's 990 schemas against 172, 118 of its 144 flat object schemas of twelve properties or fewer without `$ref` against 71, and 232 of the 2020-12 suite's 384 groups against 212; the table backend's agreement test, which holds a plan to the module writer's verdicts and errors field by field, now takes 1434 of the 2245 suite groups across every dialect against 1298. The two handlers cost the plan entry 0.7 KB gzipped: `fromPlan` loads at 6.9 KB against 6.2, the rich reader at 9.8 against 9.0.
+
 - `ata-validator/stream` takes any object with `isValidObject()` and `validate()`, which a module `ata build` wrote provides as `{ isValidObject: isValid, validate }`: the declared parameter was the runtime `Validator`, so a Worker that validates an upload with a compiled module and no runtime needed a cast. Types only; the code already called just those two methods.
 
 ## 1.63.1 - 2026-11-04
