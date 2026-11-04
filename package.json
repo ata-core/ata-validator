@@ -121,6 +121,10 @@
       "types": "./lib/kernels/plan.d.ts",
       "import": "./lib/kernels/plan-rich.mjs"
     },
+    "./openapi": {
+      "types": "./lib/openapi.d.ts",
+      "default": "./lib/openapi.js"
+    },
     "./ir": {
       "import": "./lib/ir/index.mjs"
     }

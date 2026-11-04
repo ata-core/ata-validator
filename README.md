@@ -200,6 +200,8 @@ What a page's validators add to its first load, gzipped, in applications built t
 
 Many forms go out as data for one shared interpreter instead of code, where that makes the bundle smaller; the plugin decides for the whole application, and keeps written code for a single form. Needs ata-validator 1.63.0 and the plugin's 0.12.0.
 
+With an OpenAPI document the plugin writes the validators from it (`ata({ openapi: 'openapi.json' })`, request bodies by operation, see [its README](https://github.com/ata-core/unplugin-ata#one-openapi-document-for-the-server-and-the-page)); a server reads the same document through `operationSchemas` in `ata-validator/openapi`.
+
 The form and the server decide alike. A validator the plugin compiles answers exactly as `new Validator(schema)` does on the server, the same schema read the same way: on a nine-field signup schema (email, uri, a pattern, lengths counted in characters, a fixed set of fields) the compiled form and the server's validator disagreed on 0 of 50,000 generated documents, so a submit the page accepts is one the server accepts.
 
 A schema that arrives at run time (a form builder, a CMS, a schema served by the backend) can arrive as a plan instead. The server writes it with `tablePlan` from `ata-validator/ir`, which does the heavy work (references, dialects, normalization); the page reads it with `fromPlan` from `ata-validator/plan`, which carries the table interpreter and loads the format checks a plan names when it names them. Verdicts, errors and filled defaults are the server's for the same schema.
