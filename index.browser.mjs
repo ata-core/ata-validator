@@ -15,7 +15,16 @@ import { toTypeScript, renderPretty, renderCompact, toOutput, toRetryMessage, de
 import { defineSchema, schemaOf } from './lib/schema-helpers.mjs';
 
 // Pure-marked reads, so a bundler drops what goes unused (lib/schema-helpers.mjs).
-const api = /* @__PURE__ */ (() => { core._registerTiering(tiering.createTiering(() => import('./lib/codegen-engine.js'))); return core; })();
+// In development, once: a page that loads this entry compiles its schemas in
+// the browser, and a schema the build can read could be compiled by the build
+// instead. A production build replaces process.env.NODE_ENV and drops the
+// whole statement, the try included; where nothing defines process, the
+// ReferenceError is caught. Not in Node (no document).
+const api = /* @__PURE__ */ (() => {
+  core._registerTiering(tiering.createTiering(() => import('./lib/codegen-engine.js')));
+  try { if (process.env.NODE_ENV !== 'production' && typeof document !== 'undefined') console.info('ata-validator: this page compiles its schemas in the browser, which takes the validator runtime (about 51 KB gzipped). A schema the build can read can be compiled by the build instead, a few KB for a form: https://github.com/ata-core/unplugin-ata') } catch {}
+  return core;
+})();
 export const Validator = /* @__PURE__ */ (() => api.Validator)();
 export const compile = /* @__PURE__ */ (() => api.compile)();
 export const validate = /* @__PURE__ */ (() => api.validate)();

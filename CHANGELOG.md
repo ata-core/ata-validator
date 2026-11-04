@@ -13,6 +13,8 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Changed
 
+- In development, the browser entry says once in the console that the page compiles its schemas in the browser and that the build plugin can compile a schema it can read at build time instead. A production build drops the statement: the browser runtime's first load is 55255 bytes gzipped with esbuild before and after, and Vite, webpack under Next.js and Turbopack keep no trace of it. A page whose validators the plugin compiled does not load the runtime and says nothing.
+
 - A process that has met more than 16 schemas answers a new small schema's verdicts, and its `validate()` on valid documents, on the interpreted engine alone, and compiles the validator at its first failing document or once it stays in use, as it already did for large schemas. An agent checking each of many tool schemas a few times no longer compiles each one: a new five-property schema's first check took 72 µs and now takes 13, 2000 schemas compiled at 59 µs each and now at 14, and a validator so answered holds 8.37 KB against 8.57 compiled. A server with a few routes compiles them at their first call as before (Fastify, ten routes to the first validated request: 9.2 against 9.12 ms). Not for a schema with defaults or the other options that rewrite the document, `verbose`, `abortEarly`, custom keywords or formats, a schema whose compiled functions are cached, or where code generation is blocked. `ATA_NO_SMALL_TWIN=1` turns it off.
 
 ### Fixed

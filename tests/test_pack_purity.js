@@ -230,6 +230,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 597 KB with the email, uri and uri-reference checks as regular expressions
 // for the plans (lib/kernels/formats-small.mjs): email with uri 2166 to 641
 // bytes gzipped in a bundle. Measured 596.84 KB.
-assert.ok(manifest.size < 597 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 598 KB with the README's browser section (Next.js, many forms, the same
+// decision as the server) and the browser entry's development hint, which a
+// production build drops. Measured 597.62 KB.
+assert.ok(manifest.size < 598 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
