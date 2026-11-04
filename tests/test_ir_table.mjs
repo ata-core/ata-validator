@@ -10,7 +10,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { specialize, functionBody } from '../lib/ir/emit.mjs'
-import { tableModule } from '../lib/ir/table.mjs'
+import { tableModule, tablePlan } from '../lib/ir/table.mjs'
+import { fromPlan } from '../lib/kernels/plan-rich.mjs'
+import { fromPlan as fromPlainPlan } from '../lib/kernels/plan.mjs'
 import * as K from '../lib/kernels/index.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -21,18 +23,23 @@ const FIELDS = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'mess
 const shape = (r) => JSON.stringify([r.valid, (r.errors || []).map((e) => FIELDS.map((f) => e[f] === undefined ? '<undef>' : e[f]))])
 
 let groups = 0; let taken = 0; let cases = 0
-function compare (schema, docs, label) {
+async function compare (schema, docs, label) {
   for (const rich of [true, false]) for (const useDefaults of [true, false]) {
     const t = tableModule(schema, { richErrors: rich, useDefaults })
     if (t === null) return false
     let m
     try { m = loadModule(specialize(schema, { verdict: true, richErrors: rich, useDefaults })) } catch { return false }
     const tb = loadTable(t)
+    // The same plan as JSON, over the wire to ata-validator/plan.
+    const wire = await fromPlan(JSON.parse(JSON.stringify(tablePlan(schema, { richErrors: rich, useDefaults }))))
     for (const d of docs) {
-      const a = structuredClone(d); const b = structuredClone(d); const c = structuredClone(d); const g = structuredClone(d)
+      const a = structuredClone(d); const b = structuredClone(d); const c = structuredClone(d); const g = structuredClone(d); const w = structuredClone(d)
       assert.strictEqual(shape(tb.validate(b)), shape(m.validate(a)), `${label} (${rich ? 'rich' : 'plain'}): ${JSON.stringify(d).slice(0, 120)}`)
       assert.strictEqual(tb.isValid(g), m.isValid(c), `${label}: verdict`)
       assert.strictEqual(JSON.stringify(b), JSON.stringify(a), `${label}: the filled document`)
+      assert.strictEqual(shape(wire.validate(w)), shape(m.validate(structuredClone(d))), `${label} (${rich ? 'rich' : 'plain'}, plan over the wire): ${JSON.stringify(d).slice(0, 120)}`)
+      assert.strictEqual(JSON.stringify(w), JSON.stringify(a), `${label}: the document a plan filled`)
+      assert.strictEqual(wire.isValid(structuredClone(d)), m.isValid(structuredClone(d)), `${label}: the plan's verdict`)
       cases++
     }
   }
@@ -46,7 +53,7 @@ for (const dialect of fs.readdirSync(SUITE)) {
     for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
       groups++
       if (JSON.stringify(g.schema).includes('localhost:1234')) continue
-      if (compare(g.schema, g.tests.map((t) => t.data), `${dialect}/${f}: ${g.description}`)) taken++
+      if (await compare(g.schema, g.tests.map((t) => t.data), `${dialect}/${f}: ${g.description}`)) taken++
     }
   }
 }
@@ -58,8 +65,17 @@ const FORMS = [
   { $defs: { line: { type: 'string', minLength: 2 } }, type: 'object', properties: { a: { $ref: '#/$defs/line' }, b: { allOf: [{ $ref: '#/$defs/line' }, { maxLength: 5 }] }, c: { not: { const: 'x' } }, d: { if: { type: 'string' }, then: { minLength: 3 }, else: { type: 'number' } } }, dependentRequired: { a: ['b'] } },
 ]
 const DOCS = [{}, { email: 'x@y.co', name: 'Ada', quantity: 3 }, { email: 'bad', name: 'A', quantity: 99, coupon: 'x', extra: 1 }, { address: { street: '', zip: '1', country: 'XX' }, tags: ['a', 'a', 'b', 'c'] }, { address: {} }, { a: 'x', b: 'toolong', c: 'x', d: 'ab' }, { a: 'xy', d: 5 }, { d: true }, null, [], 'str', 42, { address: { street: 's', zip: '12345' } }]
-for (const [i, s] of FORMS.entries()) assert.ok(compare(s, DOCS, 'form ' + i), `form ${i}: the table refused it`)
+for (const [i, s] of FORMS.entries()) assert.ok(await compare(s, DOCS, 'form ' + i), `form ${i}: the table refused it`)
+
+// ata-validator/plan alone reads plain plans and refuses a rich one by name.
+{
+  const plain = await fromPlainPlan(JSON.parse(JSON.stringify(tablePlan(FORMS[0], { richErrors: false }))))
+  const m = loadModule(specialize(FORMS[0], { verdict: true, richErrors: false }))
+  for (const d of DOCS) assert.strictEqual(shape(plain.validate(structuredClone(d))), shape(m.validate(structuredClone(d))), 'ata-validator/plan, plain: ' + JSON.stringify(d))
+  await assert.rejects(fromPlainPlan(tablePlan(FORMS[0], {})), /ata-validator\/plan-rich/)
+  await assert.rejects(fromPlainPlan({ ...tablePlan(FORMS[0], { richErrors: false }), uses: ['constructor'] }), /constructor/)
+}
 
 // Coverage must not shrink unnoticed.
 assert.ok(taken >= 1295, `the table took ${taken} suite groups`)
-console.log(`ok: the table backend answers as the module writer on ${taken} of ${groups} suite groups and ${FORMS.length} forms (${cases} cases)`)
+console.log(`ok: the table backend, as a module and as a plan over the wire, answers as the module writer on ${taken} of ${groups} suite groups and ${FORMS.length} forms (${cases} cases)`)

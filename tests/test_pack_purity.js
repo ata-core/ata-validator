@@ -233,6 +233,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 598 KB with the README's browser section (Next.js, many forms, the same
 // decision as the server) and the browser entry's development hint, which a
 // production build drops. Measured 597.62 KB.
-assert.ok(manifest.size < 598 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 601 KB with plans over the wire (lib/kernels/plan.mjs, plan-rich.mjs,
+// order.mjs, tablePlan): a page that receives its schema at run time loads
+// 6.2 KB gzipped against 53.0 for the runtime. Measured 600.55 KB.
+assert.ok(manifest.size < 601 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

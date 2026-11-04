@@ -113,6 +113,14 @@
     "./kernels": {
       "import": "./lib/kernels/index.mjs"
     },
+    "./plan": {
+      "types": "./lib/kernels/plan.d.ts",
+      "import": "./lib/kernels/plan.mjs"
+    },
+    "./plan-rich": {
+      "types": "./lib/kernels/plan.d.ts",
+      "import": "./lib/kernels/plan-rich.mjs"
+    },
     "./ir": {
       "import": "./lib/ir/index.mjs"
     }

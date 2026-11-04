@@ -202,7 +202,20 @@ Many forms go out as data for one shared interpreter instead of code, where that
 
 The form and the server decide alike. A validator the plugin compiles answers exactly as `new Validator(schema)` does on the server, the same schema read the same way: on a nine-field signup schema (email, uri, a pattern, lengths counted in characters, a fixed set of fields) the compiled form and the server's validator disagreed on 0 of 50,000 generated documents, so a submit the page accepts is one the server accepts.
 
-A schema the build cannot read, one fetched at run time, keeps the runtime, which is the right tool for it.
+A schema that arrives at run time (a form builder, a CMS, a schema served by the backend) can arrive as a plan instead. The server writes it with `tablePlan` from `ata-validator/ir`, which does the heavy work (references, dialects, normalization); the page reads it with `fromPlan` from `ata-validator/plan`, which carries the table interpreter and loads the format checks a plan names when it names them. Verdicts, errors and filled defaults are the server's for the same schema.
+
+```js
+// server
+import { tablePlan } from 'ata-validator/ir'
+app.get('/forms/signup', () => tablePlan(signupSchema, { richErrors: false }))
+
+// page
+import { fromPlan } from 'ata-validator/plan'
+const v = await fromPlan(await (await fetch('/forms/signup')).json())
+v.validate(data)
+```
+
+For the nine-field signup schema above, a Vite page that receives its schema at run time loads 53.0 KB of JavaScript gzipped with `new Validator(schema)` and 6.2 KB with `fromPlan`, the errors on the page the same. `ata-validator/plan-rich` reads plans with ata's rich errors as well. A plan takes the keywords forms use (types, properties, required, additionalProperties, the leaf checks and formats, items, allOf, `$ref`, not, if, dependentRequired) and defaults; `tablePlan` returns `null` for anything else, and such a schema keeps the runtime.
 
 ## Measured by others
 

@@ -77,6 +77,16 @@ const source = tableModule(schema, { richErrors: false })
 // export const{isValid,validate}=tablePlain(P)
 ```
 
+`tablePlan(schema, options)` writes the same plan as JSON, for a page that
+receives its schemas at run time: `fromPlan(plan)` from `ata-validator/plan`
+reads it (plain errors) and `ata-validator/plan-rich` reads rich ones too.
+A plan names kernels only in fixed places (a step's handler, a leaf's
+descriptor, check and hint), resolved against a table with no prototype, so
+a plan from the network cannot reach anything else; the schema's own values
+stay data. The format checks and the error order load when a plan names
+them. On 1298 suite groups and 3140 SchemaStore runs a plan over JSON
+answers as the module writer does (`tests/test_ir_table.mjs`).
+
 It takes `richErrors`, `useDefaults` and `assertFormat`, and the keywords
 forms use: types, properties, required, additionalProperties, the leaf
 checks and formats, items, prefixItems, allOf, `$ref`, not, if and
