@@ -190,7 +190,12 @@ const esbuild = require('esbuild')
 // closed walk's bitmask of names met), and addSchema() refuses a schema
 // after the verdict-only compile too (lib/validator-core.js). 314 bytes
 // gzipped across the three files for the same answer on every path.
-const BUDGET = 59900
+// 60500 (60442 measured): the tier-0 object verdict as one closure over its
+// plan, bound directly where no code is generated; a node of enum or const
+// alone admitted to tier 0; the interpreter's keywords read in one pass into
+// a record (lib/tier0.js, lib/shape-classifier.js, lib/interpreter-core.js).
+// An invalid flat form with code generation blocked 25 to 15 ns.
+const BUDGET = 60500
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

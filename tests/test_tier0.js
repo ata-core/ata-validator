@@ -212,5 +212,27 @@ test("validate: boolean type", () => {
   assert(tier0Validate(plan, { b: "true" }) === false);
 });
 
+// A node of enum or const alone, no type, is tier 0 when every value is a
+// primitive: the values decide, as the full engines decide it. One such field
+// (`{ enum: ['TR', 'DE'] }`, `{ const: true }`) kept the whole object off tier 0.
+test("untyped enum and const: tier 0, answered as the interpreted engine", () => {
+  const { classify } = require("../lib/shape-classifier");
+  const { Validator } = require("../index.js");
+  const s = { type: "object", properties: { country: { enum: ["TR", "DE", 0, null, true] }, terms: { const: true }, n: { type: "integer" } }, required: ["terms"], additionalProperties: false };
+  assert(classify(s).tier === 0, "untyped primitive enum and const should be tier 0");
+  assert(classify({ enum: ["a", 1] }).tier === 0, "a root enum alone should be tier 0");
+  assert(classify({ type: "object", properties: { a: { enum: [{ k: 1 }, "x"] } } }).tier !== 0, "an enum with an object value stays off tier 0");
+  assert(classify({ type: "object", properties: { a: { enum: ["x"], minLength: 1 } } }).tier !== 0, "a type-bound keyword without a type stays off tier 0");
+  assert(classify({ type: "object", properties: { a: { const: { k: 1 } } } }).tier !== 0, "an object const stays off tier 0");
+  const fast = new Validator(s), slow = new Validator(s, { engine: "interpreter" });
+  const docs = [{ terms: true, country: "TR" }, { terms: true, country: "FR" }, { terms: true, country: 0 }, { terms: true, country: -0 }, { terms: true, country: null }, { terms: true, country: true }, { terms: true, country: "0" }, { terms: true, country: NaN }, { terms: true, country: {} }, { terms: true, country: [] }, { terms: false }, { terms: 1 }, { terms: "true" }, {}, { terms: true, n: 1.5 }, { terms: true, x: 1 }, [], null, "x"];
+  for (const d of docs) {
+    assert(fast.isValidObject(d) === slow.validate(d).valid, `isValidObject on ${JSON.stringify(d)} disagrees with the interpreted engine`);
+    assert(fast.isValidObject(d) === fast.validate(d).valid, `isValidObject and validate() disagree on ${JSON.stringify(d)}`);
+  }
+  const root = new Validator({ enum: ["a", 1, null, true] }), rootSlow = new Validator({ enum: ["a", 1, null, true] }, { engine: "interpreter" });
+  for (const d of ["a", 1, null, true, false, "b", 2, {}, [], -0, NaN, undefined]) assert(root.isValidObject(d) === rootSlow.validate(d).valid, `root enum on ${String(d)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -4,6 +4,11 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## 1.63.1 - 2026-11-04
 
+### Changed
+
+- Where code generation is blocked (a strict Content Security Policy, `--disallow-code-generation-from-strings`, Bun's ahead-of-time compiler), a flat object schema's `isValidObject()` is bound to the tier-0 plan's own closure: it was a wrapper that counted its calls to try the generator, which never arrived there, so every call paid a count and a call (an empty object 17 to 9 ns, an invalid form 25 to 15). A field of `enum` or `const` alone, no `type`, now keeps a schema on tier 0 when every value is a primitive (`{ enum: ['TR', 'DE'] }`, `{ const: true }`): one such field sent the whole object to the slower engines. The plan's fields are read once into its closure, and the prototype test runs once per document rather than once per present field.
+- A schema node's keywords are read in one pass over its own names into a record of one shape (`lib/interpreter-core.js` readKeywords): read by name on the schema, each absent keyword was a lookup that missed on an object of yet another shape, and with 3,200 schemas of 64 shapes in one process the first check went from 27.1 to 25.9 µs a schema. The interpreted twin is not built where no code can be generated, since the interpreted engine is the compile there (24.8 to 24.0 µs under the same flag).
+
 ### Fixed
 
 - `addSchema()` after `isValidObject()` was accepted and ignored by that method: the verdict-only compile the first `isValidObject()` makes binds a function over the registry as it was, so a definition added afterwards reached `validate()` but not `isValidObject()`, which kept answering against the old one. It now throws, as it did after `validate()`: add schemas before the first call. A call the interpreted twin answered compiled nothing and still takes a schema added after it.
