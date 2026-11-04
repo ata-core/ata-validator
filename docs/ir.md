@@ -93,9 +93,9 @@ answers as the module writer does (`tests/test_ir_table.mjs`).
 
 It takes `richErrors`, `useDefaults` and `assertFormat`, and the keywords
 forms use: types, properties, required, additionalProperties, the leaf
-checks and formats, items, prefixItems, allOf, anyOf, oneOf, `$ref`, not,
-if and dependentRequired. Anything else (patternProperties, propertyNames,
-contains, dependentSchemas, unevaluated keywords, dynamic references,
+checks and formats, patternProperties, propertyNames, items, prefixItems,
+allOf, anyOf, oneOf, `$ref`, not, if and dependentRequired. Anything else
+(contains, dependentSchemas, unevaluated keywords, dynamic references,
 another option) returns `null`, and the caller writes the module instead. `@ata-project/unplugin` chooses
 between the two for a whole application by which bundle is smaller.
 
