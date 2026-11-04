@@ -74,6 +74,22 @@ for (const [i, s] of FORMS.entries()) assert.ok(await compare(s, DOCS, 'form ' +
   for (const d of DOCS) assert.strictEqual(shape(plain.validate(structuredClone(d))), shape(m.validate(structuredClone(d))), 'ata-validator/plan, plain: ' + JSON.stringify(d))
   await assert.rejects(fromPlainPlan(tablePlan(FORMS[0], {})), /ata-validator\/plan-rich/)
   await assert.rejects(fromPlainPlan({ ...tablePlan(FORMS[0], { richErrors: false }), uses: ['constructor'] }), /constructor/)
+  // A plan that is not one the writer makes is refused at load, by what is wrong.
+  const good = tablePlan(FORMS[0], { richErrors: false })
+  const broken = {
+    'a defaults index out of range': (q) => { q.F = [[[], ['x', 99], [], -1, [], []]] },
+    'a properties step that is not one': (q) => { const st = q.P[0].find((t) => t[0] === 'tReq'); st[1] = 1; st[2] = 0 },
+    'not a keyword descriptor': (q) => { q.P[0].push(['tLeaf', 'tProps', 1]) },
+    'a step whose handler': (q) => { q.P[0].push(['typeP', 1]) },
+    'at least its root node': (q) => { q.P = [] },
+    'a node index out of range': (q) => { q.P[0].push(['tRef', 7]) },
+  }
+  // A plan from another ata-validator is read, with one warning naming both versions.
+  const warns = []; const warn = console.warn; console.warn = (m) => warns.push(m)
+  try { await fromPlainPlan({ ...good, ata: '0.0.1' }); await fromPlainPlan({ ...good, ata: '0.0.1' }) } finally { console.warn = warn }
+  assert.strictEqual(warns.length, 1, 'one warning per version')
+  assert.match(warns[0], /written by ata-validator 0\.0\.1 and is read by/)
+  for (const [why, f] of Object.entries(broken)) { const q = JSON.parse(JSON.stringify(good)); f(q); await assert.rejects(fromPlainPlan(q), (e) => e.message.includes(why), why) }
 }
 
 // Coverage must not shrink unnoticed.

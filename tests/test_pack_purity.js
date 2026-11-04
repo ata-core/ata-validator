@@ -238,6 +238,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 6.2 KB gzipped against 53.0 for the runtime. Measured 600.55 KB.
 // 603 KB with ata-validator/openapi (operationSchemas), which a server and the
 // build plugin's openapi option share. Measured 602.74 KB.
-assert.ok(manifest.size < 603 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 605 KB with a plan checked step by step when it is read, its version
+// stamp, operation names from operationId and jsonSchemaDialect. Measured
+// 604.45 KB.
+assert.ok(manifest.size < 605 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

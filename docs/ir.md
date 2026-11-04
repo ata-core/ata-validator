@@ -83,7 +83,11 @@ reads it (plain errors) and `ata-validator/plan-rich` reads rich ones too.
 A plan names kernels only in fixed places (a step's handler, a leaf's
 descriptor, check and hint), resolved against a table with no prototype, so
 a plan from the network cannot reach anything else; the schema's own values
-stay data. The format checks and the error order load when a plan names
+stay data. Every step is checked when the plan is read, and one the writer
+does not make is refused there. A plan is as trusted as a schema: it can
+carry any pattern a schema can. It records the ata-validator that wrote it,
+and reading one from another version warns once, since the page and the
+server agree on every document only on the same version. The format checks and the error order load when a plan names
 them. On 1298 suite groups and 3140 SchemaStore runs a plan over JSON
 answers as the module writer does (`tests/test_ir_table.mjs`).
 

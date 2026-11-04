@@ -202,7 +202,7 @@ Many forms go out as data for one shared interpreter instead of code, where that
 
 With an OpenAPI document the plugin writes the validators from it (`ata({ openapi: 'openapi.json' })`, request bodies by operation, see [its README](https://github.com/ata-core/unplugin-ata#one-openapi-document-for-the-server-and-the-page)); a server reads the same document through `operationSchemas` in `ata-validator/openapi`.
 
-The form and the server decide alike. A validator the plugin compiles answers exactly as `new Validator(schema)` does on the server, the same schema read the same way: on a nine-field signup schema (email, uri, a pattern, lengths counted in characters, a fixed set of fields) the compiled form and the server's validator disagreed on 0 of 50,000 generated documents, so a submit the page accepts is one the server accepts.
+The form and the server decide alike. A validator the plugin compiles answers exactly as `new Validator(schema)` does on the server, the same schema read the same way, when the page is built with the same ata-validator version the server runs: on a nine-field signup schema (email, uri, a pattern, lengths counted in characters, a fixed set of fields) the compiled form and the server's validator disagreed on 0 of 50,000 generated documents, so a submit the page accepts is one the server accepts.
 
 A schema that arrives at run time (a form builder, a CMS, a schema served by the backend) can arrive as a plan instead. The server writes it with `tablePlan` from `ata-validator/ir`, which does the heavy work (references, dialects, normalization); the page reads it with `fromPlan` from `ata-validator/plan`, which carries the table interpreter and loads the format checks a plan names when it names them. Verdicts, errors and filled defaults are the server's for the same schema.
 
@@ -217,7 +217,7 @@ const v = await fromPlan(await (await fetch('/forms/signup')).json())
 v.validate(data)
 ```
 
-For the nine-field signup schema above, a Vite page that receives its schema at run time loads 53.0 KB of JavaScript gzipped with `new Validator(schema)` and 6.2 KB with `fromPlan`, the errors on the page the same. `ata-validator/plan-rich` reads plans with ata's rich errors as well. A plan takes the keywords forms use (types, properties, required, additionalProperties, the leaf checks and formats, items, allOf, `$ref`, not, if, dependentRequired) and defaults; `tablePlan` returns `null` for anything else, and such a schema keeps the runtime.
+For the nine-field signup schema above, a Vite page that receives its schema at run time loads 53.0 KB of JavaScript gzipped with `new Validator(schema)` and 6.2 KB with `fromPlan`, the errors on the page the same. `ata-validator/plan-rich` reads plans with ata's rich errors as well. A plan is as trusted as a schema, so serve it from your own server: `fromPlan` refuses one that is not well formed before it runs, and says so once when a plan was written by another ata-validator version, whose answers may differ. A plan takes the keywords forms use (types, properties, required, additionalProperties, the leaf checks and formats, items, allOf, `$ref`, not, if, dependentRequired) and defaults; `tablePlan` returns `null` for anything else, and such a schema keeps the runtime.
 
 ## Measured by others
 
