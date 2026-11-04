@@ -170,6 +170,13 @@ import ata from '@ata-project/unplugin/vite'
 export default { plugins: [ata()] }
 ```
 
+```js
+// next.config.mjs, for Turbopack (the default since Next.js 16) and webpack
+import withAta from '@ata-project/unplugin/next'
+
+export default withAta({ /* your config */ })
+```
+
 Webpack, Rspack, Rollup, Rolldown, esbuild and Bun take the same plugin; see its [setup](https://github.com/ata-core/unplugin-ata#setup).
 
 An order form with six fields, an email format, a pattern and a default, its errors read on submit:
@@ -179,7 +186,21 @@ An order form with six fields, an email format, a pattern and a default, its err
 | without the plugin (code split) | 55.3 KB | 779 ms | 13.9 ms |
 | with the plugin | 4.5 KB | 372 ms | 1.6 ms |
 
-The sizes are an esbuild build, minified, gzip level 9. The times are Chrome with Lighthouse's mobile throttling (CPU 4x slower, 1.6 Mbps, 150 ms round trip), the files served gzipped, medians of 11 runs; the submit is made as soon as the page has loaded, before the runtime warms itself up in idle time, so a later submit on the runtime takes less than that. Ten generated form schemas come to 8.4 KB with the plugin. Needs ata-validator 1.63.0 and the plugin's 0.12.0; with earlier versions the plugin's modules are larger (11.3 KB for this form).
+The sizes are an esbuild build, minified, gzip level 9. The times are Chrome with Lighthouse's mobile throttling (CPU 4x slower, 1.6 Mbps, 150 ms round trip), the files served gzipped, medians of 11 runs; the submit is made as soon as the page has loaded, before the runtime warms itself up in idle time, so a later submit on the runtime takes less than that.
+
+What a page's validators add to its first load, gzipped, in applications built the usual way (Vite + React, Next.js 16), forms of six fields reading their errors on submit:
+
+| | ata 1.62.1, plugin 0.11.3 | ata 1.63.0, plugin 0.12.0 |
+|---|---|---|
+| Vite, one form | 2.33 KB | 1.41 KB |
+| Vite, ten forms | 8.02 KB | 2.26 KB |
+| Vite, ten forms with email and uri fields | 12.07 KB | 2.95 KB |
+| Next.js with webpack, one form with rich errors | 10.71 KB | 4.63 KB |
+| Next.js with Turbopack, one form with rich errors | 67.52 KB (the plugin could not run) | 4.23 KB |
+
+Many forms go out as data for one shared interpreter instead of code, where that makes the bundle smaller; the plugin decides for the whole application, and keeps written code for a single form. Needs ata-validator 1.63.0 and the plugin's 0.12.0.
+
+The form and the server decide alike. A validator the plugin compiles answers exactly as `new Validator(schema)` does on the server, the same schema read the same way: on a nine-field signup schema (email, uri, a pattern, lengths counted in characters, a fixed set of fields) the compiled form and the server's validator disagreed on 0 of 50,000 generated documents, so a submit the page accepts is one the server accepts.
 
 A schema the build cannot read, one fetched at run time, keeps the runtime, which is the right tool for it.
 
@@ -1013,7 +1034,7 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 | Fastify | dedicated plugin | [`fastify-ata`](https://github.com/ata-core/fastify-ata) |
 | Vite, Webpack, Rollup, Rolldown, esbuild, Rspack (build-time compile) | dedicated plugin | [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata) |
 | Vite (build-time compile) | dedicated plugin | [`ata-vite`](https://github.com/ata-core/ata-vite), the Vite entry of the plugin above |
-| Next.js (build-time compile) | webpack entry of the plugin above | `@ata-project/unplugin/webpack` in `next.config.js` |
+| Next.js (build-time compile, Turbopack and webpack) | config wrapper of the plugin above | `withAta` from `@ata-project/unplugin/next` in `next.config.mjs` |
 | Hono | async middleware | [docs/integrations/hono.md](docs/integrations/hono.md) |
 | Elysia | Standard Schema V1 in the `body` slot | [docs/integrations/elysia.md](docs/integrations/elysia.md) |
 | tRPC | Standard Schema V1 input | [docs/integrations/trpc.md](docs/integrations/trpc.md) |
