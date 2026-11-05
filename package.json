@@ -126,6 +126,7 @@
       "default": "./lib/openapi.js"
     },
     "./ir": {
+      "types": "./lib/ir/index.d.ts",
       "import": "./lib/ir/index.mjs"
     }
   },
