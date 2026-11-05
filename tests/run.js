@@ -164,6 +164,7 @@ const FILES = [
   "tests/test_kernels_cjs_sync.js",
   "tests/test_kernels_esm_only.js",
   "tests/test_ir_table.mjs",
+  "tests/test_plan_handlers.mjs",
   "tests/test_formats_small.js",
   "tests/test_openapi.js",
   "tests/test_ir_static_unevaluated.mjs",

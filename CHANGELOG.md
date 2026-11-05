@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Fixed
+
+- The IR compiler (`ata-validator/ir`, which `@ata-project/unplugin` writes modules with) ignored `propertyDependencies`, a keyword the engine honours, so a module compiled from a schema with it accepted what `new Validator(schema)` rejects, in 1.63.0 and 1.63.1. The front end now refuses such a schema (`specialize` throws, the plugin keeps the runtime for it, `tablePlan` returns null), as it refuses every other keyword it does not run. Found in review by diffing the engine's keyword set against the front end's; the plan writer had begun skipping unknown names the same day and would have carried it too.
+
 ### Added
 
 - `ata-validator/ir` ships declarations: `specialize`, `compileClosures`, `tableModule` and `tablePlan` with their documented options, `tablePlan` returning the `Plan` type `ata-validator/plan` reads. A TypeScript program that wrote plans on the server had no type for the call and needed a declaration of its own.
