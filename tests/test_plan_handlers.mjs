@@ -9,6 +9,11 @@ import { createRequire } from 'node:module'
 import { tablePlan } from '../lib/ir/table.mjs'
 import { fromPlan } from '../lib/kernels/plan.mjs'
 import { fromPlan as fromRich } from '../lib/kernels/plan-rich.mjs'
+import { specialize, functionBody } from '../lib/ir/emit.mjs'
+import { compile as compileClosures } from '../lib/ir/run.mjs'
+import { MEANINGFUL } from '../lib/ir/front.mjs'
+import * as K from '../lib/kernels/index.mjs'
+import fs from 'node:fs'
 
 const require = createRequire(import.meta.url)
 const { Validator } = require('../index.js')
@@ -46,6 +51,8 @@ const cases = [
     [{ 'x-a': {} }, { 'x-a': { n: 2 }, y: {} }, { 'x-b': { n: 's' } }]],
   ['a cycle of defaults', { $defs: { node: { type: 'object', properties: { v: { type: 'integer', default: 7 }, next: { $ref: '#/$defs/node' } } } }, $ref: '#/$defs/node' },
     [{}, { next: {} }, { next: { next: { v: 1 } } }]],
+  ['propertyDependencies', { type: 'object', properties: { kind: { type: 'string' }, n: {}, iban: { type: 'string' } }, propertyDependencies: { kind: { card: { required: ['n'], properties: { n: { type: 'integer', minimum: 1 } } }, iban: { required: ['iban'] }, 'a/b~c': { maxProperties: 1 } }, other: 'not an object, ignored' } },
+    [{ kind: 'card', n: 1 }, { kind: 'card' }, { kind: 'card', n: 0 }, { kind: 'iban' }, { kind: 'iban', iban: 'TR' }, { kind: 'a/b~c', n: 1 }, { kind: 'none' }, { kind: 5 }, { n: 1 }, {}, 'x']],
 ]
 
 let checks = 0
@@ -64,10 +71,32 @@ for (const [name, schema, docs] of cases) {
   }
 }
 
-// A keyword the engine honours and no handler runs is refused, never
-// skipped: propertyDependencies is in the engine's keyword set.
-const honoured = { type: 'object', properties: { kind: { type: 'string' }, n: {} }, propertyDependencies: { kind: { card: { required: ['n'] } } } }
-assert.strictEqual(new Validator(honoured).validate({ kind: 'card' }).valid, false, 'the engine honours propertyDependencies')
-assert.strictEqual(tablePlan(honoured), null, 'a plan refuses propertyDependencies rather than skipping it')
+// The module writer and the closures on the same schemas and documents,
+// against the engine: a handler added to the plan is added to the front end
+// first, and the two other backends read that front end.
+const loadModule = (src) => new Function('K', functionBody(src))(K)
+let backends = 0
+for (const [name, schema, docs] of cases) {
+  for (const rich of [false, true]) {
+    const engine = new Validator(schema, { richErrors: rich })
+    const mod = loadModule(specialize(schema, { richErrors: rich }))
+    const clo = compileClosures(schema, { richErrors: rich })
+    for (const d of docs) {
+      const a = structuredClone(d); const b = structuredClone(d); const c = structuredClone(d)
+      const want = shape(engine.validate(a), a)
+      assert.strictEqual(shape(mod.validate(b), b), want, `${name} (${rich ? 'rich' : 'plain'}, module): ${JSON.stringify(d)}`)
+      assert.strictEqual(shape(clo.validate(c), c), want, `${name} (${rich ? 'rich' : 'plain'}, closures): ${JSON.stringify(d)}`)
+      backends += 2
+    }
+  }
+}
 
-console.log(`ok: the plan handlers answer as the engine on ${checks} checks over ${cases.length} schemas, both shapes, and a keyword no handler runs is refused`)
+// Every keyword the engine's record names is one the front end knows, so a
+// name the engine honours can never be skipped as noise by any backend
+// (propertyDependencies was, once).
+const record = /const KEYWORD_RECORD = \(\) => \(\{([^}]*)\}\)/s.exec(fs.readFileSync(new URL('../lib/interpreter-core.js', import.meta.url), 'utf8'))[1]
+const engineKeywords = [...record.matchAll(/([$\w-]+|'[^']+'):/g)].map((m) => m[1].replace(/'/g, ''))
+const unknownToFront = engineKeywords.filter((k) => !MEANINGFUL.has(k))
+assert.deepStrictEqual(unknownToFront, [], `keywords the engine honours and the front end would skip: ${unknownToFront.join(', ')}`)
+
+console.log(`ok: the plan handlers answer as the engine on ${checks} checks over ${cases.length} schemas, both shapes; the module writer and the closures on ${backends} more; every engine keyword (${engineKeywords.length}) is one the front end knows`)

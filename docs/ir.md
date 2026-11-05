@@ -94,8 +94,8 @@ answers as the module writer does (`tests/test_ir_table.mjs`).
 It takes `richErrors`, `useDefaults` and `assertFormat`, and the keywords
 forms use: types, properties, required, additionalProperties, the leaf
 checks and formats, patternProperties, propertyNames, items, prefixItems,
-contains, allOf, anyOf, oneOf, `$ref`, not, if, dependentRequired and
-dependentSchemas. Anything else (a `$ref` to another document, unevaluated
+contains, allOf, anyOf, oneOf, `$ref`, not, if, dependentRequired,
+dependentSchemas and propertyDependencies. Anything else (a `$ref` to another document, unevaluated
 keywords, dynamic references, another option) returns `null`, and the
 caller writes the module instead.
 A default the specialized fill declines (under additionalProperties or a
