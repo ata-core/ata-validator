@@ -6,6 +6,10 @@
 
 | Framework | Pattern | File |
 |---|---|---|
+| Fastify | dedicated plugin; `fastify-ata/stream` validates an array body record by record as it arrives, `fastify-ata/plans` serves plans to pages | [`fastify-ata`](https://github.com/ata-core/fastify-ata) |
+| Vite, Webpack, Rollup, Rolldown, esbuild, Rspack, Bun | build-time compile of `new Validator(schema)`; the `zod` and `from` options compile zod, valibot and TypeBox modules | [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata) |
+| Zod | runtime bridge, zod schemas on the ata engine | [`@ata-project/zod`](https://github.com/ata-core/ata-zod) |
+| Valibot | runtime bridge, valibot schemas on the ata engine | [`@ata-project/valibot`](https://github.com/ata-core/ata-valibot) |
 | Hono | middleware | [hono.md](./hono.md) |
 | Elysia | direct handler check | [elysia.md](./elysia.md) |
 | tRPC | Standard Schema V1 | [trpc.md](./trpc.md) |
@@ -18,7 +22,7 @@
 | Astro | API route | [astro.md](./astro.md) |
 | Effect | tagged error + Effect | [effect.md](./effect.md) |
 
-For Fastify, use the dedicated [`fastify-ata`](https://github.com/ata-core/fastify-ata) plugin. For Vite build-time compilation, use [`ata-vite`](https://github.com/ata-core/ata-vite).
+For Fastify, use the dedicated [`fastify-ata`](https://github.com/ata-core/fastify-ata) plugin; `fastify-ata/stream` ends a request at the first invalid record of a JSON array body, and `fastify-ata/plans` (0.12.0, ata-validator ^1.63.1) serves each registered schema as a plan at `GET /plans/<name>` with an ETag. For Vite build-time compilation, [`ata-vite`](https://github.com/ata-core/ata-vite) is the Vite entry of `@ata-project/unplugin` (0.8.2 takes ^0.13.0), so the `zod` and `from` options work through it.
 
 ## Picking an approach
 

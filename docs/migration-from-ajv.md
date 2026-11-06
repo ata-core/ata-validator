@@ -333,16 +333,16 @@ The generated file has zero runtime dependency on `ata-validator`. For browser /
 
 ## Performance expectations
 
-These numbers are from M4 Pro / Node 25. Run-to-run variance is about +/- 5%. The cold start and suite rows were rerun on ata 1.32.1; the warm path, `abortEarly` and HTTP rows come from an earlier 1.x release and have not been rerun since.
+These numbers are from M4 Pro / Node 25. Run-to-run variance is about +/- 5%. The cold start row was rerun on ata-validator 1.63.1 on 2026-11-06 (Node 25.2.1, the median of 7 fresh processes) and the suite row holds on it; the warm path, `abortEarly` and HTTP rows come from an earlier 1.x release and have not been rerun since.
 
 | Scenario | ajv | ata | Honest delta |
 |---|---|---|---|
 | Warm path, simple schema (S1) | ~9 ns | ~9 ns | tied |
 | Warm path, 10 fields (S2) | ~18 ns | ~19 ns | tied |
 | Invalid with `abortEarly` | ~15 ns | ~4 ns | 4x faster |
-| Serverless cold start (10 Fastify route schemas, library load to first validated request) | 30.3 ms | 9.7 ms | 3.1x faster |
+| Serverless cold start (10 Fastify route schemas, library load to first validated request) | 27.2 ms | 9.0 ms | 3.0x faster |
 | Fastify HTTP throughput | ~70k req/s | ~70k req/s | tied |
-| JSON Schema Test Suite, full, three dialects | not measured here | 100% | |
+| JSON Schema Test Suite, full, six dialects | not measured here | 100% | |
 
 Pure warm-path validation is essentially tied with ajv. The measurable wins for most projects are on cold start, bundle size, and the invalid path. Do not migrate expecting a throughput boost on a classic long-running server; the HTTP stack dominates.
 
@@ -357,7 +357,7 @@ Things that work slightly differently or are not yet supported:
 - **`coerceTypes: 'array'` with failing branches**: verdicts match the reference, but where a branch unwraps a one-element array and then fails, the reference goes on checking the unwrapped value in the next branches without writing it back, and the shim reads the value where it sits. On generated schemas mixing `anyOf`, `allOf` and arrays, the coerced data differed in 21 of 2400 documents, the verdict in none. With `coerceTypes: true` the same corpus gives no difference.
 - **Error order under `allErrors: true`**: after a `type` failure the reference keeps evaluating the node's other keywords and reports those too; ata stops at the type error. The shim does not add the extra errors.
 - **`uniqueItems` with objects**: supported, uses `JSON.stringify` for content comparison.
-- **`unevaluatedProperties` / `unevaluatedItems`**: supported, with no known spec gaps: all five dialects run clean, Draft 2020-12 1302 of 1302, 2019-09 1261 of 1261, draft 7 929 of 929, draft-06 841 of 841, the v1 dialect 1135 of 1135. The verdict is generated code; errors for a schema using these keywords come from the interpreted engine, which is the one thing to know if you measure the rejection path on such a schema.
+- **`unevaluatedProperties` / `unevaluatedItems`**: supported, with no known spec gaps: all six dialects run clean, Draft 2020-12 1302 of 1302, 2019-09 1261 of 1261, draft 7 929 of 929, draft-06 841 of 841, draft-04 618 of 618, the v1 dialect 1135 of 1135. The verdict is generated code; errors for a schema using these keywords come from the interpreted engine, which is the one thing to know if you measure the rejection path on such a schema.
 
 If you rely on any of the unsupported items, file an issue at [github.com/ata-core/ata-validator](https://github.com/ata-core/ata-validator/issues) with a minimal schema.
 

@@ -240,6 +240,71 @@ the response the handler writes next reaches the client instead of a closed sock
 `fetch` reports as `write EPIPE` and Chrome as "Failed to fetch"). Memory does not grow with the
 body; see the README for the measured figures.
 
+## Plans: ata-validator/ir and ata-validator/plan
+
+Both subpaths are ESM, new in 1.63.0, and experimental within 1.x (see
+[STABILITY.md](STABILITY.md)); [ir.md](ir.md) describes the compiler behind them. A plan is
+a schema written as JSON steps for the table interpreter: a server writes it once with
+`tablePlan`, a page reads it with `fromPlan` and gets the server's verdicts, errors and filled
+defaults for that schema without carrying the compiler. A plan is as trusted as a schema, so
+serve it from your own server.
+
+### tablePlan(schema, options?), ata-validator/ir
+
+Returns a `Plan` object, or `null` where the table backend does not cover the schema. Options:
+`richErrors` (default `true`), `useDefaults` (default `true`), `assertFormat` (default `true`);
+any other option makes it return `null`. On 1.63.1 a plan takes types, properties, required,
+additionalProperties, enum, const, the string, number and array bounds, format, pattern, nested
+objects and arrays, allOf, `$ref` within the document, not, if, dependentRequired and defaults;
+a `$ref` to another document, the unevaluated keywords, dynamic references, `anyOf`, `oneOf`,
+`patternProperties`, `propertyNames`, `contains`, `dependentSchemas` and `propertyDependencies`
+return `null` on 1.63.1, and the caller keeps `new Validator(schema)` for that schema. The plan
+records its format (`v: 1`, also exported as `PLAN_VERSION`), the ata-validator version that
+wrote it (`ata`), whether its errors are rich (`rich`) and the kernels it names (`uses`).
+
+```javascript
+import { tablePlan } from 'ata-validator/ir'
+
+app.get('/forms/signup', () => tablePlan(signupSchema, { richErrors: false }))
+```
+
+### fromPlan(plan), ata-validator/plan
+
+Async. Resolves to a validator once the kernels the plan names are loaded (the format checks
+and the error order load only when a plan names them): `validate(data)` returns
+`{ valid: true, data, errors: [] }` or `{ valid: false, errors }`, and `isValid(data)` the
+boolean, with `isValidObject` as the same function under the name the build plugin reads.
+Before it runs, `fromPlan` refuses a plan that is not of version 1, lists no kernels, names a
+kernel this ata-validator does not have, or is otherwise not well formed; it warns once when
+the plan was written by another ata-validator version, since a page and a server agree on every
+document only on the same version. A plan written with rich errors is read by `fromPlan` from
+`ata-validator/plan-rich`, the same function carrying the rich error shape; `ata-validator/plan`
+refuses it and says so. First load on 1.63.1: 6.2 KB gzipped plain, 9.0 KB rich.
+
+```javascript
+import { fromPlan } from 'ata-validator/plan'
+
+const v = await fromPlan(await (await fetch('/forms/signup')).json())
+v.validate(data)
+```
+
+### tableModule(schema, options?), ata-validator/ir
+
+The same plan as JavaScript module source (a string), or `null` where `tablePlan` would return
+`null`, for a build that writes the module to disk; it imports the interpreter and the handlers
+it names from `ata-validator/kernels`. Takes the same options as `tablePlan`.
+
+### specialize(schema, options?) and compileClosures(schema, options?), ata-validator/ir
+
+The IR compiler's two other backends. `specialize` returns the source of a module that imports
+its helpers from `ata-validator/kernels` by name; those names are a contract only with the
+version that wrote the module, so write it again after an upgrade. `compileClosures` builds
+`{ isValid, validate }` in memory with no `eval` or `new Function`. Both take `richErrors`,
+`useDefaults`, `assertFormat`, `schemas` (other documents a `$ref` may name, by `$id`) and
+`baseURI`; `specialize` also takes `fillSource`, and `compileClosures` takes what a module
+cannot carry: `coerceTypes`, `removeAdditional`, `verbose`, `abortEarly`, `keywords` and
+`formats`.
+
 ## Standalone Pre-compilation
 
 Skip compilation at startup by saving compiled validators to disk.

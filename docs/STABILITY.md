@@ -13,7 +13,7 @@ ata-validator follows semantic versioning. From 1.0.0 on:
 ## What is public API
 
 - The root export (`ata-validator`): `Validator` and its documented instance and static methods, `defineSchema`, `Infer`, `JSONSchema`, `validate`, `validateAsync`, `parseAsync`, `compile`, `parseJSON`, `createPaddedBuffer`, `toTypeScript`, `version`, `SIMDJSON_PADDING`, the renderers (`renderPretty`, `renderCompact`, `renderJSON`), and the Standard Schema V1 surface (`~standard`).
-- The subpath exports: `ata-validator/t`, `ata-validator/build`, `ata-validator/compat`.
+- The subpath exports: `ata-validator/t`, `ata-validator/build`, `ata-validator/compat`, `ata-validator/stream` (`RecordStream`, `streamValidator`, `validateStream`; since 1.62.0), `ata-validator/plan` and `ata-validator/plan-rich` (`fromPlan`; since 1.63.0) and `ata-validator/ir` (`tablePlan`, `tableModule`, `specialize`, `compileClosures`; since 1.63.0, experimental within 1.x, see below).
 - The `ata` CLI commands and flags documented in the README.
 - The error result shape and the error code registry (below).
 
@@ -34,7 +34,7 @@ Example: the instance methods `toStandalone()`/`toStandaloneModule()` were depre
 
 ## Spec coverage
 
-ata-validator targets JSON Schema Draft 2020-12, and reads Draft 2019-09, draft-07 and draft-06 by rewriting them to it. Against the full official suite with nothing excluded it passes 1302 of 1302 Draft 2020-12 cases, 1261 of 1261 Draft 2019-09 cases, 929 of 929 Draft 7 cases, 841 of 841 draft-06 cases and 1135 of 1135 cases of the v1 dialect, the same with code generation blocked; `npm run test:suite` reproduces all five and would name any failure. Known limitations are documented in the README's "Known limitations" section and are considered scope decisions, not bugs, for the 1.x line.
+ata-validator targets JSON Schema Draft 2020-12, and reads Draft 2019-09, draft-07, draft-06 and draft-04 by rewriting them to it. Against the full official suite with nothing excluded it passes 1302 of 1302 Draft 2020-12 cases, 1261 of 1261 Draft 2019-09 cases, 929 of 929 Draft 7 cases, 841 of 841 draft-06 cases, 618 of 618 draft-04 cases and 1135 of 1135 cases of the v1 dialect, the same with code generation blocked; `npm run test:suite` reproduces all six and would name any failure. Known limitations are documented in the README's "Known limitations" section and are considered scope decisions, not bugs, for the 1.x line.
 
 ## Compiled output
 
@@ -52,10 +52,13 @@ own reads a module from an older ata as current.
 ## The IR compiler
 
 `ata-validator/ir` and `ata-validator/kernels` are new in 1.63.0 and are
-experimental within 1.x: `specialize()` and `compileClosures()` are the
-documented entry points (see [docs/ir.md](ir.md)), and what they accept, the
+experimental within 1.x: `specialize()`, `compileClosures()`, `tableModule()`
+and `tablePlan()` on `ata-validator/ir`, and `fromPlan()` on
+`ata-validator/plan`, are the documented entry points (see
+[docs/ir.md](ir.md) and [docs/API.md](API.md)), and what they accept, the
 options they take and the schemas they refuse may change in a minor
-release. The intermediate representation itself (`front()`, `emitIR()`) is
+release. A plan carries its own version (`v: 1`) and the ata-validator that
+wrote it, and `fromPlan` refuses a plan of another version. The intermediate representation itself (`front()`, `emitIR()`) is
 internal.
 
 A module that `specialize()` writes imports its helpers from

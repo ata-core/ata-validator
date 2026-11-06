@@ -128,7 +128,7 @@ re-exports the npm one at the same version, and CI runs the official suite under
 details, and what Deno Deploy's refusal of dynamic code means for it, are in
 [docs/edge-runtimes.md](docs/edge-runtimes.md).
 
-Those four now agree with `validate()` on every case of the official suite, 3366 across three dialects. The native walker behind them does not handle every shape (`contains`, `unevaluatedProperties`, `patternProperties`, tuple `items`, cross-document `$ref`, a few formats), so for schemas using one of those the buffer APIs parse the bytes and answer through `validate()`; the list is in `lib/buffer-gate.js`. Typical request schemas stay on the zero-copy path. `npm test` holds the disagreement count at zero.
+Those four agree with `validate()` on all 3366 cases of the Draft 2020-12, draft-07 and v1 suites, the three dialects the buffer-path differential runs. The native walker behind them does not handle every shape (`contains`, `unevaluatedProperties`, `patternProperties`, tuple `items`, cross-document `$ref`, a few formats), so for schemas using one of those the buffer APIs parse the bytes and answer through `validate()`; the list is in `lib/buffer-gate.js`. Typical request schemas stay on the zero-copy path. `npm test` holds the disagreement count at zero.
 
 Where `new Function` is refused altogether, on Cloudflare Workers, Deno Deploy or under a strict Content-Security-Policy, ata drops to the interpreted engine and scores the same 1302 of 1302 with code generation blocked. No flags, and on Workers no `nodejs_compat` either. See [docs/edge-runtimes.md](docs/edge-runtimes.md). Where generated code runs but slowly, as in an ahead-of-time compiled Bun executable, a module from `ata build` is plain JavaScript that imports nothing and calls no `new Function`: on Bun 1.4.0, import plus a first validation takes 0.66 ms with such a module against 10.70 ms with the runtime compiler (medians of 21 runs). [docs/proof-no-code-generation.md](docs/proof-no-code-generation.md) runs one schema in five of these places, Workers and a CSP page included, and shows the same answers from each.
 
@@ -200,6 +200,8 @@ What a page's validators add to its first load, gzipped, in applications built t
 
 Many forms go out as data for one shared interpreter instead of code, where that makes the bundle smaller; the plugin decides for the whole application, and keeps written code for a single form. Needs ata-validator 1.63.0 and the plugin's 0.12.0.
 
+A page that writes its schemas in zod, valibot or TypeBox gets the same build-time compile from the plugin's 0.13.0 (2026-11-06). `ata({ zod: 'src/events/*.ts' })` takes modules that export zod 4 schemas, `ata({ from: 'src/schemas/*.ts' })` takes zod, valibot or TypeBox modules; the build loads each module, converts every exported schema with the library's own converter and writes `<module>.validators.mjs` and `.d.mts` beside it, one `{ validate, isValidObject }` per export, typed with the library's own types. The page keeps the library it writes schemas in and carries neither it nor a validator runtime. A `.refine(fn)`, `.transform(fn)`, valibot `check` or `transform` that reads nothing but its own parameter is carried and runs on the page in the library's order; what cannot be carried (a function closing over an outside name, `superRefine`, `preprocess`, a refine inside a union, a TypeBox kind outside the standard set, among others) stops the build by export and path, and `dropRefinements: true` takes them out knowingly. Measured with esbuild, minified, gzip level 9, on ata-validator 1.63.1: three event schemas on zod 4.6.7, the page carries 3.9 KB with the compiled validators and 93.0 KB with zod; one schema alone 1.1 KB; three carried refines on a signup schema add 0.5 KB. TypeBox 0.34.52: 1.1 KB compiled against 25.5 KB with `Value.Check` on the page. valibot 1.5.0: 1.1 KB against 1.7 KB. Not covered: zod 3, arktype, effect, and the stripping of unknown keys, which the page leaves in place where `z.object` would drop them (`strictObject` stays closed).
+
 With an OpenAPI document the plugin writes the validators from it (`ata({ openapi: 'openapi.json' })`, request bodies by operation, see [its README](https://github.com/ata-core/unplugin-ata#one-openapi-document-for-the-server-and-the-page)); a server reads the same document through `operationSchemas` in `ata-validator/openapi`.
 
 The form and the server decide alike. A validator the plugin compiles answers exactly as `new Validator(schema)` does on the server, the same schema read the same way, when the page is built with the same ata-validator version the server runs: on a nine-field signup schema (email, uri, a pattern, lengths counted in characters, a fixed set of fields) the compiled form and the server's validator disagreed on 0 of 50,000 generated documents, so a submit the page accepts is one the server accepts.
@@ -217,7 +219,7 @@ const v = await fromPlan(await (await fetch('/forms/signup')).json())
 v.validate(data)
 ```
 
-For the nine-field signup schema above, a Vite page that receives its schema at run time loads 53.0 KB of JavaScript gzipped with `new Validator(schema)` and 6.2 KB with `fromPlan`, the errors on the page the same. `ata-validator/plan-rich` reads plans with ata's rich errors as well. A plan carries `type`, `properties`, `patternProperties`, `propertyNames`, `required`, `additionalProperties`, `items`, `prefixItems`, `contains`, `allOf`, `anyOf`, `oneOf`, `not`, `if`, `$ref` within the document, `dependentRequired`, `dependentSchemas`, `propertyDependencies`, the value keywords and formats; `tablePlan` returns null for a schema with a `$ref` to another document, the unevaluated keywords or dynamic references, and the page keeps `new Validator` for that one. A name the engine ignores, such as a vendor's own keyword, means nothing to a plan either. Measured on the current SchemaStore: 844 of 990 schemas, and all 144 of its flat object schemas of twelve properties or fewer. A plan is as trusted as a schema, so serve it from your own server: `fromPlan` refuses one that is not well formed before it runs, and says so once when a plan was written by another ata-validator version, whose answers may differ. A plan takes the keywords forms use (types, properties, required, additionalProperties, the leaf checks and formats, items, allOf, `$ref`, not, if, dependentRequired) and defaults; `tablePlan` returns `null` for anything else, and such a schema keeps the runtime.
+For the nine-field signup schema above, a Vite page that receives its schema at run time loads 53.0 KB of JavaScript gzipped with `new Validator(schema)` and 6.2 KB with `fromPlan`, the errors on the page the same. `ata-validator/plan-rich` reads plans with ata's rich errors as well. On ata-validator 1.63.1 a plan takes the keywords forms use: types, properties, required, additionalProperties, enum, const, the string, number and array bounds, format, pattern, nested objects and arrays, allOf, `$ref` within the document, not, if, dependentRequired, and defaults; `tablePlan` returns `null` for anything else (a `$ref` to another document, the unevaluated keywords, dynamic references, the keywords below), and such a schema keeps `new Validator` on the page. A name the engine ignores, such as a vendor's own keyword, means nothing to a plan either. The next release carries `patternProperties`, `propertyNames`, `contains`, `anyOf`, `oneOf`, `dependentSchemas` and `propertyDependencies` as well, which on the current SchemaStore covers 844 of 990 schemas and all 144 of its flat object schemas of twelve properties or fewer; that is not in 1.63.1. A plan is as trusted as a schema, so serve it from your own server: `fromPlan` refuses one that is not well formed before it runs, and says so once when a plan was written by another ata-validator version, whose answers may differ.
 
 ## Measured by others
 
@@ -279,16 +281,18 @@ errors, 5.2M with `richErrors: false`.
 
 | Dimension | Schema | ata-AOT | runtime validator | Difference |
 |---|---|---|---|---|
-| Bundle (gzipped) | simple | 1.4 KB | 52.7 KB | 38.3x smaller |
-| Bundle (gzipped) | complex | 3.1 KB | 52.7 KB | 16.8x smaller |
-| Bundle (gzipped) | nested | 4.7 KB | 52.7 KB | 11.3x smaller |
-| Cold start | simple | 20 ms | 38 ms | 1.9x faster |
-| Throughput (1M ops) | simple | 308 Mops/s | 115 Mops/s | 2.7x faster |
-| Compile time | simple | 25 µs | 1.42 ms | 56x faster |
+| Bundle (gzipped) | simple | 1.4 KB | 52.7 KB | 37.6x smaller |
+| Bundle (gzipped) | complex | 2.9 KB | 52.7 KB | 18.2x smaller |
+| Bundle (gzipped) | nested | 4.5 KB | 52.7 KB | 11.7x smaller |
+| Cold start | simple | 21 ms | 38 ms | 1.8x faster |
+| Throughput (1M ops) | simple | 317 Mops/s | 109 Mops/s | 2.9x faster |
+| Compile time | simple | 39 µs | 1.57 ms | 40x faster |
 
 The runtime column is the default validator most frameworks ship. Reproduce on your machine
-with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-10-15,
-on ata-validator 1.54.0. On 1.51.0, across five runs, throughput moved between 263 and 325 Mops/s
+with `npm run bench:aot-vs-ajv`. Numbers from one run on Apple M4 Pro, Node 25.2.1, 2026-11-06,
+on ata-validator 1.63.1; the complex and nested schemas in the same run: cold start 21 and 20 ms
+against 41 and 40, throughput 26.3 and 18.6 Mops/s against 13.4 and 4.0, compile 66 and 126 µs
+against 1.62 and 1.73 ms. On 1.51.0, across five runs, throughput moved between 263 and 325 Mops/s
 against 97 to 110, cold start between 20 and 22 ms against 37 to 40, and the compile ratio between
 61x and 65x. The compile row is the time to write a module, a build-time cost; it was 18 µs on
 1.46.0, and modules have carried the one-pass error function since 1.47.0. The throughput row times a single one-million-call
@@ -619,6 +623,8 @@ const v = new Validator<Static<typeof UserSchema>>(UserSchema)
 
 The same works with Zod-from-JSON-Schema, Valibot, or a hand-written `type User = {...}` alongside a JSON Schema literal.
 
+On a page, the schemas themselves can stay in the library and still compile away. `@ata-project/unplugin` 0.13.0 takes `ata({ zod: 'src/events/*.ts' })` for modules that export zod 4 schemas and `ata({ from: 'src/schemas/*.ts' })` for zod, valibot or TypeBox modules, and writes one compiled `{ validate, isValidObject }` per export beside the module, typed with the library's own types, so the page carries neither the library nor a validator runtime. Measured on ata-validator 1.63.1, esbuild minified and gzipped: three zod 4.6.7 event schemas, 3.9 KB compiled against 93.0 KB with zod on the page; one TypeBox 0.34.52 schema, 1.1 KB against 25.5 KB with `Value.Check`; one valibot 1.5.0 schema, 1.1 KB against 1.7 KB. The details and what cannot be carried are under [In the browser](#in-the-browser).
+
 ### Cross-Schema `$ref`
 
 ```javascript
@@ -788,9 +794,11 @@ through a `setFormats()` export the module carries. `docs/API.md` has the
 details.
 
 **Fastify startup, 10 route schemas, from a cold process to the first validated request:
-ajv 30.3 ms, ata 9.7 ms, no build step required** (Node 25, ajv 8.20.0, loading each
-library included). ata loads in 3.7 ms, registers the routes in 0.3 ms and compiles on the
-first request, so counting only registration would overstate the gap. The first request
+the default validator 27.2 ms, ata 9.0 ms, no build step required** (Node 25.2.1, ata-validator
+1.63.1, 2026-11-06, loading each library included, the median of 7 fresh processes, three runs
+agreeing). ata loads in 3.1 ms, registers the routes in 0.24 ms and compiles on the first
+request, 5.6 ms, so counting only registration would overstate the gap; the default validator's
+split is 8.5 ms to load, 17.6 ms to set up and 1.1 ms for the first request. The first request
 here comes in the same tick as setup; a server that listens first has the code generator
 loaded by then. Reproduce with `node benchmark/bench_fastify_boot.mjs`.
 
@@ -1002,6 +1010,10 @@ fastify.register(require('fastify-ata'), {
 // All existing JSON Schema route definitions work as-is
 ```
 
+`fastify-ata/stream` (since fastify-ata 0.11.0) is a content-type parser that validates a JSON array body record by record as it arrives and ends the request at the first invalid record, so a bad import does not have to be read whole. Measured on a 100 MB body invalid at record 50: 564 ms and +569 MB of memory before, 11 ms and +2 MB after.
+
+`fastify-ata/plans` (since 0.12.0, needs ata-validator ^1.63.1) serves plans to pages. `app.register(require('fastify-ata/plans'), { plans: { signup: signupSchema } })` writes each plan once at startup with `tablePlan` and serves it at `GET /plans/<name>` with an ETag, `max-age=300`, 304 on a matching `If-None-Match` and 404 for an unknown name; `fastify.ataPlan(name)` is for handlers that embed it. The page reads it with `fromPlan` from `ata-validator/plan`, 6.2 KB gzipped on 1.63.1, and gets the same verdicts, errors and filled defaults as `new Validator(schema)` on the same ata version. A schema a plan cannot carry fails registration by name; on 1.63.1 that includes `anyOf`, `oneOf`, `patternProperties`, `propertyNames`, `contains`, `dependentSchemas` and `propertyDependencies`, which the next ata release carries.
+
 ### C++
 
 ```cpp
@@ -1046,9 +1058,12 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 
 | Framework | Pattern | Recipe |
 |---|---|---|
-| Fastify | dedicated plugin | [`fastify-ata`](https://github.com/ata-core/fastify-ata) |
-| Vite, Webpack, Rollup, Rolldown, esbuild, Rspack (build-time compile) | dedicated plugin | [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata) |
-| Vite (build-time compile) | dedicated plugin | [`ata-vite`](https://github.com/ata-core/ata-vite), the Vite entry of the plugin above |
+| Fastify | dedicated plugin; `fastify-ata/stream` validates an array body as it arrives, `fastify-ata/plans` serves plans to pages | [`fastify-ata`](https://github.com/ata-core/fastify-ata) |
+| Vite, Webpack, Rollup, Rolldown, esbuild, Rspack, Bun (build-time compile) | dedicated plugin; the `zod` and `from` options compile zod, valibot and TypeBox modules at build time | [`@ata-project/unplugin`](https://github.com/ata-core/unplugin-ata) |
+| Vite (build-time compile) | dedicated plugin | [`ata-vite`](https://github.com/ata-core/ata-vite), the Vite entry of the plugin above, with the same `zod` and `from` options |
+| Zod (runtime) | zod schemas run on the ata engine with zod's answers | [`@ata-project/zod`](https://github.com/ata-core/ata-zod) |
+| Valibot (runtime) | valibot schemas run on the ata engine with the same answers | [`@ata-project/valibot`](https://github.com/ata-core/ata-valibot) |
+| MCP TypeScript SDK | tool schema validation where code generation is blocked | [`@ata-project/mcp`](https://github.com/ata-core/ata-mcp) |
 | Next.js (build-time compile, Turbopack and webpack) | config wrapper of the plugin above | `withAta` from `@ata-project/unplugin/next` in `next.config.mjs` |
 | Hono | async middleware | [docs/integrations/hono.md](docs/integrations/hono.md) |
 | Elysia | Standard Schema V1 in the `body` slot | [docs/integrations/elysia.md](docs/integrations/elysia.md) |
@@ -1079,7 +1094,7 @@ Copy-paste recipes for the common frameworks. Most need 10-20 lines of glue. See
 
 ### Dialects
 
-`$schema` selects the dialect. Draft 2020-12 is the default; draft-07, draft-06, draft-04 and Draft 2019-09 are rewritten to the 2020-12 spelling on the way in (draft-06 as draft-07 without `if`/`then`/`else`, draft-04 as draft-06 with `id` for `$id` and without `const`, `contains` and `propertyNames`, 2019-09's tuple `items` and `$recursiveRef` as `prefixItems` and `$dynamicRef`); and `https://json-schema.org/v1` (or the dated `https://json-schema.org/v1/2026`) selects JSON Schema v1. The official suite passes in full on all five: 1302 of 1302 on 2020-12, 1261 of 1261 on 2019-09, 929 of 929 on draft-07, 841 of 841 on draft-06 and 1135 of 1135 on v1, with code generation allowed and blocked. Draft-04 and earlier are not supported; draft-04's boolean `exclusiveMinimum`/`exclusiveMaximum` is read wherever it appears.
+`$schema` selects the dialect. Draft 2020-12 is the default; draft-07, draft-06, draft-04 and Draft 2019-09 are rewritten to the 2020-12 spelling on the way in (draft-06 as draft-07 without `if`/`then`/`else`, draft-04 as draft-06 with `id` for `$id` and without `const`, `contains` and `propertyNames`, 2019-09's tuple `items` and `$recursiveRef` as `prefixItems` and `$dynamicRef`); and `https://json-schema.org/v1` (or the dated `https://json-schema.org/v1/2026`) selects JSON Schema v1. The official suite passes in full on all six: 1302 of 1302 on 2020-12, 1261 of 1261 on 2019-09, 929 of 929 on draft-07, 841 of 841 on draft-06, 618 of 618 on draft-04 and 1135 of 1135 on v1, with code generation allowed and blocked. Draft-03 and earlier are not supported; draft-04's boolean `exclusiveMinimum`/`exclusiveMaximum` is read wherever it appears.
 
 Two things differ under v1. `propertyDependencies` selects a subschema by the value of a property rather than by its presence, which is what `dependentSchemas` does. And `$dynamicRef` no longer requires bookending: the reference resolves through the dynamic scope whether or not the schema it first lands on carries a matching `$dynamicAnchor`, so the outermost matching anchor still in scope wins. Everything else ata implements is identical under both dialects, so a schema that declares no `$schema` behaves exactly as before.
 
@@ -1091,7 +1106,7 @@ Both are implemented in the interpreted engine, so a v1 schema that uses `$dynam
 
 ### Known limitations
 
-Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1302 of 1302 cases. Draft 2019-09 gives 1261 of 1261, draft 7 929 of 929, draft-06 841 of 841, draft-04 618 of 618. The v1 dialect gives 1135 of 1135. `npm run test:suite` reproduces all three.
+Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1302 of 1302 cases. Draft 2019-09 gives 1261 of 1261, draft 7 929 of 929, draft-06 841 of 841, draft-04 618 of 618. The v1 dialect gives 1135 of 1135. `npm run test:suite` reproduces all six.
 
 Areas that remain deliberate scope decisions for 1.x:
 
