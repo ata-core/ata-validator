@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Changed
+
+- A compact or schema module whose schema declares a `default` no longer carries the defaults pass as generated code. Since 1.57.0 the module exported `applyDefaults(data)` as the runtime's pass written out in full, 108 KB for pantsbuild's SchemaStore schema, beside a runtime that already had the schema; now the module keeps its `default` keywords in the schema it embeds and asks the runtime it imports for the pass on the first call (`createDefaults` on `ata-validator/error-runtime` and the written `ata-errors` file, built with lib/defaults.js, the closure pass the runtime Validator uses where its generated one declines). The fill is the same; the pass is built once per module. Forty SchemaStore schemas built with `ata build` and bundled with esbuild go from 133.0 KB to 119.2 KB gzipped in schema mode and from 246.4 KB to 231.5 KB in auto mode; the runtime gains the `defaults` part, left out when no schema of the build has a default. A self-contained module, which imports nothing, still carries the written pass. A schema module whose schema comes from a registry (`$id` references between the schemas of a build) keeps the written pass too, since the registry holds no defaults.
+
 ### Fixed
 
 - The IR compiler (`ata-validator/ir`, which `@ata-project/unplugin` writes modules with) ignored `propertyDependencies`, a keyword the engine honours, so a module compiled from a schema with it accepted what `new Validator(schema)` rejects, in 1.63.0 and 1.63.1. The front end now carries it as the engine reads it (an own name whose value is a string the map lists runs the schema under it, in place, at `/propertyDependencies/<name>/<value>`), so the module writer, the closures and a plan all answer as the engine does; `tests/test_plan_handlers.mjs` holds that, and holds that every keyword in the engine's record is one the front end knows, so no backend can skip an honoured name as noise again. Found in review by diffing the engine's keyword set against the front end's.

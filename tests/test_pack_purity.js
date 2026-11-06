@@ -255,6 +255,14 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // names (lib/kernels/table.mjs, lib/ir/table.mjs, lib/kernels/plan.mjs),
 // the ata-validator/ir declarations (lib/ir/index.d.ts) and the front end's
 // refusal of propertyDependencies. Measured 616.07 KB.
-assert.ok(manifest.size < 617 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 620 KB with the README paragraphs on the plugin's zod and from options,
+// fastify-ata's stream and plans and the six-dialect figures, and the
+// runtime's `defaults` part: a compact or schema module with a default asks
+// the runtime it imports for the pass (lib/schema-runtime-entry.js,
+// lib/error-runtime.js) instead of carrying it as generated code, which was
+// 108 KB in pantsbuild's module; forty SchemaStore schemas in schema mode
+// bundle to 119.2 KB gzipped from 133.0, in auto mode to 231.5 from 246.4.
+// Measured 619.04 KB.
+assert.ok(manifest.size < 620 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

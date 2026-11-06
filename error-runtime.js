@@ -46,4 +46,13 @@ if (typeof requestIdleCallback === 'function') { try { requestIdleCallback(warm)
 // once never runs it, and a server has it done before its first request.
 else if (typeof process === 'object' && process !== null && process.versions && process.versions.node && typeof setTimeout === 'function') { try { const t = setTimeout(warm, 0); if (t && typeof t.unref === 'function') t.unref(); } catch (_) {} }
 
-module.exports = { createErrors, compileSafe, uriWalk, ataVersion };
+// The defaults pass a compact module's applyDefaults asks for, built from the
+// schema the module embeds (lib/defaults.js, the closure pass the runtime
+// Validator uses where its generated pass declines). A module used to carry
+// the pass as its own generated code, 108 KB for a schema whose defaults are
+// large. A function that fills nothing where the schema declares no default.
+function createDefaults(schema) {
+  return require('./lib/defaults.js').buildDefaultsApplier(schema) || function () {};
+}
+
+module.exports = { createErrors, compileSafe, uriWalk, createDefaults, ataVersion };

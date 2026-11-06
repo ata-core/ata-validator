@@ -27,5 +27,12 @@ export function compileSafe(source: string): { test(input: string): boolean };
  */
 export function uriWalk(input: string, mode: 0 | 1 | 2 | 3): boolean;
 
+/**
+ * The defaults pass a compact module's `applyDefaults` runs: the runtime
+ * Validator's fill for `schema`, built on the first call. Fills nothing where
+ * the schema declares no `default`.
+ */
+export function createDefaults(schema: object): (data: unknown) => void;
+
 /** The ata-validator version this runtime belongs to. */
 export const ataVersion: string;
