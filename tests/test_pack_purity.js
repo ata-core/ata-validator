@@ -266,6 +266,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 621 KB with LeafPlan (lib/interpreter-core.js): nodes without rare
 // keywords keep those fields on one prototype, 9.98 to 8.00 KB a compiled
 // tool-like schema. Measured 620.37 KB.
-assert.ok(manifest.size < 621 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 622 KB with the closure tree's tagged-union table and deferred cycle
+// guard (lib/plan-compiler.js) and their tests' notes. Measured 621.17 KB.
+assert.ok(manifest.size < 622 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

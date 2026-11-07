@@ -201,7 +201,11 @@ const esbuild = require('esbuild')
 // (lib/interpreter-core.js): 1000 tool-like schemas held 9.98 KB each after
 // their first check, now 8.00. 317 bytes gzipped for 20% of every compiled
 // schema's memory; no verdict or request row slower.
-const BUDGET = 60850
+// 61150 (61101 measured): a union of objects that each require one property
+// fixed by a primitive const goes straight to the branch the value names
+// (tagged() in lib/plan-compiler.js). With code generation blocked a union
+// of five messages 117 to 47 ns, nested tagged unions 349 to 324; 251 bytes.
+const BUDGET = 61150
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

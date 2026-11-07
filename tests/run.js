@@ -168,6 +168,7 @@ const FILES = [
   "tests/test_plan_short_walk.js",
   "tests/test_leaf_plan.js",
   "tests/test_plan_ref_guard.js",
+  "tests/test_plan_tagged.js",
   "tests/test_formats_small.js",
   "tests/test_openapi.js",
   "tests/test_ir_static_unevaluated.mjs",

@@ -110,7 +110,9 @@ const root = path.resolve(__dirname, '..');
     // 61.2 KB (62625 measured): schema nodes without rare keywords as
     // LeafPlans, 20% less memory per compiled schema for 307 bytes
     // (tests/test_lite_bundle_size.js has the same note).
-    assert.ok(size < 61.2 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61.2 KB`);
+    // 61.5 KB (62919 measured): the tagged-union branch table, a union of
+    // five messages 117 to 47 ns with code generation blocked, 262 bytes.
+    assert.ok(size < 61.5 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61.5 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
