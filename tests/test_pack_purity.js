@@ -263,6 +263,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 108 KB in pantsbuild's module; forty SchemaStore schemas in schema mode
 // bundle to 119.2 KB gzipped from 133.0, in auto mode to 231.5 from 246.4.
 // Measured 619.04 KB.
-assert.ok(manifest.size < 620 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 621 KB with LeafPlan (lib/interpreter-core.js): nodes without rare
+// keywords keep those fields on one prototype, 9.98 to 8.00 KB a compiled
+// tool-like schema. Measured 620.37 KB.
+assert.ok(manifest.size < 621 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

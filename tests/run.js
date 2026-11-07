@@ -166,6 +166,7 @@ const FILES = [
   "tests/test_ir_table.mjs",
   "tests/test_plan_handlers.mjs",
   "tests/test_plan_short_walk.js",
+  "tests/test_leaf_plan.js",
   "tests/test_formats_small.js",
   "tests/test_openapi.js",
   "tests/test_ir_static_unevaluated.mjs",

@@ -107,7 +107,10 @@ const root = path.resolve(__dirname, '..');
     // interpreter path and addSchema() refused after the verdict-only
     // compile, 314 bytes gzipped (tests/test_lite_bundle_size.js has the
     // same note).
-    assert.ok(size < 61 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61 KB`);
+    // 61.2 KB (62625 measured): schema nodes without rare keywords as
+    // LeafPlans, 20% less memory per compiled schema for 307 bytes
+    // (tests/test_lite_bundle_size.js has the same note).
+    assert.ok(size < 61.2 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61.2 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

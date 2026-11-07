@@ -195,7 +195,13 @@ const esbuild = require('esbuild')
 // alone admitted to tier 0; the interpreter's keywords read in one pass into
 // a record (lib/tier0.js, lib/shape-classifier.js, lib/interpreter-core.js).
 // An invalid flat form with code generation blocked 25 to 15 ns.
-const BUDGET = 60500
+// 60850 (60814 measured): a schema node without a reference, applicator,
+// unevaluated, tuple, contains or pattern/dependent keyword is a LeafPlan,
+// whose 35 fields for those keywords live once on its prototype
+// (lib/interpreter-core.js): 1000 tool-like schemas held 9.98 KB each after
+// their first check, now 8.00. 317 bytes gzipped for 20% of every compiled
+// schema's memory; no verdict or request row slower.
+const BUDGET = 60850
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
