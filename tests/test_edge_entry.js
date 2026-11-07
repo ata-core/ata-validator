@@ -112,7 +112,9 @@ const root = path.resolve(__dirname, '..');
     // (tests/test_lite_bundle_size.js has the same note).
     // 61.5 KB (62919 measured): the tagged-union branch table, a union of
     // five messages 117 to 47 ns with code generation blocked, 262 bytes.
-    assert.ok(size < 61.5 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61.5 KB`);
+    // 61.6 KB (63028 measured): the index skipped for a schema with no id
+    // or anchor, first check 16.3 to 13.8 us, 52 bytes.
+    assert.ok(size < 61.6 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61.6 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

@@ -205,7 +205,11 @@ const esbuild = require('esbuild')
 // fixed by a primitive const goes straight to the branch the value names
 // (tagged() in lib/plan-compiler.js). With code generation blocked a union
 // of five messages 117 to 47 ns, nested tagged unions 349 to 324; 251 bytes.
-const BUDGET = 61150
+// 61250 (61214 measured): the interpreted engine's index skipped for a schema
+// with no id or anchor (_flatOf in lib/validator-core.js, the idle prebuild
+// in lib/tiering.js deciding it the same way); a new schema's first check
+// 16.3 to 13.8 us, 64 bytes.
+const BUDGET = 61250
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
