@@ -202,4 +202,25 @@ check('registering the meta-schemas does not leak into siblings either', () => {
   assert.ok(!plain._schemaMap.has(META), 'the one that did not, does not')
 })
 
+check('a schema that shares or contains its nodes is scanned as a tree is', () => {
+  // The first walk keeps no record of seen nodes and starts again with one
+  // past its depth or node budget (lib/schema-scan.js). A cycle, a shared
+  // subtree reached 2^30 ways, and a tree deeper than the budget must all
+  // report what a recorded walk reports.
+  const { scan, NULLABLE, TUPLE_ITEMS, EXCLUSIVE_BOOL } = require('../lib/schema-scan')
+  const cyclic = { type: 'object', properties: {} }
+  cyclic.properties.self = cyclic
+  cyclic.properties.n = { nullable: true }
+  assert.strictEqual(scan(cyclic) & NULLABLE, NULLABLE, 'a cycle')
+  let dag = { type: 'string', items: [{ nullable: true }] }
+  for (let i = 0; i < 30; i++) dag = { allOf: [dag, dag] }
+  const t = Date.now()
+  assert.strictEqual(scan(dag) & (NULLABLE | TUPLE_ITEMS), NULLABLE | TUPLE_ITEMS, 'a shared subtree')
+  assert.ok(Date.now() - t < 1000, 'the shared subtree is not walked path by path')
+  let deep = { exclusiveMinimum: true }
+  for (let i = 0; i < 600; i++) deep = { properties: { a: deep } }
+  assert.strictEqual(scan(deep) & EXCLUSIVE_BOOL, EXCLUSIVE_BOOL, 'a tree past the depth budget')
+  assert.strictEqual(scan({ enum: [[[{ nullable: 1 }]]] }) & NULLABLE, NULLABLE, 'objects inside nested arrays')
+})
+
 console.log(`\n${passed} passed`)

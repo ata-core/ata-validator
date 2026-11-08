@@ -220,7 +220,12 @@ const esbuild = require('esbuild')
 // after their first load: building a tool-like schema's nodes 3.72 to 2.35
 // us, 2000 schemas compiled 20% faster; 96 bytes. Marking the keywords in
 // readKeywords' switch measured the same speed and 18 bytes more.
-const BUDGET = 61450
+// 61560 (61552 measured): the normalization scan walks without a set of
+// seen nodes and falls back to one past a depth or node budget, and skips
+// the call on primitive values: a new schema's first check 9.49 to 8.86 us
+// (median of nine); 102 bytes. Keeping the set-free walk alone saved 6
+// bytes and most of the gain.
+const BUDGET = 61560
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

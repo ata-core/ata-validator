@@ -118,7 +118,9 @@ const root = path.resolve(__dirname, '..');
     // schema's first check 12.2 to 10.7 us, 106 bytes.
     // 61.85 KB (63292 measured): the rare-keyword test by name and the
     // first-check modules held, node building 3.72 to 2.35 us, 108 bytes.
-    assert.ok(size < 61.85 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61.85 KB`);
+    // 61.9 KB (63374 measured): the set-free normalization scan, first
+    // check 9.49 to 8.86 us, 82 bytes.
+    assert.ok(size < 61.9 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61.9 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

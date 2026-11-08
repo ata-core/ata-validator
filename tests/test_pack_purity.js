@@ -270,6 +270,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // guard (lib/plan-compiler.js) and their tests' notes. Measured 621.17 KB.
 // 623 KB with the one-pass normalization scan (lib/schema-scan.js), a new
 // schema's first check 12.2 to 10.7 us. Measured 622.22 KB.
-assert.ok(manifest.size < 623 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 624 KB with the set-free normalization scan, first check 9.49 to 8.86 us.
+// Measured 623.25 KB.
+assert.ok(manifest.size < 624 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
