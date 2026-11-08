@@ -247,20 +247,27 @@ type RefName<R> = R extends `#/$defs/${infer N}`
     ? N
     : never;
 
-/** Resolve a `$ref` against the root defs map; external/unresolvable refs -> unknown. */
+/** Follow the rest of a pointer, `A/$defs/B`, through nested objects; never
+ * where a step is missing. */
+type PointerAt<O, P> = P extends `${infer H}/${infer T}`
+  ? H extends keyof O ? PointerAt<O[H], T> : never
+  : P extends keyof O ? O[P] : never;
+
+/** Resolve a `$ref` against the root defs map, nested paths included
+ * (`#/$defs/A/$defs/B`); external/unresolvable refs -> unknown. */
 type ResolveRef<R, D> = [RefName<R>] extends [never]
   ? unknown
-  : RefName<R> extends keyof D
-    ? InferWith<D[RefName<R>], D>
-    : unknown;
+  : [PointerAt<D, RefName<R>>] extends [never]
+    ? unknown
+    : InferWith<PointerAt<D, RefName<R>>, D>;
 
 /** Object shape: required keys are required, all other declared keys optional.
  * When `properties` is absent and `additionalProperties` is a schema, infer
  * a `Record<string, V>` (the JSON Schema "dictionary"/"record" shape). */
 type InferObject<S, D> = S extends { properties: infer P }
   ? Simplify<
-      { [K in keyof P as K extends RequiredKeys<S> ? K : never]: InferWith<P[K], D> } &
-      { [K in keyof P as K extends RequiredKeys<S> ? never : K]?: InferWith<P[K], D> }
+      { -readonly [K in keyof P as K extends RequiredKeys<S> ? K : never]: InferWith<P[K], D> } &
+      { -readonly [K in keyof P as K extends RequiredKeys<S> ? never : K]?: InferWith<P[K], D> }
     >
   : S extends { additionalProperties: infer A }
     ? A extends boolean
@@ -268,10 +275,19 @@ type InferObject<S, D> = S extends { properties: infer P }
       : Record<string, InferWith<A, D>>
     : Record<string, unknown>;
 
-/** Array shape: `prefixItems` -> tuple; `items` (single schema) -> element type; otherwise unknown[]. */
+/** Array shape: `prefixItems` -> tuple, closed by `items: false`, with the
+ * rest typed by `items` when it is a schema and `unknown` when there is none;
+ * `items` (single schema) -> element type; otherwise unknown[]. */
+type InferTuple<P, D> = { -readonly [K in keyof P]: InferWith<P[K], D> };
 type InferArray<S, D> = S extends { prefixItems: infer P }
   ? P extends ReadonlyArray<unknown>
-    ? { -readonly [K in keyof P]: InferWith<P[K], D> }
+    ? S extends { items: false }
+      ? InferTuple<P, D>
+      : S extends { items: infer I }
+        ? I extends boolean
+          ? [...InferTuple<P, D>, ...unknown[]]
+          : [...InferTuple<P, D>, ...InferWith<I, D>[]]
+        : [...InferTuple<P, D>, ...unknown[]]
     : unknown[]
   : S extends { items: infer I }
     ? I extends ReadonlyArray<unknown>
@@ -296,8 +312,10 @@ type InferByTypeName<N, S, D> = N extends 'object'
               ? null
               : unknown;
 
-/** Core inference with the root defs map `D` threaded for `$ref` resolution. */
-type InferWith<S, D> = S extends { $ref: infer R }
+/** Core inference with the root defs map `D` threaded for `$ref` resolution;
+ * OpenAPI's `nullable: true`, which ata honours, adds `null`. */
+type InferWith<S, D> = S extends { nullable: true } ? InferCore<S, D> | null : InferCore<S, D>;
+type InferCore<S, D> = S extends { $ref: infer R }
   ? ResolveRef<R, D>
   : S extends { const: infer C }
     ? C
@@ -329,8 +347,12 @@ type InferWith<S, D> = S extends { $ref: infer R }
  * Handles: primitives, `type` arrays (union), `const`, `enum`, objects
  * (`properties` + `required` -> required/optional keys), arrays (`items`),
  * tuples (`prefixItems`), `anyOf`/`oneOf` (union), `allOf` (intersection),
- * and `$ref` to local `#/$defs/...` or `#/definitions/...`. External or
- * unresolvable `$ref` resolves to `unknown` rather than erroring.
+ * `$ref` to local `#/$defs/...` or `#/definitions/...` (nested paths too), and
+ * OpenAPI's `nullable`. External or unresolvable `$ref` resolves to `unknown`
+ * rather than erroring. A schema without `type` is `unknown` even when it has
+ * `properties` or `items`: those apply to objects and arrays only, so a string
+ * passes it, and a type saying otherwise would claim what validation does not
+ * check.
  *
  * Pair with {@link defineSchema}:
  * `const s = defineSchema({...}); type T = Infer<typeof s>;`

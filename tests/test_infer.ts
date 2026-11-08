@@ -58,11 +58,40 @@ const _allOf: Expect<
 void _allOf;
 
 // --- prefixItems -> tuple ---
+// Open unless `items: false` closes it: the schema allows more elements, typed
+// by `items` when it is a schema (1.64.0; it was a closed tuple, which turned
+// away arrays the schema accepts).
 const _tuple: Expect<
   Infer<{ type: 'array'; prefixItems: [{ type: 'string' }, { type: 'number' }] }>,
-  [string, number]
+  [string, number, ...unknown[]]
 > = true;
 void _tuple;
+const _tupleClosed: Expect<
+  Infer<{ type: 'array'; prefixItems: [{ type: 'string' }, { type: 'number' }]; items: false }>,
+  [string, number]
+> = true;
+void _tupleClosed;
+const _tupleRest: Expect<
+  Infer<{ type: 'array'; prefixItems: [{ type: 'string' }]; items: { type: 'boolean' } }>,
+  [string, ...boolean[]]
+> = true;
+void _tupleRest;
+
+// --- $ref to a nested definition (1.64.0; was unknown) ---
+const _nestedRef: Expect<
+  Infer<{ $defs: { A: { $defs: { B: { type: 'string' } } } }; type: 'object'; properties: { v: { $ref: '#/$defs/A/$defs/B' } }; required: ['v'] }>,
+  { v: string }
+> = true;
+void _nestedRef;
+
+// --- OpenAPI's nullable, which ata honours ---
+const _nullable: Expect<Infer<{ type: 'integer'; nullable: true }>, number | null> = true;
+void _nullable;
+
+// --- validated data is not read-only: a schema written `as const` (or through
+// defineSchema's const parameter) made every property readonly (1.64.0) ---
+declare const _mutable: Infer<{ readonly type: 'object'; readonly properties: { readonly a: { readonly type: 'string' } }; readonly required: readonly ['a'] }>;
+_mutable.a = 'changed';
 
 // --- $ref to local $defs / definitions resolves by name ---
 const refSchema = defineSchema({
