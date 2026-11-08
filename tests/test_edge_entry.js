@@ -114,7 +114,9 @@ const root = path.resolve(__dirname, '..');
     // five messages 117 to 47 ns with code generation blocked, 262 bytes.
     // 61.6 KB (63028 measured): the index skipped for a schema with no id
     // or anchor, first check 16.3 to 13.8 us, 52 bytes.
-    assert.ok(size < 61.6 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61.6 KB`);
+    // 61.75 KB (63184 measured): the one-pass normalization scan, a new
+    // schema's first check 12.2 to 10.7 us, 106 bytes.
+    assert.ok(size < 61.75 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61.75 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

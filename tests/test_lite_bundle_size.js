@@ -209,7 +209,12 @@ const esbuild = require('esbuild')
 // with no id or anchor (_flatOf in lib/validator-core.js, the idle prebuild
 // in lib/tiering.js deciding it the same way); a new schema's first check
 // 16.3 to 13.8 us, 64 bytes.
-const BUDGET = 61250
+// 61400 (61345 measured): the normalization scan reads each node's own names
+// in one pass (lib/schema-scan.js) instead of asking about ten keywords by
+// name, each a read that missed on a new object shape: a new schema's first
+// check 12.2 to 10.7 us, 2000 schemas compiled 9% faster; 95 bytes. Folding
+// the decisions into a shared function gzipped larger: not taken.
+const BUDGET = 61400
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
