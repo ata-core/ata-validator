@@ -171,6 +171,8 @@ const FILES = [
   "tests/test_plan_tagged.js",
   "tests/test_uneval_static_patterns.js",
   "tests/test_idna.js",
+  "tests/test_aot_branch_closures.js",
+  "tests/test_defaults_arrays.js",
   "tests/test_inherited_walk.js",
   "tests/test_formats_small.js",
   "tests/test_openapi.js",
