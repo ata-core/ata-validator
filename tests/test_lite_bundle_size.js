@@ -214,7 +214,13 @@ const esbuild = require('esbuild')
 // name, each a read that missed on a new object shape: a new schema's first
 // check 12.2 to 10.7 us, 2000 schemas compiled 9% faster; 95 bytes. Folding
 // the decisions into a shared function gzipped larger: not taken.
-const BUDGET = 61400
+// 61450 (61441 measured): the rare-keyword test reads the keyword record's
+// fields by name instead of looping over a list of names, a computed read
+// V8 could not cache 21 times a node, and the first-check modules are held
+// after their first load: building a tool-like schema's nodes 3.72 to 2.35
+// us, 2000 schemas compiled 20% faster; 96 bytes. Marking the keywords in
+// readKeywords' switch measured the same speed and 18 bytes more.
+const BUDGET = 61450
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
