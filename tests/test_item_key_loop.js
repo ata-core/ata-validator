@@ -60,6 +60,21 @@ for (const sparse of [false, true]) {
   }
 }
 
+// A declared property that is own but not enumerable is checked on both forms,
+// as the named reads and the interpreter check it: the key loop read the keys
+// with for-in and passed such a property holding a wrong value.
+{
+  const hidden = (p, value) => Object.defineProperty({ f0: good(0), f1: good(1) }, 'f' + p, { value, enumerable: false });
+  for (const [p, value] of [[2, bad(2)], [3, bad(3)], [4, bad(4)], [5, good(5)]]) {
+    const arr = [record(true), record(true), record(true), hidden(p, value)];
+    const want = vi.isValidObject(arr);
+    assert.strictEqual(want, value === good(p), `interpreter on hidden f${p}`);
+    assert.strictEqual(v.isValidObject(arr), want, `mixed records, hidden f${p} = ${JSON.stringify(value)}`);
+    assert.strictEqual(v.validate(arr).valid, want, `mixed records, hidden f${p}: validate`);
+    checked++;
+  }
+}
+
 // The key-loop form is the one taken on mixed records, where code generation runs.
 let codegen = true;
 try { new Function('return 1'); } catch { codegen = false; }
