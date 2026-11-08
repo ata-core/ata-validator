@@ -229,7 +229,9 @@ const esbuild = require('esbuild')
 // hostname scan noting `xn--` labels, with the IDNA2008 checks themselves
 // left out of a browser build (lib/idna.browser.js, `ata-validator/idna`
 // adds them); 148 bytes.
-const BUDGET = 61710
+// 61730 (61722 measured): property defaults kept off arrays and the
+// meta-schema loader ata-validator/ir reads (lib/vocabularies.js); 22 bytes.
+const BUDGET = 61730
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
