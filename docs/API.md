@@ -796,6 +796,32 @@ ata uses three-tier lazy compilation:
 
 Same schema string reuses compiled functions from cache. Second `new Validator(sameSchema)` skips compilation entirely.
 
+### A script that checks once
+
+A server's first request does not pay for loading the code generator: once
+the event loop is free after `require`, the package loads it and runs one
+small check, so the first request finds it ready. A script that requires the
+package and validates in the same tick, a CLI or a build step, loads it on
+that first check instead, which on an M4 Pro was 6.8 ms for a first
+`validate()` of a small schema. Most of that is V8 reading source, and Node's
+module compile cache, which a tool turns on for its own process, keeps that
+across runs:
+
+```bash
+NODE_COMPILE_CACHE=~/.cache/my-tool node my-tool.js
+```
+
+or, from the tool's entry, before it loads the package:
+
+```javascript
+require('node:module').enableCompileCache?.()
+```
+
+Measured on the same machine, seven runs each, from the second run on: the
+first `validate()` went from 6.8 to 4.6 ms with either form, and `require`
+from 1.9 to 1.2 or 1.3 ms. A validator built with `engine: 'interpreter'` does
+not load the code generator at all; its first `validate()` was 3.7 ms.
+
 ## Supported Formats
 
 Hand-written parsers, no regex:
