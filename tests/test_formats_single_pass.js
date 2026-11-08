@@ -187,7 +187,10 @@ for (const [value, expected] of DATE_TIME_PICKED) {
   console.log('ok: ipv6 single-pass agrees with net.isIPv6');
 }
 
-// hostname keeps the answers of the expression it replaces, exactly.
+// hostname keeps the answers of the expression it replaces, exactly, except
+// that since 1.64.0 an `xn--` label must also be an A-label (lib/idna.js,
+// tests/test_idna.js): `xn--hello-txk` decodes to a label that starts with a
+// spacing combining mark.
 {
   const oldHostname = (v) => v.length > 0 && v.length <= 253 &&
     /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(v);
@@ -199,7 +202,8 @@ for (const [value, expected] of DATE_TIME_PICKED) {
     'UPPER.Case', 'has_underscore.com', 'has space.com', '', 'a..b',
   ];
   for (const v of PICKED_HOST) {
-    assert.strictEqual(F.hostname(v), oldHostname(v), `hostname picked: ${JSON.stringify(v)}`);
+    const want = v === 'xn--hello-txk' ? false : oldHostname(v);
+    assert.strictEqual(F.hostname(v), want, `hostname picked: ${JSON.stringify(v)}`);
   }
 
   const alphabet = 'abzAZ09-._';
@@ -215,8 +219,13 @@ for (const [value, expected] of DATE_TIME_PICKED) {
   }
   assert.strictEqual(n, 0, `hostname: ${n} fuzz mismatches`);
 
+  // The plain scan, which the email check's domain reads, keeps the old
+  // answers; the generated `hostname` check answers as the function.
   const fn = new Function('v', F.hostnameSource('v', true) + ';return true');
-  for (const v of PICKED_HOST) assert.strictEqual(fn(v), F.hostname(v), `hostname source form: ${JSON.stringify(v)}`);
+  for (const v of PICKED_HOST) assert.strictEqual(fn(v), oldHostname(v), `hostname scan source form: ${JSON.stringify(v)}`);
+  const idna = require('../lib/idna').__ataIdna();
+  const fi = new Function('_idna', 'v', F.hostnameIdnaSource('v', true, '_idna') + ';return true');
+  for (const v of PICKED_HOST) assert.strictEqual(fi(idna, v), F.hostname(v), `hostname source form: ${JSON.stringify(v)}`);
   console.log('ok: hostname single-pass agrees with the regular expression');
 }
 

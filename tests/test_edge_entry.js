@@ -120,7 +120,11 @@ const root = path.resolve(__dirname, '..');
     // first-check modules held, node building 3.72 to 2.35 us, 108 bytes.
     // 61.9 KB (63374 measured): the set-free normalization scan, first
     // check 9.49 to 8.86 us, 82 bytes.
-    assert.ok(size < 61.9 * 1024, `the Workers bundle is ${size} bytes gzipped, over 61.9 KB`);
+    // 64.75 KB (66237 measured): IDNA2008 for `hostname` and `idn-hostname`
+    // (lib/idna-impl.js, 2.75 KB). A Workers build does not apply the
+    // package's `browser` map, which leaves it out of a page, and a Worker
+    // validates the names an API receives as a server does.
+    assert.ok(size < 64.75 * 1024, `the Workers bundle is ${size} bytes gzipped, over 64.75 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

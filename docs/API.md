@@ -816,7 +816,8 @@ Hand-written parsers, no regex:
 | `ipv4` | `192.168.1.1` |
 | `ipv6` | `::1` |
 | `uuid` | `550e8400-e29b-41d4-a716-446655440000` |
-| `hostname` | `example.com` |
+| `hostname` | `example.com`, `xn--mnchen-3ya.de` |
+| `idn-hostname` | `münchen.de` |
 | `json-pointer` | `/foo/bar` |
 | `relative-json-pointer` | `1/foo` |
 | `regex` | `^[a-z]+$` |
@@ -825,12 +826,38 @@ Hand-written parsers, no regex:
 without one is not a time, and they accept second 60 only where it is the leap
 second, 23:59:60 in UTC.
 
-**Not asserted:** `idn-hostname` and the internationalised half of `hostname`.
-Deciding whether an `xn--` label is a valid internationalised name means
-carrying the IDNA2008 tables: Unicode categories, script data, and the
-contextual and bidi rules. That is tens of kilobytes in a library whose
-compiled output is about one kilobyte per schema, and a partial version would
-turn valid names away. Anything listed as a format ata does not assert is
-treated as an annotation and passes, which is what the specification says an
-unknown format does. A schema that needs those names can supply its own check
-through the `formats` option.
+**Internationalised names.** `idn-hostname` and the `xn--` labels of a
+`hostname` are held to IDNA2008: an A-label must decode as Punycode, encode
+back to itself and give a valid U-label (RFC 5890, 5891), every character must
+be one RFC 5892 allows, the contextual rules for the middle dot, Greek keraia,
+Hebrew geresh and gershayim, katakana middle dot, Arabic-Indic digits and the
+zero width joiners apply, and a name with a right-to-left label keeps the Bidi
+rule of RFC 5893 in every label. An `idn-hostname` is read through the UTS 46
+mapping first, so fullwidth forms, upper case and the ideographic full stops
+are accepted the way a browser reads them.
+
+There are no tables. The checks are worked out from the Unicode data the
+JavaScript engine already has: general categories, binary properties, NFKC and
+NFD. When this was written they were checked code point by code point against
+IANA's IDNA2008 table (all 277,575 code points assigned in Unicode 12) and
+Unicode 16's Bidi, joining and combining class data, and against Python's
+`idna` package on 9,008 names. The one difference from that package is
+deliberate: it applies the Bidi rule to a label on its own, where RFC 5893 and
+the JSON Schema test suite apply it to every label of a name that has a
+right-to-left one, so `1a.xn--4dbc5h` is refused here. Two limits: a character
+newer than the engine's Unicode data is refused as unassigned, and a zero width
+non-joiner that does not follow a virama is allowed between letters of a
+joining script without reading their exact joining types.
+
+Node, Bun, Deno and Cloudflare Workers check these names with no setup. A
+browser bundle leaves the checks out, 2.75 KB gzipped, and a page that
+validates internationalised names adds them with one import before building
+validators:
+
+```javascript
+import 'ata-validator/idna';
+```
+
+Without it a browser bundle checks a `hostname` for letters, digits and
+hyphens only and treats `idn-hostname` as an annotation, as releases before
+1.64.0 did everywhere.

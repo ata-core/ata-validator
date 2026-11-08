@@ -99,6 +99,11 @@
       "import": "./lite.mjs",
       "require": "./lite.js"
     },
+    "./idna": {
+      "types": "./idna.d.ts",
+      "import": "./idna.mjs",
+      "require": "./idna.js"
+    },
     "./error-runtime": {
       "types": "./error-runtime.d.ts",
       "import": "./error-runtime.mjs",
@@ -152,7 +157,8 @@
     "./lib/native-message.js": "./lib/native.browser.js",
     "./lib/native-codes.js": "./lib/native.browser.js",
     "./lib/email-literal.js": false,
-    "./lib/native-positions.js": "./lib/native.browser.js"
+    "./lib/native-positions.js": "./lib/native.browser.js",
+    "./lib/idna.js": "./lib/idna.browser.js"
   },
   "scripts": {
     "prepublishOnly": "node tests/test_pack_purity.js && ATA_ALLOW_DOC_PLACEHOLDERS=1 node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js && node tests/test_safe_regex_embed.js && node tests/test_version_sync.js",
@@ -256,6 +262,9 @@
     "lite.js",
     "lite.mjs",
     "lite.d.ts",
+    "idna.js",
+    "idna.mjs",
+    "idna.d.ts",
     "error-runtime.js",
     "error-runtime.mjs",
     "error-runtime.d.ts",

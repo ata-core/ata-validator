@@ -21,7 +21,10 @@ if (!native) {
   process.exit(0);
 }
 
-const FORMATS = ['email', 'date', 'uri', 'uuid', 'ipv4', 'ipv6', 'hostname'];
+// `hostname` left the native set in 1.64.0: lib/formats.js holds its `xn--`
+// labels to IDNA2008 and the native check does not, so lib/buffer-gate.js
+// sends a schema with it to validate().
+const FORMATS = ['email', 'date', 'uri', 'uuid', 'ipv4', 'ipv6'];
 
 const samples = new Set();
 const suite = path.join(__dirname, 'suite', 'tests');

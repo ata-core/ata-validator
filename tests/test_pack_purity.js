@@ -275,6 +275,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 625 KB with the fixed unevaluatedProperties model in the code generator
 // (staticUnevalPatterns): an OpenAPI 3.1 document validated 7.1 to 4.2 ms.
 // Measured 624.85 KB.
-assert.ok(manifest.size < 625 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 635 KB with IDNA2008 for `hostname` and `idn-hostname` (lib/idna-impl.js,
+// lib/idna.browser.js, idna.js, and the copy the format kernels carry in
+// lib/kernels/formats.mjs). Measured 634.9 KB.
+assert.ok(manifest.size < 635 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

@@ -225,7 +225,11 @@ const esbuild = require('esbuild')
 // the call on primitive values: a new schema's first check 9.49 to 8.86 us
 // (median of nine); 102 bytes. Keeping the set-free walk alone saved 6
 // bytes and most of the gain.
-const BUDGET = 61560
+// 61710 (61700 measured): `idn-hostname` in the format table and the
+// hostname scan noting `xn--` labels, with the IDNA2008 checks themselves
+// left out of a browser build (lib/idna.browser.js, `ata-validator/idna`
+// adds them); 148 bytes.
+const BUDGET = 61710
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
