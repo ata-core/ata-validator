@@ -124,7 +124,11 @@ const root = path.resolve(__dirname, '..');
     // (lib/idna-impl.js, 2.75 KB). A Workers build does not apply the
     // package's `browser` map, which leaves it out of a page, and a Worker
     // validates the names an API receives as a server does.
-    assert.ok(size < 64.75 * 1024, `the Workers bundle is ${size} bytes gzipped, over 64.75 KB`);
+    // 64.95 KB (66483 measured): anyOf and oneOf asked for verdicts before
+    // their branches' errors, and the verdict with defaults taken without
+    // errors; on a Worker a schema with defaults checks 4 to 8 times faster
+    // and a large rejected document's errors build 2 to 9 times faster.
+    assert.ok(size < 64.95 * 1024, `the Workers bundle is ${size} bytes gzipped, over 64.95 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

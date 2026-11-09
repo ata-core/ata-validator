@@ -204,6 +204,7 @@ const FILES = [
   "tests/test_name_map_value_keys.js",
   "tests/test_item_key_loop.js",
   "tests/test_key_loop_shapes.js",
+  "tests/test_interp_verdict_no_errors.js",
   "tests/test_def_root_forwarder.js",
   "tests/test_untyped_properties.js",
   "tests/test_pattern_literal_keys.js",

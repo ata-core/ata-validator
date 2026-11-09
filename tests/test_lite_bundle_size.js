@@ -231,7 +231,13 @@ const esbuild = require('esbuild')
 // adds them); 148 bytes.
 // 61730 (61722 measured): property defaults kept off arrays and the
 // meta-schema loader ata-validator/ir reads (lib/vocabularies.js); 22 bytes.
-const BUDGET = 61730
+// 61960 (61948 measured): collecting errors, anyOf and oneOf ask their
+// branches for verdicts first and contains, not and if only for verdicts,
+// on the walk and the closure tree, and isValidObject() with a preprocess
+// pass takes the verdict instead of validate(); a rejected GeoJSON
+// collection's errors 0.40 to 0.04 ms on the tree, prometheus' verdict 40 to
+// 5 us with defaults; 226 bytes.
+const BUDGET = 61960
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
