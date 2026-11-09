@@ -286,6 +286,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 639 KB with the key loop on any node of 32 or more optional properties,
 // taken once the documents show more than four shapes (cypress' configuration
 // 2.41 ms to 0.10 ms a pass of 981 documents). Measured 638.2 KB.
-assert.ok(manifest.size < 639 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 640 KB with the error code's key loop, the same switch the verdict makes
+// for a node of 32 or more optional properties, read into locals that one
+// copy of the checks takes (cypress' rejected documents 2.5 to 0.45 ms a
+// pass). Measured 639.9 KB.
+assert.ok(manifest.size < 640 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
