@@ -283,6 +283,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // differential. Measured 635.4 KB.
 // 637 KB with the corrected Infer (mutable data, open tuples, nullable,
 // nested references) and its documentation. Measured 636.2 KB.
-assert.ok(manifest.size < 637 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 639 KB with the key loop on any node of 32 or more optional properties,
+// taken once the documents show more than four shapes (cypress' configuration
+// 2.41 ms to 0.10 ms a pass of 981 documents). Measured 638.2 KB.
+assert.ok(manifest.size < 639 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

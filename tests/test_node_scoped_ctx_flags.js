@@ -251,6 +251,9 @@ function bothEngines (schema, cases, label) {
     // and how many of them have been emitted, which picks the copy a
     // reference calls (sharedDefCopy): all for the whole compile.
     'sharedDefBody', 'sharedDefSiteCounts', 'sharedDefSites',
+    // How much source the key loops added over the whole compile, held to
+    // KEY_LOOP_BUDGET.
+    'keyLoopChars',
   ])
 
   const src = require('node:fs').readFileSync(require.resolve('../lib/js-compiler.js'), 'utf8')
