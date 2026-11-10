@@ -290,6 +290,12 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // for a node of 32 or more optional properties, read into locals that one
 // copy of the checks takes (cypress' rejected documents 2.5 to 0.45 ms a
 // pass). Measured 639.9 KB.
-assert.ok(manifest.size < 640 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 641 KB with modules' error fields held to the Validator's: the code and link
+// of a false subschema's error and the link of a collapsed branch error, the
+// key loop's table and sampling record carried into a module as a Map and a
+// writable object, and the copy count of shared definitions kept whole when
+// a trial emission is thrown away (a valid SARIF document was refused).
+// Measured 640.5 KB.
+assert.ok(manifest.size < 641 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
