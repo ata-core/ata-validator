@@ -339,7 +339,7 @@ const tests = [
     assert(by['#/required'].code === 'ATA7001', 'required code');
     assert(by['#/dependentRequired'].code === 'ATA7005', 'dependentRequired code');
     const one = by['#/properties/b/oneOf'];
-    assert(one.code === 'ATA4001' && one.docUrl === undefined, 'collapsed branch error keeps the module shape');
+    assert(one.code === 'ATA4001' && one.docUrl === 'https://ata-validator.com/e/ATA4001', 'a collapsed branch error has its code and its link, as the Validator gives them');
     assert(one.branchErrors[0].code === 'ATA1001', 'branch errors stamped');
   }],
 
