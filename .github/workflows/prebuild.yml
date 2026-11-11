@@ -218,11 +218,22 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           for dir in native-packages/native-*; do
-            NAME=$(node -p "require('./$dir/package.json').name")
+            # These directories come from the build jobs, which hold no
+            # publish identity. Each must be named for a target, hold the
+            # package of that name, and is published without running any
+            # script its package.json might carry.
+            TARGET="${dir#native-packages/native-}"
+            case "$TARGET" in
+              ""|*[!a-z0-9-]*) echo "unexpected native package directory: $dir"; exit 1 ;;
+            esac
+            NAME=$(cd "$dir" && node -p "require('./package.json').name")
+            if [ "$NAME" != "@ata-validator/native-$TARGET" ]; then
+              echo "$dir holds a package named $NAME, expected @ata-validator/native-$TARGET"; exit 1
+            fi
             if npm view "$NAME@$VERSION" version > /dev/null 2>&1; then
               echo "$NAME@$VERSION already published, skipping"
             else
-              (cd "$dir" && npm publish --access public)
+              (cd "$dir" && npm publish --access public --ignore-scripts)
             fi
           done
           # The core must not publish before every native it pins is visible,
