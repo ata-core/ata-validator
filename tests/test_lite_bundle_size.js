@@ -242,7 +242,9 @@ const esbuild = require('esbuild')
 // load, the draft-07, draft-06 and draft-04 ones included (the draft-04 one
 // accepted `multipleOf: 0` and `exclusiveMaximum` without `maximum`); 87
 // bytes less.
-const BUDGET = 61875
+// 61710 (61698 measured): the date, date-time and uuid checks on shared
+// digit pairs and one table; 163 bytes less.
+const BUDGET = 61710
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

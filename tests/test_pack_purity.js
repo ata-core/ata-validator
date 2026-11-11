@@ -315,6 +315,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // program is not the one-pass one, its long lists sorted by the places the
 // program records, and a required name that holds undefined reported in
 // its place by the interpreted engine. Measured 652.0 KB.
-assert.ok(manifest.size < 653 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 654 KB with the date and uuid checks read without a branch per character
+// (a date 19 to 11 ns, a uuid 37 to 27 in generated code) and the date-time
+// check on the same digit pairs; the bundles got smaller (main entry 61861
+// to 61698 bytes gzipped), the source and its notes longer. Measured 653.7 KB.
+assert.ok(manifest.size < 654 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

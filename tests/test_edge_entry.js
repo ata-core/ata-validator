@@ -131,7 +131,9 @@ const root = path.resolve(__dirname, '..');
     // 64.9 KB (66400 measured): the vendored meta-schemas are held as each
     // dialect reads them (scripts/gen-metaschemas.js) instead of rewritten
     // at load; 83 bytes less.
-    assert.ok(size < 64.9 * 1024, `the Workers bundle is ${size} bytes gzipped, over 64.9 KB`);
+    // 64.75 KB (66264 measured): the date, date-time and uuid checks on
+    // shared digit pairs and one table; 136 bytes less.
+    assert.ok(size < 64.75 * 1024, `the Workers bundle is ${size} bytes gzipped, over 64.75 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
