@@ -84,6 +84,16 @@ const irRefused = (e) => e && typeof e.message === 'string' && e.message.startsW
 const PATHS = {
   'interpreted engine': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s, { engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
   'generated code, warm': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s); for (let i = 0; i < 80; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
+  // The small engine (lib/engine-small.js) in the walk's place under the
+  // Validator: not wired into the package yet, so it is put there for the
+  // build of this one instance. Declined where it takes no part (createSmall
+  // returns null and the walk answers).
+  'small engine': { fields: RICH, fills: true, build: (s) => {
+    const im = require(path.join(ROOT, 'lib/interpreter.js')); const { createSmall } = require(path.join(ROOT, 'lib/engine-small.js'));
+    const real = im.createInterpreter; let used = false;
+    im.createInterpreter = (schema, args) => { const e = createSmall(schema, args); if (e === null) return real(schema, args); used = true; return e; };
+    try { const v = new Validator(s, { engine: 'interpreter' }); v.isValidObject(null); return used ? { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) } : null; } finally { im.createInterpreter = real; }
+  } },
   'closure tree': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s, { engine: 'interpreter' }); for (let i = 0; i < 1100; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
   'JSON text': { fields: RICH, json: true, fills: false, build: (s) => { const v = new Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
   'plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => { const v = new Validator(s, { richErrors: false, engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
