@@ -46,8 +46,14 @@ jobs:
         with:
           subject-path: ${{ steps.pack.outputs.file }}
       - name: Attach to the release
+        # The tag name and the file names reach the shell as variables, not
+        # as text written into the script: a tag may hold characters the
+        # shell would run.
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          FILE: ${{ steps.pack.outputs.file }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
-          cp "${{ steps.attest.outputs.bundle-path }}" "${{ steps.pack.outputs.file }}.sigstore.json"
-          gh release upload "${{ github.event.release.tag_name }}" "${{ steps.pack.outputs.file }}" "${{ steps.pack.outputs.file }}.sigstore.json" SHA256SUMS --clobber
+          cp "$BUNDLE" "$FILE.sigstore.json"
+          gh release upload "$TAG" "$FILE" "$FILE.sigstore.json" SHA256SUMS --clobber
