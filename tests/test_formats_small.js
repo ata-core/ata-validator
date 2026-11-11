@@ -23,7 +23,10 @@ const LEN = +(process.env.FORMATS_SMALL_LEN || 4);
   walk('', LEN);
 
   // Strings from the grammar, and each with one character changed, dropped or doubled.
-  let seed = 42; const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  // The generator's high bits: its low bits repeat with a short period, and
+  // `seed % n` took those, so whole shapes were never made (an IPv6 literal
+  // ending in a dotted IPv4 address with a two or three digit part among them).
+  let seed = 42; const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed >>> 12) % n; };
   const pick = (a) => a[rnd(a.length)];
   const H = () => pick(['0', '1', 'a', 'F', 'ff', 'abcd', '0db8', '12345']);
   const v4 = () => [1, 2, 3, 4].map(() => pick(['0', '1', '9', '25', '255', '256', '01', '199'])).join('.');
@@ -60,6 +63,12 @@ const LEN = +(process.env.FORMATS_SMALL_LEN || 4);
   }
   const walkE = (s, n) => { same(s); if (n === 0) return; for (const c of E) walkE(s + c, n - 1); };
   walkE('', Math.min(LEN, 5));
+
+  // IPv6 literals ending in a dotted IPv4 address, by name: the expression
+  // once read `\d` as the letter d and no generated string showed it.
+  for (const t of ['::ffff:192.168.1.1', '1:2:3:4:5:6:10.20.30.40', '::1.2.3.4', '::d.d.d.d', '::1d.2.3.4', '1::2:3:4:5:6:1.2.3.4', '1:2:3:4:5:6:7:1.2.3.4', '::255.255.255.255', '::256.1.1.1', '1:2:3:4:5::100.99.9.0']) {
+    same('a@[IPv6:' + t + ']'); same('http://[' + t + ']/'); same('//[' + t + '%25eth0]:80')
+  }
 
   // The suite's format tests.
   const SUITE = path.join(__dirname, 'suite/tests');
