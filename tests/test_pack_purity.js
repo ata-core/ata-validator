@@ -311,6 +311,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // skeleton carries those documents, the fill reads the schema the Validator
 // fills from), and the old drafts' meta-schemas read by their own dialect.
 // Measured 650.8 KB.
-assert.ok(manifest.size < 651 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 653 KB with a plainErrors module's errors plain and ordered where its
+// program is not the one-pass one, its long lists sorted by the places the
+// program records, and a required name that holds undefined reported in
+// its place by the interpreted engine. Measured 652.0 KB.
+assert.ok(manifest.size < 653 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

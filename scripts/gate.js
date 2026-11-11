@@ -91,7 +91,10 @@ const PATHS = {
     const src = build.compiledModuleFor(s, { format: 'cjs', plainErrors: true });
     if (!src) return null;
     const v = fromCompiledPlain(loadCjs(src), build.compiledSchemaFor(s), { richErrors: false });
-    return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) };
+    // A one-pass program that does not know every error site's place leaves
+    // some lists as it found them (lib/compiled-plain.js): no order promised.
+    const unordered = src.includes('_vC') && !src.includes('x.sort((a,b)=>o[a]-o[b]');
+    return { ordered: !unordered, validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) };
   } },
   'compact module': { fields: MODULE, abort: true, ref: { useDefaults: false }, build: (s) => {
     const v = new Validator(s); const src = aot.toCompactModule(v, { format: 'cjs', errorRuntime: './ata-errors.cjs' });
@@ -182,8 +185,15 @@ async function check(label, schema, docs, stats, report, only) {
       if (!want.valid) {
         if (P.abort && got.errors.length === 1 && got.errors[0].code === 'ATA9000') st.abort++;
         else {
-          let x = want.errors.map(shape).map((e) => JSON.stringify(e)); let y = got.errors.map(shape).map((e) => JSON.stringify(e));
-          if (P.ordered === false) { x = x.slice().sort(); y = y.slice().sort(); }
+          // A plain error has the plain fields and no others: its keys are compared too.
+          const keysOf = (e) => (P.fields === PLAIN ? ' keys ' + Object.keys(e).filter((k) => e[k] !== undefined).sort().join(',') + (Array.isArray(e.branchErrors) ? ' [' + e.branchErrors.map(keysOf).join(';') + ']' : '') : '');
+          let x = want.errors.map((e) => JSON.stringify(shape(e)) + keysOf(e)); let y = got.errors.map((e) => JSON.stringify(shape(e)) + keysOf(e));
+          if (P.ordered === false || p.ordered === false) {
+            if (x.join('\n') !== y.join('\n')) st.unordered = (st.unordered || 0) + 1;
+            // Without order, at every depth: a collapsed error's branch list is sorted too.
+            const canon = (e) => { const r = shape(e); const b = r[r.length - 1]; if (Array.isArray(e.branchErrors)) r[r.length - 1] = e.branchErrors.map(canon).sort(); return JSON.stringify(r) + keysOf(e).replace(/ \[.*$/, ''); };
+            x = want.errors.map(canon).sort(); y = got.errors.map(canon).sort();
+          }
           if (x.join('\n') !== y.join('\n')) { fail(`errors\n      Validator ${x.join(' ').slice(0, 300)}\n      path      ${y.join(' ').slice(0, 300)}`); continue; }
         }
       }
@@ -259,7 +269,7 @@ async function run(opts) {
 
 function summary({ stats, report }) {
   const lines = [`${stats.schemas} schemas, ${Object.keys(stats.paths).length} paths against the Validator`];
-  for (const [name, s] of Object.entries(stats.paths)) lines.push(`  ${name.padEnd(26)} ${String(s.taken).padStart(5)} schemas (${s.declined} declined) ${String(s.docs).padStart(7)} documents  ${s.diffs} differ${s.threw ? `, ${s.threw} threw` : ''}${s.abort ? `, ${s.abort} as ATA9000` : ''}${s.known ? `, ${s.known} known` : ''}`);
+  for (const [name, s] of Object.entries(stats.paths)) lines.push(`  ${name.padEnd(26)} ${String(s.taken).padStart(5)} schemas (${s.declined} declined) ${String(s.docs).padStart(7)} documents  ${s.diffs} differ${s.threw ? `, ${s.threw} threw` : ''}${s.abort ? `, ${s.abort} as ATA9000` : ''}${s.known ? `, ${s.known} known` : ''}${s.unordered ? `, ${s.unordered} in another order where none is promised` : ''}`);
   for (const r of report) lines.push('  ' + r);
   // What differs, by path, kind and the kind of document, with the first of each.
   for (const [k, n] of Object.entries(stats.kinds).sort((a, b) => b[1] - a[1])) lines.push(`  ${String(n).padStart(5)}  ${k}\n         ${stats.first[k].slice(0, 700)}`);
@@ -271,7 +281,7 @@ module.exports = { run, summary, PATHS };
 if (require.main === module) {
   const argv = process.argv.slice(2);
   const arg = (n) => { const i = argv.indexOf(n); return i === -1 ? undefined : argv[i + 1]; };
-  run({ schemastore: arg('--schemastore'), paths: arg('--paths') ? arg('--paths').split(',') : undefined, suite: !argv.includes('--no-suite'), every: Number(arg('--every')) || 1 }).then((r) => {
+  run({ schemastore: arg('--schemastore'), paths: arg('--paths') ? arg('--paths').split(';') : undefined, suite: !argv.includes('--no-suite'), every: Number(arg('--every')) || 1 }).then((r) => {
     console.log(summary(r));
     const bad = Object.values(r.stats.paths).reduce((n, s) => n + s.diffs + s.threw, 0);
     process.exit(bad === 0 ? 0 : 1);
