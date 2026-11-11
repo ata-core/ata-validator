@@ -128,7 +128,10 @@ const root = path.resolve(__dirname, '..');
     // their branches' errors, and the verdict with defaults taken without
     // errors; on a Worker a schema with defaults checks 4 to 8 times faster
     // and a large rejected document's errors build 2 to 9 times faster.
-    assert.ok(size < 64.95 * 1024, `the Workers bundle is ${size} bytes gzipped, over 64.95 KB`);
+    // 65.0 KB (66547 measured): the vendored draft-07, draft-06 and draft-04
+    // meta-schemas read by their own dialect; the draft-04 one accepted
+    // `multipleOf: 0` and `exclusiveMaximum` without `maximum`. 64 bytes.
+    assert.ok(size < 65.0 * 1024, `the Workers bundle is ${size} bytes gzipped, over 65.0 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

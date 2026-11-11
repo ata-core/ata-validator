@@ -306,6 +306,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 649 KB with the IR's default fills kept off arrays, as the Validator's
 // passes are (105 bytes, and the last ceiling had 79 to spare). Measured
 // 648.0 KB.
-assert.ok(manifest.size < 649 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 651 KB with errors and defaults behind a registered schema or a
+// meta-schema as the Validator gives them on every IR path (the order
+// skeleton carries those documents, the fill reads the schema the Validator
+// fills from), and the old drafts' meta-schemas read by their own dialect.
+// Measured 650.8 KB.
+assert.ok(manifest.size < 651 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
