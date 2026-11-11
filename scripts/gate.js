@@ -63,11 +63,13 @@ function loadWithRuntime(src, runtimeName, runtimeSrc) {
 
 // The ES modules of ata-validator/ir, loaded once (main awaits this).
 let ir = null; let K = null; let plans = null; let functionBody = null;
+// A file URL: on Windows an absolute path is not one the ESM loader takes.
+const at = (f) => require('node:url').pathToFileURL(path.join(ROOT, f)).href;
 async function loadIr() {
-  ir = await import(path.join(ROOT, 'lib/ir/index.mjs'));
-  K = await import(path.join(ROOT, 'lib/kernels/index.mjs'));
-  plans = await import(path.join(ROOT, 'lib/kernels/plan-rich.mjs'));
-  ({ functionBody } = await import(path.join(ROOT, 'lib/ir/emit.mjs')));
+  ir = await import(at('lib/ir/index.mjs'));
+  K = await import(at('lib/kernels/index.mjs'));
+  plans = await import(at('lib/kernels/plan-rich.mjs'));
+  ({ functionBody } = await import(at('lib/ir/emit.mjs')));
 }
 const irModule = (src) => new Function('K', functionBody(src))(K);
 const irData = (src) => { const m = /^import \{([^}]*)\} from "[^"\n]*"\n/.exec(src); return new Function('K', `const {${m[1]}}=K\n` + src.slice(m[0].length).replace(/^export const\{isValid,validate\}=/m, 'const{isValid,validate}=') + 'return{isValid,validate}')(K); };
