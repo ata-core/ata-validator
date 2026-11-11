@@ -75,6 +75,7 @@ const FILES = [
   "tests/test_aot_build.js",
   "tests/test_compact_modules.js",
   "tests/test_runtime_idna_part.js",
+  "tests/test_error_runtime_entry_split.js",
   "tests/test_interpreter_tiering.js",
   "tests/test_edge_entry.js",
   "tests/test_aot_self_ref_errors.js",
