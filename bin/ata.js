@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 'use strict';
 const { env } = require('../lib/env');
+// Text that comes from a schema file (a $ref, a keyword name in a warning) is
+// written with its control characters as escapes, as `ata validate` writes
+// it: a schema could otherwise clear the screen or forge an `ata:` line.
+const term = (t) => require('../lib/diagnose').term(String(t));
 
 const fs = require('fs');
 const path = require('path');
@@ -299,7 +303,7 @@ function cmdCompile(args) {
       for (const w of compileWarnings) reportCompileError(input, w);
       process.exit(1);
     }
-    for (const w of compileWarnings) process.stderr.write(`ata: warning: ${input}: ${w}\n`);
+    for (const w of compileWarnings) process.stderr.write(`ata: warning: ${input}: ${term(w)}\n`);
   }
   if (!src) {
     reportCompileError(input, 'schema is too complex for standalone compilation');
@@ -397,7 +401,7 @@ function cmdBuild(args) {
     for (const c of report.compiled) {
       process.stdout.write(`ata: ${c.input} -> ${c.output} (${c.bytes.toLocaleString()} bytes${c.errors === 'compact' ? ', shared errors' : c.errors === 'schema' ? ', schema module' : ''})\n`);
       for (const t of (report.bunTargets || []).filter((t) => t.input === c.input)) process.stdout.write(`ata: bun target -> ${t.output} (for bun build --compile --aot)\n`);
-      for (const d of (report.bunDeclined || []).filter((d) => d.input === c.input)) process.stderr.write(`ata: warning: ${d.input}: ${d.reason}\n`);
+      for (const d of (report.bunDeclined || []).filter((d) => d.input === c.input)) process.stderr.write(`ata: warning: ${d.input}: ${term(d.reason)}\n`);
     }
     if (report.runtime) {
       process.stdout.write(`ata: error runtime -> ${report.runtime.output} (${report.runtime.bytes.toLocaleString()} bytes, shared by the modules above)\n`);
@@ -412,7 +416,7 @@ function cmdBuild(args) {
         noDetail++;
         process.stderr.write(`ata: warning ${w.input}: no error detail, failures report the single ATA9000 error (the verdict is exact)\n`);
       } else {
-        process.stderr.write(`ata: warning ${w.input}: ${w.warning}\n`);
+        process.stderr.write(`ata: warning ${w.input}: ${term(w.warning)}\n`);
       }
     }
     if (noDetail > 0 && args.opts.mode !== 'schema') {
@@ -422,7 +426,7 @@ function cmdBuild(args) {
       process.stdout.write(`ata: cached  ${c.input}\n`);
     }
     for (const s of report.skipped) {
-      process.stdout.write(`ata: skipped ${s.input}: ${s.reason}\n`);
+      process.stdout.write(`ata: skipped ${s.input}: ${term(s.reason)}\n`);
     }
     for (const f of report.failed) {
       reportCompileError(f.input, f.error);
