@@ -133,7 +133,12 @@ for (const p of patterns) {
 for (const p of ['(a+)+$', '^(a+)+$', '^(a|aa)+$', '^a+a+$', '^a*a*$', 'a+b', '^[a-z]{0,1000}$', '^(\\w+\\s?)+$', '^(\\w+\\s?)*$', '\\01',
   '^(a*)*b$', '^(a?)+$', '^(.*a){10}$', '^[a-z]+[a-z0-9]+$', '^(\\w+\\s?){5}$', '\\w+(,\\w+)*', '^([a-z]+\\.?)+$',
   // A delimiter the loop or the rest also matches, or two varying repeats.
-  '^([a-z]+.)*[a-z]+$', '^([^/]+/)*.*$', '^(ab*b)*$', '^(a[ab]*a)*$', '^[a]{0,200}[a]{0,200}$', '^([a-z.]+\\.)*[a-z]+$']) {
+  '^([a-z]+.)*[a-z]+$', '^([^/]+/)*.*$', '^(ab*b)*$', '^(a[ab]*a)*$', '^[a]{0,200}[a]{0,200}$', '^([a-z.]+\\.)*[a-z]+$',
+  // Bounded choices in a row multiply (a security audit, 2026-11-11): these
+  // counted as 30 to 64 choices, passed as linear, and a string of 17
+  // characters that does not match ran the platform RegExp for over half a
+  // minute.
+  '^([a-z]?){64}$', '^(a?){30}$', '^(a?){30}a{30}$', '^a*(a{0,8}){8}$', '^(a{1,8}){8}$', '^a?b?c?d?e?f?g?h?i?j?k?l?m?n?$']) {
   assert.strictEqual(nativeIsLinear(p), false, p)
 }
 // And the deterministic rule takes what the simple one cannot.
