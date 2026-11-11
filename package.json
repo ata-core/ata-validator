@@ -235,6 +235,7 @@
     "aot.d.ts",
     "lib/",
     "!lib/plan-source.js",
+    "!lib/engine-small.js",
     "compat.js",
     "compat.mjs",
     "compat.d.ts",

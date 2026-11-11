@@ -28,6 +28,7 @@ const FILES = [
   "tests/test_text_path_errors.js",
   "tests/test_compiled_parity.js",
   "tests/test_module_error_fields.js",
+  "tests/test_engine_small.js",
   "tests/test_trial_restore_counts.js",
   "tests/test_compiled_extension_parity.js",
   "tests/test_buffer_gate.js",
