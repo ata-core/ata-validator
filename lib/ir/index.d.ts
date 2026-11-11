@@ -54,6 +54,12 @@ export function compileClosures(schema: JSONSchema, options?: ClosureOptions): C
 
 /** Writes the schema as a plan of steps for the interpreter in `ata-validator/kernels`, or null where the table backend does not cover it. */
 export function tableModule(schema: JSONSchema, options?: TableOptions): string | null;
+/**
+ * The closure backend: the schema as calls that build one closure per node, for a browser bundle of several forms.
+ * Plain errors only: `richErrors` must be `false`. Covers objects, arrays and value keywords; returns null for
+ * anything else (references, branches, a default to fill), and the caller writes the plan or the module instead.
+ */
+export function closureModule(schema: JSONSchema, options: { richErrors: false; assertFormat?: boolean; useDefaults?: false }): string | null;
 
 /** The same plan as JSON, for `fromPlan` in `ata-validator/plan`, or null where the table backend does not cover the schema. */
 export function tablePlan(schema: JSONSchema, options?: TableOptions): Plan | null;

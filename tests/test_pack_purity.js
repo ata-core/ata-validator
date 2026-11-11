@@ -296,6 +296,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // writable object, and the copy count of shared definitions kept whole when
 // a trial emission is thrown away (a valid SARIF document was refused).
 // Measured 640.5 KB.
-assert.ok(manifest.size < 641 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 647 KB with the closure backend of ata-validator/ir (lib/ir/closures.mjs
+// and its kernels, lib/kernels/closures.mjs): several forms in one browser
+// bundle at two thirds of their plans' size (twenty forms 3.4 KB gzipped
+// against 5.0) and checked in a third of the time. Measured 646.4 KB.
+assert.ok(manifest.size < 647 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

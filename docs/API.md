@@ -294,6 +294,13 @@ The same plan as JavaScript module source (a string), or `null` where `tablePlan
 `null`, for a build that writes the module to disk; it imports the interpreter and the handlers
 it names from `ata-validator/kernels`. Takes the same options as `tablePlan`.
 
+### closureModule(schema, options), ata-validator/ir
+
+The schema as calls that build one closure per node, for a browser bundle of
+several forms: smaller than their plans and faster to check. Plain errors only
+(`richErrors: false`), and the keywords forms are made of; `null` for anything
+else. See [docs/ir.md](ir.md).
+
 ### specialize(schema, options?) and compileClosures(schema, options?), ata-validator/ir
 
 The IR compiler's two other backends. `specialize` returns the source of a module that imports

@@ -103,6 +103,34 @@ pattern schema, or in a cycle) is filled by the shared pass, which the
 module imports and a plan names, loaded only then. `@ata-project/unplugin` chooses
 between the two for a whole application by which bundle is smaller.
 
+### The closure backend
+
+`closureModule(schema, { richErrors: false })` writes the schema as calls that
+build one closure per schema node when the module loads. A page carries the
+closures' kernels once and each form as a line of calls. It is for a bundle of
+several forms: on twenty signup-like forms, minified and gzipped, 3.4 KB
+against 5.0 KB for their plans and 8.6 KB for written modules, and a valid
+form is checked in 237 ns against 643 ns for a plan (82 ns for a written
+module, which stays the fastest and, for a single form, the smallest).
+
+```js
+import { closureModule } from 'ata-validator/ir'
+
+const source = closureModule(schema, { richErrors: false })
+// import {cObj,cRun,cVal,fmt_email_s} from "ata-validator/kernels"
+// export const{isValid,validate}=cRun(cObj("tpr",["email",cVal([0,1,4,[fmt_email_s,"email"]])],1))
+```
+
+It takes plain errors only, and what forms are made of: objects (`type`,
+`properties`, `required`, `additionalProperties: false`), arrays (`items`,
+`minItems`, `maxItems`, `uniqueItems`) and values (`type`, `enum` and `const`
+of primitives, the string and number keywords, formats). The errors are the
+`Validator`'s with `richErrors: false`, every field, in the same order.
+Anything else (a reference, `anyOf`, a default to fill, rich errors) returns
+`null`, and the caller writes the plan or the module instead.
+`tests/test_ir_closures.mjs` holds every module it writes to the module
+writer's answers on the official suite and on generated forms.
+
 ## What it refuses
 
 A schema or option outside what a backend covers throws an error whose

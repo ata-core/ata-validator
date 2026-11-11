@@ -4,6 +4,10 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ## Unreleased
 
+### Added
+
+- `closureModule(schema, { richErrors: false })` in `ata-validator/ir`, a third way to write a schema for a browser bundle: calls that build one closure per schema node when the module loads, their kernels shared by every form on the page. For several forms it is smaller than their plans and faster to check: twenty signup-like forms, minified and gzipped, 3.4 KB against 5.0 KB as plans and 8.6 KB as written modules; a valid form in 237 ns against 643 ns for a plan (a written module stays the fastest, 82 ns, and the smallest for a single form). It covers what forms are made of (objects, arrays, value keywords, formats) with plain errors, the `Validator`'s with `richErrors: false`, field for field and in the same order, and returns `null` for anything else (a reference, `anyOf`, a default to fill, rich errors). Nothing an existing call writes changes. Experimental with the rest of `ata-validator/ir`.
+
 ### Changed
 
 - The errors of a rejected document are read with the same switch the verdict makes for a node of 32 or more optional properties: once its documents have come in more than four shapes, the error code takes the node's values from the document's own names in one loop instead of reading each name. One copy of the checks serves both, so documents of one shape run what they ran before and the error code grows a little (micro's 27 to 31 KB). On sourcemeta's benchmark, reading the errors of rejected documents of many shapes takes 489 µs a pass for cypress where it took 2,452, jshintrc 926 where 4,282, cspell 635 where 2,505, clang-format 141 where 819, and the 36 schemas with rejected documents move 17% by geometric mean.
