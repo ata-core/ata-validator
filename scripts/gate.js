@@ -114,18 +114,11 @@ const PATHS = {
   'ir closure module': { fields: PLAIN, ref: { richErrors: false }, build: (s) => { const t = ir.closureModule(s, { richErrors: false }); return t === null ? null : irData(t); } },
 };
 
-// Differences that are known and written down where they are made. They are
-// counted and shown apart, and do not fail the gate; removing an entry here
-// is how one of them gets fixed.
-const KNOWN = {
-  // Generated code tests a `properties` node for an array only where a
-  // property is named `length` or like an index (lib/js-compiler.js, the
-  // properties block: the test on every node cost a reject path 18% in its
-  // first calls). An array given another own name, which JSON text cannot
-  // produce, is then read as an object by generated code and by no other
-  // path, and rejected with ATA9001.
-  'array with a named key': 'generated code reads an array with an own named key as an object',
-};
+// Differences that are known and written down where they are made, by the
+// kind of document. They are counted and shown apart, and do not fail the
+// gate; removing an entry here is how one of them gets fixed. None now: an
+// array with an own named key was one (generated code read it as an object).
+const KNOWN = {};
 
 // Schemas whose errors come in a different order from generated code than
 // from the interpreted walk (same errors, same verdict). Open, not decided.
