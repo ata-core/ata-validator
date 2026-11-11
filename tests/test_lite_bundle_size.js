@@ -237,11 +237,12 @@ const esbuild = require('esbuild')
 // pass takes the verdict instead of validate(); a rejected GeoJSON
 // collection's errors 0.40 to 0.04 ms on the tree, prometheus' verdict 40 to
 // 5 us with defaults; 226 bytes.
-// 62030 (62015 measured): the vendored draft-07, draft-06 and draft-04
-// meta-schemas read by their own dialect (lib/metaschemas.js); the draft-04
-// one accepted `multipleOf: 0` and `exclusiveMaximum` without `maximum`;
-// 67 bytes.
-const BUDGET = 62030
+// 61875 (61861 measured): the vendored meta-schemas are held as each
+// dialect reads them (scripts/gen-metaschemas.js) instead of rewritten at
+// load, the draft-07, draft-06 and draft-04 ones included (the draft-04 one
+// accepted `multipleOf: 0` and `exclusiveMaximum` without `maximum`); 87
+// bytes less.
+const BUDGET = 61875
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

@@ -174,6 +174,7 @@ const FILES = [
   "tests/test_ir_defaults_arrays.mjs",
   "tests/test_ir_registered_docs.mjs",
   "tests/test_metaschema_dialects.js",
+  "tests/test_metaschemas_generated.js",
   "tests/test_gate_suite.js",
   "tests/test_compiled_plain_order.js",
   "tests/test_plan_handlers.mjs",
