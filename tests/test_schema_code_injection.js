@@ -49,6 +49,8 @@ const PAYLOADS = [
   `\\'+(${set})+'`,
   `\\"+(${set})+"`,
   `')};${set};({'`,
+  `x',y:${set},z:'`,
+  `x',${set},'`,
   `"]);${set};(["`,
   `</script><script>${set}</script>`,
   `__proto__`,
@@ -84,6 +86,16 @@ function schemasFor(p) {
   s.push({ type: 'object', properties: { k: { type: 'string', errorMessage: { type: p } } } });
   s.push({ type: 'array', items: { type: 'object', properties: { [p]: { oneOf: [{ const: p }, { type: 'number' }] } } } });
   s.push({ type: 'object', properties: { k: { type: 'string', format: p } } });
+  // A type name is a string of the schema too. One that is not a JSON Schema
+  // type was written into the error code between quotes without escaping,
+  // and the expression after its quote ran when the schema was compiled
+  // (found by a security audit, 2026-11-11; no test had a hostile type).
+  s.push({ type: 'object', properties: { k: { type: p } } });
+  s.push({ type: p });
+  s.push({ type: ['string', p] });
+  s.push({ type: 'object', properties: { k: { type: [p] } } });
+  s.push({ type: 'array', items: { type: p } });
+  s.push({ anyOf: [{ type: p }, { type: 'string' }] });
   // Where the path is not known when the code is generated, the error is built
   // from literals at run time: nested under items, patternProperties,
   // additionalProperties and a $ref.

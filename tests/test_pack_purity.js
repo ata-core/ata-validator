@@ -319,6 +319,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // (a date 19 to 11 ns, a uuid 37 to 27 in generated code) and the date-time
 // check on the same digit pairs; the bundles got smaller (main entry 61861
 // to 61698 bytes gzipped), the source and its notes longer. Measured 653.7 KB.
-assert.ok(manifest.size < 654 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 655 KB with the type name escaped in generated error code, a non-numeric
+// length bound refused by the IR module writer, and type lookups on own
+// names only. Measured 654.2 KB.
+assert.ok(manifest.size < 655 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
