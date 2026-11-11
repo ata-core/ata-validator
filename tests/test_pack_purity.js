@@ -303,6 +303,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 648 KB with pickModules (lib/ir/pick.mjs), the one place that chooses
 // between written modules, plans and closures for an application, so a
 // plugin and the command line do not each carry a rule. Measured 647.9 KB.
-assert.ok(manifest.size < 648 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 649 KB with the IR's default fills kept off arrays, as the Validator's
+// passes are (105 bytes, and the last ceiling had 79 to spare). Measured
+// 648.0 KB.
+assert.ok(manifest.size < 649 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

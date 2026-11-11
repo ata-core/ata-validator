@@ -169,6 +169,7 @@ const FILES = [
   "tests/test_ir_table.mjs",
   "tests/test_ir_closures.mjs",
   "tests/test_ir_pick.mjs",
+  "tests/test_ir_defaults_arrays.mjs",
   "tests/test_plan_handlers.mjs",
   "tests/test_plan_short_walk.js",
   "tests/test_leaf_plan.js",
