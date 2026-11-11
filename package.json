@@ -166,6 +166,7 @@
     "build": "cmake-js build --target ata",
     "rebuild": "cmake-js rebuild --target ata",
     "test": "node tests/run.js",
+    "gate": "node --max-old-space-size=8192 scripts/gate.js",
     "bench:size": "node benchmark/bench_aot_size.mjs",
     "test:suite": "node tests/run_suite.js && node tests/run_suite.js draft7 && node tests/run_suite.js v1 && node tests/run_suite.js draft6 && node tests/run_suite.js draft2019-09 && node tests/run_suite.js draft4",
     "test:compat": "node tests/test_compat.js",
