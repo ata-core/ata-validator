@@ -104,6 +104,11 @@
       "import": "./idna.mjs",
       "require": "./idna.js"
     },
+    "./order": {
+      "types": "./order.d.ts",
+      "import": "./order.mjs",
+      "require": "./order.js"
+    },
     "./error-runtime": {
       "types": "./error-runtime.d.ts",
       "import": "./error-runtime.mjs",
@@ -251,6 +256,9 @@
     "compiled-plain.js",
     "compiled-plain.mjs",
     "compiled-plain.d.ts",
+    "order.js",
+    "order.mjs",
+    "order.d.ts",
     "compiled-bare.js",
     "compiled-bare.mjs",
     "compiled-bare.d.ts",

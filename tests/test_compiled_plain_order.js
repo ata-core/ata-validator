@@ -20,13 +20,13 @@ const { Validator } = require('..')
 const build = require('../build.js')
 const { fromCompiledPlain } = require('../lib/compiled-plain')
 
-function plain (schema) {
-  const src = build.compiledModuleFor(schema, { format: 'cjs', plainErrors: true })
+function plain (schema, order) {
+  const src = build.compiledModuleFor(schema, order ? { format: 'cjs', plainErrors: true, order: true } : { format: 'cjs', plainErrors: true })
   const m = new Module('plain'); m.filename = path.join(__dirname, 'plain.cjs'); m.paths = Module._nodeModulePaths(__dirname); m._compile(src, m.filename)
   return { src, v: fromCompiledPlain(m.exports, build.compiledSchemaFor(schema), { richErrors: false }) }
 }
-const same = (schema, docs, label) => {
-  const { src, v } = plain(schema)
+const same = (schema, docs, label, order) => {
+  const { src, v } = plain(schema, order)
   const want = new Validator(schema, { richErrors: false })
   let rejected = 0
   for (const d of docs) {
@@ -56,6 +56,24 @@ for (let i = 0; i < 12; i++) { wide.properties['p' + i] = { type: 'string', minL
 const doc = { zz: 1, yy: 2 }
 for (let i = 11; i >= 0; i--) doc['p' + i] = i % 2 ? 1 : 'x'
 same(wide, [doc, { p3: 1 }, Object.fromEntries(wide.required.map((k) => [k, 1]))], 'long list')
+
+// A list the program cannot order itself (a pattern property's subschema
+// next to `required`; items behind a shared definition): with `order: true`
+// the module imports ata-validator/order and the wrapper hands it the
+// schema. Without it the module imports nothing, as before.
+const nested = { type: 'object', properties: { m: { patternProperties: { '^[a-z]+$': { type: 'object' } } } }, required: ['k'] }
+const shared = { type: 'object', properties: { p: { type: 'object', additionalProperties: { $ref: '#/$defs/x' } } }, $defs: { x: { type: 'object', properties: { a: { enum: [1] }, b: { type: 'string' } } } } }
+for (const [schema, docs] of [[nested, [{ m: { bogus: 1 } }, { k: 1, m: { x: 1, y: 2 } }]], [shared, [{ p: { A: { a: 2, b: 1 }, B: { b: 2, a: 3 }, C: { a: 4 } } }]]]) {
+  const src = same(schema, docs, 'imported sort', true)
+  if (schema === nested) assert.ok(src.includes('require("ata-validator/order")'), 'the module imports the sort')
+  assert.ok(!plain(schema).src.includes('ata-validator/order'), 'not unless asked')
+}
+const { ordered } = require('../order.js')
+import('../order.mjs').then((m) => {
+  const errs = [{ schemaPath: '#/required' }, { schemaPath: '#/properties/m/type' }]
+  assert.deepStrictEqual(m.ordered(nested, errs.slice()).map((e) => e.schemaPath), ['#/properties/m/type', '#/required'])
+  assert.deepStrictEqual(ordered(nested, errs.slice()).map((e) => e.schemaPath), ['#/properties/m/type', '#/required'])
+})
 
 // A required property that holds undefined, on the walk and on the closure tree.
 const req = { type: 'object', properties: { a: { type: 'string' }, b: { type: 'string' }, c: { type: 'string' } }, required: ['a', 'b', 'c'] }

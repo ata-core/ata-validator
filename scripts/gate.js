@@ -49,7 +49,8 @@ const pick = (fields) => function f(e) { return fields.map((k) => e[k]).concat([
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-gate-'));
 let seq = 0;
-const loadCjs = (src) => { const m = new Module('gate'); m._compile(src, path.join(tmp, 'm.cjs')); return m.exports; };
+// Compiled as a file of this package, so a module's `ata-validator/order` import resolves to it.
+const loadCjs = (src) => { const m = new Module('gate'); m.filename = path.join(ROOT, 'gate-module.cjs'); m.paths = Module._nodeModulePaths(ROOT); m._compile(src, m.filename); return m.exports; };
 // A module that imports a runtime file: both written to a directory of their own.
 function loadWithRuntime(src, runtimeName, runtimeSrc) {
   const d = path.join(tmp, String(seq++)); fs.mkdirSync(d);
@@ -88,12 +89,12 @@ const PATHS = {
   'module, one pass': { fields: MODULE, abort: true, ref: { useDefaults: false }, ordered: false, build: (s) => { const src = aot.toStandaloneModule(new Validator(s), { format: 'cjs', onePass: true, onWarning() {} }); return src ? loadCjs(src) : null; } },
   'module, plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => {
     if (!build.compiledEligible(s)) return null;
-    const src = build.compiledModuleFor(s, { format: 'cjs', plainErrors: true });
+    const src = build.compiledModuleFor(s, { format: 'cjs', plainErrors: true, order: true });
     if (!src) return null;
     const v = fromCompiledPlain(loadCjs(src), build.compiledSchemaFor(s), { richErrors: false });
     // A one-pass program that does not know every error site's place leaves
     // some lists as it found them (lib/compiled-plain.js): no order promised.
-    const unordered = src.includes('_vC') && !src.includes('x.sort((a,b)=>o[a]-o[b]');
+    const unordered = false;
     return { ordered: !unordered, validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) };
   } },
   'compact module': { fields: MODULE, abort: true, ref: { useDefaults: false }, build: (s) => {
