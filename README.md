@@ -765,7 +765,9 @@ their own: full 13.8 to 12.8 KB, without JSON entry points 10.9, verdict only 2.
 A validator built with `{ richErrors: false }` is compiled away as well: the module writes its
 errors in that plain shape (`compiledModuleFor(schema, { plainErrors: true })`) and
 `fromCompiledPlain()` from `ata-validator/compiled-plain` hands them out as they are, with no
-error pipeline in the bundle, 2.6 KB gzipped for the wrapper. Where the plugin sees a
+error pipeline in the bundle, 2.6 KB gzipped for the wrapper. Written with `order: true`, a
+module that cannot order its own errors imports the sort from `ata-validator/order` (1.1 KB
+gzipped, once in a page). Where the plugin sees a
 validator only ever called (`v.validate(x)`, `v.isValidObject(x)`), never handed to other code,
 it uses the bare wrappers of `ata-validator/compiled-bare` instead, which leave out Standard
 Schema and the extension hook nothing can reach there: 0.3 KB gzipped for both, and

@@ -195,8 +195,15 @@ export function compiledSchemaFor(schema: unknown): object;
  * replacement would not answer as the runtime does: a schema
  * {@link compiledEligible} declines, one the emitter cannot compile, and one
  * whose detailed errors the generator cannot produce.
+ *
+ * `plainErrors`: errors in the `richErrors: false` shape, for
+ * `fromCompiledPlain`. With `order: true` as well, a module whose program
+ * cannot put every list it reports in schema order imports the sort from
+ * `ata-validator/order`, and `fromCompiledPlain` hands it the schema; without
+ * it such a list comes as the program found it, the same errors in another
+ * order, and the module imports nothing.
  */
-export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cjs'; errorRuntime?: string; order?: boolean }): string | null;
+export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cjs'; errorRuntime?: string; order?: boolean; plainErrors?: boolean; onePass?: boolean; verdictOnly?: boolean }): string | null;
 
 /**
  * The Validator options `fromCompiled()` reproduces, so a plugin can tell

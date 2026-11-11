@@ -663,6 +663,13 @@ v.validate(data); v.isValidObject(data); v.validateJSON(text); v.isValidJSON(tex
   does: a schema with custom `errorMessage`s, one the emitter cannot
   compile, and one whose detailed errors the generator cannot produce.
   Leave those calls to the runtime.
+- `compiledModuleFor(schema, { plainErrors: true })` writes the module for
+  `fromCompiledPlain()` of `ata-validator/compiled-plain`: errors in the
+  `richErrors: false` shape. Add `order: true` and a module whose program
+  cannot put every list it reports in schema order imports the sort from
+  `ata-validator/order` (`ordered(schema, errors)`), which
+  `fromCompiledPlain()` hands the schema. Without it such a module imports
+  nothing and reports those lists as it found them.
 - `compiledEligible(schema)` is the first of those checks alone, without
   building anything.
 - `compiledSchemaFor(schema)` is the schema a default `Validator` reads
