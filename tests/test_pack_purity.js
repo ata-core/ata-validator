@@ -254,6 +254,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 613 KB with the tier-0 closure, untyped enum and const on tier 0 and the
 // keyword record (tests/test_lite_bundle_size.js has the note). Measured
 // 612.34 KB.
-assert.ok(manifest.size < 613 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 614 KB with the 1.63.2 security fixes: a type name escaped in generated
+// error code, a non-numeric length bound refused by the IR module writer,
+// uniqueItems over tuple positions, the pattern rule's product bound, the
+// scanner declined on a hash collision. Measured 613.8 KB.
+assert.ok(manifest.size < 614 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
