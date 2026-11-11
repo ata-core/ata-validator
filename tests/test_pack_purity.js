@@ -322,6 +322,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 655 KB with the type name escaped in generated error code, a non-numeric
 // length bound refused by the IR module writer, and type lookups on own
 // names only. Measured 654.2 KB.
-assert.ok(manifest.size < 655 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 656 KB with uniqueItems comparing tuple positions by value, bounded
+// choices in a pattern counted as a product before it goes to the platform
+// RegExp, an over-long IDN label refused before it is encoded, and the text
+// scanner declined where two names share a hash. Measured 655.5 KB.
+assert.ok(manifest.size < 656 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
