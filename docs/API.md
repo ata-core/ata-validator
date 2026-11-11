@@ -301,6 +301,12 @@ several forms: smaller than their plans and faster to check. Plain errors only
 (`richErrors: false`), and the keywords forms are made of; `null` for anything
 else. See [docs/ir.md](ir.md).
 
+### pickModules(schemas, options, size), ata-validator/ir
+
+Chooses written modules, plans or closures for a set of schemas by which makes
+the smaller browser bundle, and returns each schema's source. `size(text)` is
+the gzipped length of a text. See [docs/ir.md](ir.md).
+
 ### specialize(schema, options?) and compileClosures(schema, options?), ata-validator/ir
 
 The IR compiler's two other backends. `specialize` returns the source of a module that imports

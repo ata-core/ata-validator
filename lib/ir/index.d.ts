@@ -65,3 +65,19 @@ export function closureModule(schema: JSONSchema, options: { richErrors: false; 
 export function tablePlan(schema: JSONSchema, options?: TableOptions): Plan | null;
 
 export const PLAN_VERSION: 1;
+
+/** One schema's source as `pickModules` wrote it, and by which backend. */
+export interface PickedSource { kind: 'module' | 'table' | 'closures'; source: string }
+/**
+ * The backend that makes the smallest browser bundle for a set of schemas: written modules, plans or closures,
+ * one choice for the set. `size(text)` is the gzipped length of a text (node:zlib where there is one).
+ * `sources[i]` is null where the module writer refuses `schemas[i]`.
+ */
+export function pickModules(
+  schemas: JSONSchema[],
+  options: { richErrors?: boolean; useDefaults?: boolean; assertFormat?: boolean } | undefined,
+  size: (text: string) => number,
+  moduleOptions?: Record<string, unknown>,
+): { backend: 'module' | 'table' | 'closures'; saving: number; sources: Array<PickedSource | null> };
+export const TABLE_COST: number;
+export const CLOSURE_COST: number;

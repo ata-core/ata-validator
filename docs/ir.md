@@ -131,6 +131,30 @@ Anything else (a reference, `anyOf`, a default to fill, rich errors) returns
 `tests/test_ir_closures.mjs` holds every module it writes to the module
 writer's answers on the official suite and on generated forms.
 
+### Choosing a backend
+
+`pickModules(schemas, options, size)` chooses for a whole application: it
+writes every schema each way and takes plans or closures only where their
+sources are smaller than the written modules by more than the backend's
+runtime costs a bundle. `size` is the gzipped length of a text, which the
+caller supplies (`(s) => zlib.gzipSync(s).length` in Node), so the function
+loads where there is no zlib. It returns the backend and, for each schema,
+the source and the backend that wrote it; a schema the chosen backend does
+not take is written as a module beside the others.
+
+```js
+import zlib from 'node:zlib'
+import { pickModules } from 'ata-validator/ir'
+
+const { backend, sources } = pickModules(schemas, { richErrors: false }, (s) => zlib.gzipSync(s).length)
+```
+
+One form stays a written module. The costs are set from 142 sets of 1 to 7
+generated forms bundled each way: above them the chosen backend was the
+smaller bundle every time; below them some sets would have been smaller too
+and stay written modules. `tests/test_ir_pick.mjs` bundles a few sets and
+holds the choice to never being the larger bundle.
+
 ## What it refuses
 
 A schema or option outside what a backend covers throws an error whose

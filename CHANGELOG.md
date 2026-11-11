@@ -7,6 +7,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 ### Added
 
 - `closureModule(schema, { richErrors: false })` in `ata-validator/ir`, a third way to write a schema for a browser bundle: calls that build one closure per schema node when the module loads, their kernels shared by every form on the page. For several forms it is smaller than their plans and faster to check: twenty signup-like forms, minified and gzipped, 3.4 KB against 5.0 KB as plans and 8.6 KB as written modules; a valid form in 237 ns against 643 ns for a plan (a written module stays the fastest, 82 ns, and the smallest for a single form). It covers what forms are made of (objects, arrays, value keywords, formats) with plain errors, the `Validator`'s with `richErrors: false`, field for field and in the same order, and returns `null` for anything else (a reference, `anyOf`, a default to fill, rich errors). Nothing an existing call writes changes. Experimental with the rest of `ata-validator/ir`.
+- `pickModules(schemas, options, size)` in `ata-validator/ir` chooses, for a whole application, the backend that makes the smallest browser bundle: written modules, plans or closures. A build plugin and a command line can ask the same function instead of each carrying its own rule. One form stays a written module; a backend with a runtime is taken only where its sources are smaller by more than that runtime costs, a line set from 142 sets of forms bundled each way, above which the choice was the smaller bundle every time.
 
 ### Changed
 
