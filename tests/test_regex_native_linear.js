@@ -138,7 +138,11 @@ for (const p of ['(a+)+$', '^(a+)+$', '^(a|aa)+$', '^a+a+$', '^a*a*$', 'a+b', '^
   // counted as 30 to 64 choices, passed as linear, and a string of 17
   // characters that does not match ran the platform RegExp for over half a
   // minute.
-  '^([a-z]?){64}$', '^(a?){30}$', '^(a?){30}a{30}$', '^a*(a{0,8}){8}$', '^(a{1,8}){8}$', '^a?b?c?d?e?f?g?h?i?j?k?l?m?n?$']) {
+  '^([a-z]?){64}$', '^(a?){30}$', '^(a?){30}a{30}$', '^a*(a{0,8}){8}$', '^(a{1,8}){8}$', '^a?b?c?d?e?f?g?h?i?j?k?l?m?n?$',
+  // The same product behind the rules that did not count it: a delimited
+  // loop or one choice, then a row of optional atoms (found in review of the
+  // fix above; 24 of them took 183 ms on 17 characters, doubling with each).
+  '^(a*b)*' + 'a?'.repeat(30) + '$', '^(a*b)*' + 'a?'.repeat(13) + '$', '^([a-z]+\\.)*' + '[a-z]?'.repeat(20) + '$', '^(x|y)' + 'a?'.repeat(30) + '$']) {
   assert.strictEqual(nativeIsLinear(p), false, p)
 }
 // And the deterministic rule takes what the simple one cannot.
