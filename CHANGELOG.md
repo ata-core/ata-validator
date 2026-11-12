@@ -2,6 +2,21 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## 1.63.2 - 2026-11-12
+
+### Security
+
+- A schema's `type` value could run as code in the process that compiles the schema. A `type` that is not one of the seven JSON Schema type names was written into the generated error code between quotes as it stood, so a value containing a quote ended the string and the text after it was evaluated: when a failing document's errors were read, and when a module was written for the schema (`ata build`, `compiledModuleFor`). Default options, every version from 1.20.0. Only a schema can carry it, a document being validated cannot, so applications that compile schemas they did not write are the ones exposed: tool schemas from a remote MCP server, schemas uploaded by tenants or users, documents fetched from a third party. The name is now written as an escaped string literal in both error generators (`tests/test_schema_code_injection.js`). Upgrade if you compile schemas from a source you do not control.
+- The module writer of `ata-validator/ir` (1.63.0 and 1.63.1) wrote `minLength` and `maxLength` into the module without checking that they are numbers, so a string there became source in the written module. It now refuses such a schema with `ir: minLength is not a number`, as the runtime and the other writers already did (`tests/test_schema_code_injection_ir.mjs`).
+
+### Fixed
+
+- `uniqueItems` accepted two equal objects in positions described by `prefixItems` when `items` named a primitive type: generated code compared such an array by identity, which holds only when every element is a primitive. Positions under `prefixItems` are now compared by value.
+- A pattern whose bounded choices multiply, such as `^([a-z]?){64}$` or `^(a?){30}$`, was classified as linear and run on the platform's RegExp, where a string of 17 characters that does not match took more than 30 seconds. The ways a bounded repetition can match are now counted as a product, and past 4096 the pattern runs on the linear-time engine. Of the 1015 SchemaStore patterns that ran on the platform's RegExp, one moves.
+- `isValidJSON()` and `validateJSON()` threw a ReferenceError for a schema with 48 or more properties two of whose names share a hash (`ab` and `bA`), once the text scanner was built after the first 64 calls. The scanner is now declined for such a schema and the document is parsed.
+- `ata build` wrote control characters from a schema file's names and messages to the terminal as they stood. They are written as escapes.
+- A `type` named `constructor` or `__proto__` made the compiler throw a TypeError: type names were looked up on objects with a prototype. Such a name is now read as any other unknown type name.
+
 ## 1.63.1 - 2026-11-04
 
 ### Changed
