@@ -2,6 +2,14 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Security
+
+- A property name in a schema could run as code in the process that validates with the schema. Where a property has a `format`, the error generator placed the code that reports the failure with `String.prototype.replace`, giving it as the replacement text, and a replacement text is searched for `$&`, `` $` ``, `$'` and `$$`. The report carries the property's name in its paths, so a name holding `` $` `` pulled a copy of the generated source into the middle of a quoted string, and that copy holds the name again, escaped for another kind of quote. A quote in the name then ended the string and the text after it was evaluated when a failing document's errors were built, by `validate()` and `validateJSON()` on the default path, and in the modules `ata build` writes. Every version from 0.12.6 is affected, 1.63.2 included. A schema that is not written by the application (taken from a request, a tenant, a registry) is the way in; a schema the application wrote itself is not. Without a quote the same names only gave wrong paths: a property named `a$&b` was reported as `/areturn falseb`.
+- The module writer of `ata-validator/ir` placed the schema for the shared defaults pass, and the written defaults pass itself, the same way. A default holding `$&` was filled into documents as a piece of the module's source, and a schema with `` $` `` in any text the pass carries (a description is enough: SchemaStore's `apollo-router` schema has one) gave a module that does not parse. The kernel inliner replaced its two parameters in two passes, the second over text that already held an expression from the schema.
+- Every such call now passes a function, which is not searched. `tests/test_schema_text_twin.mjs` holds each of sixteen paths (the generated code behind the `Validator`, the interpreted engine, the compiled and standalone modules, and the IR's module, table, plan and closures) to the answers of the schema's twin, the same schema with each text swapped for a plain one, over 33 shapes of schema and 29 texts: the replacement patterns, the words the writers' own source is made of, and three texts that ran as code before.
+
 ## 1.63.2 - 2026-11-12
 
 ### Security
