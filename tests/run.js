@@ -197,6 +197,7 @@ const FILES = [
   "tests/test_ir_default_fill.mjs",
   "tests/test_kernels_formats_sync.js",
   "tests/test_ir_minified.mjs",
+  "tests/test_schema_text_twin.mjs",
   "tests/test_kernels_preprocess_sync.js",
   "tests/test_remove_additional_array_root.js",
   "tests/test_ir_closure_features.mjs",
