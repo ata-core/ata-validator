@@ -50,6 +50,53 @@ for (const [schema, docs] of named) {
   }
 }
 
+// A format inside a branch of anyOf or oneOf. The error generator scores the
+// branches with a copy of each one's code in which every pushed error is a
+// count, and the counter was named `_n`, the name the inline date-time, time
+// and ipv6 checks give a string's length, as a const: inside one of those
+// checks the count was an assignment to a constant. And a check's own local
+// could be the very name the generator had given the value it reads
+// (`const _c2=_c2.charCodeAt(...)`). validateJSON() threw for the document:
+//   { "anyOf": [{ "properties": { "at": { "type": "string", "format": "date-time" } }, "required": ["at"] }, { "required": ["b"] }] }
+//   on { "at": "soon" }
+// Four of SchemaStore's schemas have the shape (appveyor among them). Every
+// format is put in four shapes of branch here, and each answer is held to
+// the interpreted engine's.
+const FORMATS = ['date-time', 'date', 'time', 'email', 'uuid', 'uri', 'ipv4', 'ipv6', 'hostname', 'duration', 'uri-reference', 'json-pointer', 'regex', 'idn-email', 'iri', 'relative-json-pointer', 'uri-template', 'idn-hostname', 'iri-reference']
+const SAMPLE = { 'date-time': '2020-01-01T00:00:00Z', date: '2020-01-01', time: '10:00:00Z', email: 'a@b.co', uuid: '123e4567-e89b-12d3-a456-426614174000', uri: 'https://a.example/x', ipv4: '1.2.3.4', ipv6: '::1', hostname: 'a.example', duration: 'P1D', 'uri-reference': '/x', 'json-pointer': '/a/b', regex: '^a$', 'idn-email': 'a@b.co', iri: 'https://a.example/x', 'relative-json-pointer': '0/a', 'uri-template': '/x/{id}', 'idn-hostname': 'a.example', 'iri-reference': '/x' }
+const branch = {
+  anyOf: (f) => ({ anyOf: [{ type: 'object', properties: { a: { type: 'string', format: f } }, required: ['a'] }, { type: 'object', properties: { b: { type: 'integer' } }, required: ['b'] }] }),
+  oneOf: (f) => ({ oneOf: [{ type: 'object', properties: { a: { type: 'string', format: f } }, required: ['a'] }, { type: 'object', properties: { b: { type: 'integer' } }, required: ['b'] }] }),
+  'anyOf under a property': (f) => ({ type: 'object', properties: { x: { anyOf: [{ type: 'object', properties: { a: { type: 'string', format: f } } }, { type: 'null' }] } } }),
+  'anyOf over items': (f) => ({ anyOf: [{ type: 'array', items: { type: 'string', format: f } }, { type: 'integer' }] }),
+  'three properties deep': (f) => ({ type: 'object', properties: { p: { type: 'object', properties: { q: { type: 'object', properties: { a: { type: 'string', format: f }, b: { type: 'string', format: f } } } } } } }),
+}
+const branchDocs = (k, good) => k === 'anyOf under a property' ? [{ x: { a: 'x' } }, { x: { a: good } }, { x: { a: 'x'.repeat(30) } }, { x: 1 }, { x: null }]
+  : k === 'anyOf over items' ? [['x'], [good], ['x'.repeat(30)], 'no', 3]
+    : k === 'three properties deep' ? [{ p: { q: { a: 'x', b: good } } }, { p: { q: { a: good, b: 'x'.repeat(30) } } }, { p: { q: { a: good, b: good } } }]
+      : [{ a: 'x' }, { a: good }, { a: 'x'.repeat(30) }, { a: 1 }, {}, { b: 'x' }, { b: 1 }]
+let inBranch = 0
+for (const f of FORMATS) {
+  for (const [k, make] of Object.entries(branch)) {
+    for (const d of branchDocs(k, SAMPLE[f])) {
+      const want = new Validator(make(f), { engine: 'interpreter' }).validate(structuredClone(d)).valid
+      for (const m of methods) {
+        for (const opts of [undefined, { richErrors: false }, { allErrors: false }]) {
+          const label = `${m}(${JSON.stringify(d)}), format ${f} in ${k}${opts ? ' ' + JSON.stringify(opts) : ''}`
+          let got
+          assert.doesNotThrow(() => { got = ask(new Validator(make(f), opts), m, d) }, label)
+          assert.strictEqual(got, want, label)
+          const warm = new Validator(make(f), opts)
+          ask(warm, m, {}); ask(warm, m, [])
+          assert.doesNotThrow(() => { got = ask(warm, m, d) }, label + ', a later call')
+          assert.strictEqual(got, want, label + ', a later call')
+          inBranch += 2
+        }
+      }
+    }
+  }
+}
+
 const SUITE = path.join(__dirname, 'suite', 'tests')
 const docs = [null, 0, 1.5, '', 'x', true, [], {}, [null], [[]], [{}], { a: null }, { a: [] }, [1, 'a', null, {}, []], { foo: null, bar: null }]
 let schemas = 0; let calls = 0
@@ -77,4 +124,4 @@ for (const draft of ['draft2020-12', 'draft2019-09', 'draft7', 'draft6', 'draft4
   }
 }
 assert.ok(schemas > 1500, 'the suite was read')
-console.log(`ok: no document makes a Validator throw, ${n} named answers, ${schemas} suite schemas, ${calls} calls`)
+console.log(`ok: no document makes a Validator throw, ${n} named answers, ${inBranch} answers with a format in a branch, ${schemas} suite schemas, ${calls} calls`)
