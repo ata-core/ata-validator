@@ -160,6 +160,8 @@ const FILES = [
   "tests/test_ir_suite.mjs",
   "tests/test_ir_differential.mjs",
   "tests/test_ir_metaschema_ref.mjs",
+  "tests/test_plain_name_id.js",
+  "tests/test_ir_plain_name_id.mjs",
   "tests/test_kernels_rank_sync.js",
   "tests/test_ir_emit_deps_sync.js",
   "tests/test_ir_key_walk.mjs",
