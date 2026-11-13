@@ -174,6 +174,7 @@ const FILES = [
   "tests/test_kernels_formats_sync.js",
   "tests/test_ir_minified.mjs",
   "tests/test_schema_text_twin.mjs",
+  "tests/test_no_throw_on_any_document.js",
   "tests/test_plain_name_id.js",
   "tests/test_ir_plain_name_id.mjs",
   "tests/test_kernels_preprocess_sync.js",
