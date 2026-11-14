@@ -21,6 +21,8 @@ export interface IROptions {
 export interface SpecializeOptions extends IROptions {
   /** A function of the schema returning the body of a default fill as source, or null; `defaultsSource` from `ata-validator/build` is one. */
   fillSource?: (schema: JSONSchema) => string | null;
+  /** Name the smaller check of a format where there is one (`email`, `uri`, `uri-reference`): the same answers from a regular expression, fewer bytes in a bundle, slower by tens of nanoseconds a check. Off by default. */
+  smallFormats?: boolean;
 }
 
 /** Options the closures take beyond IROptions: what a module cannot carry. */
