@@ -59,7 +59,16 @@ function topLevelNames (line) {
 
 const exportName = (format) => 'fmt_' + format.replace(/-/g, '_');
 
-const uses = (text, name) => new RegExp('(?<![\\w$.])' + name.replace(/\$/g, '\\$') + '(?![\\w$])').test(text);
+// Whether `text` names `name` as an identifier of its own: not part of a
+// longer one, and not a property read.
+function uses (text, name) {
+  const part = /[\w$]/;
+  for (let i = text.indexOf(name); i !== -1; i = text.indexOf(name, i + 1)) {
+    const before = i === 0 ? '' : text[i - 1]; const after = text[i + name.length] || '';
+    if (before !== '.' && !part.test(before) && !part.test(after)) return true;
+  }
+  return false;
+}
 
 // One module a format and one a hoisted helper, under lib/kernels/formats/,
 // and lib/kernels/formats.mjs naming each format from its module. A bundler
