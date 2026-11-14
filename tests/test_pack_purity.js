@@ -258,6 +258,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // error code, a non-numeric length bound refused by the IR module writer,
 // uniqueItems over tuple positions, the pattern rule's product bound, the
 // scanner declined on a hash collision. Measured 613.8 KB.
-assert.ok(manifest.size < 614 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 615 KB with the 1.63.3 fixes: schema text placed into generated code by a
+// function and never as a replacement pattern (and the twin test that holds
+// fifteen paths to it), a fragment-only $id read as an anchor in every
+// dialect, a null document answered where two shapes threw, and a format in a
+// branch no longer colliding with the branch scorer. Measured 614.9 KB.
+assert.ok(manifest.size < 615 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

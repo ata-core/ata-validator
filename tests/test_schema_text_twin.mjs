@@ -24,7 +24,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { specialize, functionBody } from '../lib/ir/emit.mjs'
-import { compileClosures, tableModule, tablePlan, closureModule } from '../lib/ir/index.mjs'
+import { compileClosures, tableModule, tablePlan } from '../lib/ir/index.mjs'
 import { fromPlan } from '../lib/kernels/plan-rich.mjs'
 import * as K from '../lib/kernels/index.mjs'
 
@@ -119,7 +119,6 @@ const PATHS = {
   'ir closures': (s) => mod(compileClosures(structuredClone(s), {})),
   'ir table': (s) => { const t = tableModule(structuredClone(s), {}); return t === null ? null : mod(loadData(t)) },
   'ir plan': (s) => { const p = tablePlan(structuredClone(s), {}); return p === null ? null : mod(fromPlan(JSON.parse(JSON.stringify(p)))) },
-  'ir closure module': (s) => { const t = closureModule(structuredClone(s), { richErrors: false }); return t === null ? null : mod(loadData(t)) },
 }
 
 // What a path said for a document, with the text swapped for its twin's so
