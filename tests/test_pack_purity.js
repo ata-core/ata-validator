@@ -326,11 +326,13 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // choices in a pattern counted as a product before it goes to the platform
 // RegExp, an over-long IDN label refused before it is encoded, and the text
 // scanner declined where two names share a hash. Measured 655.5 KB.
-// 657 KB with a fragment-only `$id` read as an anchor in every dialect, a
+// 660 KB with a fragment-only `$id` read as an anchor in every dialect, a
 // null document answered where two shapes of schema threw, a format in a
-// branch no longer colliding with the branch scorer in validateJSON(), and
-// schema text placed into generated code by a function, never as a
-// replacement pattern. Measured 656.4 KB.
-assert.ok(manifest.size < 657 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// branch no longer colliding with the branch scorer in validateJSON(), schema
+// text placed into generated code by a function, never as a replacement
+// pattern, the format kernels one module each (25 files where one was: a page
+// of a ten-page Next.js site loads 4.8 KB of scripts beyond the home page
+// where it loaded 9.7), and specialize()'s smallFormats. Measured 659.2 KB.
+assert.ok(manifest.size < 660 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
