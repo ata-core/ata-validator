@@ -314,7 +314,7 @@ its helpers from `ata-validator/kernels` by name; those names are a contract onl
 version that wrote the module, so write it again after an upgrade. `compileClosures` builds
 `{ isValid, validate }` in memory with no `eval` or `new Function`. Both take `richErrors`,
 `useDefaults`, `assertFormat`, `schemas` (other documents a `$ref` may name, by `$id`) and
-`baseURI`; `specialize` also takes `fillSource`, and `compileClosures` takes what a module
+`baseURI`; `specialize` also takes `fillSource` and `smallFormats`, and `compileClosures` takes what a module
 cannot carry: `coerceTypes`, `removeAdditional`, `verbose`, `abortEarly`, `keywords` and
 `formats`.
 
