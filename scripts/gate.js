@@ -94,6 +94,14 @@ const PATHS = {
     im.createInterpreter = (schema, args) => { const e = createSmall(schema, args); if (e === null) return real(schema, args); used = true; return e; };
     try { const v = new Validator(s, { engine: 'interpreter' }); v.isValidObject(null); return used ? { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) } : null; } finally { im.createInterpreter = real; }
   } },
+  // A bundle of a candidate browser entry (ATA_V2_BUNDLE, an ESM file that
+  // exports Validator). A feature the entry leaves out throws "ata2: ..." and
+  // the schema counts as declined.
+  ...(process.env.ATA_V2_BUNDLE ? { 'v2 entry': { fields: RICH, fills: true, async: true, build: async (s) => {
+    const B = await import(require('node:url').pathToFileURL(process.env.ATA_V2_BUNDLE).href);
+    const out = (e) => { if (e && /^ata2:/.test(String(e.message))) { const k = String(e.message).slice(6, 60); (globalThis.__ata2 || (globalThis.__ata2 = {}))[k] = (globalThis.__ata2[k] || 0) + 1; return true; } return false; };
+    try { const v = new B.Validator(s); v.isValidObject(null); v.validate(null); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } catch (e) { if (out(e)) return null; throw e; }
+  } } } : {}),
   'closure tree': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s, { engine: 'interpreter' }); for (let i = 0; i < 1100; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
   'JSON text': { fields: RICH, json: true, fills: false, build: (s) => { const v = new Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
   'plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => { const v = new Validator(s, { richErrors: false, engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
@@ -275,6 +283,7 @@ async function run(opts) {
 
 function summary({ stats, report }) {
   const lines = [`${stats.schemas} schemas, ${Object.keys(stats.paths).length} paths against the Validator`];
+  if (globalThis.__ata2) lines.push('  left out: ' + JSON.stringify(globalThis.__ata2));
   for (const [name, s] of Object.entries(stats.paths)) lines.push(`  ${name.padEnd(26)} ${String(s.taken).padStart(5)} schemas (${s.declined} declined) ${String(s.docs).padStart(7)} documents  ${s.diffs} differ${s.threw ? `, ${s.threw} threw` : ''}${s.abort ? `, ${s.abort} as ATA9000` : ''}${s.known ? `, ${s.known} known` : ''}${s.unordered ? `, ${s.unordered} in another order where none is promised` : ''}`);
   for (const r of report) lines.push('  ' + r);
   // What differs, by path, kind and the kind of document, with the first of each.
