@@ -326,6 +326,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // choices in a pattern counted as a product before it goes to the platform
 // RegExp, an over-long IDN label refused before it is encoded, and the text
 // scanner declined where two names share a hash. Measured 655.5 KB.
-assert.ok(manifest.size < 656 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 658 KB with the format kernels one module each (lib/kernels/formats/, 25
+// files where one was): a page of a ten-page Next.js site loads 4.8 KB of
+// scripts beyond the home page where it loaded 9.7, since a bundler keeps a
+// module for the whole build and every page carried every page's formats.
+// The bytes are file entries and import lines. Measured 657.96 KB.
+assert.ok(manifest.size < 658 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
