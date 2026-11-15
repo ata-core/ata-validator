@@ -336,6 +336,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 661 KB with the uniqueItems helpers' text written at build time
 // (lib/unique-items-source.js), so generated code that carries it works in a
 // bundle whose names were minified. Measured 660.2 KB.
-assert.ok(manifest.size < 661 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 662 KB with patterns read in unicode mode wherever they are valid in it,
+// in the linear engine and on the platform RegExp, so a character above
+// U+FFFF is one character (issue #94). Measured 661.2 KB.
+assert.ok(manifest.size < 662 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
