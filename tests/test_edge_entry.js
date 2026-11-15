@@ -135,9 +135,10 @@ const root = path.resolve(__dirname, '..');
     // shared digit pairs and one table; 136 bytes less.
     // 64.85 KB (66346 measured): the verdict asked first only while it pays,
     // four misses in a row turning it off until a branch passes; 82 bytes.
-    // 65.05 KB (66576 measured): a pattern is read in unicode mode wherever
-    // it is valid in it, so `^.$` matches "🐲" (issue #94); 172 bytes.
-    assert.ok(size < 65.05 * 1024, `the Workers bundle is ${size} bytes gzipped, over 65.05 KB`);
+    // 65 KB (66496 measured): a pattern is read in unicode mode wherever it
+    // is valid in it, so `^.$` matches "🐲" (issue #94); 92 bytes, paid in
+    // part by folding the engine's class escapes and DFA closure walk.
+    assert.ok(size < 65 * 1024, `the Workers bundle is ${size} bytes gzipped, over 65 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

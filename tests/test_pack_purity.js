@@ -338,7 +338,7 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // bundle whose names were minified. Measured 660.2 KB.
 // 662 KB with patterns read in unicode mode wherever they are valid in it,
 // in the linear engine and on the platform RegExp, so a character above
-// U+FFFF is one character (issue #94). Measured 661.2 KB.
+// U+FFFF is one character (issue #94). Measured 661.1 KB.
 assert.ok(manifest.size < 662 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

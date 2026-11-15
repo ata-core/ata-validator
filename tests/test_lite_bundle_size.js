@@ -252,10 +252,11 @@ const esbuild = require('esbuild')
 // oneOf-matched-twice error and the severity table through properties on
 // its own functions, so the text generated code carries still works in a
 // bundle whose names were minified (it threw there); 46 bytes.
-// 62030 (62013 measured): a pattern is read in unicode mode wherever it is
+// 61935 (61922 measured): a pattern is read in unicode mode wherever it is
 // valid in it, in the linear engine and on the platform RegExp, so `^.$`
-// matches "🐲" and `^.{2}$` does not (issue #94); 192 bytes.
-const BUDGET = 62030
+// matches "🐲" and `^.{2}$` does not (issue #94); 101 bytes, paid in part by
+// folding the engine's class escapes and its DFA closure walk into one.
+const BUDGET = 61935
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
