@@ -304,6 +304,8 @@ const FILES = [
   "tests/test_lite_parity.js",
   "tests/test_lite_bundle_size.js",
   "tests/test_node_bundle.js",
+  "tests/test_minified_browser_codegen.js",
+  "tests/test_unique_items_source_sync.js",
   "tests/test_parse_json.js",
   "tests/test_scanner_early_exit.js",
   "tests/test_generated_function_split.js",
