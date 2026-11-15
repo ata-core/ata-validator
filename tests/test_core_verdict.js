@@ -178,6 +178,25 @@ mutations.push(['inherited keys taken as own', mutant([['|| has(o, last) ||', '|
 mutations.push(['non-enumerable properties taken as absent', mutant([['const x = has(o, k) ? o[k] : undefined', 'const x = undefined']])])
 // The same for the second half (lib/core/verdict-full.js): the first half
 // is compiled again to load the changed second half.
+// The same for lib/core/verdict-more.js: a fresh first half loads the
+// changed module, which reads that first half's internals.
+let mutants = 0
+function mutantMore (edits) {
+  const MORE = require.resolve('../lib/core/verdict-more.js')
+  let src = fs.readFileSync(MORE, 'utf8')
+  for (const [from, to] of edits) { assert.ok(src.includes(from), 'mutation anchor missing: ' + from); src = src.split(from).join(to) }
+  const tag = '__coreMore' + (++mutants)
+  let more = null
+  globalThis[tag] = () => more || (more = (() => {
+    const m = new Module(MORE, module); m.filename = MORE; m.paths = Module._nodeModulePaths(path.dirname(MORE))
+    m._compile(src.split("require('./verdict')").join('globalThis.' + tag + 'V'), MORE)
+    return m.exports
+  })())
+  let first = fs.readFileSync(FILE, 'utf8').split("require('./verdict-more')").join('globalThis.' + tag + '()')
+  const m = new Module(FILE, module); m.filename = FILE; m.paths = Module._nodeModulePaths(path.dirname(FILE)); m._compile(first, FILE)
+  globalThis[tag + 'V'] = m.exports
+  return m.exports.createVerdict
+}
 function mutantFull (edits) {
   const FULL = require.resolve('../lib/core/verdict-full.js')
   let src = fs.readFileSync(FULL, 'utf8')
@@ -186,9 +205,10 @@ function mutantFull (edits) {
   return (schema, args) => createVerdict(schema, args) === null ? null : _second(schema, args, m.exports)
 }
 mutations.push(['a reference in a nested $id resource resolved from the root base', mutant([['resolveRef(st.refs[i].$ref, b, state)', 'resolveRef(st.refs[i].$ref, state.rootBase, state)']])])
-mutations.push(['a non-enumerable property skipped where own names are read', mutant([['    if (x !== undefined && !valueAt(V, props, e, i, x)) return false\n  }\n  return true', '  }\n  return true'], ['    if (x !== undefined && !valueAt(V, props, e, j, x)) return false\n  }\n  return true', '  }\n  return true']])])
-mutations.push(['a dynamic scope entry not popped', mutant([['return b === undefined || V.scope.includes(b) ? V : extend(V, b)', 'return b === undefined || V.scope.includes(b) ? V : (V.scope.push(b), V)']])])
-mutations.push(['annotations of a failed anyOf branch counted', mutant([['        if (!fs[i](d)) continue\n', '        if (!fs[i](d) && k === 1) continue\n']])])
+mutations.push(['a non-enumerable property skipped where own names are read', mutant([['    if (x !== undefined && !valueAt(V, props, e, i, x)) return false\n  }\n  return true', '  }\n  return true']])])
+mutations.push(['a non-enumerable property skipped where own names are read, many declared', mutantMore([['    if (x !== undefined && !valueAt(V, props, e, j, x)) return false\n  }\n  return true', '  }\n  return true']])])
+mutations.push(['a dynamic scope entry not popped', mutantMore([['return b === undefined || V.scope.includes(b) ? V : extend(V, b)', 'return b === undefined || V.scope.includes(b) ? V : (V.scope.push(b), V)']])])
+mutations.push(['annotations of a failed anyOf branch counted', mutantMore([['        if (!fs[i](d)) continue\n', '        if (!fs[i](d) && k === 1) continue\n']])])
 mutations.push(['a dynamic scope entry not popped in the second half', mutantFull([['if (pushed) sc.pop()', '']])])
 mutations.push(['annotations of a failed branch counted in the second half', mutantFull([['if (ok && a !== NONE && sink !== NONE) merge(sink, a)', 'if (a !== NONE && sink !== NONE) merge(sink, a)'], ['      if (!f(d, sc, st, sub, b)) return false\n      if (a !== NONE) merge(a, sub)\n      return true', '      const ok = f(d, sc, st, sub, b)\n      if (a !== NONE) merge(a, sub)\n      return ok']])])
 mutations.push(['a nested $id not changing the base', mutantFull([['const base = fixed !== undefined ? fixed : b', 'const base = b']])])
