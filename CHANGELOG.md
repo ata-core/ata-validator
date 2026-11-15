@@ -57,7 +57,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 - Defaults under `properties` were written onto arrays as named properties, by both defaults passes and on every path: `[1]` against `{ properties: { A: { default: 0 } } }` came back with keys `0` and `A`. `properties` applies to objects; objects inside arrays are still filled. A `not` over such a property then judged the changed array, and the generated code left its error out where the interpreted engine reported it (sil-kit-participant-configuration). The fills of `ata-validator/ir` (written modules, `compileClosures`, plans) hold to the same rule: they were left writing onto arrays when the `Validator` stopped, so a page compiled by the build plugin would have filled an array the runtime leaves alone.
 - The IR compiler (`ata-validator/ir`, which `@ata-project/unplugin` writes modules with) ignored `propertyDependencies`, a keyword the engine honours, so a module compiled from a schema with it accepted what `new Validator(schema)` rejects, in 1.63.0 and 1.63.1. The front end now carries it as the engine reads it (an own name whose value is a string the map lists runs the schema under it, in place, at `/propertyDependencies/<name>/<value>`), so the module writer, the closures and a plan all answer as the engine does; `tests/test_plan_handlers.mjs` holds that, and holds that every keyword in the engine's record is one the front end knows, so no backend can skip an honoured name as noise again. Found in review by diffing the engine's keyword set against the front end's.
 
-## 1.63.3 - YYYY-MM-DD
+## 1.63.3 - 2026-11-15
 
 ### Security
 
