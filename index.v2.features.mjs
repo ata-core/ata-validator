@@ -3,3 +3,6 @@ import em from './lib/features/error-messages.js';
 import ms from './lib/features/metaschemas.js';
 export const errorMessages = em.errorMessages;
 export const metaschemas = ms.metaschemas;
+import mu from './lib/features/mutators.js';
+export const coerceTypes = mu.coerceTypes;
+export const removeAdditional = mu.removeAdditional;

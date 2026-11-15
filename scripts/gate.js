@@ -109,6 +109,9 @@ const PATHS = {
       'v2 entry, no defaults': { fields: RICH, ref: { useDefaults: false }, fills: true, async: true, build: v2({ useDefaults: false }) },
       'v2 entry, formats off': { fields: RICH, ref: { assertFormat: false }, fills: true, async: true, build: v2({ assertFormat: false }) },
       'v2 entry, abortEarly': { fields: MODULE, ref: { abortEarly: true, engine: 'interpreter' }, fills: true, async: true, build: v2({ abortEarly: true }) },
+      'v2 entry, coerce': { fields: RICH, ref: { coerceTypes: true }, fills: true, async: true, build: v2({ coerceTypes: true }) },
+      'v2 entry, coerce array': { fields: RICH, ref: { coerceTypes: 'array' }, fills: true, async: true, build: v2({ coerceTypes: 'array' }) },
+      'v2 entry, remove': { fields: RICH, ref: { removeAdditional: true }, fills: true, async: true, build: v2({ removeAdditional: true }) },
       'v2 entry, JSON text': { fields: RICH, json: true, fills: false, async: true, build: async (s) => { const b = await v2(undefined)(s); if (b === null) return null; const B = await import(require('node:url').pathToFileURL(process.env.ATA_V2_BUNDLE).href); const v = new B.Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
     };
   })() : {}),
