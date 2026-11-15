@@ -97,11 +97,20 @@ const PATHS = {
   // A bundle of a candidate browser entry (ATA_V2_BUNDLE, an ESM file that
   // exports Validator). A feature the entry leaves out throws "ata2: ..." and
   // the schema counts as declined.
-  ...(process.env.ATA_V2_BUNDLE ? { 'v2 entry': { fields: RICH, fills: true, async: true, build: async (s) => {
-    const B = await import(require('node:url').pathToFileURL(process.env.ATA_V2_BUNDLE).href);
-    const out = (e) => { if (e && /^ata2:/.test(String(e.message))) { const k = String(e.message).slice(6, 60); (globalThis.__ata2 || (globalThis.__ata2 = {}))[k] = (globalThis.__ata2[k] || 0) + 1; return true; } return false; };
-    try { const v = new B.Validator(s); v.isValidObject(null); v.validate(null); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } catch (e) { if (out(e)) return null; throw e; }
-  } } } : {}),
+  ...(process.env.ATA_V2_BUNDLE ? (() => {
+    const v2 = (opts) => async (s) => {
+      const B = await import(require('node:url').pathToFileURL(process.env.ATA_V2_BUNDLE).href);
+      const out = (e) => { if (e && /^ata2:/.test(String(e.message))) { const k = String(e.message).slice(6, 60); (globalThis.__ata2 || (globalThis.__ata2 = {}))[k] = (globalThis.__ata2[k] || 0) + 1; return true; } return false; };
+      try { const v = new B.Validator(s, opts); v.isValidObject(null); v.validate(null); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } catch (e) { if (out(e)) return null; throw e; }
+    };
+    return {
+      'v2 entry': { fields: RICH, fills: true, async: true, build: v2(undefined) },
+      'v2 entry, plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, async: true, build: v2({ richErrors: false }) },
+      'v2 entry, no defaults': { fields: RICH, ref: { useDefaults: false }, fills: true, async: true, build: v2({ useDefaults: false }) },
+      'v2 entry, formats off': { fields: RICH, ref: { assertFormat: false }, fills: true, async: true, build: v2({ assertFormat: false }) },
+      'v2 entry, abortEarly': { fields: MODULE, ref: { abortEarly: true, engine: 'interpreter' }, fills: true, async: true, build: v2({ abortEarly: true }) },
+    };
+  })() : {}),
   'closure tree': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s, { engine: 'interpreter' }); for (let i = 0; i < 1100; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
   'JSON text': { fields: RICH, json: true, fills: false, build: (s) => { const v = new Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
   'plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => { const v = new Validator(s, { richErrors: false, engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
