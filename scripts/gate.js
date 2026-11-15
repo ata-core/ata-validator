@@ -109,6 +109,7 @@ const PATHS = {
       'v2 entry, no defaults': { fields: RICH, ref: { useDefaults: false }, fills: true, async: true, build: v2({ useDefaults: false }) },
       'v2 entry, formats off': { fields: RICH, ref: { assertFormat: false }, fills: true, async: true, build: v2({ assertFormat: false }) },
       'v2 entry, abortEarly': { fields: MODULE, ref: { abortEarly: true, engine: 'interpreter' }, fills: true, async: true, build: v2({ abortEarly: true }) },
+      'v2 entry, JSON text': { fields: RICH, json: true, fills: false, async: true, build: async (s) => { const b = await v2(undefined)(s); if (b === null) return null; const B = await import(require('node:url').pathToFileURL(process.env.ATA_V2_BUNDLE).href); const v = new B.Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
     };
   })() : {}),
   'closure tree': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s, { engine: 'interpreter' }); for (let i = 0; i < 1100; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
