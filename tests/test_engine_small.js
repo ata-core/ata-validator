@@ -72,6 +72,11 @@ compare({ type: 'string', format: 'hasOwnProperty' }, ['x'], 'a format named lik
 const hidden = Object.defineProperty({ a: 1 }, 'b', { value: 'x', enumerable: false })
 compare({ properties: { a: { type: 'string' }, b: { type: 'integer' } }, additionalProperties: false }, [hidden, Object.create({ a: 1 }), { a: undefined }, { __proto__: null, c: 1 }, [undefined], NaN, Infinity, -0], 'values JSON cannot hold', {})
 compare({ required: ['a', 'toString'], properties: { a: {} } }, [{ a: undefined }, {}, { toString: 1 }], 'required and undefined', {})
+const typeDocs = [1, 'x', {}, [], null, true, 1.5]
+for (const t of ['toString', 'constructor', 'hasOwnProperty', '__proto__', 'valueOf']) {
+  compare({ type: t }, typeDocs, `a type named like an Object member (${t})`, {})
+  compare({ type: ['string', t] }, typeDocs, `a type list holding an Object member's name (${t})`, {})
+}
 
 assert.ok(groups > 4000 && docs > 20000, `${groups} groups, ${docs} documents`)
 console.log(`test_engine_small: ok, ${groups} schema builds, ${docs} documents as the interpreter's walk; ${declined} declined, ${uncaptured} where no document fails`)
