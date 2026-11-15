@@ -23,9 +23,16 @@ const { Validator } = require('..')
 const cases = []
 function capture (schema, data, label, options) {
   cap = null
-  try { new Validator(schema, { engine: 'interpreter', ...options }).isValidObject(null) } catch { return }
+  let v
+  try { v = new Validator(schema, { engine: 'interpreter', useDefaults: false, ...options }); v.isValidObject(null) } catch { return }
+  // A schema simple enough for the Validator's first-call path builds the
+  // interpreter only when a value fails; the documents are offered until one
+  // does. A schema none of them fails is counted, not compared.
+  for (let i = 0; cap === null && i < data.length; i++) try { v.validate(data[i]) } catch {}
   if (cap !== null) cases.push({ schema: cap.schema, args: cap.args, data, label })
+  else uncaptured++
 }
+let uncaptured = 0
 
 const SUITE = path.join(__dirname, 'suite/tests')
 for (const dialect of fs.readdirSync(SUITE)) {
@@ -133,4 +140,4 @@ for (const [name, make] of mutations) {
   console.log(`  mutation ${name}: caught on ${m.differ} documents`)
 }
 
-console.log(`test_core_verdict: ok, ${taken} schemas taken, ${declined} declined, ${r.docs} documents as the interpreter's walk`)
+console.log(`test_core_verdict: ok, ${taken} schemas taken, ${declined} declined, ${r.docs} documents as the interpreter's walk; ${uncaptured} schemas no document of which made the Validator build its interpreter`)

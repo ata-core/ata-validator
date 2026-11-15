@@ -52,7 +52,7 @@ for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json')).sort()) {
   schemas++
   cap = null
   let full
-  try { new Validator(schema, { engine: 'interpreter', useDefaults: false }).isValidObject(null); full = new Validator(schema, { useDefaults: false }) } catch { skipped++; continue }
+  try { const v = new Validator(schema, { engine: 'interpreter', useDefaults: false }); v.isValidObject(null); for (let i = 0; cap === null && i < list.length; i++) v.validate(structuredClone(list[i])); full = new Validator(schema, { useDefaults: false }) } catch { skipped++; continue }
   if (cap === null) { skipped++; continue }
   const walk = real(cap.schema, { ...cap.args, tier: Infinity })
   let core
@@ -70,5 +70,5 @@ for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json')).sort()) {
     }
   }
 }
-console.log(`SchemaStore: ${schemas} schemas with documents, ${taken} taken, ${declined} declined, ${skipped} the Validator refused; ${docs} documents on taken schemas, ${differ} differences`)
+console.log(`SchemaStore: ${schemas} schemas with documents, ${taken} taken, ${declined} declined, ${skipped} the Validator refused or never built its interpreter; ${docs} documents on taken schemas, ${differ} differences`)
 process.exit(differ === 0 ? 0 : 1)
