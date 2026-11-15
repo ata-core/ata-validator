@@ -63,6 +63,10 @@ const extra = [
   [{ type: 'array', prefixItems: [{ type: 'string' }], items: { type: 'integer' }, contains: { type: 'integer', minimum: 5 }, minContains: 2, maxContains: 3, uniqueItems: true }, [['a', 5, 6], ['a', 5], ['a', 5, 6, 7, 8], ['a', 5, 5], [1, 5, 6]], 'array keywords'],
   [{ dependentRequired: { a: ['b'] }, dependentSchemas: { c: { required: ['d'] } } }, [{}, { a: 1 }, { a: 1, b: 1 }, { c: 1 }, { c: 1, d: 1 }, hidden], 'dependencies'],
   [{ properties: Object.fromEntries(Array.from({ length: 40 }, (_, i) => ['p' + i, { type: 'integer' }])), required: ['p0', 'p39'], additionalProperties: false }, [{ p0: 1, p39: 2 }, { p0: 1 }, { p0: 1, p39: 2, p20: 's' }, { p0: 1, p39: 2, q: 1 }, Object.defineProperty({ p0: 1, p39: 2 }, 'p5', { value: 's' })], 'forty properties'],
+  [{ type: 'object', properties: { n: { type: 'integer', minimum: 1, maximum: 3 }, x: { type: 'number', maximum: 2 }, s: { type: 'string', minLength: 1, maxLength: 2 }, e: { type: 'string', enum: ['a', 'b'] } }, required: ['n'], additionalProperties: false }, [{ n: 2 }, { n: 0 }, { n: 1.5 }, { n: 2, x: 2.5 }, { n: 2, s: '' }, { n: 2, s: '\ud83d\ude00\ud83d\ude00' }, { n: 2, s: 'abc' }, { n: 2, e: 'c' }, Object.defineProperty({ n: 2 }, 's', { value: 'abc' }), Object.defineProperty({}, 'n', { value: 2, enumerable: false }), Object.create({ n: 2 }), Object.assign(Object.create({ s: 'abc' }), { n: 2 })], 'leaf codes in place'],
+  [{ type: 'array', items: { type: 'integer', minimum: 0 } }, [[0, 1], [-1], [1.5], ['1']], 'array of bounded integers'],
+  [{ anyOf: [{ type: 'number' }, { type: 'null', description: 'none' }] }, [1, null, 'x', NaN, Infinity], 'union of types'],
+  [{ type: 'integer', enum: [1, 2.5, 'x'] }, [1, 2.5, 'x', 2], 'enum and type'],
 ]
 for (const [schema, data, label] of extra) capture(schema, data, label, {})
 capture({ type: 'string', format: 'even' }, ['ab', 'abc', 1], 'caller format', { formats: { even: (s) => s.length % 2 === 0 } })
