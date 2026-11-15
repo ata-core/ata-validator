@@ -20,14 +20,16 @@ const { Validator } = require('..')
 
 let groups = 0; let docs = 0; let declined = 0; let uncaptured = 0
 function compare (schema, data, label, options) {
-  // The Validator builds the interpreter on its first failing call, so null
-  // and then each document is offered until one fails. Offering null alone
-  // skipped, silently, every schema that accepts null.
+  // The Validator builds the interpreter when a call fails and needs errors:
+  // isValidObject() answers a failure on its first-call shortcut without it.
+  // So null and then each document go to validate() until it is built.
+  // Offering null to isValidObject() alone skipped, silently, every schema
+  // that accepts null or answers on the shortcut.
   cap = null
   let v
   try { v = new Validator(schema, { engine: 'interpreter', ...options }) } catch { return }
   for (const d of [null, ...data]) {
-    try { v.isValidObject(d) } catch {}
+    try { v.validate(d) } catch {}
     if (cap !== null) break
   }
   if (cap === null) { uncaptured++; return }
