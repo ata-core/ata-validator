@@ -195,7 +195,11 @@ const esbuild = require('esbuild')
 // alone admitted to tier 0; the interpreter's keywords read in one pass into
 // a record (lib/tier0.js, lib/shape-classifier.js, lib/interpreter-core.js).
 // An invalid flat form with code generation blocked 25 to 15 ns.
-const BUDGET = 60500
+// 60520 (60506 measured): the anyOf/oneOf collapse reaches its score, its
+// oneOf-matched-twice error and the severity table through properties on
+// its own functions, so the text generated code carries still works in a
+// bundle whose names were minified (it threw there).
+const BUDGET = 60520
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

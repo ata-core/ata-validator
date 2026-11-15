@@ -263,6 +263,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // fifteen paths to it), a fragment-only $id read as an anchor in every
 // dialect, a null document answered where two shapes threw, and a format in a
 // branch no longer colliding with the branch scorer. Measured 614.9 KB.
-assert.ok(manifest.size < 615 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 616 KB with the uniqueItems helpers' text written at build time
+// (lib/unique-items-source.js), so generated code that carries it works in a
+// bundle whose names were minified. Measured 615.6 KB.
+assert.ok(manifest.size < 616 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
