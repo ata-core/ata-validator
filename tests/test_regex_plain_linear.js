@@ -48,7 +48,9 @@ for (const p of patterns) {
   if (!plainLinear(p)) continue;
   accepted++;
   assert.ok(nativeIsLinear(p), `plainLinear accepts ${JSON.stringify(p)}, which the code generator gives the linear engine`);
-  const re = new RegExp(p);
+  // Unicode mode where the pattern is valid in it, as both engines give it
+  // to the RegExp (Interpreter#pattern, reFlags in lib/js-compiler.js).
+  let re; try { re = new RegExp(p, 'u'); } catch { re = new RegExp(p); }
   const safe = compileSafe(p);
   for (let t = 0; t < 12; t++) {
     let s = '';
