@@ -244,7 +244,11 @@ const esbuild = require('esbuild')
 // bytes less.
 // 61710 (61698 measured): the date, date-time and uuid checks on shared
 // digit pairs and one table; 163 bytes less.
-const BUDGET = 61710
+// 61745 (61731 measured): the anyOf/oneOf collapse reaches its score, its
+// oneOf-matched-twice error and the severity table through properties on
+// its own functions, so the text generated code carries still works in a
+// bundle whose names were minified (it threw there); 33 bytes.
+const BUDGET = 61745
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

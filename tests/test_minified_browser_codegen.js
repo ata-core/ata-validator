@@ -3,9 +3,9 @@
 // The browser entry with the code generator, bundled with every name
 // minified, as a production build of a page does. Generated code that carries
 // a helper's text must not depend on the names a bundler gives it: the
-// uniqueItems helpers were read with String(fn), and in such a bundle every
+// uniqueItems helpers and the anyOf/oneOf collapse were read with String(fn), and in such a bundle every
 // array checked against uniqueItems threw "_uq is not defined" once the page's
-// validator ran on generated code (from 1.45.0). Every 2020-12 and draft-07
+// validator ran on generated code (from 1.45.0). Every 2020-12, 2019-09 and draft-07
 // suite group runs through the bundle, and each answer and error list must
 // match the Validator's.
 
@@ -31,13 +31,16 @@ const script = `
   const { Validator: Full } = require(${JSON.stringify(ROOT)})
   import(${JSON.stringify('file://' + path.join(dir, 'bundle.mjs'))}).then(({ Validator: Min }) => {
     const root = ${JSON.stringify(path.join(ROOT, 'tests', 'suite', 'tests'))}
+    // Values every group is also asked about: the suite's own documents did
+    // not reach the anyOf/oneOf collapse of every schema.
+    const PROBES = [true, null, 0, 1.5, '', 'x', [], [1], [{}], [[1], { x: 1 }], {}, { a: 1 }, { foo: [] }]
     const shape = (r) => JSON.stringify(r.valid ? true : r.errors.map((e) => [e.code, e.keyword, e.instancePath, e.schemaPath, e.message]))
     let docs = 0, differ = [], thrown = []
-    for (const d of ['draft2020-12', 'draft7']) for (const f of fs.readdirSync(root + '/' + d).filter((x) => x.endsWith('.json'))) for (const g of JSON.parse(fs.readFileSync(root + '/' + d + '/' + f))) {
+    for (const d of ['draft2020-12', 'draft2019-09', 'draft7']) for (const f of fs.readdirSync(root + '/' + d).filter((x) => x.endsWith('.json'))) for (const g of JSON.parse(fs.readFileSync(root + '/' + d + '/' + f))) {
       if (f === 'format.json' && /idn/.test(g.description)) continue
       let a, b
       try { a = new Full(g.schema); b = new Min(g.schema); a.isValidObject(null) } catch { continue }
-      for (const t of g.tests) {
+      for (const t of g.tests.concat(PROBES.map((data) => ({ data })))) {
         docs++
         let want, got
         try { want = shape(a.validate(structuredClone(t.data))) } catch { continue }
@@ -52,5 +55,5 @@ const out = JSON.parse(execFileSync(process.execPath, ['-e', script], { encoding
 fs.rmSync(dir, { recursive: true, force: true })
 assert.strictEqual(out.nThrown, 0, 'nothing throws in the minified bundle: ' + out.thrown.join('; '))
 assert.strictEqual(out.nDiffer, 0, 'the minified bundle answers as the Validator: ' + out.differ.join('; '))
-assert.ok(out.docs > 2000, 'the suite ran: ' + out.docs)
+assert.ok(out.docs > 3000, 'the suite ran: ' + out.docs)
 console.log('ok: minified browser bundle with the code generator,', out.docs, 'suite documents, same answers')

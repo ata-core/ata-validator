@@ -326,6 +326,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // choices in a pattern counted as a product before it goes to the platform
 // RegExp, an over-long IDN label refused before it is encoded, and the text
 // scanner declined where two names share a hash. Measured 655.5 KB.
-assert.ok(manifest.size < 656 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 657 KB with the uniqueItems helpers' text written at build time
+// (lib/unique-items-source.js), so generated code that carries it works in a
+// bundle whose names were minified. Measured 656.1 KB.
+assert.ok(manifest.size < 657 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

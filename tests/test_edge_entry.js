@@ -133,7 +133,11 @@ const root = path.resolve(__dirname, '..');
     // at load; 83 bytes less.
     // 64.75 KB (66264 measured): the date, date-time and uuid checks on
     // shared digit pairs and one table; 136 bytes less.
-    assert.ok(size < 64.75 * 1024, `the Workers bundle is ${size} bytes gzipped, over 64.75 KB`);
+    // 64.8 KB (66318 measured): the anyOf/oneOf collapse reaches its score,
+    // its oneOf-matched-twice error and the severity table through
+    // properties on its own functions, so generated code that carries its
+    // text works in a minified bundle; 54 bytes.
+    assert.ok(size < 64.8 * 1024, `the Workers bundle is ${size} bytes gzipped, over 64.8 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
