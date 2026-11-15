@@ -73,6 +73,8 @@ const extra = [
   [{ type: 'object', properties: { n: { type: 'integer', minimum: 1, maximum: 3 }, x: { type: 'number', maximum: 2 }, s: { type: 'string', minLength: 1, maxLength: 2 }, e: { type: 'string', enum: ['a', 'b'] } }, required: ['n'], additionalProperties: false }, [{ n: 2 }, { n: 0 }, { n: 1.5 }, { n: 2, x: 2.5 }, { n: 2, s: '' }, { n: 2, s: '\ud83d\ude00\ud83d\ude00' }, { n: 2, s: 'abc' }, { n: 2, e: 'c' }, Object.defineProperty({ n: 2 }, 's', { value: 'abc' }), Object.defineProperty({}, 'n', { value: 2, enumerable: false }), Object.create({ n: 2 }), Object.assign(Object.create({ s: 'abc' }), { n: 2 })], 'leaf codes in place'],
   [{ $defs: { a: { type: 'object', properties: { x: { type: 'string' }, y: {} }, required: ['x'], additionalProperties: false } }, oneOf: [{ $ref: '#/$defs/a' }, { properties: { z: { type: 'integer' }, y: {} }, additionalProperties: false }] }, [{ x: 's' }, { x: 1 }, { z: 1 }, { z: 's' }, { y: 1 }, {}, { q: 1 }, { x: 's', z: 1 }, Object.create({ x: 's' }), Object.create({ q: 1 }), Object.assign(Object.create({ z: 1 }), {}), 'x', []], 'oneOf of closed objects'],
   [{ anyOf: [{ properties: { a: { type: 'string' } }, additionalProperties: false }, { properties: { b: { type: 'string' } }, required: ['b'], additionalProperties: false }] }, [{ a: 's' }, { a: 1 }, { b: 's' }, { b: 1 }, {}, { c: 1 }, Object.create({ c: 1 }), Object.create({ a: 1 }), 1], 'anyOf of closed objects'],
+  [{ type: 'object', properties: { name: { type: 'string' }, n: { type: 'integer' } }, required: ['name'] }, [Object.create({ name: 'x' }), Object.assign(Object.create({ name: 'x' }), { n: 1 }), Object.create({ n: 's' }), Object.assign(Object.create({ n: 's' }), { name: 'x' }), Object.defineProperty({ name: 'x' }, 'n', { value: 's' }), Object.defineProperty({}, 'name', { value: 'x' }), { name: 'x' }], 'inherited and hidden, open'],
+  [{ type: 'object', properties: { name: { type: 'string' }, n: { type: 'integer' } }, required: ['name'], additionalProperties: false }, [Object.create({ name: 'x' }), Object.assign(Object.create({ z: 1 }), { name: 'x' }), Object.assign(Object.create({ n: 's' }), { name: 'x' }), Object.defineProperty({ name: 'x' }, 'n', { value: 's' }), Object.defineProperty({ name: 'x' }, 'z', { value: 1 }), { name: 'x' }], 'inherited and hidden, closed'],
   [{ type: 'array', items: { type: 'integer', minimum: 0 } }, [[0, 1], [-1], [1.5], ['1']], 'array of bounded integers'],
   [{ anyOf: [{ type: 'number' }, { type: 'null', description: 'none' }] }, [1, null, 'x', NaN, Infinity], 'union of types'],
   [{ type: 'integer', enum: [1, 2.5, 'x'] }, [1, 2.5, 'x', 2], 'enum and type'],
@@ -136,6 +138,20 @@ const mutations = [
   ['minimum ignored', strip((k, v) => k === 'minimum' && typeof v === 'number')],
   ['maximum off by one', strip((k, v) => k === 'maximum' && typeof v === 'number', (v) => v + 1)],
 ]
+// Cores whose own source is changed so that a key for-in met is taken as
+// own, or a declared property that is not enumerable is taken as absent.
+// The source is compiled as a module of its own; the file is not touched.
+const Module = require('node:module')
+const FILE = require.resolve('../lib/core/verdict.js')
+function mutant (edits) {
+  let src = fs.readFileSync(FILE, 'utf8')
+  for (const [from, to] of edits) { assert.ok(src.includes(from), 'mutation anchor missing: ' + from); src = src.split(from).join(to) }
+  const m = new Module(FILE, module); m.filename = FILE; m.paths = Module._nodeModulePaths(path.dirname(FILE)); m._compile(src, FILE)
+  return m.exports.createVerdict
+}
+mutations.push(['inherited keys taken as own', mutant([['|| has(o, last) ||', '|| true ||'], ['if (last !== undefined && !has(o, last))', 'if (false)']])])
+mutations.push(['non-enumerable properties taken as absent', mutant([['const x = has(o, k) ? o[k] : undefined', 'const x = undefined']])])
+mutations.push(['a failing inherited key taken as own', mutant([['has(o, k) ? false : exactObj(', 'false && exactObj(']])])
 for (const [name, make] of mutations) {
   const m = run(make, false)
   assert.ok(m.differ > 0, `mutation "${name}" went unnoticed`)
