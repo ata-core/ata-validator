@@ -6,3 +6,5 @@ export const metaschemas = ms.metaschemas;
 import mu from './lib/features/mutators.js';
 export const coerceTypes = mu.coerceTypes;
 export const removeAdditional = mu.removeAdditional;
+import cg from './lib/features/codegen.js';
+export const codegen = cg.codegen;
