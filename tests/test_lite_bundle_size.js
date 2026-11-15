@@ -244,7 +244,11 @@ const esbuild = require('esbuild')
 // bytes less.
 // 61710 (61698 measured): the date, date-time and uuid checks on shared
 // digit pairs and one table; 163 bytes less.
-const BUDGET = 61710
+// 61790 (61775 measured): asking anyOf's and oneOf's branches for their
+// verdict first stops after four misses in a row, until a branch passes:
+// where none passes it walked them twice (SchemaStore's pre-commit-config
+// rejected 8% slower than 1.63.2, now level); 77 bytes.
+const BUDGET = 61790
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
