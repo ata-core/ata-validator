@@ -133,11 +133,12 @@ const root = path.resolve(__dirname, '..');
     // at load; 83 bytes less.
     // 64.75 KB (66264 measured): the date, date-time and uuid checks on
     // shared digit pairs and one table; 136 bytes less.
-    // 64.8 KB (66318 measured): the anyOf/oneOf collapse reaches its score,
-    // its oneOf-matched-twice error and the severity table through
-    // properties on its own functions, so generated code that carries its
-    // text works in a minified bundle; 54 bytes.
-    assert.ok(size < 64.8 * 1024, `the Workers bundle is ${size} bytes gzipped, over 64.8 KB`);
+    // 64.85 KB (66346 measured): the verdict asked first only while it pays,
+    // four misses in a row turning it off until a branch passes; 82 bytes.
+    // 65 KB (66496 measured): a pattern is read in unicode mode wherever it
+    // is valid in it, so `^.$` matches "🐲" (issue #94); 92 bytes, paid in
+    // part by folding the engine's class escapes and DFA closure walk.
+    assert.ok(size < 65 * 1024, `the Workers bundle is ${size} bytes gzipped, over 65 KB`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

@@ -244,11 +244,19 @@ const esbuild = require('esbuild')
 // bytes less.
 // 61710 (61698 measured): the date, date-time and uuid checks on shared
 // digit pairs and one table; 163 bytes less.
-// 61745 (61731 measured): the anyOf/oneOf collapse reaches its score, its
+// 61790 (61775 measured): asking anyOf's and oneOf's branches for their
+// verdict first stops after four misses in a row, until a branch passes:
+// where none passes it walked them twice (SchemaStore's pre-commit-config
+// rejected 8% slower than 1.63.2, now level); 77 bytes.
+// 61835 (61821 measured): the anyOf/oneOf collapse reaches its score, its
 // oneOf-matched-twice error and the severity table through properties on
 // its own functions, so the text generated code carries still works in a
-// bundle whose names were minified (it threw there); 33 bytes.
-const BUDGET = 61745
+// bundle whose names were minified (it threw there); 46 bytes.
+// 61935 (61922 measured): a pattern is read in unicode mode wherever it is
+// valid in it, in the linear engine and on the platform RegExp, so `^.$`
+// matches "🐲" and `^.{2}$` does not (issue #94); 101 bytes, paid in part by
+// folding the engine's class escapes and its DFA closure walk into one.
+const BUDGET = 61935
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

@@ -49,10 +49,10 @@ quoting any figure; a stale pin once hid a real bug for five months.
 
 Every figure in the README, the docs and on the site is measured, not estimated. If a
 change moves one, remeasure and update all of them together. Current figures, all with
-zero regressions: Draft 2020-12 1302 of 1302, 2019-09 1261 of 1261, draft 7 929 of 929,
-draft-06 841 of 841, draft-04 618 of 618, the v1 dialect 1135
-of 1135, identical with code generation blocked. The buffer path
-agrees with `validate()` on all 3366 cases of the 2020-12, draft-07 and v1 suites; `lib/buffer-gate.js` routes the shapes
+zero regressions: Draft 2020-12 1300 of 1300, 2019-09 1259 of 1259, draft 7 927 of 927,
+draft-06 839 of 839, draft-04 616 of 616, the v1 dialect 1147
+of 1147, identical with code generation blocked. The buffer path
+agrees with `validate()` on all 3374 cases of the 2020-12, draft-07 and v1 suites; `lib/buffer-gate.js` routes the shapes
 the native walker gets wrong, and that count must stay at zero.
 
 Do not write a number you have not run. Do not round a measured figure into a claim.
