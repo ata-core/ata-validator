@@ -11,7 +11,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { _plainLinear: plainLinear } = require('../lib/interpreter-core');
+const { plainLinear } = require('../lib/engine-shared');
 const { nativeIsLinear } = require('../lib/regex-linear');
 const { compileSafe } = require('../lib/safe-regex');
 
