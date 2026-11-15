@@ -18,11 +18,19 @@ let cap = null
 im.createInterpreter = (schema, args) => { cap = { schema, args }; return real(schema, args) }
 const { Validator } = require('..')
 
-let groups = 0; let docs = 0; let declined = 0
+let groups = 0; let docs = 0; let declined = 0; let uncaptured = 0
 function compare (schema, data, label, options) {
+  // The Validator builds the interpreter on its first failing call, so null
+  // and then each document is offered until one fails. Offering null alone
+  // skipped, silently, every schema that accepts null.
   cap = null
-  try { new Validator(schema, { engine: 'interpreter', ...options }).isValidObject(null) } catch { return }
-  if (cap === null) return
+  let v
+  try { v = new Validator(schema, { engine: 'interpreter', ...options }) } catch { return }
+  for (const d of [null, ...data]) {
+    try { v.isValidObject(d) } catch {}
+    if (cap !== null) break
+  }
+  if (cap === null) { uncaptured++; return }
   const walk = real(cap.schema, { ...cap.args, tier: Infinity })
   const small = createSmall(cap.schema, cap.args)
   if (small === null) { declined++; return }
@@ -64,4 +72,4 @@ compare({ properties: { a: { type: 'string' }, b: { type: 'integer' } }, additio
 compare({ required: ['a', 'toString'], properties: { a: {} } }, [{ a: undefined }, {}, { toString: 1 }], 'required and undefined', {})
 
 assert.ok(groups > 4000 && docs > 20000, `${groups} groups, ${docs} documents`)
-console.log(`test_engine_small: ok, ${groups} schema builds, ${docs} documents as the interpreter's walk; ${declined} declined`)
+console.log(`test_engine_small: ok, ${groups} schema builds, ${docs} documents as the interpreter's walk; ${declined} declined, ${uncaptured} where no document fails`)
