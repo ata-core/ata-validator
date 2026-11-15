@@ -177,6 +177,7 @@ function mutantFull (edits) {
   globalThis[name] = m.exports
   return mutant([["require('./verdict-full')", 'globalThis.' + name]])
 }
+mutations.push(['a reference in a nested $id resource resolved from the root base', mutant([['resolveRef(st.refs[i].$ref, b, state)', 'resolveRef(st.refs[i].$ref, state.rootBase, state)']])])
 mutations.push(['a dynamic scope entry not popped', mutantFull([['if (pushed) sc.pop()', '']])])
 mutations.push(['annotations of a failed branch counted', mutantFull([['if (ok && a !== NONE && sink !== NONE) merge(sink, a)', 'if (a !== NONE && sink !== NONE) merge(sink, a)'], ['      if (!f(d, sc, st, sub, b)) return false\n      if (a !== NONE) merge(a, sub)\n      return true', '      const ok = f(d, sc, st, sub, b)\n      if (a !== NONE) merge(a, sub)\n      return ok']])])
 mutations.push(['a nested $id not changing the base', mutantFull([['const base = fixed !== undefined ? fixed : b', 'const base = b']])])
