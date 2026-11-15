@@ -75,6 +75,13 @@ const extra = [
   [{ anyOf: [{ properties: { a: { type: 'string' } }, additionalProperties: false }, { properties: { b: { type: 'string' } }, required: ['b'], additionalProperties: false }] }, [{ a: 's' }, { a: 1 }, { b: 's' }, { b: 1 }, {}, { c: 1 }, Object.create({ c: 1 }), Object.create({ a: 1 }), 1], 'anyOf of closed objects'],
   [{ type: 'object', properties: { name: { type: 'string' }, n: { type: 'integer' } }, required: ['name'] }, [Object.create({ name: 'x' }), Object.assign(Object.create({ name: 'x' }), { n: 1 }), Object.create({ n: 's' }), Object.assign(Object.create({ n: 's' }), { name: 'x' }), Object.defineProperty({ name: 'x' }, 'n', { value: 's' }), Object.defineProperty({}, 'name', { value: 'x' }), { name: 'x' }], 'inherited and hidden, open'],
   [{ type: 'object', properties: { name: { type: 'string' }, n: { type: 'integer' } }, required: ['name'], additionalProperties: false }, [Object.create({ name: 'x' }), Object.assign(Object.create({ z: 1 }), { name: 'x' }), Object.assign(Object.create({ n: 's' }), { name: 'x' }), Object.defineProperty({ name: 'x' }, 'n', { value: 's' }), Object.defineProperty({ name: 'x' }, 'z', { value: 1 }), { name: 'x' }], 'inherited and hidden, closed'],
+  [{ type: 'toString' }, [1, 'x', null, NaN], 'a type named like an Object member'],
+  [{ $id: 'https://example.com/root', $defs: { a: { $id: 'inner/', $defs: { b: { type: 'integer' } }, properties: { x: { $ref: '#/$defs/b' } } } }, properties: { v: { $ref: 'inner/' } } }, [{ v: { x: 1 } }, { v: { x: 's' } }, {}], 'nested $id'],
+  [{ unevaluatedProperties: false, anyOf: [{ properties: { a: { type: 'string' } } }, { properties: { b: { type: 'string' } }, allOf: [{ required: ['c'] }] }] }, [{ a: 's' }, { b: 's' }, { a: 's', b: 's' }, { b: 's', c: 1 }, {}], 'unevaluated after a failed branch'],
+  [{ unevaluatedItems: false, prefixItems: [{ type: 'string' }], oneOf: [{ contains: { type: 'integer' } }, { prefixItems: [true, { type: 'integer' }] }] }, [['a'], ['a', 1], ['a', 's'], ['a', 1, 1]], 'unevaluated items through oneOf and contains'],
+  [{ $defs: { n: { $dynamicAnchor: 'x', type: 'object', properties: { next: { $dynamicRef: '#x' } } } }, $dynamicAnchor: 'x', $ref: '#/$defs/n', required: ['k'] }, [{ k: 1 }, { k: 1, next: { k: 1 } }, { k: 1, next: {} }, cyc], 'dynamic reference to the outermost anchor'],
+  [{ properties: { a: { $ref: 'https://nowhere.example/x' } } }, [{}, { a: 1 }], 'a reference that does not resolve'],
+  [{ propertyDependencies: { kind: { a: { required: ['x'] } } } }, [{ kind: 'a' }, { kind: 'a', x: 1 }, { kind: 'b' }, { kind: 1 }], 'propertyDependencies'],
   [{ type: 'array', items: { type: 'integer', minimum: 0 } }, [[0, 1], [-1], [1.5], ['1']], 'array of bounded integers'],
   [{ anyOf: [{ type: 'number' }, { type: 'null', description: 'none' }] }, [1, null, 'x', NaN, Infinity], 'union of types'],
   [{ type: 'integer', enum: [1, 2.5, 'x'] }, [1, 2.5, 'x', 2], 'enum and type'],
@@ -88,13 +95,15 @@ const dialectOf = (label) => label.split('/')[0].split(':')[0]
 // Runs every case through `make`; returns the number of documents on which
 // it disagreed with the walk (or throws on the first when `strict`).
 function run (make, strict) {
-  const taken = {}; const declined = {}; let docs = 0; let differ = 0
+  const taken = {}; const declined = {}; const second = {}; let docs = 0; let differ = 0
   for (const c of cases) {
     const d = dialectOf(c.label)
     const walk = real(c.schema, { ...c.args, tier: Infinity })
+    const before = fullBuilds
     const core = make(c.schema, c.args)
     if (core === null) { declined[d] = (declined[d] || 0) + 1; continue }
     taken[d] = (taken[d] || 0) + 1
+    if (fullBuilds > before) second[d] = (second[d] || 0) + 1
     for (const x of c.data) {
       docs++
       let want; try { want = walk.validate(x).valid } catch (e) { want = e }
@@ -106,13 +115,18 @@ function run (make, strict) {
       }
     }
   }
-  return { taken, declined, docs, differ }
+  return { taken, declined, second, docs, differ }
 }
 
 const { createVerdict } = require('../lib/core/verdict.js')
+// Counts the schemas the second half (lib/core/verdict-full.js) builds.
+let fullBuilds = 0
+const fullModule = require('../lib/core/verdict-full.js')
+const realFull = fullModule.createFull
+fullModule.createFull = (...a) => { fullBuilds++; return realFull(...a) }
 const r = run(createVerdict, true)
 const all = new Set([...Object.keys(r.taken), ...Object.keys(r.declined)])
-for (const d of [...all].sort()) if (fs.existsSync(path.join(SUITE, d))) console.log(`  ${d.padEnd(14)} taken ${String(r.taken[d] || 0).padStart(4)}  declined ${String(r.declined[d] || 0).padStart(4)}`)
+for (const d of [...all].sort()) if (fs.existsSync(path.join(SUITE, d))) console.log(`  ${d.padEnd(14)} taken ${String(r.taken[d] || 0).padStart(4)} (second half ${String(r.second[d] || 0).padStart(4)})  declined ${String(r.declined[d] || 0).padStart(4)}`)
 const taken = Object.values(r.taken).reduce((a, b) => a + b, 0)
 const declined = Object.values(r.declined).reduce((a, b) => a + b, 0)
 assert.ok(taken > 3000 && r.docs > 15000, `${taken} schemas taken, ${r.docs} documents`)
@@ -151,6 +165,21 @@ function mutant (edits) {
 }
 mutations.push(['inherited keys taken as own', mutant([['|| has(o, last) ||', '|| true ||'], ['if (last !== undefined && !has(o, last))', 'if (false)']])])
 mutations.push(['non-enumerable properties taken as absent', mutant([['const x = has(o, k) ? o[k] : undefined', 'const x = undefined']])])
+// The same for the second half (lib/core/verdict-full.js): the first half
+// is compiled again to load the changed second half.
+let mutantCount = 0
+function mutantFull (edits) {
+  const FULL = require.resolve('../lib/core/verdict-full.js')
+  let src = fs.readFileSync(FULL, 'utf8')
+  for (const [from, to] of edits) { assert.ok(src.includes(from), 'mutation anchor missing: ' + from); src = src.split(from).join(to) }
+  const m = new Module(FULL, module); m.filename = FULL; m.paths = Module._nodeModulePaths(path.dirname(FULL)); m._compile(src, FULL)
+  const name = '__coreFullMutant' + (++mutantCount)
+  globalThis[name] = m.exports
+  return mutant([["require('./verdict-full')", 'globalThis.' + name]])
+}
+mutations.push(['a dynamic scope entry not popped', mutantFull([['if (pushed) sc.pop()', '']])])
+mutations.push(['annotations of a failed branch counted', mutantFull([['if (ok && a !== NONE && sink !== NONE) merge(sink, a)', 'if (a !== NONE && sink !== NONE) merge(sink, a)'], ['      if (!f(d, sc, st, sub, b)) return false\n      if (a !== NONE) merge(a, sub)\n      return true', '      const ok = f(d, sc, st, sub, b)\n      if (a !== NONE) merge(a, sub)\n      return ok']])])
+mutations.push(['a nested $id not changing the base', mutantFull([['const base = fixed !== undefined ? fixed : b', 'const base = b']])])
 mutations.push(['array items checked in place without their bounds', mutant([['case 8: if (Number.isInteger(x) && x >= it[0] && x <= it[1]) continue; return false', 'case 8: if (Number.isInteger(x)) continue; return false']])])
 mutations.push(['a failing inherited key taken as own', mutant([['has(o, k) ? false : exactObj(', 'false && exactObj(']])])
 for (const [name, make] of mutations) {
