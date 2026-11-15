@@ -240,6 +240,7 @@
     "!lib/validator-small.js",
     "!lib/small-tier.js",
     "!lib/features/",
+    "!lib/core/",
     "compat.js",
     "compat.mjs",
     "compat.d.ts",
