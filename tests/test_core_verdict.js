@@ -189,7 +189,7 @@ mutations.push(['a dynamic scope entry not popped', mutant([['sc.push(b); const 
 mutations.push(['annotations of a failed anyOf branch counted', mutant([['        if (!fs[i](d)) continue\n', '        if (!fs[i](d) && k === 1) continue\n']])])
 mutations.push(['annotations of a failed branch counted in the second half', mutantFull([['if (ok && a !== NONE && sink !== NONE) merge(sink, a)', 'if (a !== NONE && sink !== NONE) merge(sink, a)'], ['      if (!f(d, sc, st, sub, b)) return false\n      if (a !== NONE) merge(a, sub)\n      return true', '      const ok = f(d, sc, st, sub, b)\n      if (a !== NONE) merge(a, sub)\n      return ok']])])
 mutations.push(['a nested $id not changing the base', mutantFull([['const base = fixed !== undefined ? fixed : b', 'const base = b']])])
-mutations.push(['a property that can pass taken as one that never does', mutant([['const never = (V, s) => s === false ||', 'const never = (V, s) => s === false || s === true || (isMap(s) && s.type === \'integer\') ||']])])
+mutations.push(['a property that can pass taken as one that never does', mutant([['  if (s === false) return true\n', '  if (s === false || s === true || (isMap(s) && s.type === \'integer\')) return true\n']])])
 mutations.push(['array items checked in place without their bounds', mutant([['case 8: if (Number.isInteger(x) && x >= it[0] && x <= it[1]) continue; return false', 'case 8: if (Number.isInteger(x)) continue; return false']])])
 mutations.push(['a failing inherited key taken as own', mutant([['has(o, k) ? false : exactObj(', 'false && exactObj(']])])
 for (const [name, make] of mutations) {
