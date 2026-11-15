@@ -204,7 +204,7 @@ function mutantFull (edits) {
   const m = new Module(FULL, module); m.filename = FULL; m.paths = Module._nodeModulePaths(path.dirname(FULL)); m._compile(src, FULL)
   return (schema, args) => createVerdict(schema, args) === null ? null : _second(schema, args, m.exports)
 }
-mutations.push(['a reference in a nested $id resource resolved from the root base', mutant([['resolveRef(st.refs[i].$ref, b, state)', 'resolveRef(st.refs[i].$ref, state.rootBase, state)']])])
+mutations.push(['a reference in a nested $id resource resolved from the root base', mutant([['resolveOnce(st.refs[i].$ref, b, state, memo)', 'resolveOnce(st.refs[i].$ref, state.rootBase, state, memo)']])])
 mutations.push(['a non-enumerable property skipped where own names are read', mutant([['    if (x !== undefined && !valueAt(V, props, e, i, x)) return false\n  }\n  return true', '  }\n  return true']])])
 mutations.push(['a non-enumerable property skipped where own names are read, many declared', mutantMore([['    if (x !== undefined && !valueAt(V, props, e, j, x)) return false\n  }\n  return true', '  }\n  return true']])])
 mutations.push(['a dynamic scope entry not popped', mutantMore([['return b === undefined || V.scope.includes(b) ? V : extend(V, b)', 'return b === undefined || V.scope.includes(b) ? V : (V.scope.push(b), V)']])])

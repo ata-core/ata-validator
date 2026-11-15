@@ -17,9 +17,10 @@ const im = require('../lib/interpreter.js')
 let n = 0, fellBack = 0
 function same (schema, label) {
   const want = textFacts(schema)
-  const got = facts(schema)
-  if (got === null) { fellBack++; return }
+  const f = facts(schema)
+  if (f === null) { fellBack++; return }
   n++
+  const got = { errorMessage: f.errorMessage, default: f.default, format: f.format, metaRef: f.metaRef, notFlat: f.notFlat }
   assert.deepStrictEqual(got, want, label)
 }
 
