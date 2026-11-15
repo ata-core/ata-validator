@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Changed
+
+- The official test suite is pinned at 245a45a (from 89e83a7). It removed duplicate uniqueItems, duration, ipv6 and idn-email cases and added v1 propertyNames and if/then/else groups, very small multipleOf divisors, escaped relative-json-pointer cases and RFC 3987 iri cases. Every dialect still passes in full, with and without code generation: Draft 2020-12 1300 of 1300, 2019-09 1259 of 1259, draft-07 927 of 927, draft-06 839 of 839, draft-04 616 of 616, the v1 dialect 1147 of 1147. The buffer path agrees with `validate()` on all 3374 cases of the 2020-12, draft-07 and v1 suites. The README and docs carry the new counts.
+
 ## 1.64.0 - 2026-11-15
 
 ### Added

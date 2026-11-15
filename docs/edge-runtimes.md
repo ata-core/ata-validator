@@ -170,7 +170,7 @@ infrastructure.
 
 The JSR package re-exports the npm package of the same version, so the two are
 the same engine. CI runs the package under Deno on every change: the official
-suite in its six dialects (1302, 1261, 929, 841, 618 and 1135 cases, all passing), the
+suite in its six dialects (1300, 1259, 927, 839, 616 and 1147 cases, all passing), the
 suite with `eval` and `new Function` blocked, and a smoke test that refuses
 dynamic code the way Deno Deploy does and checks that the interpreted engine
 answers. On Deno Deploy itself nothing was timed, and with its closing nothing
@@ -200,9 +200,9 @@ happens to allow. `tests/test_no_eval.js` blocks `eval` and `new Function`
 before ata is loaded and runs the entire official test suite through it. It runs
 as part of `npm test`, and the run fails if the result drops.
 
-With code generation blocked, ata passes **1302 of 1302** cases on Draft 2020-12,
-**1261 of 1261** on Draft 2019-09, **929 of 929** on Draft 7, **841 of 841** on
-draft-06, **618 of 618** on draft-04 and **1135 of 1135** on the v1 dialect, the
+With code generation blocked, ata passes **1300 of 1300** cases on Draft 2020-12,
+**1259 of 1259** on Draft 2019-09, **927 of 927** on Draft 7, **839 of 839** on
+draft-06, **616 of 616** on draft-04 and **1147 of 1147** on the v1 dialect, the
 same figures the compiled path scores.
 
 ## What needs the native addon
