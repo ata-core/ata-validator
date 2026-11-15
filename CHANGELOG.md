@@ -35,6 +35,7 @@ All notable changes to ata-validator are documented here. The format follows [Ke
 
 ### Fixed
 
+- `abortEarly: true` handed out the full error list, not the ATA9000 stub it promises, for a schema with a dynamic reference (`$dynamicRef`, or a 2019-09 `$recursiveRef`) that the code generator did not unroll: 25 rejections of the 2020-12, 2019-09 and draft-07 suites, in `dynamicRef`, `unevaluatedItems`, `unevaluatedProperties`, `recursiveRef` and `ref`. The verdict was right. Such a schema now answers abortEarly from the interpreted engine's verdict, and one the generator unrolled from the generated verdict, as every other schema does. A new test holds the contract on every rejection of the three suites with the default engine, with `engine: 'interpreter'` and with defaults off (4459 rejections).
 - An `idn-hostname` label longer than a label can be (126 UTF-16 units, 63 code points) is refused before it is encoded: encoding it first cost time quadratic in its length.
 - Release workflow: the native packages are published without running scripts and only under the names the workflow expects, and the release tag reaches the shell as a variable.
 - `ata-validator/error-runtime`, which a build plugin's compact modules import, pulled the defaults pass into every bundle since compact modules began asking it for their defaults: 1.6 KB gzipped for a bundle whose schemas declare none. The ES module entry imports the pass on its own, so a bundler leaves it out unless a module calls `createDefaults`. Not in a release.
