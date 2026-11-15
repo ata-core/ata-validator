@@ -131,6 +131,11 @@ const fullModule = require('../lib/core/verdict-full.js')
 const realFull = fullModule.createFull
 fullModule.createFull = (...a) => { fullBuilds++; return realFull(...a) }
 const r = run(createVerdict, true)
+// The second half alone on every schema the core takes: it answers the few
+// the first half hands it, so it is held to the walk on all of them.
+const { _second } = require('../lib/core/verdict.js')
+const r2 = run((schema, args) => createVerdict(schema, args) === null ? null : _second(schema, args), true)
+console.log(`  second half alone: ${Object.values(r2.taken).reduce((a, b) => a + b, 0)} schemas, ${r2.docs} documents as the walk`)
 const all = new Set([...Object.keys(r.taken), ...Object.keys(r.declined)])
 for (const d of [...all].sort()) if (fs.existsSync(path.join(SUITE, d))) console.log(`  ${d.padEnd(14)} taken ${String(r.taken[d] || 0).padStart(4)} (second half ${String(r.second[d] || 0).padStart(4)})  declined ${String(r.declined[d] || 0).padStart(4)}`)
 const taken = Object.values(r.taken).reduce((a, b) => a + b, 0)
@@ -173,20 +178,18 @@ mutations.push(['inherited keys taken as own', mutant([['|| has(o, last) ||', '|
 mutations.push(['non-enumerable properties taken as absent', mutant([['const x = has(o, k) ? o[k] : undefined', 'const x = undefined']])])
 // The same for the second half (lib/core/verdict-full.js): the first half
 // is compiled again to load the changed second half.
-let mutantCount = 0
 function mutantFull (edits) {
   const FULL = require.resolve('../lib/core/verdict-full.js')
   let src = fs.readFileSync(FULL, 'utf8')
   for (const [from, to] of edits) { assert.ok(src.includes(from), 'mutation anchor missing: ' + from); src = src.split(from).join(to) }
   const m = new Module(FULL, module); m.filename = FULL; m.paths = Module._nodeModulePaths(path.dirname(FULL)); m._compile(src, FULL)
-  const name = '__coreFullMutant' + (++mutantCount)
-  globalThis[name] = m.exports
-  return mutant([["require('./verdict-full')", 'globalThis.' + name]])
+  return (schema, args) => createVerdict(schema, args) === null ? null : _second(schema, args, m.exports)
 }
 mutations.push(['a reference in a nested $id resource resolved from the root base', mutant([['resolveRef(st.refs[i].$ref, b, state)', 'resolveRef(st.refs[i].$ref, state.rootBase, state)']])])
 mutations.push(['a non-enumerable property skipped where own names are read', mutant([['    if (x !== undefined && !valueAt(V, props, e, i, x)) return false\n  }\n  return true', '  }\n  return true'], ['    if (x !== undefined && !valueAt(V, props, e, j, x)) return false\n  }\n  return true', '  }\n  return true']])])
-mutations.push(['a dynamic scope entry not popped', mutant([['sc.push(b); const ok = f1(d); sc.pop(); return ok', 'sc.push(b); return f1(d)']])])
+mutations.push(['a dynamic scope entry not popped', mutant([['return b === undefined || V.scope.includes(b) ? V : extend(V, b)', 'return b === undefined || V.scope.includes(b) ? V : (V.scope.push(b), V)']])])
 mutations.push(['annotations of a failed anyOf branch counted', mutant([['        if (!fs[i](d)) continue\n', '        if (!fs[i](d) && k === 1) continue\n']])])
+mutations.push(['a dynamic scope entry not popped in the second half', mutantFull([['if (pushed) sc.pop()', '']])])
 mutations.push(['annotations of a failed branch counted in the second half', mutantFull([['if (ok && a !== NONE && sink !== NONE) merge(sink, a)', 'if (a !== NONE && sink !== NONE) merge(sink, a)'], ['      if (!f(d, sc, st, sub, b)) return false\n      if (a !== NONE) merge(a, sub)\n      return true', '      const ok = f(d, sc, st, sub, b)\n      if (a !== NONE) merge(a, sub)\n      return ok']])])
 mutations.push(['a nested $id not changing the base', mutantFull([['const base = fixed !== undefined ? fixed : b', 'const base = b']])])
 mutations.push(['a property that can pass taken as one that never does', mutant([['  if (s === false) return true\n', '  if (s === false || s === true || (isMap(s) && s.type === \'integer\')) return true\n']])])
