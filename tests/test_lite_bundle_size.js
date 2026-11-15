@@ -248,7 +248,11 @@ const esbuild = require('esbuild')
 // verdict first stops after four misses in a row, until a branch passes:
 // where none passes it walked them twice (SchemaStore's pre-commit-config
 // rejected 8% slower than 1.63.2, now level); 77 bytes.
-const BUDGET = 61790
+// 61835 (61821 measured): the anyOf/oneOf collapse reaches its score, its
+// oneOf-matched-twice error and the severity table through properties on
+// its own functions, so the text generated code carries still works in a
+// bundle whose names were minified (it threw there); 46 bytes.
+const BUDGET = 61835
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

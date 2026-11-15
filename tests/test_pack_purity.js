@@ -333,6 +333,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // pattern, the format kernels one module each (25 files where one was: a page
 // of a ten-page Next.js site loads 4.8 KB of scripts beyond the home page
 // where it loaded 9.7), and specialize()'s smallFormats. Measured 659.2 KB.
-assert.ok(manifest.size < 660 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 661 KB with the uniqueItems helpers' text written at build time
+// (lib/unique-items-source.js), so generated code that carries it works in a
+// bundle whose names were minified. Measured 660.2 KB.
+assert.ok(manifest.size < 661 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
