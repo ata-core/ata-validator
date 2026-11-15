@@ -192,7 +192,7 @@ function mutantMore (edits) {
     m._compile(src.split("require('./verdict')").join('globalThis.' + tag + 'V'), MORE)
     return m.exports
   })())
-  let first = fs.readFileSync(FILE, 'utf8').split("require('./verdict-more')").join('globalThis.' + tag + '()')
+  let first = fs.readFileSync(FILE, 'utf8').split("req('./verdict-more')").join('globalThis.' + tag + '()')
   const m = new Module(FILE, module); m.filename = FILE; m.paths = Module._nodeModulePaths(path.dirname(FILE)); m._compile(first, FILE)
   globalThis[tag + 'V'] = m.exports
   return m.exports.createVerdict
@@ -281,4 +281,30 @@ for (const [src, sample] of FAMILIES) {
   console.log(`  mutation sequence matcher accepts longer strings: caught on ${caught} strings`)
 }
 
+// A browser bundle loads lib/core/verdict-more.js and the second half as a
+// chunk. Until it has loaded, createVerdict must answer PENDING for every
+// schema that needs them and never load them itself; after it has, the same
+// schemas get checks. A copy of the first half is compiled whose own loads
+// of the parts throw.
+async function chunked () {
+  let src = fs.readFileSync(FILE, 'utf8')
+  for (const part of ['more', 'full']) {
+    const from = "req('./verdict-" + part + "')"
+    assert.ok(src.includes(from), 'anchor missing: ' + from)
+    src = src.split(from).join("(() => { throw new Error('verdict-" + part + " loaded outside the chunk') })()")
+  }
+  const m = new Module(FILE, module); m.filename = FILE; m.paths = Module._nodeModulePaths(path.dirname(FILE)); m._compile(src, FILE)
+  const C = m.exports
+  C._chunked(() => Promise.resolve([require('../lib/core/verdict-more.js'), require('../lib/core/verdict-full.js')]))
+  let waiting = []
+  const r1 = run((schema, args) => { const v = C.createVerdict(schema, args); if (v === C.PENDING) { waiting.push([schema, args]); return null } return v }, true)
+  await C._loaded()
+  const keep = new Set(waiting.map((w) => w[0])); waiting = null
+  const r2 = run((schema, args) => keep.has(schema) ? C.createVerdict(schema, args) : null, true)
+  const n = (r) => Object.values(r.taken).reduce((a, b) => a + b, 0)
+  assert.strictEqual(n(r1) + n(r2), taken)
+  console.log(`  chunked: ${n(r1)} schemas answered before the chunk, ${n(r2)} after it, as the walk`)
+}
+
 console.log(`test_core_verdict: ok, ${taken} schemas taken, ${declined} declined, ${r.docs} documents as the interpreter's walk; ${fuzzed} strings on ${FAMILIES.length} patterns matched without a RegExp; ${uncaptured} schemas no document of which made the Validator build its interpreter`)
+chunked().catch((e) => { console.error(e); process.exit(1) })
