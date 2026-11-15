@@ -151,6 +151,7 @@ function mutant (edits) {
 }
 mutations.push(['inherited keys taken as own', mutant([['|| has(o, last) ||', '|| true ||'], ['if (last !== undefined && !has(o, last))', 'if (false)']])])
 mutations.push(['non-enumerable properties taken as absent', mutant([['const x = has(o, k) ? o[k] : undefined', 'const x = undefined']])])
+mutations.push(['array items checked in place without their bounds', mutant([['case 8: if (Number.isInteger(x) && x >= it[0] && x <= it[1]) continue; return false', 'case 8: if (Number.isInteger(x)) continue; return false']])])
 mutations.push(['a failing inherited key taken as own', mutant([['has(o, k) ? false : exactObj(', 'false && exactObj(']])])
 for (const [name, make] of mutations) {
   const m = run(make, false)
@@ -158,4 +159,64 @@ for (const [name, make] of mutations) {
   console.log(`  mutation ${name}: caught on ${m.differ} documents`)
 }
 
-console.log(`test_core_verdict: ok, ${taken} schemas taken, ${declined} declined, ${r.docs} documents as the interpreter's walk; ${uncaptured} schemas no document of which made the Validator build its interpreter`)
+// Patterns matched without a RegExp (sequence() in the core) against the
+// platform RegExp with the u flag: a million strings per pattern, built from
+// a valid sample changed at random positions, with ASCII, other BMP
+// characters, lone surrogates of both halves and surrogate pairs. Each
+// pattern must be one the core recognises, or this compares RegExp with
+// itself. A matcher that accepts a longer string must be caught.
+const { _sequence } = require('../lib/core/verdict.js')
+const FAMILIES = [
+  ['^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', '01890a5d-ac96-774b-bcce-b302099a8057'],
+  ['^\\d{4}-\\d{2}-\\d{2}$', '2026-10-31'],
+  ['^[0-9a-f]{16}$', '0123456789abcdef'],
+  ['^#[0-9a-f]{6}$', '#00ff00'],
+  ['^[A-Z]{3}-\\d{4}$', 'ABC-1234'],
+  ['^[a-z0-9-]+$', 'a-1'],
+  ['^[A-Za-z0-9._-]+$', 'A.b_c'],
+  ['^\\w{2,5}$', 'ab_9'],
+  ['^[a-c]?$', 'b'],
+  ['^[\\]\\-a]*$', ']-a'],
+]
+const PALETTE = ['a', 'f', 'z', 'A', 'Z', '0', '9', '-', '_', '.', '#', ']', ' ', '\n', 'é', '\u0130', '\u212a', '\ud83d', '\ude00', '\ud83d\ude00', '\u0000', 'g', 'G', '/']
+let seed = 7
+const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed >>> 8) % n }
+function fuzz (test, src, sample, count) {
+  const re = new RegExp(src, 'u')
+  let differ = 0, matched = 0
+  for (let t = 0; t < count; t++) {
+    let x = sample
+    const edits = rnd(4)
+    for (let e = 0; e < edits; e++) {
+      const at = rnd(x.length + 1), r = rnd(3), ch = PALETTE[rnd(PALETTE.length)]
+      x = r === 0 ? x.slice(0, at) + ch + x.slice(at + 1) : r === 1 ? x.slice(0, at) + ch + x.slice(at) : x.slice(0, at) + x.slice(at + 1)
+    }
+    const want = re.test(x)
+    if (test(x) !== want) differ++
+    if (want) matched++
+  }
+  // Both answers must be common, or the strings do not test the matcher.
+  assert.ok(matched > count / 50 && matched < count - count / 50, `${src}: ${matched} of ${count} strings match`)
+  return differ
+}
+let fuzzed = 0
+for (const [src, sample] of FAMILIES) {
+  const m = _sequence(src)
+  assert.ok(m !== null, 'not recognised: ' + src)
+  assert.strictEqual(createVerdict({ type: 'string', pattern: src }, {})(sample), true, src)
+  const d = fuzz(m.test, src, sample, 1e6)
+  assert.strictEqual(d, 0, `${src}: ${d} strings answered unlike the RegExp`)
+  fuzzed += 1e6
+}
+{
+  const broken = mutant([['if (x.length !== L) return false', 'if (x.length < L) return false']])
+  let caught = 0
+  for (const [src, sample] of FAMILIES) {
+    const f = broken({ type: 'string', pattern: src }, {})
+    caught += fuzz((x) => f(x), src, sample, 20000)
+  }
+  assert.ok(caught > 0, 'mutation "sequence matcher accepts longer strings" went unnoticed')
+  console.log(`  mutation sequence matcher accepts longer strings: caught on ${caught} strings`)
+}
+
+console.log(`test_core_verdict: ok, ${taken} schemas taken, ${declined} declined, ${r.docs} documents as the interpreter's walk; ${fuzzed} strings on ${FAMILIES.length} patterns matched without a RegExp; ${uncaptured} schemas no document of which made the Validator build its interpreter`)
