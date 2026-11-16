@@ -39,7 +39,10 @@ function run (V, schema0, mutate, docs, first) {
   return out
 }
 
-const patterns = []
+const patterns = [
+  ['unreached bad pattern', { $defs: { x: { pattern: '(' } }, type: 'string' }],
+  ['reached bad pattern', { type: 'string', pattern: '(' }],
+]
 function patternRun (V, schema, first) {
   const v = new V(schema)
   const out = []
@@ -75,5 +78,7 @@ function patternRun (V, schema, first) {
       n++
     }
   }
+  assert.ok(patternRun(Edge, patterns[0][1], 'validate').every((x) => typeof x === 'boolean'), 'an unreached bad pattern is not thrown')
+  assert.ok(patternRun(Edge, patterns[1][1], 'validate').every((x) => x === 'throws SyntaxError'), 'a reached bad pattern is thrown as a SyntaxError')
   console.log(`test_validator_small_lifecycle: ok, ${n} cases answered by the edge entry as by the browser entry and the 1.x Validator`)
 })().catch((e) => { console.error(e); process.exit(1) })
