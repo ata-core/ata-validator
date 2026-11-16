@@ -71,17 +71,28 @@ function countingParses (fn) {
 }
 
 // --- reading the verdict must not build the diagnostic layer ----------------
+// The witness is the same validator with richErrors off: reading `.valid` must
+// parse the document no more often than that. With the native engine loaded
+// both parse it zero times; on pure JS (no addon, or ATA_NO_NATIVE=1) the
+// verdict itself needs one parse, and the diagnostic layer must add none.
 {
   const v = new Validator(SCHEMA);
+  const plain = new Validator(SCHEMA, { richErrors: false });
   v.validateJSON(RAW_BAD); // warm every lazy path before counting
+  plain.validateJSON(RAW_BAD);
+  plain.validateJSON(RAW_GOOD);
+
+  const base = countingParses(() => plain.validateJSON(RAW_BAD).valid).parses;
+  const baseOk = countingParses(() => plain.validateJSON(RAW_GOOD).valid).parses;
+  assert.ok(base <= 1 && baseOk <= 1, `the plain verdict parses at most once (${base}, ${baseOk})`);
 
   const verdict = countingParses(() => v.validateJSON(RAW_BAD).valid);
   assert.strictEqual(verdict.value, false, 'the verdict is still correct');
-  assert.strictEqual(verdict.parses, 0, 'reading .valid parses the document zero times');
+  assert.strictEqual(verdict.parses, base, 'reading .valid parses the document no more than with richErrors off');
 
   const ok = countingParses(() => v.validateJSON(RAW_GOOD).valid);
   assert.strictEqual(ok.value, true, 'a valid document is still valid');
-  assert.strictEqual(ok.parses, 0, 'and costs no parse either');
+  assert.strictEqual(ok.parses, baseOk, 'and a valid one neither');
 
   console.log('ok: reading the verdict builds no diagnostics');
 }
