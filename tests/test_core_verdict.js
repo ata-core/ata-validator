@@ -100,13 +100,17 @@ const dialectOf = (label) => label.split('/')[0].split(':')[0]
 
 // Runs every case through `make`; returns the number of documents on which
 // it disagreed with the walk (or throws on the first when `strict`).
+const SHAPE = /^invalid schema: "(enum|required)" must be an array$/
 function run (make, strict) {
-  const taken = {}; const declined = {}; const second = {}; let docs = 0; let differ = 0
+  const taken = {}; const declined = {}; const second = {}; let docs = 0; let differ = 0; let shaped = 0
   for (const c of cases) {
     const d = dialectOf(c.label)
     const walk = real(c.schema, { ...c.args, tier: Infinity })
     const before = fullBuilds
-    const core = make(c.schema, c.args)
+    // An enum or required that is not a list is thrown (as every path does);
+    // the cases below hold that, so such a schema is left out here.
+    let core
+    try { core = make(c.schema, c.args) } catch (e) { if (e instanceof TypeError && SHAPE.test(e.message)) { shaped++; continue } throw e }
     if (core === null) { declined[d] = (declined[d] || 0) + 1; continue }
     taken[d] = (taken[d] || 0) + 1
     if (fullBuilds > before) second[d] = (second[d] || 0) + 1
@@ -121,10 +125,25 @@ function run (make, strict) {
       }
     }
   }
-  return { taken, declined, second, docs, differ }
+  return { taken, declined, second, docs, differ, shaped }
 }
 
 const { createVerdict } = require('../lib/core/verdict.js')
+
+// enum and required that are not lists: a TypeError with the text every path
+// gives, wherever they are, and before anything is compiled; null is absent.
+for (const [s, k] of [
+  [{ enum: 'a' }, 'enum'], [{ required: 'a' }, 'required'], [{ required: true }, 'required'],
+  [{ type: 'object', properties: { a: { enum: { x: 1 } } } }, 'enum'], [{ properties: { a: { required: 1 } } }, 'required'],
+  [{ $defs: { x: { enum: 'a' } }, type: 'string' }, 'enum'], [{ $defs: { x: { required: 'a' } }, $ref: '#/$defs/x' }, 'required'],
+  [{ allOf: [{ anyOf: [{ enum: 1 }] }] }, 'enum'], [{ $recursiveRef: '#', items: { enum: 'a' } }, 'enum'],
+]) assert.throws(() => createVerdict(s, {}), (e) => e instanceof TypeError && e.message === `invalid schema: "${k}" must be an array`, JSON.stringify(s))
+{
+  const n = createVerdict({ enum: null, required: null, type: 'string' }, {})
+  assert.deepStrictEqual(['a', 1].map(n), [true, false], 'null enum and required read as absent')
+  const p = createVerdict({ properties: { enum: { type: 'string' }, required: { type: 'integer' } }, required: ['enum'] }, {})
+  assert.deepStrictEqual([{ enum: 'x' }, { enum: 1 }, {}, { enum: 'x', required: 's' }].map(p), [true, false, false, false], 'properties named enum and required')
+}
 // Counts the schemas the second half (lib/core/verdict-full.js) builds.
 let fullBuilds = 0
 const fullModule = require('../lib/core/verdict-full.js')
@@ -306,5 +325,5 @@ async function chunked () {
   console.log(`  chunked: ${n(r1)} schemas answered before the chunk, ${n(r2)} after it, as the walk`)
 }
 
-console.log(`test_core_verdict: ok, ${taken} schemas taken, ${declined} declined, ${r.docs} documents as the interpreter's walk; ${fuzzed} strings on ${FAMILIES.length} patterns matched without a RegExp; ${uncaptured} schemas no document of which made the Validator build its interpreter`)
+console.log(`test_core_verdict: ok, ${taken} schemas taken, ${declined} declined, ${r.shaped} with an enum or required that is not a list thrown, ${r.docs} documents as the interpreter's walk; ${fuzzed} strings on ${FAMILIES.length} patterns matched without a RegExp; ${uncaptured} schemas no document of which made the Validator build its interpreter`)
 chunked().catch((e) => { console.error(e); process.exit(1) })
