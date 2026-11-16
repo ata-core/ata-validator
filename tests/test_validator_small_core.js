@@ -75,5 +75,35 @@ for (const dialect of fs.readdirSync(SUITE)) {
   }
 }
 
+// Routing of validate() (lib/core/feature.js): a validator whose first value
+// fails takes the small engine's validate as its own; one whose first value
+// passes asks the core first until more than a quarter of at least 8 calls
+// have failed, and then takes the small engine's. A committed validator keeps
+// nothing of the core's tree, and isValidObject compiles it again.
+{
+  const S = { type: 'object', properties: { a: { type: 'string' } }, required: ['a'] }
+  const proto = (e) => Object.getPrototypeOf(e)
+  const v1 = new Edge(S)
+  assert.strictEqual(v1.isValidObject({ a: 'x' }), true)
+  assert.notStrictEqual(v1._engine.isValid, proto(v1._engine).isValid, 'isValidObject compiled the core')
+  assert.strictEqual(v1.validate({}).valid, false)
+  assert.strictEqual(v1._engine.validate, v1._engine.small.validate, 'a first failing value commits validate to the small engine')
+  assert.strictEqual(v1._engine.isValid, proto(v1._engine).isValid, 'the committed validator keeps no core tree')
+  assert.strictEqual(v1.isValidObject({ a: 'x' }), true)
+  assert.strictEqual(v1.isValidObject({}), false)
+  const v2 = new Edge(S)
+  assert.strictEqual(v2.validate({ a: 'x' }).valid, true)
+  assert.notStrictEqual(v2._engine.validate, v2._engine.small.validate, 'a first passing value keeps the core first')
+  for (let i = 0; i < 3; i++) assert.strictEqual(v2.validate({ a: 'y' }).valid, true)
+  assert.notStrictEqual(v2._engine.validate, v2._engine.small.validate, 'no failure yet')
+  for (let i = 0; i < 4; i++) { assert.strictEqual(v2.validate({}).valid, false); assert.strictEqual(v2.validate({ a: 'z' }).valid, true) }
+  assert.strictEqual(v2._engine.validate, v2._engine.small.validate, 'failures past a quarter commit validate to the small engine')
+  assert.strictEqual(v2._engine.isValid, proto(v2._engine).isValid, 'and drop the core tree')
+  assert.strictEqual(v2.validate({}).errors.length > 0, true)
+  const v3 = new Edge(S)
+  for (let i = 0; i < 40; i++) assert.strictEqual(v3.validate(i % 10 === 9 ? {} : { a: 'x' }).valid, i % 10 !== 9)
+  assert.notStrictEqual(v3._engine.validate, v3._engine.small.validate, 'one failure in ten keeps the core first')
+}
+
 assert.ok(built >= runs, `the core built ${built} engines for ${runs} Validators`)
 console.log(`test_validator_small_core: ok, ${schemas} schemas and ${docs} documents answered the same with and without the core (${refused} refused by both, ${shaped} runs on a schema with an enum or required that is not a list, thrown by both)`)
