@@ -263,7 +263,10 @@ const esbuild = require('esbuild')
 // 61975 (61970 measured): isValidObject's first call marks its stub bound
 // only once the compile has returned, so a compile that threw throws the
 // same error on the next call instead of overflowing the stack; 6 bytes.
-const BUDGET = 61975
+// 62010 (62008 measured): isValidObject fills a default from a document
+// given through `schemas` as validate() does, where it answered before the
+// fill and rejected what validate() accepted; 38 bytes.
+const BUDGET = 62010
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

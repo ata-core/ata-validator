@@ -314,6 +314,7 @@ const FILES = [
   "tests/test_abort_early_contract.js",
   "tests/test_non_bmp_pattern.js",
   "tests/test_schema_shape.js",
+  "tests/test_defaults_schemas_doc.js",
   "tests/test_parse_json.js",
   "tests/test_scanner_early_exit.js",
   "tests/test_generated_function_split.js",
