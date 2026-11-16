@@ -67,4 +67,20 @@ for (const [schema, data, valid] of SAME) {
   }
 }
 
-console.log(`ok: a non-array enum or required is one schema error on every entry point (${checks} checks)`);
+// ata-validator/ir: the front end throws the same error; the module builders
+// decline such a schema (null), so the caller falls back to the Validator.
+(async () => {
+  const ir = await import('../lib/ir/index.mjs');
+  for (const [schema, , k] of BAD) {
+    const msg = `invalid schema: "${k}" must be an array`;
+    for (const name of ['front', 'compileClosures', 'specialize']) {
+      assert.throws(() => ir[name](schema), { name: 'TypeError', message: msg }, `ir.${name} ${JSON.stringify(schema)}`);
+      checks++;
+    }
+    for (const name of ['tableModule', 'closureModule']) {
+      assert.strictEqual(ir[name](schema), null, `ir.${name} declines ${JSON.stringify(schema)}`);
+      checks++;
+    }
+  }
+  console.log(`ok: a non-array enum or required is one schema error on every entry point (${checks} checks)`);
+})().catch((e) => { console.error(e); process.exit(1); });
