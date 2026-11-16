@@ -85,7 +85,7 @@ called made it 1.004 to 1.015 times slower.
 What a new process pays in all, as a Workers isolate does on its first
 requests: the entry imported, then a validator built for every schema of a
 corpus and asked once about each of its documents, valid and invalid (15
-processes each, load average 3.4 to 4.1, ms):
+processes each, load average 3.5 to 4.0, ms):
 
 | corpus | schemas | method | browser entry | edge entry | ratio |
 |---|---:|---|---:|---:|---:|
