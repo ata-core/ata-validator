@@ -18,7 +18,14 @@ const OneX = require('..').Validator
 
 const answer = (f) => { try { const r = f(); return typeof r === 'boolean' ? r : r.valid } catch (e) { return 'throws ' + e.constructor.name } }
 
-const cases = []
+const cases = [
+  ['type deleted', { type: 'string' }, (s) => { delete s.type }, ['a', 1]],
+  ['keyword added', { type: 'object' }, (s) => { s.required = ['a'] }, [{}, { a: 1 }]],
+  ['bound changed', { type: 'string', maxLength: 3 }, (s) => { s.maxLength = 1 }, ['abc', 'abcd', 'a']],
+  ['$defs target replaced', { $defs: { a: { type: 'string' } }, properties: { x: { $ref: '#/$defs/a' } } }, (s) => { s.$defs.a = { type: 'number' } }, [{ x: 'y' }, { x: 1 }]],
+  ['$defs target changed in place', { $defs: { a: { type: 'string', minLength: 2 } }, type: 'object', properties: { x: { $ref: '#/$defs/a' } } }, (s) => { s.$defs.a.minLength = 5 }, [{ x: 'yy' }, { x: 'y' }, { x: 1 }]],
+  ['properties emptied', { type: 'object', properties: { a: { type: 'integer' } }, additionalProperties: false }, (s) => { s.properties = {} }, [{ a: 1 }, { a: 's' }, { b: 1 }]],
+]
 
 // Each case: answers after the mutation, from a Validator first called with
 // one method; every answer is asked of both methods.

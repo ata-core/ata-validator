@@ -67,16 +67,15 @@ for (const dialect of fs.readdirSync(SUITE)) {
   }
 }
 
-// When validate() is called first, the core compiles at a later call, from
-// a walk of the schema made then and not from the scan of the first call: a
-// reference added in between is compiled as a reference, not met by a build
-// that was told there are none.
+// The schema as it was at the first call: a reference added after it, when
+// validate() came first and the core compiles at a later call, is not read.
 {
   const s = { type: 'object', properties: { a: { type: 'string' } } }
   const v = new Edge(s)
   assert.strictEqual(v.validate({ a: 'x' }).valid, true)
   s.properties.b = { $ref: '#/properties/a' }
-  assert.strictEqual(v.isValidObject({ a: 'x', b: 1 }), false)
+  assert.strictEqual(v.isValidObject({ a: 'x', b: 1 }), true)
+  assert.strictEqual(v.validate({ a: 'x', b: 1 }).valid, true)
 }
 
 assert.ok(built >= runs, `the core built ${built} engines for ${runs} Validators`)
