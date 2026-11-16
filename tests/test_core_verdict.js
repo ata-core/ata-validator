@@ -79,7 +79,7 @@ const extra = [
   [{ type: 'object', properties: Object.fromEntries(Array.from({ length: 20 }, (_, i) => ['q' + i, { type: 'integer' }])), required: ['q3'], additionalProperties: false }, [{ q3: 1 }, { q3: 1, q9: 's' }, { q9: 1 }, { q3: 1, z: 1 }, Object.defineProperty({ q3: 1 }, 'q5', { value: 's' }), Object.defineProperty({}, 'q3', { value: 1 }), Object.defineProperty({}, 'q3', { value: 's' }), Object.create({ q3: 1 }), Object.defineProperty({ q3: 1 }, 'z', { value: 1 })], 'twenty properties, walked by own names'],
   [{ $dynamicAnchor: 'x', properties: { n: { $dynamicRef: '#x' } }, unevaluatedProperties: false, anyOf: [{ properties: { a: {} } }, { properties: { b: {} }, allOf: [{ required: ['c'] }] }] }, [{ a: 1 }, { b: 1 }, { b: 1, c: 1 }, { a: 1, n: { b: 1 } }, { a: 1, n: { a: 1 } }], 'dynamic reference and a failed branch'],
   [{ $id: 'https://example.com/leave/main', if: { $id: 'first_scope', properties: { z: {} }, $defs: { thingy: { $dynamicAnchor: 'thingy', type: 'number' } } }, then: { $id: 'second_scope', $ref: 'start', $defs: { thingy: { $dynamicAnchor: 'thingy', type: 'null' } } }, $defs: { start: { $id: 'start', $dynamicRef: 'inner_scope#thingy' }, thingy: { $id: 'inner_scope', $dynamicAnchor: 'thingy', type: 'string' } } }, ['a', 42, null, true], 'a dynamic scope left behind'],
-  [{ $id: 'https://example.com/r2', $dynamicAnchor: 'q', $defs: { b: { type: 'string' } }, properties: { v: { $id: 'inner/', $defs: { b: { type: 'integer' } }, properties: { x: { $ref: '#/$defs/b' } } }, w: { $dynamicRef: '#q' } }, unevaluatedProperties: false }, [{ v: { x: 1 } }, { v: { x: 's' } }, { w: { v: { x: 's' } } }, { z: 1 }], 'nested $id in the second half'],
+  [{ $id: 'https://example.com/r2', $dynamicAnchor: 'q', $defs: { b: { type: 'string' } }, properties: { v: { $id: 'inner/', $defs: { b: { type: 'integer' } }, properties: { x: { $ref: '#/$defs/b' } } }, w: { $dynamicRef: '#q' } }, unevaluatedProperties: false }, [{ v: { x: 1 } }, { v: { x: 's' } }, { w: { v: { x: 's' } } }, { z: 1 }], 'nested $id beside a dynamic reference'],
   [{ type: 'object', properties: { a: { $ref: 'https://nowhere.example/a' }, b: false, c: { type: 'integer' } } }, [{}, { a: 1 }, { a: undefined }, { b: null }, { c: 1 }, { c: 's' }, Object.create({ a: 1 }), Object.defineProperty({}, 'a', { value: 1 }), Object.defineProperty({}, 'b', { value: undefined })], 'properties that can never pass'],
   [{ type: 'toString' }, [1, 'x', null, NaN], 'a type named like an Object member'],
   [{ $id: 'https://example.com/root', $defs: { a: { $id: 'inner/', $defs: { b: { type: 'integer' } }, properties: { x: { $ref: '#/$defs/b' } } } }, properties: { v: { $ref: 'inner/' } } }, [{ v: { x: 1 } }, { v: { x: 's' } }, {}], 'nested $id'],
@@ -127,11 +127,10 @@ function badShape (s, seen) {
   return null
 }
 function run (make, strict) {
-  const taken = {}; const declined = {}; const second = {}; let docs = 0; let differ = 0; let shaped = 0
+  const taken = {}; const declined = {}; let docs = 0; let differ = 0; let shaped = 0
   for (const c of cases) {
     const d = dialectOf(c.label)
     const walk = real(c.schema, { ...c.args, tier: Infinity })
-    const before = fullBuilds
     // An enum or required that is not a list (null reads as absent) is a
     // TypeError with the text every path gives, from the first one in the
     // schema; any other schema builds. Held on the main run (createVerdict);
@@ -149,7 +148,6 @@ function run (make, strict) {
     if (core === null) { declined[d] = (declined[d] || 0) + 1; continue }
     assert.strictEqual(bad, null, c.label + ': an enum or required that is not a list was not thrown')
     taken[d] = (taken[d] || 0) + 1
-    if (fullBuilds > before) second[d] = (second[d] || 0) + 1
     for (const x of c.data) {
       docs++
       let want; try { want = walk.validate(x).valid } catch (e) { want = e }
@@ -161,7 +159,7 @@ function run (make, strict) {
       }
     }
   }
-  return { taken, declined, second, docs, differ, shaped }
+  return { taken, declined, docs, differ, shaped }
 }
 
 const { createVerdict } = require('../lib/core/verdict.js')
@@ -180,19 +178,9 @@ for (const [s, k] of [
   const p = createVerdict({ properties: { enum: { type: 'string' }, required: { type: 'integer' } }, required: ['enum'] }, {})
   assert.deepStrictEqual([{ enum: 'x' }, { enum: 1 }, {}, { enum: 'x', required: 's' }].map(p), [true, false, false, false], 'properties named enum and required')
 }
-// Counts the schemas the second half (lib/core/verdict-full.js) builds.
-let fullBuilds = 0
-const fullModule = require('../lib/core/verdict-full.js')
-const realFull = fullModule.createFull
-fullModule.createFull = (...a) => { fullBuilds++; return realFull(...a) }
 const r = run(createVerdict, true)
-// The second half alone on every schema the core takes: it answers the few
-// the first half hands it, so it is held to the walk on all of them.
-const { _second } = require('../lib/core/verdict.js')
-const r2 = run((schema, args) => createVerdict(schema, args) === null ? null : _second(schema, args), true)
-console.log(`  second half alone: ${Object.values(r2.taken).reduce((a, b) => a + b, 0)} schemas, ${r2.docs} documents as the walk`)
 const all = new Set([...Object.keys(r.taken), ...Object.keys(r.declined)])
-for (const d of [...all].sort()) if (fs.existsSync(path.join(SUITE, d))) console.log(`  ${d.padEnd(14)} taken ${String(r.taken[d] || 0).padStart(4)} (second half ${String(r.second[d] || 0).padStart(4)})  declined ${String(r.declined[d] || 0).padStart(4)}`)
+for (const d of [...all].sort()) if (fs.existsSync(path.join(SUITE, d))) console.log(`  ${d.padEnd(14)} taken ${String(r.taken[d] || 0).padStart(4)}  declined ${String(r.declined[d] || 0).padStart(4)}`)
 const taken = Object.values(r.taken).reduce((a, b) => a + b, 0)
 const declined = Object.values(r.declined).reduce((a, b) => a + b, 0)
 assert.ok(taken > 3000 && r.docs > 15000, `${taken} schemas taken, ${r.docs} documents`)
@@ -231,8 +219,6 @@ function mutant (edits) {
 }
 mutations.push(['inherited keys taken as own', mutant([['|| has(o, last) ||', '|| true ||'], ['if (last !== undefined && !has(o, last))', 'if (false)']])])
 mutations.push(['non-enumerable properties taken as absent', mutant([['const x = has(o, k) ? o[k] : undefined', 'const x = undefined']])])
-// The same for the second half (lib/core/verdict-full.js): the first half
-// is compiled again to load the changed second half.
 // The same for lib/core/verdict-more.js: a fresh first half loads the
 // changed module, which reads that first half's internals.
 let mutants = 0
@@ -252,13 +238,6 @@ function mutantMore (edits) {
   globalThis[tag + 'V'] = m.exports
   return m.exports.createVerdict
 }
-function mutantFull (edits) {
-  const FULL = require.resolve('../lib/core/verdict-full.js')
-  let src = fs.readFileSync(FULL, 'utf8')
-  for (const [from, to] of edits) { assert.ok(src.includes(from), 'mutation anchor missing: ' + from); src = src.split(from).join(to) }
-  const m = new Module(FULL, module); m.filename = FULL; m.paths = Module._nodeModulePaths(path.dirname(FULL)); m._compile(src, FULL)
-  return (schema, args) => createVerdict(schema, args) === null ? null : _second(schema, args, m.exports)
-}
 mutations.push(['a reference in a nested $id resource resolved from the root base', mutant([['resolveOnce(st.refs[i].$ref, b, state, memo)', 'resolveOnce(st.refs[i].$ref, state.rootBase, state, memo)']])])
 mutations.push(['a non-enumerable property skipped where own names are read', mutant([['    if (x !== undefined && !valueAt(V, props, e, i, x)) return false\n  }\n  return true', '  }\n  return true']])])
 mutations.push(['a non-enumerable property skipped where own names are read, many declared', mutantMore([['    if (x !== undefined && !valueAt(V, props, e, j, x)) return false\n  }\n  return true', '  }\n  return true']])])
@@ -269,9 +248,6 @@ mutations.push(['names a pattern matched in a failed anyOf branch counted', muta
 mutations.push(['annotations of a failed oneOf branch counted', mutantMore([['if (oneF[i](d)) { if (++n > 1) return false } else { np = p1; nc = c1; nk = k1 }', 'if (oneF[i](d)) { if (++n > 1) return false }']])])
 mutations.push(['annotations of a passing if dropped', mutantMore([['if (ifF(d)) { if (thenF', 'if (ifF(d)) { np = p1; nc = c1; nk = k1; if (thenF']])])
 mutations.push(['an index contains did not match counted as evaluated', mutantMore([['if (ctf(d[i])) { c++; EC[nc++] = i }', '{ if (ctf(d[i])) c++; EC[nc++] = i }']])])
-mutations.push(['a dynamic scope entry not popped in the second half', mutantFull([['if (pushed) sc.pop()', '']])])
-mutations.push(['annotations of a failed branch counted in the second half', mutantFull([['if (ok && a !== NONE && sink !== NONE) merge(sink, a)', 'if (a !== NONE && sink !== NONE) merge(sink, a)'], ['      if (!f(d, sc, st, sub, b)) return false\n      if (a !== NONE) merge(a, sub)\n      return true', '      const ok = f(d, sc, st, sub, b)\n      if (a !== NONE) merge(a, sub)\n      return ok']])])
-mutations.push(['a nested $id not changing the base', mutantFull([['const base = fixed !== undefined ? fixed : b', 'const base = b']])])
 mutations.push(['a property that can pass taken as one that never does', mutant([['  if (s === false) return true\n', '  if (s === false || s === true || (isMap(s) && s.type === \'integer\')) return true\n']])])
 mutations.push(['array items checked in place without their bounds', mutant([['case 8: if (Number.isInteger(x) && x >= it[0] && x <= it[1]) continue; return false', 'case 8: if (Number.isInteger(x)) continue; return false']])])
 mutations.push(['a failing inherited key taken as own', mutant([['has(o, k) ? false : exactObj(', 'false && exactObj(']])])
