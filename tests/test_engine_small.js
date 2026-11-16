@@ -18,7 +18,7 @@ let cap = null
 im.createInterpreter = (schema, args) => { cap = { schema, args }; return real(schema, args) }
 const { Validator } = require('..')
 
-let groups = 0; let docs = 0; let declined = 0; let uncaptured = 0
+let groups = 0; let docs = 0; let declined = 0; let uncaptured = 0; let refused = 0
 function compare (schema, data, label, options) {
   // The Validator builds the interpreter when a call fails and needs errors:
   // isValidObject() answers a failure on its first-call shortcut without it.
@@ -33,7 +33,13 @@ function compare (schema, data, label, options) {
     if (cap !== null) break
   }
   if (cap === null) { uncaptured++; return }
-  const walk = real(cap.schema, { ...cap.args, tier: Infinity })
+  // A schema both engines refuse (a non-array enum or required, as in the
+  // suite's draft-03 files) must be refused by both with the same error.
+  let walk
+  try { walk = real(cap.schema, { ...cap.args, tier: Infinity }) } catch (e) {
+    assert.throws(() => createSmall(cap.schema, cap.args), { name: e.name, message: e.message }, label + ': both refuse the schema')
+    refused++; return
+  }
   const small = createSmall(cap.schema, cap.args)
   if (small === null) { declined++; return }
   groups++
@@ -79,4 +85,4 @@ for (const t of ['toString', 'constructor', 'hasOwnProperty', '__proto__', 'valu
 }
 
 assert.ok(groups > 4000 && docs > 20000, `${groups} groups, ${docs} documents`)
-console.log(`test_engine_small: ok, ${groups} schema builds, ${docs} documents as the interpreter's walk; ${declined} declined, ${uncaptured} where no document fails`)
+console.log(`test_engine_small: ok, ${groups} schema builds, ${docs} documents as the interpreter's walk; ${declined} declined, ${refused} refused by both, ${uncaptured} where no document fails`)
