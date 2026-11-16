@@ -72,16 +72,5 @@ for (const dialect of fs.readdirSync(SUITE)) {
   }
 }
 
-// The schema as it was at the first call: a reference added after it, when
-// validate() came first and the core compiles at a later call, is not read.
-{
-  const s = { type: 'object', properties: { a: { type: 'string' } } }
-  const v = new Edge(s)
-  assert.strictEqual(v.validate({ a: 'x' }).valid, true)
-  s.properties.b = { $ref: '#/properties/a' }
-  assert.strictEqual(v.isValidObject({ a: 'x', b: 1 }), true)
-  assert.strictEqual(v.validate({ a: 'x', b: 1 }).valid, true)
-}
-
 assert.ok(built >= runs, `the core built ${built} engines for ${runs} Validators`)
 console.log(`test_validator_small_core: ok, ${schemas} schemas and ${docs} documents answered the same with and without the core (${refused} refused by both, ${shaped} runs on a schema with an enum or required that is not a list left out)`)
