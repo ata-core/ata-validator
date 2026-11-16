@@ -260,7 +260,10 @@ const esbuild = require('esbuild')
 // schema error, "invalid schema: "enum" must be an array", where the
 // interpreter threw from inside itself or skipped `required` and accepted
 // every object; 42 bytes.
-const BUDGET = 61965
+// 61975 (61970 measured): isValidObject's first call marks its stub bound
+// only once the compile has returned, so a compile that threw throws the
+// same error on the next call instead of overflowing the stack; 6 bytes.
+const BUDGET = 61975
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
