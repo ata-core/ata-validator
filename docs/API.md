@@ -21,6 +21,15 @@ const v = new Validator({
 });
 ```
 
+Treat the schema object as read-only once a validator has been built from it. A
+`Validator` built with no options is cached by its schema object, so a second
+`new Validator(sameObject)` returns the first instance, compiled from what the
+object held then. Parts of the schema are also compiled on later calls, not all
+at once, so changing the object after the first call can leave one instance
+answering partly by the old schema and partly by the new one. To validate
+against a changed schema, build the validator from a new object, for example
+`new Validator(structuredClone(schema))`.
+
 The schema can also be a boolean, which JSON Schema allows anywhere a schema is
 allowed: `true` accepts every instance, `false` rejects every instance.
 
