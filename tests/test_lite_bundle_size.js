@@ -256,7 +256,11 @@ const esbuild = require('esbuild')
 // valid in it, in the linear engine and on the platform RegExp, so `^.$`
 // matches "🐲" and `^.{2}$` does not (issue #94); 101 bytes, paid in part by
 // folding the engine's class escapes and its DFA closure walk into one.
-const BUDGET = 61935
+// 61965 (61964 measured): an `enum` or `required` that is not an array is one
+// schema error, "invalid schema: "enum" must be an array", where the
+// interpreter threw from inside itself or skipped `required` and accepted
+// every object; 42 bytes.
+const BUDGET = 61965
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
