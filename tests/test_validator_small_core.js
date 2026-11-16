@@ -5,7 +5,11 @@
 // (lib/core/feature.js, as index.v2.edge.mjs does). Both must give the same
 // answers: on every schema of the official suite and every document, the
 // verdict, validate()'s verdict and its errors, with isValidObject or
-// validate called first, and with abortEarly.
+// validate called first, and with abortEarly. The order of the runs below
+// also takes the core through both walks its text() chooses between (the
+// scan it hands to the first compile, after a validator first asked for a
+// verdict; the facts alone, after one first asked to validate), each
+// followed by either first call.
 
 const assert = require('node:assert')
 const fs = require('node:fs')

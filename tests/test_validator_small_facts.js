@@ -4,10 +4,10 @@
 // anything: whether it has errorMessage, default or format, whether it
 // references a json-schema.org document, and whether it has $id or an anchor.
 // Without the verdict core it asks them of the schema's JSON text; with it
-// (lib/core/feature.js), of a text the core writes from its scan, which may
-// only err towards true, and from an exact walk where the scan found one true. This holds the
-// exact walk to the text, the scan's false answers to the text's, and the
-// answers the Validator gets to the text's, on every schema of the official
+// (lib/core/feature.js), of a text the core writes from its scan, or from an
+// exact walk where the scan cannot stand for the text. This holds the exact
+// walk and the scan to the text, and the answers the Validator gets to the
+// text's, on every schema of the official
 // suite (as given and as the Validator normalises it), on edge cases of the
 // text, and on SchemaStore when ATA_SCHEMASTORE names a checkout.
 
@@ -29,7 +29,7 @@ function same (schema, label) {
   const q = asked(core(schema))
   for (const k of FIELDS) assert.strictEqual(q[k], want[k], label + ': ' + k + ' as the Validator asks it')
   const st = scan(schema, true)
-  if (st.facts !== null) { scanned++; for (const k of FIELDS) if (!st.facts[k]) assert.strictEqual(want[k], false, label + ': ' + k + ' false in the scan') }
+  if (st.facts !== null) { scanned++; for (const k of FIELDS) assert.strictEqual(st.facts[k], want[k], label + ': ' + k + ' in the scan') }
   const f = facts(schema)
   if (f === null) { fellBack++; return }
   n++
@@ -68,6 +68,19 @@ const edges = [
   { errorMessage: null }, { a: 'errorMessage"' }, { ' default': 1 }, { a: 'de\nfault' }, { a: '"default"' },
 ]
 for (const e of edges) same(e, JSON.stringify(e))
+// Every word and reference keyword between characters JSON.stringify escapes
+// or that border a token, as a key, a value and a keyword's value.
+const WORDS = ['errorMessage', 'default', 'format', '$id', '$anchor', '$dynamicAnchor', '$recursiveAnchor', '$ref', '$dynamicRef', '$recursiveRef']
+const SIDES = ['', '"', '\\', '\\"', '"\\', 'x', 'x"', '"x', ' ', '\n', '\u2028', '\ud800', ':', '":"', 'a"b']
+let generated = 0
+for (const w of WORDS) {
+  for (const a of SIDES) {
+    for (const b of SIDES) {
+      const t = a + w + b
+      for (const e of [{ description: t }, { [t]: 1 }, { [t]: 'https://json-schema.org/draft/2020-12/schema' }, { [t]: t + 'json-schema.org/' }, { enum: [t] }, { properties: { [t]: {} } }, { $ref: t }, { title: [t, { [t]: t }] }]) { same(e, 'generated: ' + JSON.stringify(e)); generated++ }
+    }
+  }
+}
 // What the core's scan skips: type names it knows, required names that are
 // declared properties, keyword names that hold no word. And values the scan
 // cannot read as the text does.
@@ -79,7 +92,10 @@ const scanEdges = [
   { properties: { x: { type: 'string', description: 'x"format"' } } }, hidden, { properties: { a: new Node() } },
   { description: new String('format') }, { properties: { a: { enum: [new String('default')] } } }, Object.assign(Object.create(null), { type: 'string', title: 'default' }),
   { allOf: [{ $id: 'x' }] }, { $defs: { a: { $anchor: 'a' } } }, { properties: { a: { $dynamicAnchor: 'a' } } }, { items: [{ format: 'date' }] },
-  { properties: { 'a"format': {} } }, { propertyDependencies: { default: { a: { type: 'string' } } } }, { patternProperties: { '^format$': {} } },
+  { properties: { 'a"format': {} } },
+  { properties: Object.assign(Object.create({ toJSON () { return { default: 1 } } }), { a: {} }) }, { allOf: Object.assign([{}], { toJSON: () => ['format'] }) },
+  { required: Object.assign(['a'], { toJSON: () => ['default'] }), properties: { a: {} } }, { type: Object.assign(['string'], { toJSON: () => 'errorMessage' }) },
+  { patternProperties: Object.defineProperty({ x: {} }, 'toJSON', { value: () => ({ $id: 'x' }) }) }, { properties: { a: Object.defineProperty({}, 'toJSON', { value: () => ({ format: 1 }) }) } }, { propertyDependencies: { default: { a: { type: 'string' } } } }, { patternProperties: { '^format$': {} } },
 ]
 for (const e of scanEdges) { let label; try { label = JSON.stringify(e) } catch { label = String(e) } same(e, 'scan: ' + label) }
 // toJSON and bigint: the walk hands the question back to the text.
@@ -101,4 +117,5 @@ if (root) {
 }
 
 assert.ok(n > 5000, `${n} schemas compared`)
+assert.ok(generated > 10000, `${generated} generated schemas`)
 console.log(`test_validator_small_facts: ok, ${n} schemas answered the same both ways${root ? `, ${ss} SchemaStore files among them` : ''}; ${fellBack} left to the text; the scan answered for ${scanned}`)
