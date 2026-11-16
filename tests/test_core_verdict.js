@@ -100,18 +100,46 @@ const dialectOf = (label) => label.split('/')[0].split(':')[0]
 
 // Runs every case through `make`; returns the number of documents on which
 // it disagreed with the walk (or throws on the first when `strict`).
-const SHAPE = /^invalid schema: "(enum|required)" must be an array$/
+// The test's own walk for an enum or required that is not a list, through
+// every value that can hold a subschema (a superset of what the core walks:
+// the keyword found must be one a subschema holds).
+function badShape (s, seen) {
+  if (s === null || typeof s !== 'object' || seen.has(s)) return null
+  seen.add(s)
+  if (Array.isArray(s)) { for (const x of s) { const r = badShape(x, seen); if (r !== null) return r } return null }
+  for (const k of ['enum', 'required']) if (s[k] !== undefined && s[k] !== null && !Array.isArray(s[k])) return k
+  for (const k of Object.keys(s)) {
+    if (k === 'enum' || k === 'const' || k === 'default' || k === 'examples') continue
+    const v = s[k]
+    // A map of subschemas holds them under names, which are not keywords.
+    if (k === 'properties' || k === 'patternProperties' || k === '$defs' || k === 'definitions' || k === 'dependentSchemas') { if (v && typeof v === 'object') for (const x of Object.values(v)) { const r = badShape(x, seen); if (r !== null) return r } continue }
+    const r = badShape(v, seen)
+    if (r !== null) return r
+  }
+  return null
+}
 function run (make, strict) {
   const taken = {}; const declined = {}; const second = {}; let docs = 0; let differ = 0; let shaped = 0
   for (const c of cases) {
     const d = dialectOf(c.label)
     const walk = real(c.schema, { ...c.args, tier: Infinity })
     const before = fullBuilds
-    // An enum or required that is not a list is thrown (as every path does);
-    // the cases below hold that, so such a schema is left out here.
+    // An enum or required that is not a list (null reads as absent) is a
+    // TypeError with the text every path gives, from the first one in the
+    // schema; any other schema builds. Held on the main run (createVerdict);
+    // the runs of one part alone leave such a schema out.
+    const bad = badShape(c.schema, new Set())
+    if (bad !== null && !strict) { shaped++; continue }
     let core
-    try { core = make(c.schema, c.args) } catch (e) { if (e instanceof TypeError && SHAPE.test(e.message)) { shaped++; continue } throw e }
+    try { core = make(c.schema, c.args) } catch (e) {
+      if (bad === null) throw e
+      assert.ok(e instanceof TypeError, c.label + ': a TypeError')
+      assert.strictEqual(e.message, `invalid schema: "${bad}" must be an array`, c.label)
+      shaped++
+      continue
+    }
     if (core === null) { declined[d] = (declined[d] || 0) + 1; continue }
+    assert.strictEqual(bad, null, c.label + ': an enum or required that is not a list was not thrown')
     taken[d] = (taken[d] || 0) + 1
     if (fullBuilds > before) second[d] = (second[d] || 0) + 1
     for (const x of c.data) {
