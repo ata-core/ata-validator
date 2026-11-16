@@ -32,6 +32,7 @@ const FILES = [
   "tests/test_core_verdict.js",
   "tests/test_validator_small_facts.js",
   "tests/test_validator_small_core.js",
+  "tests/test_validator_small_lifecycle.js",
   "tests/test_trial_restore_counts.js",
   "tests/test_compiled_extension_parity.js",
   "tests/test_buffer_gate.js",

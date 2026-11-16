@@ -1,8 +1,8 @@
 'use strict'
 
 // The 2.0 Validator (lib/validator-small.js) answers with the small engine
-// alone unless an entry sets the verdict core as its engine (Validator.core,
-// lib/core/feature.js, as index.v2.edge.mjs does). Both must give the same
+// alone unless an entry's class carries the verdict core as `core`
+// (lib/core/feature.js, as index.v2.edge.mjs does). Both must give the same
 // answers: on every schema of the official suite and every document, the
 // verdict, validate()'s verdict and its errors, with isValidObject or
 // validate called first, and with abortEarly.
@@ -19,17 +19,18 @@ const F = require('../lib/features/error-messages.js')
 const M = require('../lib/features/metaschemas.js')
 const { Validator } = small
 for (const m of [F, M]) for (const k of Object.keys(m)) try { Validator.use(m[k]) } catch {}
+class Edge extends Validator {}
+Edge.prototype.core = core
 
-assert.strictEqual(Validator.core, undefined, 'the small engine is the default')
+assert.strictEqual(new Validator({}).core, undefined, 'the small engine is the default')
 
 const clone = (x) => x === undefined ? x : structuredClone(x)
 const shape = (r) => JSON.stringify({ valid: r.valid, errors: r.valid ? [] : r.errors.map((e) => [e.code, e.keyword, e.instancePath, e.schemaPath, e.message]) })
 // Each answer for a document, from a Validator built and first called under
 // the given engine; null where the Validator refuses the schema.
 function answers (schema, docs, opts, withCore, validateFirst) {
-  Validator.core = withCore ? core : undefined
   try {
-    const v = new Validator(schema, opts)
+    const v = withCore ? new Edge(schema, opts) : new Validator(schema, opts)
     const out = []
     for (const d of docs) {
       if (validateFirst) { out.push(shape(v.validate(clone(d)))); out.push(v.isValidObject(clone(d))) } else { out.push(v.isValidObject(clone(d))); out.push(shape(v.validate(clone(d)))) }
@@ -38,8 +39,6 @@ function answers (schema, docs, opts, withCore, validateFirst) {
   } catch (e) {
     if (/^ata2:/.test(e.message)) return null
     throw e
-  } finally {
-    Validator.core = undefined
   }
 }
 
@@ -73,13 +72,11 @@ for (const dialect of fs.readdirSync(SUITE)) {
 // reference added in between is compiled as a reference, not met by a build
 // that was told there are none.
 {
-  Validator.core = core
   const s = { type: 'object', properties: { a: { type: 'string' } } }
-  const v = new Validator(s)
+  const v = new Edge(s)
   assert.strictEqual(v.validate({ a: 'x' }).valid, true)
   s.properties.b = { $ref: '#/properties/a' }
   assert.strictEqual(v.isValidObject({ a: 'x', b: 1 }), false)
-  Validator.core = undefined
 }
 
 assert.ok(built >= runs, `the core built ${built} engines for ${runs} Validators`)
