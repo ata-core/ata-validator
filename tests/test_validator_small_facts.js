@@ -14,12 +14,14 @@
 const assert = require('node:assert')
 const fs = require('node:fs')
 const path = require('node:path')
-const { facts, textFacts, scan } = require('../lib/core/verdict.js')
+const { facts, scan } = require('../lib/core/verdict.js')
 const core = require('../lib/core/feature.js')
 // The questions as _build asks them of a text (the schema's, or the core's).
 const NOT_FLAT = /"\$(?:id|anchor|dynamicAnchor|recursiveAnchor)"/
 const META_REF = /"\$(?:ref|dynamicRef|recursiveRef)":"[^"]*json-schema\.org\//
 const asked = (t) => ({ errorMessage: t.includes('"errorMessage"'), default: t.includes('"default"'), format: t.includes('"format"'), metaRef: t.includes('json-schema.org/') && META_REF.test(t), notFlat: NOT_FLAT.test(t) })
+// The same questions asked of the schema's own JSON text.
+const textFacts = (schema) => asked(JSON.stringify(schema) || '')
 const FIELDS = ['errorMessage', 'default', 'format', 'metaRef', 'notFlat']
 const im = require('../lib/interpreter.js')
 
