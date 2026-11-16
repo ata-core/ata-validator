@@ -18,6 +18,9 @@ const CASES = [
   [{ allOf: [{ $dynamicRef: '#nope' }] }, 1],
   [{ $dynamicRef: '#nope' }, 1],
   [{ $defs: { x: { $dynamicAnchor: 'other' } }, properties: { a: { $dynamicRef: '#nope' } } }, { a: 1 }],
+  // An optional property with two leaf checks beside the reference took a
+  // shortcut that wrote the leaf checks and skipped the reference.
+  [{ type: 'object', properties: { a: { $dynamicRef: '#nope', type: 'integer', minimum: 0 } } }, { a: 1 }],
 ];
 
 let checks = 0;
@@ -38,6 +41,26 @@ for (const [schema, data] of CASES) {
     ['isValidJSON', (v) => v.isValidJSON(text)],
   ]) {
     assert.strictEqual(call(new Validator(schema)), false, `${name} ${label}`);
+    checks++;
+  }
+}
+
+// Beside other keywords, under every applicator, on every method: the
+// answer is the interpreted engine's.
+const LEAVES = [{}, { type: 'integer', minimum: 0 }, { type: 'integer', minimum: 0, maximum: 9 }, { type: 'string', minLength: 1, maxLength: 5 }, { enum: [1, 2] }, { type: 'object', required: ['x'] }];
+const WRAPS = [
+  (l) => ({ type: 'object', properties: { a: l } }), (l) => ({ type: 'object', properties: { a: l }, required: ['a'] }),
+  (l) => ({ type: 'array', items: l }), (l) => ({ prefixItems: [l] }), (l) => ({ additionalProperties: l }),
+  (l) => ({ anyOf: [l, { type: 'null' }] }), (l) => ({ not: l }), (l) => ({ properties: { a: { properties: { b: l } } } }),
+  (l) => ({ $defs: { d: l }, properties: { a: { $ref: '#/$defs/d' } } }),
+];
+for (const w of WRAPS) for (const leaf of LEAVES) {
+  const schema = w({ ...leaf, $dynamicRef: '#nope' });
+  for (const d of [1, { a: 1 }, { a: { b: 1 } }, [1]]) {
+    const want = new Validator(schema, { engine: 'interpreter' }).validate(structuredClone(d)).valid;
+    const text = JSON.stringify(d);
+    const got = [new Validator(schema).validate(structuredClone(d)).valid, new Validator(schema).isValidObject(structuredClone(d)), new Validator(schema).isValidJSON(text)];
+    assert.deepStrictEqual(got, [want, want, want], `${JSON.stringify(schema)} on ${text}`);
     checks++;
   }
 }
