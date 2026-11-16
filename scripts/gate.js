@@ -47,7 +47,10 @@ const MODULE = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'mess
 const PLAIN = ['keyword', 'instancePath', 'schemaPath', 'params', 'message'];
 const pick = (fields) => function f(e) { return fields.map((k) => e[k]).concat([Array.isArray(e.branchErrors) ? e.branchErrors.map(f) : null]); };
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-gate-'));
+// The real path: require.cache is keyed by it, and on macOS the temporary
+// directory is reached through a link, so the cache entries below never
+// matched and every module loaded from it stayed.
+const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ata-gate-')));
 let seq = 0;
 // Compiled as a file of this package, so a module's `ata-validator/order` import resolves to it.
 const loadCjs = (src) => { const m = new Module('gate'); m.filename = path.join(ROOT, 'gate-module.cjs'); m.paths = Module._nodeModulePaths(ROOT); m._compile(src, m.filename); return m.exports; };
@@ -57,7 +60,10 @@ function loadWithRuntime(src, runtimeName, runtimeSrc) {
   fs.writeFileSync(path.join(d, runtimeName), runtimeSrc);
   const f = path.join(d, 'm.cjs'); fs.writeFileSync(f, src);
   const m = require(f);
+  // Let go of the module both ways it is held: the cache and the gate's own
+  // list of children.
   for (const k of Object.keys(require.cache)) if (k.startsWith(d)) delete require.cache[k];
+  module.children = module.children.filter((c) => !c.filename.startsWith(d));
   return m;
 }
 
@@ -184,6 +190,9 @@ function extraDocs(schema) {
 let EVERY = 1; let SEEN = 0;
 async function check(label, schema, docs, stats, report, only) {
   if (EVERY > 1 && SEEN++ % EVERY !== 0) return;
+  // Let the event loop run: a loaded error runtime warms itself up on a
+  // timer, and timers that never fire hold every module the run loaded.
+  await new Promise((r) => setImmediate(r));
   const refs = new Map();
   const refFor = (opts) => { const k = JSON.stringify(opts || {}); if (!refs.has(k)) { try { refs.set(k, new Validator(schema, opts)); } catch { refs.set(k, null); } } return refs.get(k); };
   if (refFor() === null) return;
