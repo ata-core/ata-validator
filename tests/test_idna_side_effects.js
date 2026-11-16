@@ -18,7 +18,7 @@ const esbuild = require('esbuild')
 const root = path.join(__dirname, '..')
 const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ata-idna-se-')))
 fs.mkdirSync(path.join(dir, 'node_modules'))
-fs.symlinkSync(root, path.join(dir, 'node_modules', 'ata-validator'), 'dir')
+fs.symlinkSync(root, path.join(dir, 'node_modules', 'ata-validator'), 'junction')
 
 // U+302E then a Korean label: valid hostname letters, invalid IDNA2008.
 const BAD = '\\u302e\\uc2e4\\ub840.\\ud14c\\uc2a4\\ud2b8'
