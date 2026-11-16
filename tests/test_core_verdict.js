@@ -91,6 +91,14 @@ const extra = [
   [{ type: 'array', items: { type: 'integer', minimum: 0 } }, [[0, 1], [-1], [1.5], ['1']], 'array of bounded integers'],
   [{ anyOf: [{ type: 'number' }, { type: 'null', description: 'none' }] }, [1, null, 'x', NaN, Infinity], 'union of types'],
   [{ type: 'integer', enum: [1, 2.5, 'x'] }, [1, 2.5, 'x', 2], 'enum and type'],
+  // What a subschema evaluated, as unevaluated* reads it: a failed oneOf
+  // branch, contains on items it does not match, contains in a failed
+  // branch, a passing if without then or else.
+  [{ unevaluatedProperties: false, oneOf: [{ properties: { b: {} }, allOf: [{ required: ['zz'] }] }, { properties: { a: { type: 'string' } }, required: ['a'] }] }, [{ a: 's' }, { a: 's', b: 1 }, { b: 1 }, { a: 's', zz: 1 }], 'unevaluated after a failed oneOf branch'],
+  [{ unevaluatedItems: false, contains: { type: 'integer' } }, [[1], [1, 's'], ['s'], [1, 2]], 'unevaluated items and contains'],
+  [{ unevaluatedItems: false, anyOf: [{ contains: { type: 'string' }, minContains: 3 }, true] }, [[], ['a', 'b'], ['a', 'b', 'c']], 'unevaluated items and contains in a failed branch'],
+  [{ unevaluatedProperties: false, if: { properties: { a: { const: 1 } }, required: ['a'] } }, [{ a: 1 }, { a: 2 }, {}], 'unevaluated after a passing if'],
+  [{ unevaluatedProperties: false, anyOf: [{ patternProperties: { '^x': true }, dependentSchemas: { x: { required: ['q'] } } }, true] }, [{ x: 1 }, { x: 1, q: 1 }, {}], 'unevaluated after names matched in a failed branch'],
 ]
 for (const [schema, data, label] of extra) capture(schema, data, label, {})
 capture({ type: 'string', format: 'even' }, ['ab', 'abc', 1], 'caller format', { formats: { even: (s) => s.length % 2 === 0 } })
@@ -255,7 +263,12 @@ mutations.push(['a reference in a nested $id resource resolved from the root bas
 mutations.push(['a non-enumerable property skipped where own names are read', mutant([['    if (x !== undefined && !valueAt(V, props, e, i, x)) return false\n  }\n  return true', '  }\n  return true']])])
 mutations.push(['a non-enumerable property skipped where own names are read, many declared', mutantMore([['    if (x !== undefined && !valueAt(V, props, e, j, x)) return false\n  }\n  return true', '  }\n  return true']])])
 mutations.push(['a dynamic scope entry not popped', mutantMore([['return b === undefined || V.scope.includes(b) ? V : extend(V, b)', 'return b === undefined || V.scope.includes(b) ? V : (V.scope.push(b), V)']])])
-mutations.push(['annotations of a failed anyOf branch counted', mutantMore([['        if (!fs[i](d)) continue\n', '        if (!fs[i](d) && k === 1) continue\n']])])
+// The form that records what subschemas evaluated (unevaluated*).
+mutations.push(['annotations of a failed anyOf branch counted', mutantMore([['if (anyF[i](d)) n++\n          else { np = p1; nc = c1; nk = k1 }', 'if (anyF[i](d)) n++']])])
+mutations.push(['names a pattern matched in a failed anyOf branch counted', mutantMore([['if (anyF[i](d)) n++\n          else { np = p1; nc = c1; nk = k1 }', 'if (anyF[i](d)) n++\n          else { np = p1; nc = c1 }']])])
+mutations.push(['annotations of a failed oneOf branch counted', mutantMore([['if (oneF[i](d)) { if (++n > 1) return false } else { np = p1; nc = c1; nk = k1 }', 'if (oneF[i](d)) { if (++n > 1) return false }']])])
+mutations.push(['annotations of a passing if dropped', mutantMore([['if (ifF(d)) { if (thenF', 'if (ifF(d)) { np = p1; nc = c1; nk = k1; if (thenF']])])
+mutations.push(['an index contains did not match counted as evaluated', mutantMore([['if (ctf(d[i])) { c++; EC[nc++] = i }', '{ if (ctf(d[i])) c++; EC[nc++] = i }']])])
 mutations.push(['a dynamic scope entry not popped in the second half', mutantFull([['if (pushed) sc.pop()', '']])])
 mutations.push(['annotations of a failed branch counted in the second half', mutantFull([['if (ok && a !== NONE && sink !== NONE) merge(sink, a)', 'if (a !== NONE && sink !== NONE) merge(sink, a)'], ['      if (!f(d, sc, st, sub, b)) return false\n      if (a !== NONE) merge(a, sub)\n      return true', '      const ok = f(d, sc, st, sub, b)\n      if (a !== NONE) merge(a, sub)\n      return ok']])])
 mutations.push(['a nested $id not changing the base', mutantFull([['const base = fixed !== undefined ? fixed : b', 'const base = b']])])
