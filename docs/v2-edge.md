@@ -73,7 +73,7 @@ is pi-schema's benchmark cases.
 
 ### Values that keep failing
 
-`validate` on the suite with every value failing (15 or 31 runs) is 1.013 to
+`validate` on the suite with every value failing (11 or 31 runs) is 1.013 to
 1.039 times the browser entry, with overlapping ranges. Most of that is not
 the validator's work: loading any additional module into the process, even
 a 60 KB file holding only comments, made the browser entry 1.009 to 1.015
