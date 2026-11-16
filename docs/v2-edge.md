@@ -39,12 +39,12 @@ the core's speed but is not slower than the browser entry.
 
 Before either, the Validator asks five questions of the schema (does it use
 `errorMessage`, `default`, `format`, a json-schema.org meta-schema reference,
-`$id` or an anchor). The edge entry answers them by walking the schema rather
-than writing its JSON text. Where the validators built before were first
-asked for a verdict, that walk is the core's own scan, which the first compile
-then takes, so the schema is walked once. Where they were first asked to
-`validate`, the walk gathers only the answers, which costs less, and the core
-walks the schema itself if it compiles later.
+`$id` or an anchor). Where the validator built before this one was first
+asked for a verdict, the edge entry answers them with the core's own scan of
+the schema, which the core's first compile then takes, so the schema is
+walked once. Where it was first asked to `validate`, the edge entry reads
+the schema's JSON text, as the browser entry does, and the core walks the
+schema itself if it compiles later.
 
 ## Measurements
 
@@ -79,6 +79,27 @@ the validator's work: loading any additional module into the process, even
 a 60 KB file holding only comments, made the browser entry 1.009 to 1.015
 times slower on the same row (31 and 45 runs), and the core loaded and never
 called made it 1.004 to 1.015 times slower.
+
+### A fresh process
+
+What a new process pays in all, as a Workers isolate does on its first
+requests: the entry imported, then a validator built for every schema of a
+corpus and asked once about each of its documents, valid and invalid (15
+processes each, load average 3.4 to 4.1, ms):
+
+| corpus | schemas | method | browser entry | edge entry | ratio |
+|---|---:|---|---:|---:|---:|
+| pi-schema's benchmark cases | 9 | `isValidObject` | 7.9 (7.4..8.5) | 8.8 (8.7..9.8) | 1.118 |
+| pi-schema's benchmark cases | 9 | `validate` | 9.4 (8.7..10.7) | 12.1 (11.7..13.8) | 1.290 |
+| JSON Schema Test Suite, five dialects | 1,327 | `isValidObject` | 34.3 (33.6..37.6) | 35.6 (34.7..37.0) | 1.035 |
+| JSON Schema Test Suite, five dialects | 1,327 | `validate` | 40.5 (39.7..61.7) | 58.5 (57.4..61.8) | 1.444 |
+| SchemaStore samples | 492 | `isValidObject` | 399.6 (386.6..440.2) | 320.1 (318.0..329.0) | 0.801 |
+| SchemaStore samples | 492 | `validate` | 435.2 (425.9..451.6) | 473.0 (469.6..513.2) | 1.087 |
+
+A process that checks each schema only a handful of times pays more with the
+edge entry, except for `isValidObject` on large schemas: the import, and for
+`validate` the core's compile at a validator's second call, are not won back
+in so few calls. The edge entry is for processes that keep their validators.
 
 ### One-time cost per process
 
