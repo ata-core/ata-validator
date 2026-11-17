@@ -6,6 +6,7 @@
 // lib/codegen-engine.js, so that the edge entry (index.edge.js) and
 // ata-validator/lite can load the core without it.
 const core = require('./lib/validator-core.js');
+const { env } = require('./lib/env');
 
 // Validation as the body arrives: `v.stream(opts)` is a record stream over the
 // validator (lib/stream.js), loaded on first use. Defined here, on the Node
@@ -54,7 +55,9 @@ function warmUp () {
   const list = built;
   built = [];
   core._registerBuiltHook(null);
-  if (process.env.ATA_NO_WARM === '1') return;
+  // Through lib/env: the browser field's `require` condition points a page's
+  // bundler here, and a page has no `process`.
+  if (env('ATA_NO_WARM') === '1') return;
   // Untouched: neither compiled for validate() nor a verdict or validate
   // method read off it (the prototype's accessors bind the method on the
   // instance at the first read, a verdict-only compile sets no other mark).
