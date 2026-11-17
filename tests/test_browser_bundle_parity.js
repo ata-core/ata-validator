@@ -98,7 +98,10 @@ function inNode (schema, docs, F, opts) {
           compared++
           const got = ctx.__run(JSON.stringify(grp.schema), JSON.stringify(grp.docs), JSON.stringify(F), JSON.stringify(opts))
           if (got === want) continue
-          if (!c.idna && (/^(idn-)?hostname\.json$/.test(grp.file) || /: (idn-)?hostname format$/.test(grp.label))) { hostnameOnly.add(grp.label); continue }
+          // Excused only as a different answer: a bundle that failed to build
+          // the validator or threw on a document is never a documented difference.
+          const answered = got !== 'ctor' && JSON.parse(got).every((r) => r[0] !== 'threw')
+          if (answered && !c.idna && (/^(idn-)?hostname\.json$/.test(grp.file) || /: (idn-)?hostname format$/.test(grp.label))) { hostnameOnly.add(grp.label); continue }
           differ.push(grp.label)
         }
       }
