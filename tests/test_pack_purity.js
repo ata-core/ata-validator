@@ -348,6 +348,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 664 KB with rejections keeping their internals in private fields and
 // removeAdditional keeping the keys patternProperties match (#117), the
 // pattern compile shared with the interpreted engine. Measured 663.0 KB.
-assert.ok(manifest.size < 664 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 666 KB with removeAdditional reaching array elements, references, allOf
+// members and the values under patternProperties, additionalProperties and
+// dependentSchemas (#116), lib/remove-additional.js and its notes.
+// Measured 664.7 KB.
+assert.ok(manifest.size < 666 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

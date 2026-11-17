@@ -141,7 +141,11 @@ const root = path.resolve(__dirname, '..');
     // 66600 bytes (66572 measured): isValidObject fills a default from a
     // document given through `schemas` as validate() does, where it answered
     // before the fill and rejected what validate() accepted; 45 bytes.
-    assert.ok(size < 66600, `the Workers bundle is ${size} bytes gzipped, over 66600`);
+    // 67250 bytes (67227 measured): removeAdditional reaches closed objects in
+    // array elements, behind a $ref and in allOf members (issue #116) and keeps
+    // keys patternProperties match (#117), as lib/remove-additional.js; about
+    // 805 bytes, the private rejection fields before it took 27 off.
+    assert.ok(size < 67250, `the Workers bundle is ${size} bytes gzipped, over 67250`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
