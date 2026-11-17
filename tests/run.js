@@ -43,6 +43,7 @@ const FILES = [
   "tests/test_remove_additional_nested.js",
   "tests/test_remove_additional_patterns.js",
   "tests/test_remove_additional_reach.js",
+  "tests/test_defaults_reach_linear.js",
   "tests/test_exclusive_bounds.js",
   "tests/test_engine_differential.js",
   "tests/test_error_shape_differential.js",
