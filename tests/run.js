@@ -193,6 +193,7 @@ const FILES = [
   "tests/test_idna.js",
   "tests/test_idna_side_effects.js",
   "tests/test_browser_require_bundle.js",
+  "tests/test_browser_bundle_parity.js",
   "tests/test_aot_branch_closures.js",
   "tests/test_defaults_arrays.js",
   "tests/test_interpreter_no_codegen.js",
