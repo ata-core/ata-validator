@@ -41,6 +41,7 @@ const FILES = [
   "tests/test_buffer_reject_cost.js",
   "tests/test_nan_verdict.js",
   "tests/test_remove_additional_nested.js",
+  "tests/test_remove_additional_patterns.js",
   "tests/test_exclusive_bounds.js",
   "tests/test_engine_differential.js",
   "tests/test_error_shape_differential.js",

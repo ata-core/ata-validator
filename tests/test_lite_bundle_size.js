@@ -266,7 +266,11 @@ const esbuild = require('esbuild')
 // 62010 (62008 measured): isValidObject fills a default from a document
 // given through `schemas` as validate() does, where it answered before the
 // fill and rejected what validate() accepted; 38 bytes.
-const BUDGET = 62010
+// 62080 (62075 measured): removeAdditional keeps the keys a patternProperties
+// pattern matches, matched by the interpreted engine's pattern compile, where
+// it deleted them from a document that then passed (#117); 107 bytes. The
+// private rejection fields before it took 40 off.
+const BUDGET = 62080
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
