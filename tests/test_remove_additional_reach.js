@@ -79,6 +79,34 @@ for (const [name, schema, input, want] of cases) {
   assert.deepStrictEqual(d, { id: 1 })
 }
 
+// The fused verdict strips every closed object it reaches or none: a closed
+// object in items below a node that also has properties was left out, and
+// the verdict rejected the key the pass removes.
+{
+  const A = { type: 'object', properties: { id: {} }, additionalProperties: false }
+  const s = { type: 'array', items: { type: 'array', properties: { unused: A }, items: { ...A } } }
+  for (const o of [{}, { engine: 'interpreter' }]) {
+    const d = [[{ id: 1, extra: 1 }]]
+    assert.strictEqual(new Validator(s, { removeAdditional: true, ...o }).validate(d).valid, true)
+    assert.deepStrictEqual(d, [[{ id: 1 }]])
+  }
+}
+
+// A schema reached on many paths does not grow the generated pass without
+// bound: an allOf chain repeating a reference at each level declines it, and
+// the closure pass takes the schema.
+{
+  const defs = { n0: item }
+  for (let i = 1; i < 40; i++) defs['n' + i] = { allOf: [{ $ref: '#/$defs/n' + (i - 1) }, { $ref: '#/$defs/n' + (i - 1) }] }
+  const t = Date.now()
+  const src = require('../lib/codegen-engine.js').preprocessSource({ $defs: defs, $ref: '#/$defs/n39' }, { removeAdditional: true })
+  assert.strictEqual(src, null, 'the generated pass declines')
+  assert.ok(Date.now() - t < 2000, 'and decides quickly')
+  const d = { id: 1, extra: 1 }
+  require('../lib/remove-additional.js').buildRemover({ $defs: defs, $ref: '#/$defs/n39' }, (x) => new RegExp(x, 'u'))(d)
+  assert.deepStrictEqual(d, { id: 1 }, 'the closure pass applies each shared schema once per value')
+}
+
 // Data deeper than the schema bounds terminates.
 {
   const s = { $defs: { n: { type: 'object', properties: { c: { $ref: '#/$defs/n' } }, additionalProperties: false } }, $ref: '#/$defs/n' }

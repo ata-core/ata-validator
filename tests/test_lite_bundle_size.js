@@ -270,11 +270,11 @@ const esbuild = require('esbuild')
 // pattern matches, matched by the interpreted engine's pattern compile, where
 // it deleted them from a document that then passed (#117); 107 bytes. The
 // private rejection fields before it took 40 off.
-// 62840 (62830 measured): removeAdditional reaches closed objects in array
+// 62850 (62848 measured): removeAdditional reaches closed objects in array
 // elements, behind a $ref and in allOf members, and the values under
 // patternProperties, additionalProperties and dependentSchemas, as the
-// defaults pass does (issue #116), in lib/remove-additional.js; 755 bytes.
-const BUDGET = 62840
+// defaults pass does (issue #116), in lib/remove-additional.js; 773 bytes.
+const BUDGET = 62850
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
