@@ -339,6 +339,12 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 662 KB with patterns read in unicode mode wherever they are valid in it,
 // in the linear engine and on the platform RegExp, so a character above
 // U+FFFF is one character (issue #94). Measured 661.1 KB.
-assert.ok(manifest.size < 662 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 663 KB with the fixes after it: enum and required shapes refused on every
+// path, a nested $dynamicRef with no anchor declined, defaults from `schemas`
+// documents filled by isValidObject, the idna import kept by bundlers, the
+// warm-up reading its switch through lib/env, and validateJSON's unparsed
+// rejection ordered and serialized like the others; most of the growth is
+// their CHANGELOG entries. Measured 662.1 KB.
+assert.ok(manifest.size < 663 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

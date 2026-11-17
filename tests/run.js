@@ -305,6 +305,7 @@ const FILES = [
   "tests/test_validate_json_single_parse.js",
   "tests/test_single_pass_errors.js",
   "tests/test_lazy_json_errors.js",
+  "tests/test_json_plain_error_order.js",
   "tests/test_lazy_instance.js",
   "tests/test_cyclic_input.js",
   "tests/test_native_error_codes.js",
