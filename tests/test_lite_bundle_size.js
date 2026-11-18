@@ -282,7 +282,10 @@ const esbuild = require('esbuild')
 // does and refuses a fragment-only $id, which it registered under undefined
 // and then threw a TypeError on (issue #121), and both refuse any non-empty
 // fragment-only $id; 25 bytes.
-const BUDGET = 62950
+// 62980 (62976 measured): addSchema()'s refusal after compilation says how to get a
+// validator of one's own when the schema object was compiled before (issue
+// #122); 31 bytes.
+const BUDGET = 62980
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

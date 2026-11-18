@@ -45,6 +45,7 @@ const FILES = [
   "tests/test_remove_additional_reach.js",
   "tests/test_defaults_reach_linear.js",
   "tests/test_addschema_fragment_id.js",
+  "tests/test_addschema_shared.js",
   "tests/test_anchor_other_document.js",
   "tests/test_exclusive_bounds.js",
   "tests/test_engine_differential.js",
