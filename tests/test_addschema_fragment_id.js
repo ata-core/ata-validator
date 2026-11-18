@@ -14,7 +14,7 @@ const { Validator } = require('..')
 
 const root = () => ({ $id: 'urn:root', type: 'object', properties: { x: { $ref: 'urn:root#frag' } } })
 
-for (const bad of [{ $id: '#frag', maxLength: 2 }, { $id: '' }, { $id: 5 }, {}, null]) {
+for (const bad of [{ $id: '#frag', maxLength: 2 }, { $id: '#/foo' }, { $id: '#123' }, { $id: '' }, { $id: 5 }, {}, null]) {
   const v = new Validator(root())
   assert.throws(() => v.addSchema(bad), /^Error: Schema must have \$id$/, `addSchema(${JSON.stringify(bad)}) refuses`)
   assert.deepStrictEqual([...(v._schemaMap || new Map()).keys()].filter((k) => typeof k !== 'string'), [], 'nothing registered under a non-string key')
@@ -22,8 +22,10 @@ for (const bad of [{ $id: '#frag', maxLength: 2 }, { $id: '' }, { $id: 5 }, {}, 
   assert.doesNotThrow(() => v.validate({ x: 'ab' }))
 }
 
-// The same schema through the schemas option is refused the same way.
-assert.throws(() => new Validator(root(), { schemas: [{ $id: '#frag', maxLength: 2 }] }), /Schema in schemas option must have \$id/)
+// The same schemas through the schemas option are refused the same way.
+for (const bad of [{ $id: '#frag', maxLength: 2 }, { $id: '#/foo' }, { $id: '#123' }]) assert.throws(() => new Validator(root(), { schemas: [bad] }), /Schema in schemas option must have \$id/)
+// "#" is the empty fragment and stays accepted, as before.
+assert.doesNotThrow(() => new Validator(root()).addSchema({ $id: '#' }))
 
 // A document with an identity registers and resolves as before.
 {
