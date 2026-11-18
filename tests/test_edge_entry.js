@@ -145,9 +145,12 @@ const root = path.resolve(__dirname, '..');
     // array elements, behind a $ref and in allOf members (issue #116) and keeps
     // keys patternProperties match (#117), as lib/remove-additional.js; about
     // 805 bytes, the private rejection fields before it took 27 off.
-    // 67300 bytes (67272 measured): addSchema()'s refusal after compilation
-    // says how to get a validator of one's own (issue #122); 23 bytes.
-    assert.ok(size < 67300, `the Workers bundle is ${size} bytes gzipped, over 67300`);
+    // 67280 bytes (67262 measured): addSchema() names a document as the
+    // schemas option does and refuses a fragment-only $id (issue #121); 27
+    // bytes.
+    // 67320 bytes (67294 measured): addSchema()'s refusal after compilation says how to get a
+    // validator of one's own (issue #122); 23 bytes.
+    assert.ok(size < 67320, `the Workers bundle is ${size} bytes gzipped, over 67320`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

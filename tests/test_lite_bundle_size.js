@@ -278,10 +278,14 @@ const esbuild = require('esbuild')
 // 62920 (62917 measured): whether a default is reachable is worked out once
 // per schema in linear time, by the walk removeAdditional now shares; it grew
 // exponentially on an allOf chain naming each definition twice; 27 bytes.
-// 62960 (62951 measured): addSchema()'s refusal after compilation says how
-// to get a validator of one's own when the schema object was compiled before
-// (issue #122); 31 bytes.
-const BUDGET = 62960
+// 62950 (62942 measured): addSchema() names a document as the schemas option
+// does and refuses a fragment-only $id, which it registered under undefined
+// and then threw a TypeError on (issue #121), and both refuse any non-empty
+// fragment-only $id; 25 bytes.
+// 62980 (62976 measured): addSchema()'s refusal after compilation says how to get a
+// validator of one's own when the schema object was compiled before (issue
+// #122); 31 bytes.
+const BUDGET = 62980
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
