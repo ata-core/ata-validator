@@ -266,7 +266,19 @@ const esbuild = require('esbuild')
 // 62010 (62008 measured): isValidObject fills a default from a document
 // given through `schemas` as validate() does, where it answered before the
 // fill and rejected what validate() accepted; 38 bytes.
-const BUDGET = 62010
+// 62080 (62075 measured): removeAdditional keeps the keys a patternProperties
+// pattern matches, matched by the interpreted engine's pattern compile, where
+// it deleted them from a document that then passed (#117); 107 bytes. The
+// private rejection fields before it took 40 off.
+// 62900 (62890 measured): removeAdditional reaches closed objects in array
+// elements, behind a $ref and in allOf members, and the values under
+// patternProperties, additionalProperties and dependentSchemas, as the
+// defaults pass does (issue #116), in lib/remove-additional.js, with a
+// reachability worked out once per schema in linear time; 815 bytes.
+// 62920 (62917 measured): whether a default is reachable is worked out once
+// per schema in linear time, by the walk removeAdditional now shares; it grew
+// exponentially on an allOf chain naming each definition twice; 27 bytes.
+const BUDGET = 62920
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

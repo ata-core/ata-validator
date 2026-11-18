@@ -1,6 +1,7 @@
 'use strict';
 // Writes lib/kernels/preprocess.mjs: the passes lib/mutators.js holds and lib/validator-core.js runs
-// before a check under coerceTypes and removeAdditional, the reading of a
+// before a check under coerceTypes (removeAdditional's pass is
+// lib/remove-additional.js, which the IR imports itself), the reading of a
 // schema through references they use, and the schema an error's path names
 // (resolveSchemaByPath, for verbose errors), as their text; and from
 // lib/rejections.js the plain shape an error is presented in (stripOrdinal). ata-validator/ir runs
@@ -11,7 +12,7 @@ const path = require('path');
 const { take } = require('../lib/aot-order.js');
 const fsr = (f) => fs.readFileSync(path.join(__dirname, '..', 'lib', f), 'utf8');
 
-const MUTATORS = ['buildCoercer', 'coercionFor', 'buildNodeCoercer', 'buildSingleCoercion', 'buildRemover', 'collectRemovals'];
+const MUTATORS = ['buildCoercer', 'coercionFor', 'buildNodeCoercer', 'buildSingleCoercion'];
 const NAMES = ['resolveRefForPreprocess', 'resolveSchemaForPreprocess', 'resolveSchemaByPath'];
 
 function render () {
@@ -21,7 +22,7 @@ ${take('mutators.js', MUTATORS)}
 ${take('validator-core.js', NAMES)}
 ${(fsr('rejections.js').match(/^const COLLAPSE_CODES = .*$/m) || (() => { throw new Error('gen-kernels-preprocess: COLLAPSE_CODES not found in lib/rejections.js') })())[0]}
 ${take('rejections.js', ['stripOrdinal'])}
-export { buildCoercer, buildRemover, resolveSchemaForPreprocess, resolveSchemaByPath, stripOrdinal };
+export { buildCoercer, resolveSchemaForPreprocess, resolveSchemaByPath, stripOrdinal };
 `;
 }
 

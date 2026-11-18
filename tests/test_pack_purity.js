@@ -345,8 +345,15 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // warm-up reading its switch through lib/env, and validateJSON's unparsed
 // rejection ordered and serialized like the others; most of the growth is
 // their CHANGELOG entries. Measured 662.1 KB.
+// 664 KB with rejections keeping their internals in private fields and
+// removeAdditional keeping the keys patternProperties match (#117), the
+// pattern compile shared with the interpreted engine. Measured 663.0 KB.
+// 666 KB with removeAdditional reaching array elements, references, allOf
+// members and the values under patternProperties, additionalProperties and
+// dependentSchemas (#116), lib/remove-additional.js and its notes.
+// Measured 664.7 KB.
 // On the 2.0 branch, also lib/mutators.js, which the 1.x Validator and the
-// 2.0 entry share. Measured 662.7 KB.
-assert.ok(manifest.size < 663 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 2.0 entry share. Measured 665.4 KB.
+assert.ok(manifest.size < 666 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
