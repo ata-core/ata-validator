@@ -285,7 +285,10 @@ const esbuild = require('esbuild')
 // 62980 (62976 measured): addSchema()'s refusal after compilation says how to get a
 // validator of one's own when the schema object was compiled before (issue
 // #122); 31 bytes.
-const BUDGET = 62980
+// 63040 (63032 measured): the removal pass and the defaults module load only
+// for a schema with a closed object in its text, which kept 0.25 ms off a
+// server's first validated request; 56 bytes.
+const BUDGET = 63040
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
