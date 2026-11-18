@@ -150,7 +150,9 @@ const root = path.resolve(__dirname, '..');
     // bytes.
     // 67320 bytes (67294 measured): addSchema()'s refusal after compilation says how to get a
     // validator of one's own (issue #122); 23 bytes.
-    assert.ok(size < 67320, `the Workers bundle is ${size} bytes gzipped, over 67320`);
+    // 67340 bytes (67332 measured): the removal pass loads only for a schema
+    // with a closed object in its text; 38 bytes.
+    assert.ok(size < 67340, `the Workers bundle is ${size} bytes gzipped, over 67340`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
