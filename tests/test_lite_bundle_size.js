@@ -288,7 +288,13 @@ const esbuild = require('esbuild')
 // 63040 (63032 measured): the removal pass and the defaults module load only
 // for a schema with a closed object in its text, which kept 0.25 ms off a
 // server's first validated request; 56 bytes.
-const BUDGET = 63040
+// 63180 (63166 measured): plainLinear scans characters in one loop in place
+// of a sticky RegExp whose first call cost 100 to 160 microseconds (62823 on
+// the 2.0 branch, 62768 before), and a second scanner, compiled only when a
+// pattern has a group or `\uXXXX`, takes one level of group and that escape,
+// so such a pattern gets the platform RegExp instead of the linear engine's
+// first compile; 343 bytes.
+const BUDGET = 63180
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

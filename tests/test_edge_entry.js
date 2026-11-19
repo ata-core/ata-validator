@@ -152,7 +152,12 @@ const root = path.resolve(__dirname, '..');
     // validator of one's own (issue #122); 23 bytes.
     // 67340 bytes (67332 measured): the removal pass loads only for a schema
     // with a closed object in its text; 38 bytes.
-    assert.ok(size < 67340, `the Workers bundle is ${size} bytes gzipped, over 67340`);
+    // 67560 bytes (67549 measured): plainLinear scans characters in one loop
+    // in place of a sticky RegExp whose first call cost 100 to 160
+    // microseconds, and a second scanner takes one level of group and
+    // `\uXXXX`, so a pattern like `^(/|\./)?[^\u0000]+$` gets the platform
+    // RegExp instead of the linear engine's first compile; 217 bytes.
+    assert.ok(size < 67560, `the Workers bundle is ${size} bytes gzipped, over 67560`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

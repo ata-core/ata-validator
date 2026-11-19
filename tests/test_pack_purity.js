@@ -357,6 +357,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 667 KB on the 2.0 branch after merging 1.65.0 (addSchema id checks, the
 // removal pass loaded only for closed objects, its notes). Master measures
 // 681769 bytes, this branch 682289. Measured 666.3 KB.
-assert.ok(manifest.size < 667 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 668 KB: plainLinear scans characters in one loop instead of a sticky
+// RegExp whose first call cost 100 to 160 microseconds (682678 bytes), and
+// a second scanner takes one level of group, kept apart so a process whose
+// patterns have none never compiles it, and `\uXXXX` with it (683551
+// bytes, 667.5 KB).
+assert.ok(manifest.size < 668 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
