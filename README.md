@@ -643,10 +643,12 @@ const v = new Validator({
   }
 }, { schemas: [addressSchema] });
 
-// Or use addSchema()
+// Or use addSchema(), before the first check
 const v2 = new Validator(mainSchema);
 v2.addSchema(addressSchema);
 ```
+
+`new Validator(schema)` without options returns the same validator for the same schema object once one has compiled, so building it again costs a lookup. That validator is already compiled, and `addSchema()` on it throws. To register schemas on a validator of your own, pass an options object, `new Validator(mainSchema, {})`, or a copy of the schema.
 
 ### Options
 
