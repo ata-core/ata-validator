@@ -354,6 +354,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // Measured 664.7 KB.
 // On the 2.0 branch, also lib/mutators.js, which the 1.x Validator and the
 // 2.0 entry share. Measured 665.4 KB.
-assert.ok(manifest.size < 666 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 667 KB on the 2.0 branch after merging 1.65.0 (addSchema id checks, the
+// removal pass loaded only for closed objects, its notes). Master measures
+// 681769 bytes, this branch 682289. Measured 666.3 KB.
+assert.ok(manifest.size < 667 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
