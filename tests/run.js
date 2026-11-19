@@ -34,6 +34,7 @@ const FILES = [
   "tests/test_core_engine_mutation.js",
   "tests/test_core_engine_predicates.js",
   "tests/test_core_engine_heap.js",
+  "tests/test_core_heap.js",
   "tests/test_validator_small_facts.js",
   "tests/test_validator_small_core.js",
   "tests/test_validator_small_lifecycle.js",
