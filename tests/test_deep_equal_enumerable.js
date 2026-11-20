@@ -13,7 +13,6 @@ const path = require('path')
 const Module = require('module')
 const { Validator } = require('..')
 const aot = require('../lib/aot-impl')
-const small = require('../lib/validator-small')
 const { _deq } = require('../lib/unique-items')
 
 const ROOT = path.join(__dirname, '..')
@@ -48,14 +47,11 @@ const cases = [
 const paths = {
   'interpreted engine': (s) => { const v = new Validator(s, { engine: 'interpreter' }); return (d) => [v.isValidObject(d()), v.validate(d()).valid] },
   'closure tree': (s) => { const v = new Validator(s, { engine: 'interpreter' }); for (let i = 0; i < 1100; i++) v.isValidObject(i % 2 ? {} : []); return (d) => [v.isValidObject(d()), v.validate(d()).valid] },
-  'validator-small': (s) => { const v = new small.Validator(s); return (d) => [v.isValidObject(d()), v.validate(d()).valid] },
   'generated code, calls 1, 3 and 100': (s) => (d) => { const v = new Validator(s); const r = []; for (let i = 1; i <= 100; i++) { const x = v.isValidObject(d()); if (i === 1 || i === 3 || i === 100) r.push(x) } r.push(v.validate(d()).valid); return r },
   module: (s) => { const src = aot.toStandaloneModule(new Validator(s), { format: 'cjs', order: true, onWarning () {} }); if (!src) return null; const m = loadCjs(src); return (d) => [m.isValid(d()), m.validate(d()).valid] },
 }
 let n = 0
 ;(async () => {
-  const edge = await import('../index.v2.edge.mjs')
-  paths['v2 edge'] = (s) => { const v = new edge.Validator(s); return (d) => [v.isValidObject(d()), v.validate(d()).valid] }
   for (const [schema, doc, want] of cases) {
     for (const [pn, build] of Object.entries(paths)) {
       const ask = build(structuredClone(schema))
