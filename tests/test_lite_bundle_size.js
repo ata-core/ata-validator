@@ -288,7 +288,10 @@ const esbuild = require('esbuild')
 // 63040 (63032 measured): the removal pass and the defaults module load only
 // for a schema with a closed object in its text, which kept 0.25 ms off a
 // server's first validated request; 56 bytes.
-const BUDGET = 63040
+// 63064 (63059 measured): deep equality (enum, const, uniqueItems) reads the
+// enumerable own keys of both sides, so an object with a non-enumerable key no
+// longer compares differently by argument order; 27 bytes.
+const BUDGET = 63064
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
