@@ -45,6 +45,7 @@ const ATA_VERSION = require(path.join(ROOT, 'lib/version'));
 const RICH = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'message', 'expected', 'received', 'detail', 'suggestion', 'related', 'rank', 'docUrl'];
 const MODULE = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'message', 'docUrl'];
 const PLAIN = ['keyword', 'instancePath', 'schemaPath', 'params', 'message'];
+const VERBOSE = RICH.concat(['parentSchema', 'schema', 'data']);
 const pick = (fields) => function f(e) { return fields.map((k) => e[k]).concat([Array.isArray(e.branchErrors) ? e.branchErrors.map(f) : null]); };
 
 // The real path: require.cache is keyed by it, and on macOS the temporary
@@ -93,6 +94,7 @@ function v2Paths(bundle, label) {
     [label + ', plain errors']: { fields: PLAIN, ref: { richErrors: false }, fills: true, async: true, build: v2({ richErrors: false }) },
     [label + ', no defaults']: { fields: RICH, ref: { useDefaults: false }, fills: true, async: true, build: v2({ useDefaults: false }) },
     [label + ', formats off']: { fields: RICH, ref: { assertFormat: false }, fills: true, async: true, build: v2({ assertFormat: false }) },
+    [label + ', verbose']: { fields: VERBOSE, ref: { verbose: true }, fills: true, async: true, build: v2({ verbose: true }) },
     [label + ', abortEarly']: { fields: MODULE, ref: { abortEarly: true, engine: 'interpreter' }, fills: true, async: true, build: v2({ abortEarly: true }) },
     [label + ', coerce']: { fields: RICH, ref: { coerceTypes: true }, fills: true, async: true, build: v2({ coerceTypes: true }) },
     [label + ', coerce array']: { fields: RICH, ref: { coerceTypes: 'array' }, fills: true, async: true, build: v2({ coerceTypes: 'array' }) },
