@@ -46,6 +46,7 @@ const RICH = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'messag
 const MODULE = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'message', 'docUrl'];
 const PLAIN = ['keyword', 'instancePath', 'schemaPath', 'params', 'message'];
 const VERBOSE = RICH.concat(['parentSchema', 'schema', 'data']);
+const PLAIN_VERBOSE = PLAIN.concat(['parentSchema', 'schema', 'data']);
 const pick = (fields) => function f(e) { return fields.map((k) => e[k]).concat([Array.isArray(e.branchErrors) ? e.branchErrors.map(f) : null]); };
 
 // The real path: require.cache is keyed by it, and on macOS the temporary
@@ -82,28 +83,37 @@ const irModule = (src) => new Function('K', functionBody(src))(K);
 const irData = (src) => { const m = /^import \{([^}]*)\} from "[^"\n]*"\n/.exec(src); return new Function('K', `const {${m[1]}}=K\n` + src.slice(m[0].length).replace(/^export const\{isValid,validate\}=/m, 'const{isValid,validate}=') + 'return{isValid,validate}')(K); };
 const irRefused = (e) => e && typeof e.message === 'string' && e.message.startsWith('ir:');
 
-// The 2.0 Validator's paths, from a bundle of one of its entries.
-function v2Paths(bundle, label) {
+// The 2.0 Validator's paths, from a bundle of one of its entries. `rich`: the
+// entry's errors carry the rich fields (the browser entry with its richErrors
+// feature registered, or the edge entry); without them they are held to the
+// fields and the key set of the Validator's `richErrors: false` errors.
+function v2Paths(bundle, label, rich) {
+  const F = rich ? RICH : PLAIN;
+  const VF = rich ? VERBOSE : PLAIN_VERBOSE;
+  const R = (o) => (rich ? o : { ...o, richErrors: false });
+  const keys = !rich;
   const v2 = (opts) => async (s) => {
     const B = await import(require('node:url').pathToFileURL(bundle).href);
     const out = (e) => { if (e && /^ata2:/.test(String(e.message))) { const k = String(e.message).slice(6, 60); (globalThis.__ata2 || (globalThis.__ata2 = {}))[k] = (globalThis.__ata2[k] || 0) + 1; return true; } return false; };
     try { const v = new B.Validator(s, opts); v.isValidObject(null); v.validate(null); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } catch (e) { if (out(e)) return null; throw e; }
   };
   return {
-    [label]: { fields: RICH, fills: true, async: true, build: v2(undefined) },
+    [label]: { fields: F, keys, ref: R(undefined), fills: true, async: true, build: v2(undefined) },
     [label + ', plain errors']: { fields: PLAIN, ref: { richErrors: false }, fills: true, async: true, build: v2({ richErrors: false }) },
-    [label + ', no defaults']: { fields: RICH, ref: { useDefaults: false }, fills: true, async: true, build: v2({ useDefaults: false }) },
-    [label + ', formats off']: { fields: RICH, ref: { assertFormat: false }, fills: true, async: true, build: v2({ assertFormat: false }) },
-    [label + ', verbose']: { fields: VERBOSE, ref: { verbose: true }, fills: true, async: true, build: v2({ verbose: true }) },
+    // Without the rich fields, the messages are still the Validator's default ones.
+    ...(rich ? {} : { [label + ', messages']: { fields: PLAIN.slice(), fills: true, async: true, build: v2(undefined) } }),
+    [label + ', no defaults']: { fields: F, keys, ref: R({ useDefaults: false }), fills: true, async: true, build: v2({ useDefaults: false }) },
+    [label + ', formats off']: { fields: F, keys, ref: R({ assertFormat: false }), fills: true, async: true, build: v2({ assertFormat: false }) },
+    [label + ', verbose']: { fields: VF, keys, ref: R({ verbose: true }), fills: true, async: true, build: v2({ verbose: true }) },
     [label + ', abortEarly']: { fields: MODULE, ref: { abortEarly: true, engine: 'interpreter' }, fills: true, async: true, build: v2({ abortEarly: true }) },
-    [label + ', coerce']: { fields: RICH, ref: { coerceTypes: true }, fills: true, async: true, build: v2({ coerceTypes: true }) },
-    [label + ', coerce array']: { fields: RICH, ref: { coerceTypes: 'array' }, fills: true, async: true, build: v2({ coerceTypes: 'array' }) },
-    [label + ', remove']: { fields: RICH, ref: { removeAdditional: true }, fills: true, async: true, build: v2({ removeAdditional: true }) },
-    [label + ', tiered up']: { fields: RICH, fills: true, async: true, build: async (s) => { const b = await v2(undefined)(s); if (b === null) return null; const B = await import(require('node:url').pathToFileURL(bundle).href); const v = new B.Validator(s); if (!(await v._tierUp())) throw new Error('tier-up refused'); const tag = (f) => (d) => { try { return f(d); } catch (e) { e.message += ' | schema ' + JSON.stringify(s).slice(0, 400) + ' | doc ' + JSON.stringify(d).slice(0, 200); throw e; } }; return { validate: tag((d) => { const r = v.validate(d); if (!r.valid) r.errors.length; return r; }), isValid: tag((d) => v.isValidObject(d)) }; } },
-    [label + ', JSON text']: { fields: RICH, json: true, fills: false, async: true, build: async (s) => { const b = await v2(undefined)(s); if (b === null) return null; const B = await import(require('node:url').pathToFileURL(bundle).href); const v = new B.Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
+    [label + ', coerce']: { fields: F, keys, ref: R({ coerceTypes: true }), fills: true, async: true, build: v2({ coerceTypes: true }) },
+    [label + ', coerce array']: { fields: F, keys, ref: R({ coerceTypes: 'array' }), fills: true, async: true, build: v2({ coerceTypes: 'array' }) },
+    [label + ', remove']: { fields: F, keys, ref: R({ removeAdditional: true }), fills: true, async: true, build: v2({ removeAdditional: true }) },
+    [label + ', tiered up']: { fields: F, keys, ref: R(undefined), fills: true, async: true, build: async (s) => { const b = await v2(undefined)(s); if (b === null) return null; const B = await import(require('node:url').pathToFileURL(bundle).href); const v = new B.Validator(s); if (!(await v._tierUp())) throw new Error('tier-up refused'); const tag = (f) => (d) => { try { return f(d); } catch (e) { e.message += ' | schema ' + JSON.stringify(s).slice(0, 400) + ' | doc ' + JSON.stringify(d).slice(0, 200); throw e; } }; return { validate: tag((d) => { const r = v.validate(d); if (!r.valid) r.errors.length; return r; }), isValid: tag((d) => v.isValidObject(d)) }; } },
+    [label + ', JSON text']: { fields: F, keys, ref: R(undefined), json: true, fills: false, async: true, build: async (s) => { const b = await v2(undefined)(s); if (b === null) return null; const B = await import(require('node:url').pathToFileURL(bundle).href); const v = new B.Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
     // The first call is validate here, after which an entry may compile its
     // verdicts at a later call.
-    [label + ', validate first']: { fields: RICH, fills: true, async: true, build: async (s) => {
+    [label + ', validate first']: { fields: F, keys, ref: R(undefined), fills: true, async: true, build: async (s) => {
       const B = await import(require('node:url').pathToFileURL(bundle).href);
       try { const v = new B.Validator(s); v.validate(null); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } catch (e) { if (e && /^ata2:/.test(String(e.message))) return null; throw e; }
     } },
@@ -133,8 +143,9 @@ const PATHS = {
   // browser entry (ATA_V2_BUNDLE) and the server and edge entry, the core
   // its engine (ATA_V2_EDGE_BUNDLE). A feature the entry leaves out throws
   // "ata2: ..." and the schema counts as declined.
-  ...(process.env.ATA_V2_BUNDLE ? v2Paths(process.env.ATA_V2_BUNDLE, 'v2 entry') : {}),
-  ...(process.env.ATA_V2_EDGE_BUNDLE ? v2Paths(process.env.ATA_V2_EDGE_BUNDLE, 'v2 edge entry') : {}),
+  ...(process.env.ATA_V2_BUNDLE ? v2Paths(process.env.ATA_V2_BUNDLE, 'v2 entry', false) : {}),
+  ...(process.env.ATA_V2_RICH_BUNDLE ? v2Paths(process.env.ATA_V2_RICH_BUNDLE, 'v2 entry, rich errors', true) : {}),
+  ...(process.env.ATA_V2_EDGE_BUNDLE ? v2Paths(process.env.ATA_V2_EDGE_BUNDLE, 'v2 edge entry', true) : {}),
   'closure tree': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s, { engine: 'interpreter' }); for (let i = 0; i < 1100; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
   'JSON text': { fields: RICH, json: true, fills: false, build: (s) => { const v = new Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
   'plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => { const v = new Validator(s, { richErrors: false, engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
@@ -236,7 +247,7 @@ async function check(label, schema, docs, stats, report, only) {
         if (P.abort && got.errors.length === 1 && got.errors[0].code === 'ATA9000') st.abort++;
         else {
           // A plain error has the plain fields and no others: its keys are compared too.
-          const keysOf = (e) => (P.fields === PLAIN ? ' keys ' + Object.keys(e).filter((k) => e[k] !== undefined).sort().join(',') + (Array.isArray(e.branchErrors) ? ' [' + e.branchErrors.map(keysOf).join(';') + ']' : '') : '');
+          const keysOf = (e) => (P.fields === PLAIN || P.keys ? ' keys ' + Object.keys(e).filter((k) => e[k] !== undefined).sort().join(',') + (Array.isArray(e.branchErrors) ? ' [' + e.branchErrors.map(keysOf).join(';') + ']' : '') : '');
           let x = want.errors.map((e) => JSON.stringify(shape(e)) + keysOf(e)); let y = got.errors.map((e) => JSON.stringify(shape(e)) + keysOf(e));
           if (P.ordered === false || p.ordered === false) {
             if (x.join('\n') !== y.join('\n')) st.unordered = (st.unordered || 0) + 1;

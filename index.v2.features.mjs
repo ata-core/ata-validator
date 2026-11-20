@@ -8,3 +8,5 @@ export const coerceTypes = mu.coerceTypes;
 export const removeAdditional = mu.removeAdditional;
 import cg from './lib/features/codegen.js';
 export const codegen = cg.codegen;
+import re from './lib/features/rich-errors.js';
+export const richErrors = re.richErrors;

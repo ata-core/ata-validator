@@ -239,6 +239,7 @@
     "!lib/plan-source.js",
     "!lib/engine-small.js",
     "!lib/engine-shared.js",
+    "!lib/rejection-core.js",
     "!lib/validator-small.js",
     "!lib/small-tier.js",
     "!lib/features/",
