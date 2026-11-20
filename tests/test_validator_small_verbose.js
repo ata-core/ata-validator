@@ -161,3 +161,20 @@ assert.throws(() => new Validator({ type: 'string' }, { richErrors: true }).vali
   assert.ok(answer(new Validator(s), { nme: 'abc' }).errors[0].related, 'typo correlation comes with the feature')
   console.log(`validator-small verbose and addSchema: ${schemas} validators, ${compared} documents equal to the 1.x Validator, ${messages} messages without the rich fields equal to its default ones (${declined} declined)`)
 })().catch((e) => { console.error(e); process.exit(1) })
+
+// A root that declares draft-06 with the draft-06 meta-schema registered
+// through addSchema(), as @rjsf/validator-ata does with additionalMetaSchemas:
+// that meta-schema has no $vocabulary, so the 1.x Validator changes nothing
+// for it and neither does this one. One with a $vocabulary is still refused.
+{
+  const meta = require('../lib/metaschemas.js').METASCHEMAS.get('http://json-schema.org/draft-06/schema#')
+  const formats = { color: (s) => /^#[0-9a-f]{3,6}$/i.test(s) }
+  const schema = { $schema: 'http://json-schema.org/draft-06/schema#', type: 'object', properties: { a: { type: 'string', format: 'color' } } }
+  for (const [V2, ref] of [[Validator, { richErrors: false }], [Rich, {}]]) {
+    const make = (V, o) => { const v = new V(schema, { verbose: true, formats, ...o }); v.addSchema(meta); return v }
+    for (const d of [{ a: 1 }, { a: 'red' }, { a: '#fff' }]) assert.deepStrictEqual(answer(make(V2, {}), d), answer(make(OneX, ref), d), 'draft-06 meta-schema added: ' + JSON.stringify(d))
+  }
+  const v = new Validator({ $schema: 'https://example.com/meta', type: 'string' }, {})
+  v.addSchema({ $id: 'https://example.com/meta', $vocabulary: { 'https://json-schema.org/draft/2020-12/vocab/core': true } })
+  assert.throws(() => v.validate(1), { message: 'ata2: vocabularies' })
+}
