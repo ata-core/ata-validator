@@ -10,3 +10,5 @@ import cg from './lib/features/codegen.js';
 export const codegen = cg.codegen;
 import re from './lib/features/rich-errors.js';
 export const richErrors = re.richErrors;
+import vb from './lib/features/verbose.js';
+export const verbose = vb.verbose;

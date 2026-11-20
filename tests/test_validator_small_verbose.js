@@ -12,8 +12,8 @@
 // Errors are compared in both shapes the 2.0 Validator has. Without its
 // richErrors feature they equal the 1.x Validator's under `richErrors: false`,
 // key set included, and their messages equal its default ones. With the
-// feature (here carried by a class, as index.v2.edge.mjs carries it, since
-// Validator.use() registers for the whole process) they equal the 1.x
+// feature (here registered on a second copy of the module, since
+// Validator.use() registers for the whole module) they equal the 1.x
 // Validator's default errors.
 
 const assert = require('node:assert')
@@ -25,9 +25,18 @@ const { codegen } = require('../lib/features/codegen.js')
 const { metaschemas } = require('../lib/features/metaschemas.js')
 const { errorMessages } = require('../lib/features/error-messages.js')
 const { richErrors } = require('../lib/features/rich-errors.js')
-Validator.use(metaschemas, errorMessages)
-class Rich extends Validator {}
-Rich.prototype.rich = richErrors
+const { verbose } = require('../lib/features/verbose.js')
+const fresh = () => {
+  for (const k of Object.keys(require.cache)) if (k.endsWith(path.join('lib', 'validator-small.js'))) delete require.cache[k]
+  return require('../lib/validator-small.js').Validator
+}
+// Asked for verbose without the feature, a validator is refused, naming it.
+assert.throws(() => new (fresh())({ type: 'string' }, { verbose: true }).validate(1), { message: 'ata2: verbose, Validator.use(verbose)' })
+Validator.use(metaschemas, errorMessages, verbose)
+// A second copy of the module, its own feature registry, with the rich
+// fields registered: Validator.use() registers for the whole module.
+const Rich = fresh()
+Rich.use(metaschemas, errorMessages, richErrors, verbose)
 
 const DIALECTS = { 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', draft7: 'http://json-schema.org/draft-07/schema#' }
 const clone = (x) => x === undefined ? x : structuredClone(x)
@@ -124,10 +133,18 @@ sameThrow((V) => new V({ type: 'string' }, {}).addSchema({ type: 'string' }), 'n
 sameThrow((V) => new V({ type: 'string' }, {}).addSchema(true), 'a boolean schema')
 sameThrow((V) => new V({ type: 'string' }, {}).addSchema({ $id: '#frag', type: 'string' }), 'a fragment-only $id is an anchor, not an identity')
 sameThrow((V) => new V({ $schema: 'http://json-schema.org/draft-04/schema#', type: 'string' }, {}).addSchema({ id: 'http://x/a', type: 'string' }), "draft-04's `id` alone")
+// After a call, with the 1.x Validator's message less its note on the
+// instance `new Validator(schema)` hands back from a cache, which this class
+// does not have.
+const LATE = 'Cannot add schema after compilation: call addSchema() before validate(), isValidObject(), validateJSON() or isValidJSON()'
 for (const call of ['validate', 'validateJSON', 'isValidJSON']) {
-  sameThrow((V) => { const v = new V({ type: 'string' }, {}); v[call](call.endsWith('JSON') ? '"a"' : 'a'); v.addSchema({ $id: 'http://x/a' }) }, 'after ' + call)
+  let a
+  try { const v = new OneX({ type: 'string' }, {}); v[call](call.endsWith('JSON') ? '"a"' : 'a'); v.addSchema({ $id: 'http://x/a' }) } catch (e) { a = e }
+  assert.ok(a && a.message.startsWith(LATE + ' ('), 'the 1.x message: ' + (a && a.message))
+  const v = new Validator({ type: 'string' }, {}); v[call](call.endsWith('JSON') ? '"a"' : 'a')
+  assert.throws(() => v.addSchema({ $id: 'http://x/a' }), { message: LATE }, 'after ' + call)
 }
-// After isValidObject() too, with the same message. The 1.x Validator takes
+// After isValidObject() too. The 1.x Validator takes
 // a document added after an isValidObject() its first-call shortcut answered,
 // which compiled nothing; its message names the call all the same.
 {
@@ -142,6 +159,7 @@ for (const call of ['validate', 'validateJSON', 'isValidJSON']) {
 }
 // A validator that tiers up to generated code keeps the documents added to it.
 Validator.use(codegen)
+Rich.use(codegen)
 // Asking for the rich fields by name without the feature is refused, naming it.
 assert.throws(() => new Validator({ type: 'string' }, { richErrors: true }).validate(1), { message: 'ata2: richErrors, Validator.use(richErrors)' })
 ;(async () => {

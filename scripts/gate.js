@@ -84,9 +84,9 @@ const irData = (src) => { const m = /^import \{([^}]*)\} from "[^"\n]*"\n/.exec(
 const irRefused = (e) => e && typeof e.message === 'string' && e.message.startsWith('ir:');
 
 // The 2.0 Validator's paths, from a bundle of one of its entries. `rich`: the
-// entry's errors carry the rich fields (the browser entry with its richErrors
-// feature registered, or the edge entry); without them they are held to the
-// fields and the key set of the Validator's `richErrors: false` errors.
+// bundle registers the richErrors feature, so the errors carry the rich
+// fields; without it they are held to the fields and the key set of the
+// Validator's `richErrors: false` errors.
 function v2Paths(bundle, label, rich) {
   const F = rich ? RICH : PLAIN;
   const VF = rich ? VERBOSE : PLAIN_VERBOSE;
@@ -141,11 +141,13 @@ const PATHS = {
   } },
   // Bundles of candidate 2.0 entries, ESM files that export Validator: the
   // browser entry (ATA_V2_BUNDLE) and the server and edge entry, the core
-  // its engine (ATA_V2_EDGE_BUNDLE). A feature the entry leaves out throws
-  // "ata2: ..." and the schema counts as declined.
+  // its engine (ATA_V2_EDGE_BUNDLE); each also with the richErrors feature
+  // registered (ATA_V2_RICH_BUNDLE, ATA_V2_EDGE_RICH_BUNDLE). A feature the
+  // entry leaves out throws "ata2: ..." and the schema counts as declined.
   ...(process.env.ATA_V2_BUNDLE ? v2Paths(process.env.ATA_V2_BUNDLE, 'v2 entry', false) : {}),
   ...(process.env.ATA_V2_RICH_BUNDLE ? v2Paths(process.env.ATA_V2_RICH_BUNDLE, 'v2 entry, rich errors', true) : {}),
-  ...(process.env.ATA_V2_EDGE_BUNDLE ? v2Paths(process.env.ATA_V2_EDGE_BUNDLE, 'v2 edge entry', true) : {}),
+  ...(process.env.ATA_V2_EDGE_BUNDLE ? v2Paths(process.env.ATA_V2_EDGE_BUNDLE, 'v2 edge entry', false) : {}),
+  ...(process.env.ATA_V2_EDGE_RICH_BUNDLE ? v2Paths(process.env.ATA_V2_EDGE_RICH_BUNDLE, 'v2 edge entry, rich errors', true) : {}),
   'closure tree': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s, { engine: 'interpreter' }); for (let i = 0; i < 1100; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
   'JSON text': { fields: RICH, json: true, fills: false, build: (s) => { const v = new Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
   'plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => { const v = new Validator(s, { richErrors: false, engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
