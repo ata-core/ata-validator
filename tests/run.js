@@ -173,6 +173,7 @@ const FILES = [
   "tests/test_kernels_rank_sync.js",
   "tests/test_ir_emit_deps_sync.js",
   "tests/test_ir_key_walk.mjs",
+  "tests/test_ir_object_flag.mjs",
   "tests/test_ir_module_split.mjs",
   "tests/test_ir_error_path.mjs",
   "tests/test_ir_self_cycle.mjs",
