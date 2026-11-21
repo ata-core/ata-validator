@@ -297,7 +297,10 @@ const esbuild = require('esbuild')
 // relative $ref at its document's base, not by path suffix, so they no longer
 // act on a different registered document; 71 bytes.
 // 63180 (63171 measured): the three fixes above together in one tree.
-const BUDGET = 63180
+// 63230 (63226 measured): Validator.fromStandalone fills defaults from the
+// documents given through `schemas` and before every verdict, as a Validator
+// does; 55 bytes.
+const BUDGET = 63230
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
