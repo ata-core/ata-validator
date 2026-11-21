@@ -297,7 +297,9 @@ const esbuild = require('esbuild')
 // relative $ref at its document's base, not by path suffix, so they no longer
 // act on a different registered document; 71 bytes.
 // 63180 (63171 measured): the three fixes above together in one tree.
-const BUDGET = 63180
+// 63350 (63345 measured): a schema holding a value JSON cannot carry gets a
+// compile cache key of its own, read from the normalization walk; 174 bytes.
+const BUDGET = 63350
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

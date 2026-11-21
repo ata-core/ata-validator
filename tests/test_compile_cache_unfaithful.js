@@ -36,13 +36,11 @@ for (const [odd, plain, doc] of pairs) {
 }
 
 // The key: a faithful schema's is its text, as before; an unfaithful one's is
-// its own, and stays the same for the same object.
+// one no other schema has.
 const text = JSON.stringify({ const: null })
 assert.strictEqual(core.compileCacheKey(text, new Map(), { const: null }), text)
-const odd = { const: NaN }
-const k1 = core.compileCacheKey(text, new Map(), odd)
+const k1 = core.compileCacheKey(text, new Map(), { const: NaN })
 assert.notStrictEqual(k1, text)
-assert.strictEqual(core.compileCacheKey(text, new Map(), odd), k1)
 assert.notStrictEqual(core.compileCacheKey(text, new Map(), { const: NaN }), k1)
 // A registered document is held to the same rule.
 const t2 = JSON.stringify({ $ref: 'urn:x' })
