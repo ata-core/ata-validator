@@ -1,7 +1,7 @@
 // ata-validator/features: featuresFor() and the shape of a feature.
 
 /** The name of a feature, as ata-validator/features/<name> exports it. */
-export type FeatureName = 'formats' | 'uri' | 'draft7' | 'defaults' | 'uniqueItems' | 'branchCollapse' | 'richErrors' | 'verbose' | 'metaschemas' | 'errorMessages' | 'coerceTypes' | 'removeAdditional' | 'codegen' | 'standardSchema' |
+export type FeatureName = 'formats' | 'uri' | 'draft7' | 'defaults' | 'uniqueItems' | 'branchCollapse' | 'patterns' | 'richErrors' | 'verbose' | 'metaschemas' | 'errorMessages' | 'coerceTypes' | 'removeAdditional' | 'codegen' | 'standardSchema' |
   'formatEmail' | 'formatDate' | 'formatDateTime' | 'formatTime' | 'formatDuration' | 'formatUuid' | 'formatIpv4' | 'formatIpv6' | 'formatHostname' | 'formatRegex' | 'formatJsonPointer' | 'formatRelativeJsonPointer' | 'formatUriTemplate' | 'formatIdnEmail' | 'formatIdnHostname' | 'formatUri' | 'formatUriReference' | 'formatIri' | 'formatIriReference';
 
 /** A feature for the 2.0 Validator's Validator.use(). Its contents are internal. */

@@ -18,7 +18,7 @@ const NONE = () => null;
 const ALL = {
   draft7: d7.draft7, metaschemas: ms.metaschemas,
   defaults: { buildDefaultsApplier: NONE }, coerceTypes: { build: NONE }, removeAdditional: { build: NONE },
-  errorMessage: {}, verbose: {}, richErrors: {}, codegen: {}, formats: {}, uri: {}, uniqueItems: {}, branchCollapse: {},
+  errorMessage: {}, verbose: {}, richErrors: {}, codegen: {}, formats: {}, uri: {}, uniqueItems: {}, branchCollapse: {}, patterns: {},
 };
 
 // The features a Validator built from `schema` with `options`, and given

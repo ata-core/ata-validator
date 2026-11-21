@@ -33,6 +33,7 @@ const CASES = {
   defaults: ['defaults.js', { properties: { a: { default: 1 } } }, {}, {}],
   uniqueItems: ['uniqueItems.js', { uniqueItems: true }, {}, [1, 1]],
   branchCollapse: ['branchCollapse.js', { anyOf: [{ type: 'string' }] }, {}, 1],
+  patterns: ['patterns.js', { pattern: '(a+)+b' }, {}, 'aab'],
   richErrors: ['richErrors.js', { type: 'string' }, { richErrors: true }, 1],
   verbose: ['verbose.js', { type: 'string' }, { verbose: true }, 1],
   metaschemas: ['metaschemas.js', { $ref: 'https://json-schema.org/draft/2020-12/schema' }, {}, { type: 1 }],
@@ -115,7 +116,7 @@ const CASES = {
   assert.ok(!(await carried('ata-validator/features/formatUriReference')).includes('lib/fmt/URI_FAST.js'), 'formatUriReference leaves out URI_FAST')
   const files = await carried('ata-validator/features')
   for (const [other, f] of Object.entries(own)) assert.strictEqual(files.includes(f), other === 'draft7' || other === 'metaschemas', `ata-validator/features and ${f}`)
-  for (const f of ['lib/enrich-error.js', 'lib/fmt/ipv6.js', 'lib/unique-dup.js', 'lib/branch-collapse.js', 'lib/defaults.js', 'lib/mutators.js']) assert.ok(!files.includes(f), 'ata-validator/features leaves out ' + f)
+  for (const f of ['lib/enrich-error.js', 'lib/fmt/ipv6.js', 'lib/unique-dup.js', 'lib/branch-collapse.js', 'lib/defaults.js', 'lib/mutators.js', 'lib/safe-regex.js']) assert.ok(!files.includes(f), 'ata-validator/features leaves out ' + f)
   // The declarations.
   execFileSync(process.execPath, [TSC_JS, '--noEmit', '--strict', '--module', 'nodenext', '--moduleResolution', 'nodenext', path.join(__dirname, 'feature_exports_types.ts')], { cwd: ROOT, stdio: 'inherit' })
   console.log(`ok: ${Object.keys(CASES).length} feature exports resolve and register; featuresFor() carries draft7 and the meta-schemas only; the declarations type-check`)

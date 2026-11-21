@@ -14,6 +14,8 @@ import _uniqueItems from './lib/features/uniqueItems.js';
 export const uniqueItems = _uniqueItems.uniqueItems;
 import _branchCollapse from './lib/features/branchCollapse.js';
 export const branchCollapse = _branchCollapse.branchCollapse;
+import _patterns from './lib/features/patterns.js';
+export const patterns = _patterns.patterns;
 import _richErrors from './lib/features/richErrors.js';
 export const richErrors = _richErrors.richErrors;
 import _verbose from './lib/features/verbose.js';

@@ -250,6 +250,8 @@
     "!lib/plan-source.js",
     "!lib/engine-small.js",
     "!lib/engine-shared.js",
+    "!lib/engine-shared-core.js",
+    "!lib/defaults-core.js",
     "!lib/rejection-core.js",
     "!lib/groups.js",
     "!lib/gates.js",

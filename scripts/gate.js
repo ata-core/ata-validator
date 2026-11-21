@@ -173,7 +173,7 @@ function corePath(opts, wrap) {
     },
   };
 }
-const FULL = ['errorMessages', 'metaschemas', 'coerceTypes', 'removeAdditional', 'formats', 'uri', 'draft7', 'defaults', 'uniqueItems', 'branchCollapse'];
+const FULL = ['errorMessages', 'metaschemas', 'coerceTypes', 'removeAdditional', 'formats', 'uri', 'draft7', 'defaults', 'uniqueItems', 'branchCollapse', 'patterns'];
 const FMT = { date: (x) => /^\d{4}-\d\d-\d\d$/.test(x), uri: (x) => x.includes(':'), email: (x) => x.includes('@') };
 const CORE_PATHS = {
   'v2 core + featuresFor': corePath({}),

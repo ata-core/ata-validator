@@ -42,6 +42,8 @@ const FULL = {
 // lib/engine-full.js: lib/engine-small.js reading the groups from their
 // modules where the core reads them from what was registered (lib/groups.js).
 const ENGINE = [
+  ["require('./engine-shared-core')\n", "require('./engine-shared')\n"],
+  ['compilePattern(src, G.safe)', 'compilePattern(src)'],
   ["const { G, refuse, builtinFormat } = require('./groups')\n", "const { _deq: eq, duplicatePair } = require('./unique-items')\nlet _collapse = null\nconst collapse = (kw, br, pp, sp, o) => (_collapse || (_collapse = require('./branch-collapse')._collapse))(kw, br, pp, sp, o)\nlet formatTable = null\n"],
   ['  // Enum and const equality, as the Validator set it (lib/groups.js).\n  const eq = G.eq\n', ''],
   ['      const name = s.format\n', "      const name = s.format; const table = formatTable || (formatTable = require('./formats').formatChecks())\n"],
@@ -75,7 +77,7 @@ const SUBS = [
   ['  if (code === 1 && !shown && scan(s) === DEFINITIONS) return s;\n', ''],
   ["  const d = need('draft7');", "  const d = require('./draft7');"],
   ["need('draft7').stripFormatAssertions", "require('./draft7').stripFormatAssertions"],
-  ["need('defaults').buildDefaultsApplier", "require('./defaults').buildDefaultsApplier"],
+  ["need('defaults').buildDefaultsApplier(pre, G.safe)", "require('./defaults').buildDefaultsApplier(pre)"],
 ];
 
 function render () {
