@@ -83,6 +83,16 @@ function cases() {
       root: { definitions: { nope: { type: 'number' } }, properties: { q: { $ref: b + 'a.json' } } },
       schemas: [{ $id: b + 'a.json', properties: { p: { $ref: b + 'b.json' } } }, { $id: b + 'b.json', properties: { r: { $ref: '#/definitions/nope' } } }],
     }, [{ q: { p: { r: 1 } } }, { q: { p: { r: 's' } } }, {}], false],
+    // A cycle across documents that reaches the generators as written:
+    // normalizeRefs gives up on a registered document in another dialect.
+    // The verdict generator stopped at the re-entry and checked nothing there.
+    ['cycle across documents, references as written', {
+      root: { $schema: 'https://json-schema.org/draft/2020-12/schema', $ref: b + 'cy-a.json' },
+      schemas: [
+        { $schema: 'http://json-schema.org/draft-07/schema#', $id: b + 'cy-a.json', type: 'object', required: ['x'], properties: { child: { $ref: b + 'cy-b.json' } } },
+        { $id: b + 'cy-b.json', type: 'object', properties: { back: { $ref: b + 'cy-a.json' } } },
+      ],
+    }, [{ x: 1, child: { back: {} } }, { x: 1, child: { back: { x: 1 } } }, { x: 1 }, {}], false],
   ]
 }
 
