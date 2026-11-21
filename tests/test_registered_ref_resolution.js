@@ -63,6 +63,7 @@ function cases() {
     $id: b + 'foundryvtt-module-manifest.json',
     allOf: [{ $ref: 'foundryvtt-base-package-manifest.json#' }, { properties: { library: { type: 'boolean' } } }],
   }
+  const loop = (ref) => ({ type: 'object', required: ['v'], properties: { next: { $ref: ref } } })
   const reg = (doc, extra = []) => ({ root: { $ref: doc.$id }, schemas: [doc, ...extra] })
   return [
     // name, { root, schemas }, documents, whether the reference resolves
@@ -93,6 +94,15 @@ function cases() {
         { $id: b + 'cy-b.json', type: 'object', properties: { back: { $ref: b + 'cy-a.json' } } },
       ],
     }, [{ x: 1, child: { back: {} } }, { x: 1, child: { back: { x: 1 } } }, { x: 1 }, {}], false],
+    // A local definition reached again through an anchor, so cyclicDefNames
+    // does not see the cycle. With references as written (the draft-07
+    // document again), the verdict generator stopped at the re-entry and
+    // wrote no check for it.
+    ...[['definition back through an anchor', { x: loop('#a'), y: { $anchor: 'a', ...loop('#/$defs/x') } }, '#/$defs/x'],
+      ['anchor cycle', { n: { $anchor: 'nn', ...loop('#nn') } }, '#/$defs/n']].map(([label, defs, entry]) => [label + ', references as written', {
+      root: { $schema: 'https://json-schema.org/draft/2020-12/schema', $id: b + 'ld-root.json', properties: { o: { $ref: b + 'ld-other.json' }, t: { $ref: entry } }, $defs: defs },
+      schemas: [{ $schema: 'http://json-schema.org/draft-07/schema#', $id: b + 'ld-other.json', type: 'string' }],
+    }, [{ t: { v: 1, next: { v: 1, next: {} } } }, { t: { v: 1, next: { v: 1 } } }, { t: {} }], false]),
   ]
 }
 
