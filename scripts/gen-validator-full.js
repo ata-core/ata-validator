@@ -25,6 +25,17 @@ const FULL = {
   rich: ["    if (r !== undefined && !f) need('richErrors');"],
   use: [],
   merge: [],
+  // The full entries carry Standard Schema built in.
+  standard: [
+    "Object.defineProperty(Validator.prototype, '~standard', {",
+    "  configurable: true,",
+    "  get() {",
+    "    const std = require('./standard-schema').standardSchemaFor(this, (self) => self._rawSchema, (self, value) => self.validate(value));",
+    "    Object.defineProperty(this, '~standard', { value: std });",
+    "    return std;",
+    "  },",
+    "});",
+  ],
   exports: ['module.exports = { Validator };'],
 };
 

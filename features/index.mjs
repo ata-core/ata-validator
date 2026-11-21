@@ -26,7 +26,10 @@ const ALL = {
 // that refuses a schema at run time (lib/validator-small.js), so a
 // Validator with exactly these features takes the schema, and one without
 // any of them refuses it. Throws where any Validator would refuse the schema
-// for another reason.
+// for another reason. It never names standardSchema (`~standard`): no schema
+// says whether its validator reaches a Standard Schema consumer, so the
+// caller that hands it to one (the build plugin, from its reading of the
+// code) registers standardSchema itself.
 export function featuresFor (schema, options, schemas) {
   const got = new Set();
   small._probe({ all: ALL, got });

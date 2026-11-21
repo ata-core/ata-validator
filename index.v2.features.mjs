@@ -66,4 +66,6 @@ import _formatIri from './lib/features/formatIri.js';
 export const formatIri = _formatIri.formatIri;
 import _formatIriReference from './lib/features/formatIriReference.js';
 export const formatIriReference = _formatIriReference.formatIriReference;
+import _standardSchema from './lib/features/standardSchema.js';
+export const standardSchema = _standardSchema.standardSchema;
 export { featuresFor } from './features/index.mjs';

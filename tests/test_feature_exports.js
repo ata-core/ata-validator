@@ -40,6 +40,7 @@ const CASES = {
   coerceTypes: ['coerceTypes.js', { type: 'number' }, { coerceTypes: true }, '1'],
   removeAdditional: ['removeAdditional.js', { type: 'object', additionalProperties: false }, { removeAdditional: true }, { a: 1 }],
   codegen: ['codegen.js', null, null, null],
+  standardSchema: ['standardSchema.js', null, null, null],
 }
 
 ;(async () => {
@@ -65,6 +66,17 @@ const CASES = {
     assert.strictEqual(require.resolve('ata-validator/features/' + name), path.join(ROOT, 'lib/features', name + '.js'), name + ': resolves to lib/features/' + name + '.js')
     assert.strictEqual(m[name], require(path.join(ROOT, 'lib/features', file))[name], name + ': the feature of lib/features/' + file)
     const V = fresh()
+    if (name === 'standardSchema') {
+      // Never named by featuresFor(): the plugin decides it from where a
+      // validator goes. Withheld, reading `~standard` throws the refusal.
+      assert.ok(!index.featuresFor({ type: 'string' }).includes('standardSchema'))
+      const v = new V({ type: 'string' })
+      assert.throws(() => v['~standard'], { message: 'ata2: standardSchema, Validator.use(standardSchema)' }, 'standardSchema: refused without it')
+      V.use(m.standardSchema)
+      assert.deepStrictEqual(v['~standard'].validate(1), { issues: [{ message: 'must be string', path: [] }] }, 'standardSchema: answered once registered')
+      assert.strictEqual(v['~standard'], v['~standard'], 'standardSchema: one object per validator')
+      continue
+    }
     if (name === 'codegen') {
       V.use(m.codegen)
       assert.strictEqual(await new V({ type: 'string' })._tierUp(), true, 'codegen: registered, a validator tiers up')

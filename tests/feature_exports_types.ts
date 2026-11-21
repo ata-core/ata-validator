@@ -16,8 +16,9 @@ import { removeAdditional } from 'ata-validator/features/removeAdditional'
 import { codegen } from 'ata-validator/features/codegen'
 import { formatDateTime } from 'ata-validator/features/formatDateTime'
 import { formatUri } from 'ata-validator/features/formatUri'
+import { standardSchema } from 'ata-validator/features/standardSchema'
 const names: FeatureName[] = featuresFor({ format: 'date' }, { verbose: true }, [{ $id: 'x' }])
-const all: Feature[] = [formats, uri, draft7, defaults, uniqueItems, branchCollapse, richErrors, verbose, metaschemas, errorMessages, coerceTypes, removeAdditional, codegen, formatDateTime, formatUri]
+const all: Feature[] = [formats, uri, draft7, defaults, uniqueItems, branchCollapse, richErrors, verbose, metaschemas, errorMessages, coerceTypes, removeAdditional, codegen, formatDateTime, formatUri, standardSchema]
 const dt: Feature<'formatDateTime'> = formatDateTime
 const one: Feature<'formats'> = formats
 // @ts-expect-error: not a feature name

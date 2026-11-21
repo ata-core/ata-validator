@@ -35,7 +35,11 @@ const first = (V, s, o, d) => { const v = new V(s, o); v.validate(structuredClon
   F = await import(pathToFileURL(path.join(__dirname, '..', 'index.v2.features.mjs')).href)
   const DIALECTS = { 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', 'draft2019-09': 'https://json-schema.org/draft/2019-09/schema', draft7: 'http://json-schema.org/draft-07/schema#', draft6: 'http://json-schema.org/draft-06/schema#', draft4: 'http://json-schema.org/draft-04/schema#', v1: 'https://json-schema.org/v1' }
   const OPTS = [{}, { useDefaults: false }, { assertFormat: false }, { formats: { date: () => true, uri: () => true } }, { verbose: true }]
-  let taken = 0; let refused = 0; let named = 0
+  let taken = 0; let refused = 0; let named = 0; let standard = 0
+  const FULL = require('../lib/validator-full.js').Validator
+  // The full entries' Validator, with the two features a suite schema can
+  // name that it does not carry built in.
+  FULL.use(F.metaschemas, F.errorMessages)
   const seen = {}
   for (const [dialect, uri] of Object.entries(DIALECTS)) {
     for (const sub of ['', 'optional/format']) {
@@ -52,6 +56,18 @@ const first = (V, s, o, d) => { const v = new V(s, o); v.validate(structuredClon
             for (const n of names) seen[n] = (seen[n] || 0) + 1
             first(coreWith(names), schema, o, d)
             taken++
+            // Standard Schema, which featuresFor() never names: withheld,
+            // reading `~standard` throws its refusal; registered, it answers
+            // as the full entry's on every document of the group.
+            if (Object.keys(o).length === 0) {
+              assert.ok(!names.includes('standardSchema'))
+              const bare = new (coreWith(names))(schema)
+              assert.throws(() => bare['~standard'], { message: 'ata2: standardSchema, Validator.use(standardSchema)' }, label + ': ~standard without standardSchema')
+              const mine = new (coreWith(names.concat('standardSchema')))(schema)['~standard']
+              const full = new FULL(schema)['~standard']
+              for (const t of g.tests) assert.deepStrictEqual(mine.validate(structuredClone(t.data)), full.validate(structuredClone(t.data)), label + ': ~standard on ' + t.description)
+              standard++
+            }
             for (const n of names) {
               const rest = names.filter((x) => x !== n)
               assert.throws(() => first(coreWith(rest), schema, o, d), (e) => e instanceof Error && e.message.startsWith('ata2: ') && e.message.includes('Validator.use(' + n + ')'), `${label}: without ${n}`)
@@ -80,6 +96,7 @@ const first = (V, s, o, d) => { const v = new V(s, o); v.validate(structuredClon
     assert.throws(() => first(coreWith(['uri']), every, {}, doc), { message: 'ata2: formatEmail, Validator.use(formatEmail)' })
   }
   assert.ok(taken > 8000 && refused > 4000, `${taken} schemas taken, ${refused} refusals`)
+  assert.ok(standard > 1500, standard + ' schemas read through ~standard')
 
   // The three ways to give documents: the schemas option and addSchema().
   const doc = { $id: 'https://example.com/d', $schema: 'http://json-schema.org/draft-07/schema#', definitions: { a: { type: 'string', format: 'date' } }, items: [{ uniqueItems: true }] }
@@ -115,5 +132,5 @@ const first = (V, s, o, d) => { const v = new V(s, o); v.validate(structuredClon
   assert.throws(() => new (coreWith(['formats']))(two).validate({}), { message: 'ata2: formatUri, Validator.use(formatUri)' })
   const hiddenUnique = Object.defineProperty({ type: 'array' }, 'uniqueItems', { value: true, enumerable: false })
   assert.throws(() => new (coreWith([]))(hiddenUnique).validate([1, 1]), { message: 'ata2: uniqueItems, Validator.use(uniqueItems)' })
-  console.log(`ok: ${taken} schemas taken on the core with featuresFor(), ${named} of them needing a feature; ${refused} refusals with one withheld`)
+  console.log(`ok: ${taken} schemas taken on the core with featuresFor(), ${named} of them needing a feature; ${refused} refusals with one withheld; ~standard refused without standardSchema and equal to the full entry's with it on ${standard}`)
 })().catch((e) => { console.error(e); process.exit(1) })
