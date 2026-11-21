@@ -305,7 +305,8 @@ const esbuild = require('esbuild')
 // 63230 (63226 measured): Validator.fromStandalone fills defaults from the
 // documents given through `schemas` and before every verdict, as a Validator
 // does; 55 bytes.
-const BUDGET = 63350
+// 63440 (63434 measured): the sweep's fixes together in one tree.
+const BUDGET = 63440
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
