@@ -2,6 +2,15 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- `multipleOf` now uses exact decimal divisibility across all engines (`lib/multiple-of.js`, generated code, `ata-validator/kernels`, and `src/ata.cpp`): safe integers divide with `%`, and other finite doubles are read as their shortest round-trip decimals instead of dividing with a `1e-9` tolerance. `1e20` against `3` and `0.30000000000000004` against `0.1` are now rejected, and `1e308` against `0.5` is now accepted. This changes `validate()` answers for those values.
+- `uniqueItems` no longer degrades to quadratic time when items collide on the 32-bit structural hash: `_uq` and `_uqp` read each item once and sort indices by hash then a total order over JSON values (`O(n log n)`), preserving the exact first-duplicate pair reported in errors.
+- Unicode property escapes (`\p{...}`, `\P{...}`) and control escapes (`\cX`) are now handled in the linear-time regex engine (`lib/safe-regex.js`), testing one code point at a time using a `RegExp.prototype.exec` captured when the engine initializes. Patterns with nested quantifiers around property escapes such as `^(\p{L}+)+$` now run in linear time without backtracking.
+- Removed the duplicate `DURATION_RE` property key in `lib/formats.js` `module.exports`.
+
 ## 1.65.0 - 2026-11-19
 
 ### Fixed

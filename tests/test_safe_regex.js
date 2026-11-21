@@ -81,9 +81,12 @@ for (const [pattern, input] of evilCases) {
 // Malformed `\x` and `\u` read as NaN and matched U+0000. Each one throws so
 // patternIsSafe answers false and the pattern takes the platform RegExp.
 const { patternIsSafe } = require('../lib/safe-regex')
-const unsupportedEscapes = ['^\\p{L}+$', '^\\P{Lu}$', '^[\\p{L}]$', '^\\B(a|a)$', '^(a|a)\\cJ$', '^(a|a)\\k<x>$', '^(a|a)\\xZZ$', '^(a|a)\\u12$', '^(a|a)\\x4$', '^(a|a)\\01$', '[\\c]', '[\\xZZ]']
+const unsupportedEscapes = ['^\\B(a|a)$', '^(a|a)\\k<x>$', '^(a|a)\\xZZ$', '^(a|a)\\u12$', '^(a|a)\\x4$', '^(a|a)\\01$', '[\\c]', '[\\xZZ]']
 for (const p of unsupportedEscapes) {
   check(patternIsSafe(p) === false, `patternIsSafe(${JSON.stringify(p)}) === false`)
+}
+for (const p of ['^\\p{L}+$', '^\\P{Lu}$', '^[\\p{L}]$', '^(a|a)\\cJ$']) {
+  check(patternIsSafe(p) === true, `patternIsSafe(${JSON.stringify(p)}) === true`)
 }
 // Identity escapes that ECMA-262 reads as the letter stay supported.
 for (const [p, s, expected] of [['^\\e$', 'e', true], ['^\\x41$', 'A', true], ['^\\u0041$', 'A', true], ['^[\\b]$', '\b', true]]) {
