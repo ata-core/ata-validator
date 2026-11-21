@@ -38,26 +38,45 @@ export function featuresFor (schema, options, schemas) {
     if (schemas) for (const s of schemas) v.addSchema(s);
     v._build();
   } finally { small._probe(null); }
-  return smaller([...got]);
+  return joinFeatures([...got]);
 }
 
-// The formats a schema needs, as the per-name features or as the formats and
-// uri groups, whichever adds fewer bytes to a page (format-sizes.mjs, measured
-// by scripts/gen-format-sizes.js). Either registers every check the schema
-// reads; a page that registers both carries the checks twice, so a caller
-// joining the answers for several schemas keeps the groups and drops the
-// per-name features they hold.
+// The smallest list of features that covers every check the given lists
+// register, for a page with several validators: featuresFor() of each joined.
+// A group in any list stays (it registers every check it holds, and which of
+// them its schema read is not known here), and the per-name features it holds
+// go. Each family of formats without its group present is then decided
+// again for the joined set: its names one by one, or its group, whichever
+// adds fewer bytes by format-sizes.mjs (measured by scripts/gen-format-sizes.js).
+// featuresFor() answers through it, so for one schema
+// joinFeatures(featuresFor(s)) is featuresFor(s).
 const URI = new Set(['uri', 'uri-reference', 'iri', 'iri-reference'].map(groups.featureOf));
-function smaller (names) {
-  const fm = names.filter((n) => Object.hasOwn(OWN, n));
-  if (fm.length === 0) return names;
-  const parts = new Set();
-  let one = 0;
-  for (const n of fm) { one += OWN[n]; for (const p of PARTS[n]) parts.add(p); }
-  for (const p of parts) one += PART[p];
-  one -= SHARE * (fm.length + parts.size - 1);
-  const u = fm.some((n) => URI.has(n)), f = fm.some((n) => !URI.has(n));
-  const g = u && f ? ['formats', 'uri'] : u ? ['uri'] : ['formats'];
-  if (GROUP[u && f ? 'both' : u ? 'uri' : 'formats'] >= one) return names;
-  return names.filter((n) => !Object.hasOwn(OWN, n)).concat(g);
+const ORDER = groups.NAMES.map(groups.featureOf);
+export function joinFeatures (...sets) {
+  const rest = []; const fm = new Set(); const forced = new Set();
+  for (const set of sets) {
+    for (const n of set) {
+      if (Object.hasOwn(OWN, n)) fm.add(n);
+      else if (n === 'formats' || n === 'uri') forced.add(n);
+      else if (!rest.includes(n)) rest.push(n);
+    }
+  }
+  const fam = { formats: [], uri: [] };
+  for (const n of ORDER) if (fm.has(n)) fam[URI.has(n) ? 'uri' : 'formats'].push(n);
+  // Every choice of group or names per family, the families a present group
+  // fixes left fixed; ties go to the names.
+  let best = null;
+  for (const gf of forced.has('formats') ? [true] : fam.formats.length ? [false, true] : [false]) {
+    for (const gu of forced.has('uri') ? [true] : fam.uri.length ? [false, true] : [false]) {
+      const one = (gf ? [] : fam.formats).concat(gu ? [] : fam.uri);
+      const parts = new Set(); let n = 0;
+      for (const f of one) { n += OWN[f]; for (const p of PARTS[f]) parts.add(p); }
+      for (const p of parts) n += PART[p];
+      if (one.length) n -= SHARE * (one.length + parts.size - 1);
+      n += gf && gu ? GROUP.both : gf ? GROUP.formats : gu ? GROUP.uri : 0;
+      const pick = (gf ? ['formats'] : []).concat(gu ? ['uri'] : [], one);
+      if (best === null || n < best[0]) best = [n, pick];
+    }
+  }
+  return rest.concat(best[1]);
 }

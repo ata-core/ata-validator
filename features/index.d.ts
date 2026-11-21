@@ -20,3 +20,14 @@ export interface Feature<N extends FeatureName = FeatureName> {
  * (the build plugin, from where the validator goes) registers it itself.
  */
 export declare function featuresFor(schema: unknown, options?: Record<string, unknown>, schemas?: readonly unknown[]): FeatureName[];
+
+/**
+ * The smallest list of features that covers every check the given lists
+ * register: for a page with several validators, featuresFor() of each joined.
+ * A formats or uri group in any list stays and the per-name format features
+ * it holds go; formats without their group present are named one by one or
+ * as their group, whichever adds fewer bytes to a page, by the same measured
+ * table featuresFor() reads. For a single schema,
+ * joinFeatures(featuresFor(schema)) equals featuresFor(schema).
+ */
+export declare function joinFeatures(...sets: ReadonlyArray<readonly FeatureName[]>): FeatureName[];

@@ -59,6 +59,8 @@ const CASES = {
     }
   }
   assert.strictEqual(typeof index.featuresFor, 'function', 'ata-validator/features exports featuresFor')
+  assert.strictEqual(typeof index.joinFeatures, 'function', 'ata-validator/features exports joinFeatures')
+  assert.deepStrictEqual(index.joinFeatures(['formatDate', 'draft7'], ['formats']), ['draft7', 'formats'], 'joinFeatures drops what a group holds')
   for (const [name, [file, schema, opts, doc]] of Object.entries(CASES)) {
     const m = await import('ata-validator/features/' + name)
     assert.ok(m[name] && typeof m[name] === 'object', name + ': exported by name')

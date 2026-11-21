@@ -1,6 +1,6 @@
 // Type-checked by tests/test_feature_exports.js: the declarations of
 // ata-validator/features and ata-validator/features/<name>.
-import { featuresFor, type FeatureName, type Feature } from 'ata-validator/features'
+import { featuresFor, joinFeatures, type FeatureName, type Feature } from 'ata-validator/features'
 import { formats } from 'ata-validator/features/formats'
 import { uri } from 'ata-validator/features/uri'
 import { draft7 } from 'ata-validator/features/draft7'
@@ -23,4 +23,5 @@ const dt: Feature<'formatDateTime'> = formatDateTime
 const one: Feature<'formats'> = formats
 // @ts-expect-error: not a feature name
 const bad: FeatureName = 'nope'
-void names; void all; void one; void bad; void dt
+const joined: FeatureName[] = joinFeatures(names, ['formats'], [])
+void names; void all; void one; void bad; void dt; void joined
