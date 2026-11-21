@@ -48,6 +48,7 @@ const FILES = [
   "tests/test_join_features.js",
   "tests/test_code_point_pairs.js",
   "tests/test_engine_small_mask.js",
+  "tests/test_engine_small_loops.js",
   "tests/test_trial_restore_counts.js",
   "tests/test_compiled_extension_parity.js",
   "tests/test_buffer_gate.js",
