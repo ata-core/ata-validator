@@ -294,7 +294,9 @@ const esbuild = require('esbuild')
 // pattern has a group or `\uXXXX`, takes one level of group and that escape,
 // so such a pattern gets the platform RegExp instead of the linear engine's
 // first compile; 343 bytes.
-const BUDGET = 63180
+// 63220 (63207 measured): a lone high surrogate counts as its own code
+// point, and length bounds stop scanning for pairs once decided; 41 bytes.
+const BUDGET = 63220
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

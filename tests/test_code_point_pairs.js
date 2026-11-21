@@ -7,9 +7,9 @@
 // surrogate counted it as one and accepted the over-long string.
 //
 // Every string here, alone and inside longer strings that cross the bounds,
-// is checked at count - 1, count and count + 1 for minLength, maxLength and
-// both, at the root and under a property, on every engine and entry, through
-// every method. `[...s].length` is the oracle. The 1.x Validator and the 2.0
+// is checked at count - 1.5 to count + 1.5 in half steps for minLength,
+// maxLength and both, at the root and under a property, on every engine and
+// entry, through every method. `[...s].length` is the oracle. The 1.x Validator and the 2.0
 // entries run again in a process with code generation from strings blocked,
 // and again with the small twin off (as tests/run.js runs the suite).
 
@@ -20,6 +20,9 @@ const { pathToFileURL } = require('node:url')
 
 const ROOT = path.join(__dirname, '..')
 const CHILD = process.argv[2] === '--child'
+// The counters take a fast path where String.prototype.isWellFormed exists;
+// a child runs without it, as an engine that predates it would.
+if (CHILD && process.env.ATA_TEST_NO_WELL_FORMED === '1') delete String.prototype.isWellFormed
 
 const BASE = ['\ud800b', '\ud800', '\udc00\ud800', 'a\u{1F642}\ud83d', '\u{1F642}', '\u{10FFFF}', '\ud800\ud800']
 const STRINGS = [...BASE]
@@ -35,7 +38,8 @@ STRINGS.push('\ud800b'.repeat(40), '\ud800'.repeat(65), 'b\ud800'.repeat(33) + '
 const SCHEMAS = []
 for (const s of STRINGS) {
   const n = [...s].length
-  for (const b of [n - 1, n, n + 1]) {
+  // Whole bounds and fractional ones, at half steps around the count.
+  for (const b of [n - 1.5, n - 1, n - 0.5, n, n + 0.5, n + 1, n + 1.5]) {
     if (b < 0) continue
     SCHEMAS.push([{ type: 'string', maxLength: b }, s, n <= b])
     SCHEMAS.push([{ type: 'string', minLength: b }, s, n >= b])
@@ -43,6 +47,8 @@ for (const s of STRINGS) {
   SCHEMAS.push([{ type: 'string', minLength: n, maxLength: n }, s, true])
   SCHEMAS.push([{ type: 'string', minLength: n + 1, maxLength: n + 1 }, s, false])
   SCHEMAS.push([{ type: 'string', minLength: Math.max(0, n - 1), maxLength: n - 1 }, s, false])
+  SCHEMAS.push([{ type: 'string', minLength: Math.max(0, n - 0.5), maxLength: n + 0.5 }, s, true])
+  SCHEMAS.push([{ type: 'string', minLength: n + 0.5, maxLength: n + 1.5 }, s, false])
 }
 // The same checks under a required property.
 for (const [schema, s, want] of SCHEMAS.slice()) {
@@ -93,7 +99,7 @@ async function main () {
   v1(Validator)
   v1(Validator, { engine: 'interpreter' })
 
-  if (!CHILD) {
+  if (!CHILD || process.env.ATA_TEST_NO_WELL_FORMED === '1') {
     // The engines on their own.
     for (const f of ['engine-small.js', 'engine-full.js']) {
       const { createSmall } = require(path.join(ROOT, 'lib', f))
@@ -119,7 +125,9 @@ async function main () {
     const modes = [
       [['--disallow-code-generation-from-strings'], {}],
       [[], { ATA_NO_SMALL_TWIN: '1' }],
-      [['--disallow-code-generation-from-strings'], { ATA_NO_SMALL_TWIN: '1' }]
+      [['--disallow-code-generation-from-strings'], { ATA_NO_SMALL_TWIN: '1' }],
+      [[], { ATA_TEST_NO_WELL_FORMED: '1' }],
+      [['--disallow-code-generation-from-strings'], { ATA_TEST_NO_WELL_FORMED: '1', ATA_NO_SMALL_TWIN: '1' }]
     ]
     for (const [flags, env] of modes) {
       const r = spawnSync(process.execPath, [...flags, __filename, '--child'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, ...env } })

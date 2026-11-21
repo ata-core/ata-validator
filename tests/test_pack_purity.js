@@ -362,6 +362,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // a second scanner takes one level of group, kept apart so a process whose
 // patterns have none never compiles it, and `\uXXXX` with it (683551
 // bytes, 667.5 KB).
-assert.ok(manifest.size < 668 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 669 KB: a lone high surrogate counts as its own code point, and length
+// bounds stop scanning for pairs once decided (684046 bytes, 668.0 KB).
+assert.ok(manifest.size < 669 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

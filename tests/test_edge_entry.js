@@ -157,7 +157,9 @@ const root = path.resolve(__dirname, '..');
     // microseconds, and a second scanner takes one level of group and
     // `\uXXXX`, so a pattern like `^(/|\./)?[^\u0000]+$` gets the platform
     // RegExp instead of the linear engine's first compile; 217 bytes.
-    assert.ok(size < 67560, `the Workers bundle is ${size} bytes gzipped, over 67560`);
+    // 67600 bytes (67585 measured): a lone high surrogate counts as its own
+    // code point, and length bounds stop scanning for pairs once decided.
+    assert.ok(size < 67600, `the Workers bundle is ${size} bytes gzipped, over 67600`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
