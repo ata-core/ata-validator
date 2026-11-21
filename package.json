@@ -89,6 +89,14 @@
       "import": "./compiled-standard.mjs",
       "default": "./lib/compiled-standard.js"
     },
+    "./features": {
+      "types": "./features/index.d.ts",
+      "import": "./features/index.mjs"
+    },
+    "./features/*": {
+      "types": "./features/*.d.ts",
+      "import": "./features/*.mjs"
+    },
     "./v2/plugin-core": {
       "import": "./index.v2.core.mjs"
     },

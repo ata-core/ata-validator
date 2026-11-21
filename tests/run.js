@@ -40,6 +40,7 @@ const FILES = [
   "tests/test_validator_small_lifecycle.js",
   "tests/test_validator_small_verbose.js",
   "tests/test_v2_core_features.js",
+  "tests/test_feature_exports.js",
   "tests/test_engine_small_mask.js",
   "tests/test_trial_restore_counts.js",
   "tests/test_compiled_extension_parity.js",
