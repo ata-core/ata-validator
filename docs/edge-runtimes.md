@@ -92,7 +92,7 @@ host checking tool arguments against a remote server's schemas, can keep
 patterns the linear-time regex engine cannot run off the platform RegExp with
 the `patternFallback` option (see docs/API.md). The edge entry leaves the
 option out of the bundle, and refuses it, until the Worker imports it once;
-the import adds 731 bytes gzipped:
+the import adds 3442 bytes gzipped:
 
 ```js
 import 'ata-validator/pattern-fallback'

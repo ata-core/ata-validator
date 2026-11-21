@@ -29,7 +29,7 @@ const loadCodegen = () => {
 };
 core._setCodegenLoader(loadCodegen);
 // The patternFallback option, read when a validator asks for it.
-core._internals._registerPatternFallback(() => require('./lib/pattern-fallback.js'));
+core._internals.pf = () => require('./lib/pattern-fallback.js');
 const warm = setTimeout(loadCodegen, 0);
 if (typeof warm === 'object' && typeof warm.unref === 'function') warm.unref();
 

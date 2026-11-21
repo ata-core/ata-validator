@@ -43,8 +43,8 @@ const LOOKAHEAD = '^x(?=y)'
 const NEG_LOOKAHEAD = '^(?!bad)'
 const NON_BOUNDARY = 'a\\B'
 const NAMED_BACKREF = '^(?<q>a)\\k<q>$'
-const BUDGET = '^a{70000}$'
-const PROPERTY = '^\\p{L}+$'
+const BUDGET = '^((a|b){1000}){100}$'
+const PROPERTY = '^(\\p{L}+)+$'
 const FALLBACKS = [BACKREF, LOOKAHEAD, NEG_LOOKAHEAD, NON_BOUNDARY, NAMED_BACKREF, BUDGET, PROPERTY]
 
 // A matcher that is plainly not the pattern: it accepts exactly the string
@@ -72,7 +72,7 @@ check("'platform' and undefined change nothing", () => {
     const v = new Validator(S_PATTERN, opt)
     assert.strictEqual(v.validate({ a: 'aa' }).valid, true)
     assert.strictEqual(v.validate({ a: 'ab' }).valid, false)
-    assert.strictEqual(v._patternHook, null)
+    assert.strictEqual(v._patternHook, undefined)
   }
 })
 
@@ -184,6 +184,22 @@ check('the function decides for each kind of pattern outside the engine', () => 
     const v = new Validator({ type: 'string', pattern: p }, { patternFallback: magic() })
     assert.strictEqual(v.validate('magic').valid, true, p)
     assert.strictEqual(v.validate('aa').valid, false, p)
+  }
+})
+check('a pattern the RegExp is proven to run in linear time is not fallback', () => {
+  // A property escape and a repeat past the linear engine's budget, both
+  // proven linear on the platform RegExp (lib/regex-linear.js).
+  for (const p of ['^\\p{L}+$', '^\\p{Lu}\\p{Ll}*$', '^[\\p{L} .-]+$', '^a{70000}$']) {
+    const log = []
+    const strict = new Validator({ type: 'string', pattern: p }, { patternFallback: 'reject' })
+    const fn = new Validator({ type: 'string', pattern: p }, { patternFallback: magic(log) })
+    const plain = new Validator({ type: 'string', pattern: p }, {})
+    for (const s of ['Émile', 'ab', 'a'.repeat(70000), 'x1', '']) {
+      assert.strictEqual(strict.validate(s).valid, plain.validate(s).valid, p)
+      assert.strictEqual(fn.isValidObject(s), plain.isValidObject(s), p)
+    }
+    assert.strictEqual(log.length, 0, p)
+    assert.strictEqual(fn.engine(), plain.engine(), p)
   }
 })
 check('a linear pattern is not handed to the function', () => {
@@ -305,7 +321,10 @@ check("what 'reject' lets through runs on the linear engine or a RegExp shown li
   const { nativeIsLinear } = require(path.join(ROOT, 'lib', 'regex-linear'))
   const { safeKeyMatcher } = require(path.join(ROOT, 'lib', 'defaults'))
   const OUT = {}
-  const outside = (s) => { try { return _compilePattern(s, () => OUT) === OUT } catch { return false } }
+  const outside = (s) => { try { return _compilePattern(s, (x, re) => nativeIsLinear(x) ? re : OUT) === OUT } catch { return false } }
+  // The interpreted engine without the option: the linear engine, or a
+  // RegExp the interpreter or lib/regex-linear.js shows linear.
+  const interpOk = (s) => { const m = _compilePattern(s); return m.__ataSafe === true || nativeIsLinear(s) }
   const pats = new Set()
   const walk = (n) => {
     if (n === null || typeof n !== 'object') return
@@ -323,13 +342,14 @@ check("what 'reject' lets through runs on the linear engine or a RegExp shown li
     try { new RegExp(p, 'u') } catch { try { new RegExp(p) } catch { continue } }
     if (outside(p)) { out++; continue }
     survivors++
+    assert.ok(interpOk(p), p)
     // Generated code: the linear engine, a RegExp shown linear, or declined.
     assert.ok(_internal.useSafeEngine(p) || nativeIsLinear(p) || !_internal.patternEngineOk(p), p)
     // The defaults pass's key matcher.
     const m = safeKeyMatcher(p)
     assert.ok((m && m.__ataSafe) || nativeIsLinear(p), p)
   }
-  assert.ok(survivors >= 30 && out >= 5, survivors + ' ' + out)
+  assert.ok(survivors >= 30 && out >= 2, survivors + ' ' + out)
 })
 check('the matcher contract: an object with test, a boolean answer, errors propagate', () => {
   for (const bad of [undefined, null, 1, 'x', {}, { test: 1 }]) {
@@ -519,7 +539,7 @@ const PROBE = `
   let rej = 'no'; try { new V(S, { patternFallback: 'reject' }) } catch (e) { rej = e.message.includes('outside the linear-time engine') ? 'rejected' : e.message }
   out.push(rej)
   console.log(out.join('|'))`
-const REFUSED = "TypeError: patternFallback needs import 'ata-validator/pattern-fallback' in this build|true|true|false|rejected"
+const REFUSED = "TypeError: patternFallback needs import 'ata-validator/pattern-fallback'|true|true|false|rejected"
 const HONOURED = 'built|true|true|false|rejected'
 const cjs = (entry, add) => inChild(`(async () => { const V = require(${JSON.stringify(path.join(ROOT, entry))}).Validator; const ADD = ${add ? `async () => require(${JSON.stringify(path.join(ROOT, 'pattern-fallback.js'))})` : 'null'}; ${PROBE} })()`)
 const esm = (entry, add) => inChild(`const { Validator: V } = await import(${JSON.stringify(path.join(ROOT, entry))}); const ADD = ${add ? `async () => import(${JSON.stringify(path.join(ROOT, 'pattern-fallback.mjs'))})` : 'null'}; ${PROBE}`, 'module')

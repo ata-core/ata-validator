@@ -11,7 +11,7 @@ import { toTypeScript, renderPretty, renderCompact, toOutput, toRetryMessage, de
 import { defineSchema, schemaOf } from './lib/schema-helpers.mjs';
 
 // Pure-marked reads, so a bundler drops what goes unused (lib/schema-helpers.mjs).
-const api = /* @__PURE__ */ (() => { core._registerCodegen(engine); core._internals._registerPatternFallback(() => patternFallback); return core; })();
+const api = /* @__PURE__ */ (() => { core._registerCodegen(engine); core._internals.pf = () => patternFallback; return core; })();
 export const Validator = /* @__PURE__ */ (() => api.Validator)();
 export const compile = /* @__PURE__ */ (() => api.compile)();
 export const validate = /* @__PURE__ */ (() => api.validate)();

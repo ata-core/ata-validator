@@ -7,5 +7,5 @@
 // option. On Node, ata-validator has the option already.
 const core = require('./lib/validator-core.js');
 const patternFallback = require('./lib/pattern-fallback.js');
-core._internals._registerPatternFallback(() => patternFallback);
+core._internals.pf = () => patternFallback;
 module.exports = {};

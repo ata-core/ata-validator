@@ -466,12 +466,12 @@ export interface ValidatorOptions {
    */
   engine?: 'auto' | 'interpreter';
   /**
-   * What a pattern outside the linear-time engine gets: one with a
-   * backreference, a lookaround, `\B`, `\c`, `\k`, a Unicode property escape
-   * (`\p{...}`, every one, `^\p{L}+$` included), or counted repeats past the
-   * engine's budget. The same holds for `patternProperties` keys and
-   * `propertyNames`. Patterns the engine takes, and plain patterns the
-   * platform RegExp is shown to run in linear time, are unaffected.
+   * What a pattern ata cannot show to run in linear time gets: one the
+   * linear-time engine cannot represent (a backreference, a lookaround, `\B`,
+   * `\c`, `\k`, a Unicode property escape, counted repeats past the engine's
+   * budget) and that the platform RegExp is not proven to run in linear time
+   * either. `^\p{L}+$` is proven and unaffected; `^(\p{L}+)+$` is not. The
+   * same holds for `patternProperties` keys and `propertyNames`.
    *
    * - `'platform'` (default): the platform RegExp runs it, which can backtrack.
    * - `'reject'`: the constructor (and `addSchema()`) throws, naming the
