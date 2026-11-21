@@ -22,9 +22,13 @@ const fresh = () => { for (const f of FRESH) delete require.cache[f]; const V = 
 
 // For each export name: the file under lib/features/, a schema and options
 // that need it, and a document to check.
+const { NAMES, featureOf } = require('../lib/gates.js')
+const URI = ['uri', 'uri-reference', 'iri', 'iri-reference']
+// The formats and uri groups, which featuresFor() no longer names: each
+// stands for every per-name feature it holds.
+const GROUPS = { formats: NAMES.filter((n) => !URI.includes(n)), uri: URI }
 const CASES = {
-  formats: ['formats.js', { format: 'date' }, {}, 'x'],
-  uri: ['uri.js', { format: 'uri' }, {}, 'x y'],
+  ...Object.fromEntries(NAMES.map((n) => [featureOf(n), [featureOf(n) + '.js', { format: n }, {}, 'x y']])),
   draft7: ['draft7.js', { $schema: 'http://json-schema.org/draft-07/schema#', items: [{ type: 'string' }] }, {}, [1]],
   defaults: ['defaults.js', { properties: { a: { default: 1 } } }, {}, {}],
   uniqueItems: ['uniqueItems.js', { uniqueItems: true }, {}, [1, 1]],
@@ -40,6 +44,19 @@ const CASES = {
 
 ;(async () => {
   const index = await import('ata-validator/features')
+  // The groups still register every name they hold, for a caller that has
+  // not moved to the per-name features.
+  for (const [g, names] of Object.entries(GROUPS)) {
+    const m = await import('ata-validator/features/' + g)
+    assert.strictEqual(require.resolve('ata-validator/features/' + g), path.join(ROOT, 'lib/features', g + '.js'), g + ': resolves to lib/features/' + g + '.js')
+    for (const n of names) {
+      assert.deepStrictEqual(index.featuresFor({ format: n }), [featureOf(n)], n + ': featuresFor() names ' + featureOf(n))
+      const V = fresh()
+      assert.throws(() => new V({ format: n }).validate('x'), (e) => e.message === `ata2: ${featureOf(n)}, Validator.use(${featureOf(n)})`, n + ': refused without ' + g)
+      V.use(m[g])
+      assert.strictEqual(typeof new V({ format: n }).validate('x y').valid, 'boolean', n + ': answered with ' + g)
+    }
+  }
   assert.strictEqual(typeof index.featuresFor, 'function', 'ata-validator/features exports featuresFor')
   for (const [name, [file, schema, opts, doc]] of Object.entries(CASES)) {
     const m = await import('ata-validator/features/' + name)
@@ -70,13 +87,21 @@ const CASES = {
     return Object.keys(r.metafile.inputs).map((f) => f.replace(/^.*?lib\//, 'lib/'))
   }
   const own = Object.fromEntries(Object.entries(CASES).map(([n, [f]]) => [n, 'lib/features/' + f]))
-  for (const name of Object.keys(CASES)) {
+  for (const g of Object.keys(GROUPS)) own[g] = 'lib/features/' + g + '.js'
+  for (const name of Object.keys(own)) {
     const files = await carried('ata-validator/features/' + name)
-    for (const [other, f] of Object.entries(own)) assert.strictEqual(files.includes(f), other === name, `ata-validator/features/${name} ${other === name ? 'carries' : 'leaves out'} ${f}`)
+    // A group is one module; the uri group reads the formats group's.
+    const mine = (other) => other === name || (name === 'uri' && other === 'formats')
+    for (const [other, f] of Object.entries(own)) assert.strictEqual(files.includes(f), mine(other), `ata-validator/features/${name} ${mine(other) ? 'carries' : 'leaves out'} ${f}`)
   }
+  // A per-name feature carries the shared parts its check reads, and no other.
+  const parts = (files) => files.filter((f) => f.startsWith('lib/fmt/')).sort()
+  assert.deepStrictEqual(parts(await carried('ata-validator/features/formatDate')), ['lib/fmt/pair.js'])
+  assert.deepStrictEqual(parts(await carried('ata-validator/features/formatTime')), [])
+  assert.ok(!(await carried('ata-validator/features/formatUriReference')).includes('lib/fmt/URI_FAST.js'), 'formatUriReference leaves out URI_FAST')
   const files = await carried('ata-validator/features')
   for (const [other, f] of Object.entries(own)) assert.strictEqual(files.includes(f), other === 'draft7' || other === 'metaschemas', `ata-validator/features and ${f}`)
-  for (const f of ['lib/enrich-error.js', 'lib/formats-core.js', 'lib/unique-dup.js', 'lib/branch-collapse.js', 'lib/defaults.js', 'lib/mutators.js']) assert.ok(!files.includes(f), 'ata-validator/features leaves out ' + f)
+  for (const f of ['lib/enrich-error.js', 'lib/fmt/ipv6.js', 'lib/unique-dup.js', 'lib/branch-collapse.js', 'lib/defaults.js', 'lib/mutators.js']) assert.ok(!files.includes(f), 'ata-validator/features leaves out ' + f)
   // The declarations.
   execFileSync(process.execPath, [TSC_JS, '--noEmit', '--strict', '--module', 'nodenext', '--moduleResolution', 'nodenext', path.join(__dirname, 'feature_exports_types.ts')], { cwd: ROOT, stdio: 'inherit' })
   console.log(`ok: ${Object.keys(CASES).length} feature exports resolve and register; featuresFor() carries draft7 and the meta-schemas only; the declarations type-check`)

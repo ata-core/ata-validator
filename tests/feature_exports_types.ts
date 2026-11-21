@@ -14,9 +14,12 @@ import { errorMessages } from 'ata-validator/features/errorMessages'
 import { coerceTypes } from 'ata-validator/features/coerceTypes'
 import { removeAdditional } from 'ata-validator/features/removeAdditional'
 import { codegen } from 'ata-validator/features/codegen'
+import { formatDateTime } from 'ata-validator/features/formatDateTime'
+import { formatUri } from 'ata-validator/features/formatUri'
 const names: FeatureName[] = featuresFor({ format: 'date' }, { verbose: true }, [{ $id: 'x' }])
-const all: Feature[] = [formats, uri, draft7, defaults, uniqueItems, branchCollapse, richErrors, verbose, metaschemas, errorMessages, coerceTypes, removeAdditional, codegen]
+const all: Feature[] = [formats, uri, draft7, defaults, uniqueItems, branchCollapse, richErrors, verbose, metaschemas, errorMessages, coerceTypes, removeAdditional, codegen, formatDateTime, formatUri]
+const dt: Feature<'formatDateTime'> = formatDateTime
 const one: Feature<'formats'> = formats
 // @ts-expect-error: not a feature name
 const bad: FeatureName = 'nope'
-void names; void all; void one; void bad
+void names; void all; void one; void bad; void dt

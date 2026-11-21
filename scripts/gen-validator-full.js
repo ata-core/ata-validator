@@ -24,6 +24,7 @@ const FULL = {
   stop: [],
   rich: ["    if (r !== undefined && !f) need('richErrors');"],
   use: [],
+  merge: [],
   exports: ['module.exports = { Validator };'],
 };
 

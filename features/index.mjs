@@ -7,6 +7,8 @@
 import small from '../lib/validator-small.js';
 import d7 from '../lib/features/draft7.js';
 import ms from '../lib/features/metaschemas.js';
+import groups from '../lib/groups.js';
+import { OWN, PART, PARTS, GROUP, SHARE } from './format-sizes.mjs';
 
 // What _build is handed for each feature a question asks for. It stops
 // before it builds the engine, so a feature whose code only runs after that
@@ -33,5 +35,26 @@ export function featuresFor (schema, options, schemas) {
     if (schemas) for (const s of schemas) v.addSchema(s);
     v._build();
   } finally { small._probe(null); }
-  return [...got];
+  return smaller([...got]);
+}
+
+// The formats a schema needs, as the per-name features or as the formats and
+// uri groups, whichever adds fewer bytes to a page (format-sizes.mjs, measured
+// by scripts/gen-format-sizes.js). Either registers every check the schema
+// reads; a page that registers both carries the checks twice, so a caller
+// joining the answers for several schemas keeps the groups and drops the
+// per-name features they hold.
+const URI = new Set(['uri', 'uri-reference', 'iri', 'iri-reference'].map(groups.featureOf));
+function smaller (names) {
+  const fm = names.filter((n) => Object.hasOwn(OWN, n));
+  if (fm.length === 0) return names;
+  const parts = new Set();
+  let one = 0;
+  for (const n of fm) { one += OWN[n]; for (const p of PARTS[n]) parts.add(p); }
+  for (const p of parts) one += PART[p];
+  one -= SHARE * (fm.length + parts.size - 1);
+  const u = fm.some((n) => URI.has(n)), f = fm.some((n) => !URI.has(n));
+  const g = u && f ? ['formats', 'uri'] : u ? ['uri'] : ['formats'];
+  if (GROUP[u && f ? 'both' : u ? 'uri' : 'formats'] >= one) return names;
+  return names.filter((n) => !Object.hasOwn(OWN, n)).concat(g);
 }

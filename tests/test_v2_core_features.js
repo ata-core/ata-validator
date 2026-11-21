@@ -63,7 +63,22 @@ const first = (V, s, o, d) => { const v = new V(s, o); v.validate(structuredClon
       }
     }
   }
-  for (const n of ['formats', 'uri', 'draft7', 'defaults', 'uniqueItems', 'branchCollapse', 'verbose', 'metaschemas']) assert.ok(seen[n] > 0, 'the suite needs ' + n)
+  // Every format name is needed by its own feature somewhere in the suite, so
+  // each is withheld above at least once.
+  const { NAMES, featureOf } = require('../lib/groups.js')
+  for (const n of NAMES.map(featureOf).concat(['draft7', 'defaults', 'uniqueItems', 'branchCollapse', 'verbose', 'metaschemas'])) assert.ok(seen[n] > 0, 'the suite needs ' + n)
+  assert.ok(!seen.formats && !seen.uri, 'no suite schema has formats enough for featuresFor() to name the groups')
+  // A schema with every format: featuresFor() names the two groups
+  // (features/format-sizes.mjs), and withholding either is refused.
+  {
+    const every = { type: 'object', properties: Object.fromEntries(NAMES.map((n) => [n, { format: n }])) }
+    const names = F.featuresFor(every)
+    assert.deepStrictEqual(names.slice().sort(), ['formats', 'uri'])
+    const doc = Object.fromEntries(NAMES.map((n) => [n, 'x y']))
+    assert.strictEqual(first(coreWith(names), every, {}, doc).validate(doc).errors.length > 0, true)
+    assert.throws(() => first(coreWith(['formats']), every, {}, doc), { message: /^ata2: formatUri(Reference)?, / })
+    assert.throws(() => first(coreWith(['uri']), every, {}, doc), { message: 'ata2: formatEmail, Validator.use(formatEmail)' })
+  }
   assert.ok(taken > 8000 && refused > 4000, `${taken} schemas taken, ${refused} refusals`)
 
   // The three ways to give documents: the schemas option and addSchema().
@@ -72,7 +87,7 @@ const first = (V, s, o, d) => { const v = new V(s, o); v.validate(structuredClon
   const viaOption = F.featuresFor(root, { schemas: [doc] })
   const viaAdd = F.featuresFor(root, {}, [doc])
   assert.deepStrictEqual(viaAdd.sort(), viaOption.sort(), 'addSchema() and the schemas option need the same features')
-  for (const n of ['draft7', 'formats', 'uniqueItems']) assert.ok(viaOption.includes(n), 'a registered document needs ' + n + ': ' + viaOption)
+  for (const n of ['draft7', 'formatDate', 'uniqueItems']) assert.ok(viaOption.includes(n), 'a registered document needs ' + n + ': ' + viaOption)
   for (const n of viaAdd) {
     const V = coreWith(viaAdd.filter((x) => x !== n))
     assert.throws(() => { const v = new V(root, {}); v.addSchema(doc); v.validate('x') }, (e) => e.message.includes('Validator.use(' + n + ')'), 'addSchema() without ' + n)
@@ -87,7 +102,17 @@ const first = (V, s, o, d) => { const v = new V(s, o); v.validate(structuredClon
   // the engine builds it, and refused there.
   const hidden = Object.defineProperty({ type: 'string' }, 'format', { value: 'date', enumerable: false })
   assert.deepStrictEqual(F.featuresFor(hidden), [])
-  assert.throws(() => new (coreWith([]))(hidden).validate('x'), { message: 'ata2: formats, Validator.use(formats)' })
+  assert.throws(() => new (coreWith([]))(hidden).validate('x'), { message: 'ata2: formatDate, Validator.use(formatDate)' })
+  // The same where the gate was skipped: every other format registered, and
+  // uniqueItems and branchCollapse, so the core asks no question of the text.
+  const allBut = NAMES.filter((n) => n !== 'date').map(featureOf).concat(['uniqueItems', 'branchCollapse'])
+  assert.throws(() => new (coreWith(allBut))(hidden).validate('x'), { message: 'ata2: formatDate, Validator.use(formatDate)' })
+  // Several format features in one Validator.use() call are all kept, and
+  // the formats and uri groups still register every name they hold.
+  const two = { properties: { d: { format: 'date' }, e: { format: 'email' }, u: { format: 'uri' } } }
+  assert.strictEqual(new (coreWith(['formatDate', 'formatEmail', 'formatUri']))(two).validate({ d: '2020-01-01', e: 'a@b.co', u: 'x y' }).errors.length, 1)
+  assert.strictEqual(new (coreWith(['formats', 'uri']))(two).validate({ d: 'x', e: 'x', u: 'https://a.b' }).errors.length, 2)
+  assert.throws(() => new (coreWith(['formats']))(two).validate({}), { message: 'ata2: formatUri, Validator.use(formatUri)' })
   const hiddenUnique = Object.defineProperty({ type: 'array' }, 'uniqueItems', { value: true, enumerable: false })
   assert.throws(() => new (coreWith([]))(hiddenUnique).validate([1, 1]), { message: 'ata2: uniqueItems, Validator.use(uniqueItems)' })
   console.log(`ok: ${taken} schemas taken on the core with featuresFor(), ${named} of them needing a feature; ${refused} refusals with one withheld`)

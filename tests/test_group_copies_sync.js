@@ -12,14 +12,46 @@ for (const [f, src] of Object.entries(render())) {
   assert.strictEqual(fs.readFileSync(path.join(LIB, f), 'utf8'), src, `lib/${f} differs from its source; run node scripts/gen-group-copies.js`);
 }
 const full = require('../lib/formats.js').formatChecks();
-const core = require('../lib/formats-core.js').formatChecks();
-const uri = require('../lib/uri-checks.js');
-const { FORMATS, URI_FORMATS, formatGroup } = require('../lib/gates.js');
-assert.deepStrictEqual(Object.keys(full).sort(), [...FORMATS, ...URI_FORMATS].sort(), 'lib/gates.js names every built-in format');
-assert.deepStrictEqual(Object.keys(core).sort(), [...FORMATS].sort(), 'the formats group checks every name but the URI ones');
-assert.deepStrictEqual(Object.keys(uri).sort(), [...URI_FORMATS].sort(), 'the uri group checks the URI names');
-for (const n of Object.keys(full)) assert.strictEqual(formatGroup(n), URI_FORMATS.has(n) ? 'uri' : 'formats', n);
-assert.strictEqual(formatGroup('color'), null, 'an unknown format needs no group');
+const { NAMES, featureOf } = require('../lib/gates.js');
+const URI = ['uri', 'uri-reference', 'iri', 'iri-reference'];
+assert.deepStrictEqual(Object.keys(full).sort(), [...NAMES].sort(), 'lib/gates.js names every built-in format');
+// One feature per name, lib/features/format<Name>.js, holding that check alone
+// and registered as part of formats or uri.
+const one = {};
+for (const n of NAMES) {
+  const f = featureOf(n);
+  assert.match(f, /^format[A-Z][A-Za-z0-9]*$/, n + ': ' + f);
+  const m = require('../lib/features/' + f + '.js');
+  assert.deepStrictEqual(Object.keys(m), [f], f + ' exports itself by name');
+  assert.ok(Object.isFrozen(m[f]), f + ' is frozen');
+  assert.strictEqual(m[f].name, URI.includes(n) ? 'uri' : 'formats', f + ' registers under its group');
+  assert.deepStrictEqual(Object.keys(m[f].checks), [n], f + ' checks ' + n + ' alone');
+  assert.strictEqual(typeof m[f].checks[n], 'function');
+  one[n] = m[f].checks[n];
+}
+assert.strictEqual(featureOf('date-time'), 'formatDateTime');
+assert.strictEqual(featureOf('relative-json-pointer'), 'formatRelativeJsonPointer');
+// The formats and uri groups are one module each, apart from the per-name
+// modules; they answer alike below.
+const core = require('../lib/features/formats.js').formats.checks;
+const uri = require('../lib/features/uri.js').uri.checks;
+assert.deepStrictEqual(Object.keys(core).sort(), NAMES.filter((n) => !URI.includes(n)).sort(), 'the formats group checks every name but the URI ones');
+assert.deepStrictEqual(Object.keys(uri).sort(), [...URI].sort(), 'the uri group checks the URI names');
+
+// No declaration is in two generated modules: a page that registers several
+// names carries each piece once.
+{
+  const seen = new Map();
+  for (const f of fs.readdirSync(path.join(LIB, 'fmt')).map((x) => 'fmt/' + x).concat(NAMES.map((n) => 'features/' + featureOf(n) + '.js'))) {
+    for (const m of fs.readFileSync(path.join(LIB, f), 'utf8').matchAll(/^(?:function ([\w$]+)|(?:const|let|var) ([\w$]+) =)/gm)) {
+      const d = m[1] || m[2];
+      assert.ok(!seen.has(d), `${d} is declared in lib/${f} and lib/${seen.get(d)}`);
+      seen.set(d, f);
+    }
+  }
+  assert.ok(seen.has('pair') && seen.has('ipv6') && seen.has('_uriWalk') && seen.has('URI_FAST'), 'the shared declarations are there');
+  for (const f of fs.readdirSync(path.join(LIB, 'fmt'))) assert.ok(Object.hasOwn(render(), 'fmt/' + f), 'lib/fmt/' + f + ' is generated');
+}
 // The copies answer as their sources on the suite's format documents.
 const SUITE = path.join(__dirname, 'suite/tests');
 let n = 0;
@@ -29,10 +61,12 @@ for (const dialect of ['draft2020-12', 'draft7', 'v1']) {
   for (const f of fs.readdirSync(dir)) {
     const name = f.replace(/\.json$/, '');
     if (!full[name]) continue;
-    const mine = core[name] || uri[name];
+    const mine = one[name];
+    const grp = core[name] || uri[name];
     for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) for (const t of g.tests) {
       if (typeof t.data !== 'string') continue;
       assert.strictEqual(mine(t.data), full[name](t.data), `${name}: ${JSON.stringify(t.data)}`);
+      assert.strictEqual(grp(t.data), full[name](t.data), `${name} in its group: ${JSON.stringify(t.data)}`);
       n++;
     }
   }
