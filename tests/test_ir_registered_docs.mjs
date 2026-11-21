@@ -34,6 +34,10 @@ const t = { $id: 'https://e.x/t', type: 'object', properties: { a: { type: 'stri
 const u = { $id: 'https://e.x/u', type: 'object', properties: { b: { default: 2 } } }
 const many = { $id: 'https://e.x/m', type: 'object', properties: {} }
 for (let i = 0; i < 12; i++) many.properties['f' + i] = { type: 'integer' }
+// A draft-07 document whose root is a $ref: normalization drops the $id beside
+// it, and the IR registered such a document under no name, so every reference
+// to it failed and every document was refused.
+const d7 = { $schema: 'http://json-schema.org/draft-07/schema#', $id: 'https://e.x/d7', $ref: '#/definitions/s', type: 'number', definitions: { s: { type: 'string' } } }
 const registered = [t, u, many]
 const M20 = 'https://json-schema.org/draft/2020-12/schema'
 const M19 = 'https://json-schema.org/draft/2019-09/schema'
@@ -50,6 +54,8 @@ const cases = [
   [{ properties: { l: { items: { $ref: 'https://e.x/t' } }, x: { default: 1 } } }, registered],
   [{ properties: { z: { $ref: 'https://e.x/t' }, a: { type: 'string' } } }, registered],
   [{ $ref: 'https://e.x/m' }, registered],
+  [{ $ref: 'https://e.x/d7' }, [d7]],
+  [{ properties: { p: { $ref: 'https://e.x/d7' } } }, [d7]],
   // A reference beside keywords of its own, in one document: `#/required` ranks before `#/properties/a/type`.
   [{ $ref: '#/$defs/t', properties: { x: { type: 'integer' } }, $defs: { t: { type: 'object', properties: { a: { type: 'string' } }, required: ['c'] } } }, null],
   [{ $ref: M20 }, null],
@@ -59,7 +65,7 @@ const cases = [
   [{ $schema: 'http://json-schema.org/draft-04/schema#', $ref: 'http://json-schema.org/draft-04/schema#' }, null],
 ]
 const docs = () => [
-  {}, 1, [], [{}], [{ a: 1, b: 1 }, { a: 2, b: 0 }], { a: 1, b: 1, c: 1 }, { p: { n: {} }, n: {}, l: [{}] }, { a: 1, z: { b: 1, a: 1 } },
+  {}, 1, 'abc', { p: 'abc' }, { p: 1 }, [], [{}], [{ a: 1, b: 1 }, { a: 2, b: 0 }], { a: 1, b: 1, c: 1 }, { p: { n: {} }, n: {}, l: [{}] }, { a: 1, z: { b: 1, a: 1 } },
   { f9: 'x', f2: 'y', f5: 'z' }, { multipleOf: 0 }, { exclusiveMaximum: true }, { maximum: 3, exclusiveMaximum: true }, { a: 1 }, { $defs: { foo: { type: 'integer' } } }, { $defs: { foo: { type: 1 } } }, { minLength: -1, type: 'nope' },
 ]
 
