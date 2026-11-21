@@ -365,6 +365,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 669 KB: a lone high surrogate counts as its own code point, length bounds
 // stop scanning for pairs once decided, and a well-formed string is read only
 // at the high half of each pair (684179 bytes, 668.1 KB; 683873 before).
-assert.ok(manifest.size < 669 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 670 KB: modules of ata-validator/ir take formats as calls to the caller's
+// functions, schemas resolved at build time and assertFormat read as the
+// runtime reads it (compiledBuildOptions), and verify takes a module's
+// options (686031 bytes, 670.0 KB; 684179 before).
+assert.ok(manifest.size < 670.5 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

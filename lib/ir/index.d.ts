@@ -23,6 +23,15 @@ export interface SpecializeOptions extends IROptions {
   fillSource?: (schema: JSONSchema) => string | null;
   /** Name the smaller check of a format where there is one (`email`, `uri`, `uri-reference`): the same answers from a regular expression, fewer bytes in a bundle, slower by tens of nanoseconds a check. Off by default. */
   smallFormats?: boolean;
+  /**
+   * With `holes: true`, a format given here as a function is a call in the module: the module exports
+   * `setFormats(formats)` and `formatHoles` (the names), and a check that reaches a format before
+   * `setFormats()` has given its function throws. Without `holes`, a function here is refused.
+   */
+  formats?: Record<string, unknown>;
+  holes?: boolean;
+  /** A `$ref` or `$dynamicRef` that resolves to nothing throws an `ir:` error instead of failing every value that reaches it. */
+  strictRefs?: boolean;
 }
 
 /** Options the closures take beyond IROptions: what a module cannot carry. */
