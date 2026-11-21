@@ -27,16 +27,18 @@ const { errorMessages } = require('../lib/features/error-messages.js')
 const { richErrors } = require('../lib/features/rich-errors.js')
 const { verbose } = require('../lib/features/verbose.js')
 const fresh = () => {
-  for (const k of Object.keys(require.cache)) if (k.endsWith(path.join('lib', 'validator-small.js'))) delete require.cache[k]
+  // The registry is the module's and the groups' (lib/groups.js), which the engine reads.
+  for (const k of Object.keys(require.cache)) if (['validator-small.js', 'groups.js', 'engine-small.js'].some((f) => k.endsWith(path.join('lib', f)))) delete require.cache[k]
   return require('../lib/validator-small.js').Validator
 }
 // Asked for verbose without the feature, a validator is refused, naming it.
 assert.throws(() => new (fresh())({ type: 'string' }, { verbose: true }).validate(1), { message: 'ata2: verbose, Validator.use(verbose)' })
-Validator.use(metaschemas, errorMessages, verbose)
+const { all: GROUPS } = require('../lib/features/groups.js')
+Validator.use(metaschemas, errorMessages, verbose, ...GROUPS)
 // A second copy of the module, its own feature registry, with the rich
 // fields registered: Validator.use() registers for the whole module.
 const Rich = fresh()
-Rich.use(metaschemas, errorMessages, richErrors, verbose)
+Rich.use(metaschemas, errorMessages, richErrors, verbose, ...GROUPS)
 
 const DIALECTS = { 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', draft7: 'http://json-schema.org/draft-07/schema#' }
 const clone = (x) => x === undefined ? x : structuredClone(x)

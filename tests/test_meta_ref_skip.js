@@ -8,6 +8,8 @@
 
 const assert = require('assert');
 const { Validator } = require('../lib/validator-small.js');
+// Every schema-decided group (lib/groups.js), as the full 2.0 entries register them.
+require('../lib/validator-small.js').Validator.use(...require('../lib/features/groups.js').all)
 
 const S2020 = 'https://json-schema.org/draft/2020-12/schema';
 const S07 = 'http://json-schema.org/draft-07/schema#';

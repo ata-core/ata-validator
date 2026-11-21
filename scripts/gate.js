@@ -120,6 +120,69 @@ function v2Paths(bundle, label, rich) {
   };
 }
 
+// The small engine, with every schema-decided group registered (lib/groups.js)
+// as the full 2.0 entries have them. Held here: the core paths below load
+// copies of their own.
+const { createSmall } = require(path.join(ROOT, 'lib/engine-small.js'));
+require(path.join(ROOT, 'lib/validator-small.js')).Validator.use(...require(path.join(ROOT, 'lib/features/groups.js')).all);
+
+// The plugin's core (index.v2.core.mjs) with exactly the features
+// featuresFor() names registered. The registry is the module's, and the
+// pieces the engine reads are lib/groups.js's, so each set of features gets
+// its own copy of the two and of the engine that reads them: a schema built
+// with fewer features than it needs is refused, never answered by what an
+// earlier schema registered. tests/test_v2_core_features.js holds the same
+// copies to refusing when one feature is withheld.
+let v2f = null;
+const cores = new Map();
+const FRESH = ['validator-small.js', 'groups.js', 'engine-small.js'].map((f) => path.join(ROOT, 'lib', f));
+function coreWith(names) {
+  const key = [...names].sort().join(',');
+  let V = cores.get(key);
+  if (V === undefined) {
+    for (const f of FRESH) delete require.cache[f];
+    V = require(FRESH[0]).Validator;
+    if (names.length) V.use(...names.map((n) => v2f[n]));
+    for (const f of FRESH) delete require.cache[f];
+    cores.set(key, V);
+  }
+  return V;
+}
+// The core paths: each schema with options, and optionally registered
+// through `schemas` behind a $ref (`wrap`), on the core with exactly the
+// features featuresFor() names, against the Validator built the same way.
+const asDoc = (s) => { const id = typeof s.$id === 'string' && s.$id !== '' && s.$id[0] !== '#' ? s.$id : 'https://example.com/gate-root.json'; return [id, id === s.$id ? s : { ...s, $id: id }]; };
+const wrapped = (s, opts) => { const [id, doc] = asDoc(s); return [typeof s.$schema === 'string' ? { $schema: s.$schema, $ref: id } : { $ref: id }, { ...opts, schemas: [doc] }]; };
+// A boolean schema cannot be a registered document with an $id, so it is given directly.
+const isDoc = (s) => s !== null && typeof s === 'object' && !Array.isArray(s);
+function corePath(opts, wrap) {
+  const make = (s) => (wrap && isDoc(s) ? wrapped(s, opts) : [s, opts]);
+  return {
+    fields: PLAIN, ref: { ...opts, richErrors: false }, fills: true,
+    // Registered behind a $ref, the reference is the 2.0 Validator with every
+    // feature but the error-shape ones registered, built the same way: the 1.x
+    // Validator reads a relative reference inside a registered document
+    // differently (SchemaStore's foundryvtt and cinnamon schemas), which is
+    // not a question of features.
+    refMake: wrap ? (s) => { const [r, o] = make(s); try { const v = new (coreWith(FULL))(r, o); v.isValidObject(null); return v; } catch (e) { if (/^ata2:/.test(String(e && e.message))) return null; throw e; } } : null,
+    build: (s) => {
+      const [r, o] = make(s);
+      const V = coreWith(v2f.featuresFor(r, o));
+      const v = new V(r, o); v.isValidObject(null); v.validate(null);
+      return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) };
+    },
+  };
+}
+const FULL = ['errorMessages', 'metaschemas', 'coerceTypes', 'removeAdditional', 'formats', 'uri', 'draft7', 'defaults', 'uniqueItems', 'branchCollapse'];
+const FMT = { date: (x) => /^\d{4}-\d\d-\d\d$/.test(x), uri: (x) => x.includes(':'), email: (x) => x.includes('@') };
+const CORE_PATHS = {
+  'v2 core + featuresFor': corePath({}),
+  'v2 core + featuresFor, no defaults': corePath({ useDefaults: false }),
+  'v2 core + featuresFor, formats off': corePath({ assertFormat: false }),
+  'v2 core + featuresFor, formats given': corePath({ formats: FMT }),
+  'v2 core + featuresFor, schemas map': corePath({}, true),
+};
+
 // A path: build(schema) returns { validate, isValid } or null when it declines
 // the schema. `fields` are the error fields it promises; `ref` the Validator
 // options its answers are those of; `ordered: false` where it promises the
@@ -134,7 +197,7 @@ const PATHS = {
   // build of this one instance. Declined where it takes no part (createSmall
   // returns null and the walk answers).
   'small engine': { fields: RICH, fills: true, build: (s) => {
-    const im = require(path.join(ROOT, 'lib/interpreter.js')); const { createSmall } = require(path.join(ROOT, 'lib/engine-small.js'));
+    const im = require(path.join(ROOT, 'lib/interpreter.js'));
     const real = im.createInterpreter; let used = false;
     im.createInterpreter = (schema, args) => { const e = createSmall(schema, args); if (e === null) return real(schema, args); used = true; return e; };
     try { const v = new Validator(s, { engine: 'interpreter' }); v.isValidObject(null); return used ? { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) } : null; } finally { im.createInterpreter = real; }
@@ -148,6 +211,7 @@ const PATHS = {
   ...(process.env.ATA_V2_RICH_BUNDLE ? v2Paths(process.env.ATA_V2_RICH_BUNDLE, 'v2 entry, rich errors', true) : {}),
   ...(process.env.ATA_V2_EDGE_BUNDLE ? v2Paths(process.env.ATA_V2_EDGE_BUNDLE, 'v2 edge entry', false) : {}),
   ...(process.env.ATA_V2_EDGE_RICH_BUNDLE ? v2Paths(process.env.ATA_V2_EDGE_RICH_BUNDLE, 'v2 edge entry, rich errors', true) : {}),
+  ...CORE_PATHS,
   'closure tree': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s, { engine: 'interpreter' }); for (let i = 0; i < 1100; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
   'JSON text': { fields: RICH, json: true, fills: false, build: (s) => { const v = new Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
   'plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => { const v = new Validator(s, { richErrors: false, engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
@@ -231,7 +295,7 @@ async function check(label, schema, docs, stats, report, only) {
     let p;
     try { p = P.async ? await P.build(schema) : P.build(schema); } catch (e) { st.threw++; if (report.length < 40) report.push(`${name} | ${label} | building threw: ${String(e && e.message).slice(0, 160)}`); continue; }
     if (p === null) { st.declined++; continue; }
-    const ref = refFor(P.ref);
+    const ref = P.refMake ? P.refMake(schema) : refFor(P.ref);
     if (ref === null) { st.declined++; continue; }
     st.taken++;
     const shape = pick(P.fields);
@@ -324,6 +388,7 @@ async function schemastore(root, stats, report, only) {
 
 async function run(opts) {
   await loadIr();
+  v2f = await import(at('index.v2.features.mjs'));
   const stats = { schemas: 0, paths: {}, kinds: {}, first: {} }; const report = [];
   const only = opts.paths ? new Set(opts.paths) : null;
   EVERY = opts.every > 1 ? opts.every : 1; SEEN = 0;

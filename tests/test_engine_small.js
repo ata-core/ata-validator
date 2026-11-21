@@ -12,6 +12,8 @@ const fs = require('node:fs')
 const path = require('node:path')
 const im = require('../lib/interpreter.js')
 const { createSmall } = require('../lib/engine-small.js')
+// Every schema-decided group (lib/groups.js), as the full 2.0 entries register them.
+require('../lib/validator-small.js').Validator.use(...require('../lib/features/groups.js').all)
 
 const real = im.createInterpreter
 let cap = null

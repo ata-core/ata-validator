@@ -13,6 +13,8 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { execFileSync } = require('node:child_process')
 const { createSmall } = require('../lib/engine-small.js')
+// Every schema-decided group (lib/groups.js), as the full 2.0 entries register them.
+require('../lib/validator-small.js').Validator.use(...require('../lib/features/groups.js').all)
 
 const verdicts = (schema, data) => { const v = createSmall(schema, {}); return data.map((d) => v.isValid(d)) }
 const keywords = (schema, d) => { const r = createSmall(schema, {}).validate(d); return r.valid ? [] : r.errors.map((e) => e.keyword) }
@@ -63,6 +65,7 @@ assert.deepStrictEqual(verdicts({}, [1]), [true], 'clean again')
 const before = execFileSync(process.execPath, ['-e', `
   Object.defineProperty(Object.prototype, 'type', { value: 'string', configurable: true })
   const { createSmall } = require(${JSON.stringify(path.resolve(__dirname, '../lib/engine-small.js'))})
+  require(${JSON.stringify(path.resolve(__dirname, '../lib/validator-small.js'))}).Validator.use(...require(${JSON.stringify(path.resolve(__dirname, '../lib/features/groups.js'))}).all)
   const v = createSmall({}, {}); const w = createSmall({ properties: { a: {} } }, {})
   process.stdout.write(JSON.stringify([v.isValid(1), v.isValid('x'), w.isValid('x'), w.isValid(1)]))
 `], { encoding: 'utf8' })

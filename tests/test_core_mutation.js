@@ -20,6 +20,8 @@ const { createSmall } = require('../lib/engine-small.js')
 const C = require('../lib/core/verdict.js')
 C._parts(() => require('../lib/core/verdict-more.js'))
 const { run, CONTEXTS } = require('./_schema_mutations.js')
+// Every schema-decided group (lib/groups.js), as the full 2.0 entries register them.
+require('../lib/validator-small.js').Validator.use(...require('../lib/features/groups.js').all)
 small.Validator.use(require('../lib/features/error-messages.js').errorMessages, require('../lib/features/metaschemas.js').metaschemas)
 
 // What validator-small hands its engine for a schema, or null where it

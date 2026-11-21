@@ -20,6 +20,8 @@ const small = require('../lib/validator-small.js')
 const { createSmall } = require('../lib/engine-small.js')
 const { run, CONTEXTS } = require('./_schema_mutations.js')
 small.Validator.use(require('../lib/features/error-messages.js').errorMessages, require('../lib/features/metaschemas.js').metaschemas)
+// Every schema-decided group (lib/groups.js), as the full 2.0 entries register them.
+require('../lib/validator-small.js').Validator.use(...require('../lib/features/groups.js').all)
 
 // The test build: the engine's source with its TEST constant set, requires
 // made absolute, written to a temporary file.

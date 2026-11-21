@@ -18,6 +18,8 @@ const real = im.createInterpreter
 let cap = null
 im.createInterpreter = (schema, args) => { cap = { schema, args }; return real(schema, args) }
 const { Validator } = require('..')
+// Every schema-decided group (lib/groups.js), as the full 2.0 entries register them.
+require('../lib/validator-small.js').Validator.use(...require('../lib/features/groups.js').all)
 
 // Every case as [schema, args, documents, label], captured once.
 const cases = []

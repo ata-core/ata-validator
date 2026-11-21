@@ -89,6 +89,9 @@
       "import": "./compiled-standard.mjs",
       "default": "./lib/compiled-standard.js"
     },
+    "./v2/plugin-core": {
+      "import": "./index.v2.core.mjs"
+    },
     "./stream": {
       "types": "./stream.d.ts",
       "import": "./stream.mjs",
@@ -240,6 +243,11 @@
     "!lib/engine-small.js",
     "!lib/engine-shared.js",
     "!lib/rejection-core.js",
+    "!lib/groups.js",
+    "!lib/deq.js",
+    "!lib/unique-dup.js",
+    "!lib/formats-core.js",
+    "!lib/uri-checks.js",
     "!lib/validator-small.js",
     "!lib/small-tier.js",
     "!lib/features/",
