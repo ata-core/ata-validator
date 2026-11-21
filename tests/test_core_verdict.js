@@ -251,7 +251,7 @@ mutations.push(['annotations of a failed oneOf branch counted', mutantMore([['if
 mutations.push(['annotations of a passing if dropped', mutantMore([['if (ifF(d)) { if (thenF', 'if (ifF(d)) { np = p1; nc = c1; nk = k1; if (thenF']])])
 mutations.push(['an index contains did not match counted as evaluated', mutantMore([['if (ctf(d[i])) { c++; EC[nc++] = i }', '{ if (ctf(d[i])) c++; EC[nc++] = i }']])])
 mutations.push(['a property that can pass taken as one that never does', mutant([['  if (s === false) return true\n', '  if (s === false || s === true || (isMap(s) && s.type === \'integer\')) return true\n']])])
-mutations.push(['array items checked in place without their bounds', mutant([['case 8: if (Number.isInteger(x) && x >= it[0] && x <= it[1]) continue; return false', 'case 8: if (Number.isInteger(x)) continue; return false']])])
+mutations.push(['array items checked in place without their bounds', mutant([['if (!(Number.isInteger(x) && x >= a && x <= b)) return false', 'if (!Number.isInteger(x)) return false']])])
 mutations.push(['a failing inherited key taken as own', mutant([['has(o, k) ? false : exactObj(', 'false && exactObj(']])])
 for (const [name, make] of mutations) {
   const m = run(make, false)
