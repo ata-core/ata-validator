@@ -65,6 +65,10 @@ for (const s of strings) {
     }
   }
 }
+// A negative bound is a bound: the small engine read -1 as none.
+cases.push({ s: 'a', schema: { type: 'string', maxLength: -1 }, want: false });
+cases.push({ s: '', schema: { type: 'string', maxLength: -0.5 }, want: false });
+cases.push({ s: 'a', schema: { type: 'object', properties: { p: { type: 'string', maxLength: -1 } } }, data: { p: 'a' }, want: false });
 
 // The JSON text as JSON.stringify writes it (lone surrogates escaped) and, where
 // the string needs no escape, with the units written raw.
