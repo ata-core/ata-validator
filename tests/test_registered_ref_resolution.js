@@ -84,6 +84,22 @@ function cases() {
       root: { definitions: { nope: { type: 'number' } }, properties: { q: { $ref: b + 'a.json' } } },
       schemas: [{ $id: b + 'a.json', properties: { p: { $ref: b + 'b.json' } } }, { $id: b + 'b.json', properties: { r: { $ref: '#/definitions/nope' } } }],
     }, [{ q: { p: { r: 1 } } }, { q: { p: { r: 's' } } }, {}], false],
+    // A schema reached through a name no keyword reads (SchemaStore's travis
+    // writes #/definitions/notificationObject/webhooks), in a registered
+    // document: its own #/$defs/s is that document's. The references were
+    // made local everywhere else, so this one read the root's s, which
+    // accepts anything.
+    ...[[{ $defs: { s: {} } }, '$defs'], [{ definitions: { s: {} } }, '$defs'], [{ definitions: { s: {} } }, 'definitions']].map(([rootDefs, dk]) => [`pointer through a name no keyword reads, ${dk}, root ${Object.keys(rootDefs)[0]}`, {
+      root: { ...rootDefs, properties: { w: { $ref: b + `g.json#/${dk}/group/item` } } },
+      schemas: [dk === 'definitions'
+        ? { $schema: 'http://json-schema.org/draft-07/schema#', $id: b + 'g.json', definitions: { group: { item: { properties: { u: { $ref: '#/definitions/s' } } } }, s: { type: 'string' } } }
+        : { $id: b + 'g.json', $defs: { group: { item: { properties: { u: { $ref: '#/$defs/s' } } } }, s: { type: 'string' } } }],
+    }, [{ w: { u: 1 } }, { w: { u: 's' } }, {}], true]),
+    // The same inside one document, in an embedded resource.
+    ['pointer through a name no keyword reads, embedded resource', {
+      root: { $id: b + 'root.json', $defs: { s: {}, emb: { $id: 'emb.json', $defs: { group: { item: { properties: { u: { $ref: '#/$defs/s' } } } }, s: { type: 'string' } } } }, properties: { w: { $ref: 'emb.json#/$defs/group/item' } } },
+      schemas: [],
+    }, [{ w: { u: 1 } }, { w: { u: 's' } }, {}], true],
     // A cycle across documents that reaches the generators as written:
     // normalizeRefs gives up on a registered document in another dialect.
     // The verdict generator stopped at the re-entry and checked nothing there.
