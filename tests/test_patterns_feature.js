@@ -188,7 +188,7 @@ const HAND = ['^(/|\\./|[A-Za-z]:\\\\)?[^/]+$', '^[^\\u0000]*$', '^(?:a|bc)?x*$'
   // The pass takes the Validator's matcher; the core's refuses with no engine.
   const hiddenPP = Object.defineProperty({ type: 'object', additionalProperties: false }, 'patternProperties', { value: { [deep]: {} }, enumerable: false })
   assert.throws(() => new (coreWith(['removeAdditional']))(hiddenPP, { removeAdditional: true }).validate({ xz: 1 }), REFUSED, 'removeAdditional pass: refused where it compiles a name')
-  assert.throws(() => F.removeAdditional.build(ra, (src) => core.compilePattern(src, null)), REFUSED)
+  assert.throws(() => F.removeAdditional.build(ra, null, core), REFUSED)
   const pn = { propertyNames: { pattern: deep } }
   assert.throws(() => new (coreWith([]))(pn).validate({ xz: 1 }), REFUSED, 'propertyNames: refused without patterns')
   assert.strictEqual(answer(coreWith(['patterns']), pn, [{ xz: 1 }, { q: 1 }]), answer(FULL, pn, [{ xz: 1 }, { q: 1 }]), 'propertyNames: answered as the full entry')

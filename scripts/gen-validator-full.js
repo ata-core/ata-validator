@@ -69,7 +69,7 @@ function renderEngine () {
 // draft7 group (a full entry carries draft7 anyway).
 const SUBS = [
   ["const { createSmall } = require('./engine-small');", "const { createSmall } = require('./engine-full');"],
-  ["need('removeAdditional').build(pre, (src) => require('./engine-shared-core').compilePattern(src, G.safe))", "need('removeAdditional').build(pre, require('./engine-shared').compilePattern)"],
+  ["need('removeAdditional').build(pre, G.safe, require('./engine-shared-core'))", "need('removeAdditional').build(pre, null, require('./engine-shared'))"],
   ["const { needsNormalization, scan, DEFINITIONS } = require('./schema-scan');", "const { needsNormalization } = require('./schema-scan');"],
   ['  const k = (inherit || 0) + (shown ? 8 : 0), c = kept.get(s);', '  const c = kept.get(s);'],
   ['    let schemaObj = normalize(raw, 0, !!o.verbose);', '    let schemaObj = normalize(raw, 0);'],
