@@ -11,6 +11,8 @@
 #endif
 
 #include <algorithm>
+#include <atomic>
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -50,6 +52,14 @@ static const re2::RE2::Options& ata_quiet_re2_options() {
 #endif // defined(_MSC_VER) && !defined(__clang__)
 
 #include "simdjson.h"
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#define ATA_SCAN_NEON 1
+#elif defined(__SSE2__) || defined(_M_X64)
+#include <emmintrin.h>
+#define ATA_SCAN_SSE2 1
+#endif
 
 // --- Fast format validators (no std::regex) ---
 
@@ -464,6 +474,12 @@ static std::string canonical_number(double d) {
 // left by a verdict nobody read, sends a document to the JS path, which
 // gives the same answer.
 thread_local bool tl_needs_js = false;
+// How many times any thread has set it. The binding reads this, a plain
+// global, before and after a verdict, and reads the thread_local (an out of
+// line call on macOS) only when it moved, which a document very rarely makes
+// it do. Moved by another thread, it costs one read that finds nothing set
+// here, or a stale flag that sends a document to the JS path.
+std::atomic<uint64_t> g_needs_js_marks{0};
 
 // Set and read through these, out of line: a thread_local named in a walker
 // had its address worked out on every call of that walker (a function call
@@ -471,10 +487,12 @@ thread_local bool tl_needs_js = false;
 // cost it about 10% on an 11 KB document.
 #if defined(_MSC_VER)
 #define ATA_NOINLINE __declspec(noinline)
+#define ATA_ALWAYS_INLINE __forceinline
 #else
 #define ATA_NOINLINE __attribute__((noinline))
+#define ATA_ALWAYS_INLINE inline __attribute__((always_inline))
 #endif
-ATA_NOINLINE static void mark_needs_js() { tl_needs_js = true; }
+ATA_NOINLINE static void mark_needs_js() { tl_needs_js = true; g_needs_js_marks.fetch_add(1, std::memory_order_relaxed); }
 ATA_NOINLINE static bool needs_js_now() { return tl_needs_js; }
 
 // Read once per verdict by the binding (declared there, not in ata.h), and
@@ -483,36 +501,6 @@ bool take_needs_js() {
   if (!tl_needs_js) return false;
   tl_needs_js = false;
   return true;
-}
-
-// Which entries of a property list an object has shown, past the first 64,
-// which a walker keeps in a word of its own (seen_before below). A repeat is
-// the name twice. On the heap, made only for a list that long.
-class name_seen {
- public:
-  explicit name_seen(size_t n) : w_(new uint64_t[(n + 63) / 64]()) {}
-  bool repeat(size_t i) {
-    const uint64_t m = 1ULL << (i & 63);
-    uint64_t& x = w_[i >> 6];
-    if (x & m) return true;
-    x |= m;
-    return false;
-  }
- private:
-  std::unique_ptr<uint64_t[]> w_;
-};
-
-// Whether entry `i` of a property list of `n` was seen before in this object:
-// the first 64 in `first`, the rest in `more`, made on the first need.
-static inline bool seen_before(uint64_t& first, std::unique_ptr<name_seen>& more, size_t n, size_t i) {
-  if (i < 64) {
-    const uint64_t m = 1ULL << i;
-    if (first & m) return true;
-    first |= m;
-    return false;
-  }
-  if (!more) more.reset(new name_seen(n));
-  return more->repeat(i);
 }
 
 // The names of an object, where a name outside a property list matters: a
@@ -553,6 +541,77 @@ class name_list {
   size_t n_ = 0;
   bool escaped_ = false;
 };
+
+// The first distinct names of an object, kept until there are `want` of
+// them (a minimum count, at most 16): a minimum the count reaches is asked
+// of the names only where fewer distinct ones were seen. A name with an
+// escape (`raw`) is not kept, since it may be another written plainly.
+struct name_span { const char* p; size_t n; };
+struct distinct_names {
+  name_span kept[16];  // left uninitialized; only `n` are read
+  size_t n = 0, want;
+  explicit distinct_names(uint64_t min) : want(static_cast<size_t>(std::min<uint64_t>(min, 16))) {}
+  bool full() const { return n >= want; }
+  void add(std::string_view k, bool raw) {
+    if (raw && k.find('\\') != std::string_view::npos) return;
+    for (size_t i = 0; i < n; ++i)
+      if (kept[i].n == k.size() && std::memcmp(kept[i].p, k.data(), k.size()) == 0) return;
+    kept[n++] = {k.data(), k.size()};
+  }
+};
+
+// The same from names as the text holds them (a raw_json_string: the bytes
+// after the opening quote), so no name's end is looked for: two names are
+// distinct where they differ at a byte before either holds a backslash. One
+// that may equal a kept one, through an escape, is not kept.
+struct distinct_raw_names {
+  const char* kept[16];  // left uninitialized; only `n` are read
+  size_t n = 0, want;
+  explicit distinct_raw_names(uint64_t min) : want(static_cast<size_t>(std::min<uint64_t>(min, 16))) {}
+  bool full() const { return n >= want; }
+  static bool differ(const char* a, const char* b) {
+    for (size_t i = 0;; ++i) {
+      if (a[i] == '\\' || b[i] == '\\') return false;  // may be the same name
+      if (a[i] != b[i]) return true;
+      if (a[i] == '"') return false;                    // the same name
+    }
+  }
+  void add(const char* k) {
+    for (size_t i = 0; i < n; ++i) if (!differ(kept[i], k)) return;
+    kept[n++] = k;
+  }
+};
+
+// A DOM object's count of names, from the tape where it fits there.
+static inline uint64_t dom_count(dom::object o) {
+  const size_t n = o.size();
+  if (n < 0xFFFFFF) return n;  // saturated past that: counted
+  uint64_t c = 0;
+  for ([[maybe_unused]] auto kv : o) ++c;
+  return c;
+}
+
+// Whether the first names of a DOM object hold `min` distinct ones, read
+// only until they do: false for a minimum past 16, which the caller then
+// asks of every name.
+static inline bool dom_distinct_at_least(dom::object o, uint64_t min) {
+  distinct_names d(min);
+  if (d.full()) return true;
+  for (auto [k, v] : o) { (void)v; d.add(k, false); if (d.full()) return d.n >= min; }
+  return false;
+}
+
+// Whether a DOM object holds a name twice, name by name. Off the walkers'
+// loops: asked only where a sketch says two names may be one, or where a
+// maximum count is passed.
+ATA_NOINLINE static bool dom_names_repeat(dom::object obj) {
+  name_list names;
+  for (auto [k, v] : obj) { (void)v; names.add(k, false); }
+  return names.has_repeat();
+}
+
+// The same for an on-demand object, read again from its start (below).
+static bool od_names_repeat(simdjson::ondemand::object& obj);
 
 // A count keyword (minLength, maxItems and the rest) as JSON.parse reads it.
 // The schema reaches the engine through JSON.stringify, which writes 1e21 and
@@ -858,6 +917,13 @@ struct od_plan {
     size_t required_count = 0;
     bool no_additional = false;
     std::optional<uint64_t> min_props, max_props;
+    // Which loop od_exec_plan reads the object's fields with (od_fields): the
+    // plain one, the one that also counts distinct names for a count bound,
+    // the wide one for more than 64 entries, or one that only counts, for a
+    // count bound with no properties listed and other names allowed.
+    // Fixed at compile time, so the plain loop, nearly every object's,
+    // carries no count state.
+    uint8_t loop = 0;
   };
   std::shared_ptr<obj_plan> object;
 
@@ -2094,11 +2160,15 @@ static void validate_node(const schema_node_ptr& node,
     dom::object obj; type_checked(value.get(obj));
 
     if (node->min_properties.has_value() || node->max_properties.has_value()) {
-      uint64_t prop_count = 0;
-      // A name twice is counted twice here and once by JSON.parse.
-      name_list all_names;
-      for (auto [k, v] : obj) { (void)v; all_names.add(k, false); ++prop_count; }
-      if (all_names.has_repeat()) mark_needs_js();
+      // A name twice is counted twice here and once by JSON.parse: a minimum
+      // the count reaches is asked of the first names, a maximum it passes of
+      // every name.
+      const uint64_t prop_count = dom_count(obj);
+      if ((node->min_properties.has_value() && prop_count >= *node->min_properties &&
+           !dom_distinct_at_least(obj, *node->min_properties)) ||
+          (node->max_properties.has_value() && prop_count > *node->max_properties)) {
+        if (dom_names_repeat(obj)) mark_needs_js();
+      }
       if (node->min_properties.has_value() &&
           prop_count < node->min_properties.value()) {
         errors.push_back({error_code::min_properties_violation, path,
@@ -2125,21 +2195,17 @@ static void validate_node(const schema_node_ptr& node,
     }
 
     // properties + patternProperties + additionalProperties
-    // A name twice is left to the JS path (tl_needs_js): JSON.parse keeps the
-    // last value, and this reads each. The names are kept where a value is
-    // read, including the rest of the object after a failure, which a later
-    // value of the failing name would undo.
+    // JSON.parse keeps the last value of a name, and this reads each. While
+    // every value passes that changes nothing; a value that fails is looked
+    // for again in the rest of the object, and a later one leaves the
+    // document to the JS path (tl_needs_js).
     const bool track_names = !node->properties.empty() || !node->pattern_properties.empty() ||
                              node->additional_properties_schema != nullptr;
-    name_list read_names;
     for (auto oit = obj.begin(); oit != obj.end(); ++oit) {
-      if (!all_errors && !errors.empty()) {
-        if (track_names) for (; oit != obj.end(); ++oit) read_names.add(oit.key(), false);
-        break;
-      }
+      if (!all_errors && !errors.empty()) break;
       std::string_view key = oit.key();
       dom::element val = oit.value();
-      if (track_names) read_names.add(key, false);
+      const size_t errors_before = errors.size();
       std::string key_str(key);
       bool matched = false;
 
@@ -2172,8 +2238,12 @@ static void validate_node(const schema_node_ptr& node,
                         path + "/" + key_str, ctx, errors, all_errors, dynamic_scope);
         }
       }
+      if (track_names && errors.size() > errors_before) {
+        auto later = oit;
+        for (++later; later != obj.end(); ++later)
+          if (later.key() == key) { mark_needs_js(); break; }
+      }
     }
-    if (track_names && read_names.has_repeat()) mark_needs_js();
     // propertyNames — validate key as string directly when possible
     if (node->property_names_schema) {
       auto pn = node->property_names_schema;
@@ -2752,9 +2822,11 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::CHECK_UNIQUE_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));std::set<std::string> seen;for(auto x:a)if(!seen.insert(canonical_json(x)).second)return false;} break;
     case cg::op::ARRAY_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));for(auto x:a)if(!cg_exec(p,p.subs[c.a],x,undecidable))return false;} break;
     case cg::op::CHECK_REQUIRED: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));dom::element d;if(o[p.strings[c.a]].get(d)!=SUCCESS)return false;} break;
-    // A name twice is counted twice here and once by JSON.parse.
-    case cg::op::CHECK_MIN_PROPS: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));name_list ks;for(auto [k,v]:o){(void)v;ks.add(k,false);}if(ks.has_repeat()){mark_needs_js();return false;}if(ks.size()<c.a)return false;} break;
-    case cg::op::CHECK_MAX_PROPS: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));name_list ks;for(auto [k,v]:o){(void)v;ks.add(k,false);}if(ks.has_repeat()){mark_needs_js();return false;}if(ks.size()>c.a)return false;} break;
+    // A name twice is counted twice here and once by JSON.parse: a minimum
+    // the count reaches is asked of the first names, a maximum it passes of
+    // every name.
+    case cg::op::CHECK_MIN_PROPS: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));if(dom_count(o)<c.a)return false;if(!dom_distinct_at_least(o,c.a)&&dom_names_repeat(o)){mark_needs_js();return false;}} break;
+    case cg::op::CHECK_MAX_PROPS: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));if(dom_count(o)>c.a){if(dom_names_repeat(o))mark_needs_js();return false;}} break;
     case cg::op::OBJ_PROPS_START: if(t==et::OBJECT){
       dom::object o; type_checked(value.get(o));
       // collect prop defs
@@ -2765,16 +2837,14 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
         if(code[j].o==cg::op::OBJ_PROP) props.push_back({p.strings[code[j].a],code[j].b});
         else if(code[j].o==cg::op::CHECK_NO_ADDITIONAL) no_add=true;
       }
-      // A listed name twice is left to the JS path: JSON.parse keeps the last
-      // value, and this reads each. A value that fails is looked for again in
-      // the rest of the object for the same reason.
-      uint64_t seen_first=0; std::unique_ptr<name_seen> seen_more;
+      // JSON.parse keeps the last value of a name, and this reads each. While
+      // every value passes that changes nothing; a value that fails is looked
+      // for again in the rest of the object, where a later one would undo it.
       for(auto it=o.begin();it!=o.end();++it){
         std::string_view key=it.key(); dom::element val=it.value();
         bool matched=false;
         for(size_t q=0;q<props.size();++q){
           if(key==props[q].nm){
-            if(seen_before(seen_first,seen_more,props.size(),q)){mark_needs_js();return false;}
             if(!cg_exec(p,p.subs[props[q].si],val,undecidable)){
               for(++it;it!=o.end();++it) if(it.key()==key){mark_needs_js();break;}
               return false;
@@ -2920,17 +2990,15 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     // A name twice is counted twice here and once by JSON.parse.
     case cg::op::CHECK_MIN_PROPS: if(t==json_type::object){
       simdjson::ondemand::object o; if(value.get(o)!=SUCCESS) return false;
-      name_list ks;
-      for(auto f:o){std::string_view k; if(f.unescaped_key().get(k)) return false; ks.add(k,false);}
-      if(ks.has_repeat()){mark_needs_js();return false;}
-      if(ks.size()<c.a) return false;
+      uint64_t n=0; distinct_raw_names d(c.a);
+      for(auto f:o){ simdjson::ondemand::raw_json_string rk; if(f.key().get(rk)!=SUCCESS) return false; if(!d.full()) d.add(rk.raw()); ++n; }
+      if(n<c.a) return false;
+      if(d.n<c.a&&od_names_repeat(o)){mark_needs_js();return false;}
     } break;
     case cg::op::CHECK_MAX_PROPS: if(t==json_type::object){
       simdjson::ondemand::object o; if(value.get(o)!=SUCCESS) return false;
-      name_list ks;
-      for(auto f:o){std::string_view k; if(f.unescaped_key().get(k)) return false; ks.add(k,false);}
-      if(ks.has_repeat()){mark_needs_js();return false;}
-      if(ks.size()>c.a) return false;
+      uint64_t n=0; for(auto f:o){(void)f;++n;}
+      if(n>c.a){ if(od_names_repeat(o)) mark_needs_js(); return false; }
     } break;
     case cg::op::OBJ_PROPS_START: if(t==json_type::object){
       simdjson::ondemand::object o; if(value.get(o)!=SUCCESS) return false;
@@ -2941,29 +3009,25 @@ static bool od_exec(const cg::plan& p, const std::vector<cg::ins>& code,
         if(code[j].o==cg::op::OBJ_PROP) props.push_back({p.strings[code[j].a],code[j].b});
         else if(code[j].o==cg::op::CHECK_NO_ADDITIONAL) no_add=true;
       }
-      // As in cg_exec: a listed name twice, or a failed value whose name
-      // comes again later, is left to the JS path.
-      uint64_t seen_first=0; std::unique_ptr<name_seen> seen_more;
-      int failed=-1;
+      // JSON.parse keeps the last value of a name, and this reads each. While
+      // every value passes that changes nothing, and a false here is only
+      // ever followed by the DOM walkers, which find a later value of a name
+      // that failed.
       for(auto field:o){
         simdjson::ondemand::raw_json_string rk; if(field.key().get(rk)!=SUCCESS) return false;
         std::string_view key;
         // A key that does not unescape is not JSON; it was skipped as if absent.
         if (field.unescaped_key().get(key)) return false;
-        if(failed>=0){ if(key==props[failed].nm){mark_needs_js();return false;} continue; }
         bool matched=false;
         for(size_t q=0;q<props.size();++q){
           if(key==props[q].nm){
-            if(seen_before(seen_first,seen_more,props.size(),q)){mark_needs_js();return false;}
             simdjson::ondemand::value fv; if(field.value().get(fv)!=SUCCESS) return false;
-            if(!od_exec(p,p.subs[props[q].si],fv)){ failed=(int)q; break; }
+            if(!od_exec(p,p.subs[props[q].si],fv)) return false;
             matched=true; break;
           }
         }
-        if(failed>=0) continue;
         if(!matched&&no_add) return false;
       }
-      if(failed>=0) return false;
       i=j; break;
     } else { size_t j=i+1; for(;j<code.size()&&code[j].o!=cg::op::OBJ_PROPS_END;++j) {} i=j; } break;
     case cg::op::OBJ_PROP: case cg::op::OBJ_PROPS_END: case cg::op::CHECK_NO_ADDITIONAL: break;
@@ -3299,6 +3363,10 @@ static od_plan_ptr compile_od_plan(const schema_node_ptr& node) {
         else if (only_bool) e.fk = od_plan::fast_kind::BOOLEAN;
       }
     }
+    {
+      const bool counts = op->min_props || op->max_props;
+      op->loop = op->entries.size() > 64 ? 2 : counts && op->entries.empty() && !op->no_additional ? 3 : counts ? 1 : 0;
+    }
     plan->object = std::move(op);
   }
 
@@ -3354,16 +3422,6 @@ static inline bool od_seen_before(uint64_t& first, uint64_t (&rest)[3], size_t i
   return od_seen_rest(rest, i);
 }
 
-// A name as od_exec_plan keeps it, for a minimum count: plain data, so 16 of
-// them on the stack cost nothing until one is written.
-struct name_span { const char* p; size_t n; };
-static bool others_repeat(const name_span* a, size_t n) {
-  for (size_t i = 1; i < n; ++i)
-    for (size_t j = 0; j < i; ++j)
-      if (a[i].n == a[j].n && std::memcmp(a[i].p, a[j].p, a[i].n) == 0) return true;
-  return false;
-}
-
 // Off od_exec_plan's loop, on the paths it cannot settle there, so the loop
 // keeps its shape: the object is read again from its start, names only, the
 // values skipped.
@@ -3406,26 +3464,359 @@ static bool od_names_repeat(simdjson::ondemand::object& obj) {
 // object is read again for the name, names only, since a later value of it
 // would undo the failure (JSON.parse keeps the last one). Out of line and
 // called in place of each `return false`, so the loop keeps its shape.
-ATA_NOINLINE static bool od_fail(simdjson::ondemand::object obj, const std::string& key, bool* io_err) {
-  if (needs_js_now() || (io_err && *io_err)) return false;
+//
+// The read costs a skip over the rest of the object, the whole document for
+// a failure at the top, so the text after the name is looked at first: with
+// no backslash in it and no `"key"` in it, no later name can be the key, and
+// the read is left out. `from` is where the failing name's text starts, and
+// the text's end comes with `io_err` (od_io).
+struct od_io {
+  bool err = false;  // first: od_exec_plan is handed a pointer to it
+  const char* end = nullptr;
+};
+// Whether `"key"` appears in [from, end), or a backslash does (a name may be
+// written with an escape, which a byte search does not see). Sixteen bytes
+// at a time where the platform has vectors, eight otherwise: a place is
+// compared only where the name's first byte and its closing quote both
+// stand where they would.
+static bool od_name_after(const char* from, const char* end, const std::string& key) {
+  const size_t n = static_cast<size_t>(end - from);
+  const size_t L = key.size() + 2;  // with its quotes
+  auto at = [&](size_t i) {
+    return from[i] == '"' && from[i + L - 1] == '"' && std::memcmp(from + i + 1, key.data(), key.size()) == 0;
+  };
+  size_t i = 0;
+  if (!key.empty() && n >= L + 16) {
+    // Each step reads [i + 1, i + 17) for the first byte and the backslash,
+    // and [i + L - 1, i + L + 15) for the quote; the bytes before and after
+    // the steps are looked at for a backslash below.
+    const auto* u = reinterpret_cast<const uint8_t*>(from);
+#if defined(ATA_SCAN_NEON)
+    const uint8x16_t vf = vdupq_n_u8(static_cast<uint8_t>(key[0])), vq = vdupq_n_u8('"'), vb = vdupq_n_u8('\\');
+    // Sixty-four bytes asked at once; a block that answers is looked at in
+    // its sixteen-byte steps.
+    auto hit = [&](size_t k) {
+      const uint8x16_t a = vld1q_u8(u + k + 1), b = vld1q_u8(u + k + L - 1);
+      return vorrq_u8(vandq_u8(vceqq_u8(a, vf), vceqq_u8(b, vq)), vceqq_u8(a, vb));
+    };
+    auto step = [&](size_t k) {
+      const uint8x16_t a = vld1q_u8(u + k + 1);
+      if (vmaxvq_u8(vceqq_u8(a, vb))) return true;
+      if (!vmaxvq_u8(vandq_u8(vceqq_u8(a, vf), vceqq_u8(vld1q_u8(u + k + L - 1), vq)))) return false;
+      for (size_t j = 0; j < 16; ++j) if (at(k + j)) return true;
+      return false;
+    };
+    for (; i + L + 63 <= n; i += 64) {
+      if (vmaxvq_u8(vorrq_u8(vorrq_u8(hit(i), hit(i + 16)), vorrq_u8(hit(i + 32), hit(i + 48)))))
+        if (step(i) || step(i + 16) || step(i + 32) || step(i + 48)) return true;
+    }
+    for (; i + L + 15 <= n; i += 16) if (step(i)) return true;
+#elif defined(ATA_SCAN_SSE2)
+    const __m128i vf = _mm_set1_epi8(key[0]), vq = _mm_set1_epi8('"'), vb = _mm_set1_epi8('\\');
+    for (; i + L + 15 <= n; i += 16) {
+      const __m128i a = _mm_loadu_si128(reinterpret_cast<const __m128i*>(u + i + 1));
+      const __m128i b = _mm_loadu_si128(reinterpret_cast<const __m128i*>(u + i + L - 1));
+      if (_mm_movemask_epi8(_mm_cmpeq_epi8(a, vb))) return true;
+      unsigned m = static_cast<unsigned>(_mm_movemask_epi8(_mm_and_si128(_mm_cmpeq_epi8(a, vf), _mm_cmpeq_epi8(b, vq))));
+      while (m) {
+        if (at(i + static_cast<size_t>(std::countr_zero(m)))) return true;
+        m &= m - 1;
+      }
+    }
+#else
+    constexpr uint64_t ones = 0x0101010101010101ULL, highs = 0x8080808080808080ULL;
+    const uint64_t first = ones * static_cast<uint8_t>(key[0]), quote = ones * static_cast<uint8_t>('"'), slash = ones * static_cast<uint8_t>('\\');
+    for (; i + L + 15 <= n; i += 8) {
+      uint64_t a, b;
+      std::memcpy(&a, u + i + 1, 8);
+      std::memcpy(&b, u + i + L - 1, 8);
+      const uint64_t y = a ^ slash;
+      if ((y - ones) & ~y & highs) return true;
+      const uint64_t x = (a ^ first) | (b ^ quote);
+      uint64_t m = (x - ones) & ~x & highs;  // a high bit at or after each zero byte
+      while (m) {
+        if (at(i + static_cast<size_t>(std::countr_zero(m)) / 8)) return true;
+        m &= m - 1;
+      }
+    }
+#endif
+    // Not read by the steps for a backslash: the first byte and the tail.
+    if (from[0] == '\\' || std::memchr(from + i + 1, '\\', n - i - 1)) return true;
+  } else if (std::memchr(from, '\\', n)) {
+    return true;
+  }
+  for (; i + L <= n; ++i) if (at(i)) return true;
+  return false;
+}
+
+ATA_NOINLINE static bool od_fail(simdjson::ondemand::object obj, const std::string& key, const char* from, bool* io_err) {
+  if (io_err && *io_err) return false;
+  // io_err, where given, is the first member of an od_io (is_valid_prepadded).
+  const char* end = io_err ? reinterpret_cast<const od_io*>(io_err)->end : nullptr;
+  if (end && from && from < end && !od_name_after(from, end, key)) return false;
+  if (needs_js_now()) return false;  // already left to JS, by a value inside this one
   if (od_name_twice(obj, key)) mark_needs_js();
   return false;
 }
 
-// After od_exec_plan's loop, where names past its marks matter: an entry past
-// the 256 it marks, a minimum count the object reaches (the other names kept,
-// up to 16), a maximum it passes. Out of line, off the loop of every object.
-ATA_NOINLINE static bool od_names_counted_twice(const od_plan::obj_plan& op, simdjson::ondemand::object obj,
-                                                uint64_t count, const name_span* others, size_t others_n) {
-  bool reread = op.entries.size() > 256;
-  if ((op.min_props || op.max_props) && !op.no_additional) {
-    if (op.min_props && count >= *op.min_props) {
-      if (others_n > 16) reread = true;
-      else if (others_repeat(others, others_n)) return true;
-    }
-    if (op.max_props && count > *op.max_props) reread = true;
+static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
+                         std::optional<simdjson::ondemand::json_type> pre_type = std::nullopt,
+                         bool* io_err = nullptr);
+// An entry of the list met in the object. A name twice changes nothing
+// while every value passes: the last one, which JSON.parse keeps, passed,
+// and presence is the same. A value that fails is looked for again after
+// it (od_fail), so mode 0 marks nothing. Mode 1 marks, to count the
+// distinct names; mode 2 leaves the object to the JS path on a repeat.
+template <int Mode>
+static inline bool od_mark(uint64_t& first, uint64_t (&rest)[3], size_t i) {
+  if constexpr (Mode == 0) {
+    return false;
+  } else if constexpr (Mode == 1) {
+    first |= 1ULL << i;  // no more than 64 entries here
+    return false;
+  } else {
+    return od_seen_before(first, rest, i);
   }
-  return reread && od_names_repeat(obj);
+}
+
+// The fields of an object against its plan: the loop of od_exec_plan's
+// object case, true when every field passes. Mode 0, nearly every object,
+// carries nothing for repeated names. Mode 1 also counts distinct names for
+// a count bound: listed ones by their marks, others kept until there are
+// enough of them to reach the minimum, so a repeat is only looked for in an
+// object that counts past a bound without enough distinct names seen. Mode
+// 2, past 64 entries, marks the rest out of line and reads the names again
+// for a count bound.
+
+template <int Mode>
+static bool od_fields(const od_plan::obj_plan& op, simdjson::ondemand::object& obj, bool* io_err) {
+  uint64_t required_found = 0;
+  // JSON.parse keeps the last value of a name, and this reads each: a value
+  // that fails is looked for again after it (od_fail), and a name twice is
+  // marked as od_mark says.
+  uint64_t seen_first = 0;
+  uint64_t seen_rest[3];
+  if constexpr (Mode == 2) seen_rest[0] = seen_rest[1] = seen_rest[2] = 0;
+  // Mode 1: distinct names no entry lists, kept until `want` of them.
+  name_span others[16];  // left uninitialized; only `others_n` are read
+  size_t others_n = 0;
+  size_t want = 0;
+  if constexpr (Mode == 1) want = op.min_props ? static_cast<size_t>(std::min<uint64_t>(*op.min_props, 16)) : 0;
+  uint64_t prop_count = 0;
+
+  for (auto field : obj) {
+    // Fast key compare: use raw_json_string against schema keys directly,
+    // skipping the unescape pass. Schema keys are assumed to have no
+    // unescaped quotes (true for any well-formed JSON Schema).
+    simdjson::ondemand::raw_json_string raw_key;
+    if (field.key().get(raw_key) != SUCCESS) return false;
+    prop_count++;
+
+    bool matched = false;
+    for (auto& e : op.entries) {
+      if (raw_key.unsafe_is_equal(e.key)) {
+        if (od_mark<Mode>(seen_first, seen_rest, static_cast<size_t>(&e - op.entries.data()))) { mark_needs_js(); return false; }
+        if (e.required_idx >= 0)
+          required_found |= (1ULL << e.required_idx);
+        if (e.sub) {
+          // Fast dispatch: skip recursive od_exec_plan + type().get + switch
+          // for primitive sub-plans. Mirrors the constraint code in od_exec_plan.
+          switch (e.fk) {
+            case od_plan::fast_kind::INTEGER: {
+              int64_t iv = 0;
+              double v;
+              bool got_int = true;
+              {
+                auto fv = field.value();
+                auto _e = fv.get(iv);
+                if (_e == SUCCESS) {
+                  v = static_cast<double>(iv);
+                } else if (_e == simdjson::INCORRECT_TYPE && fv.get(v) == SUCCESS) {
+                  // "1.0" is an integer; "1.5" is not.
+                  if (!is_integral(v)) return od_fail(obj, e.key, raw_key.raw(), io_err);
+                  got_int = false;
+                } else {
+                  if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true;
+                  return od_fail(obj, e.key, raw_key.raw(), io_err);
+                }
+              }
+              auto& sub = *e.sub;
+              uint8_t f = sub.num_flags;
+              if ((f & od_plan::HAS_MIN) && v < sub.num_min) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              if ((f & od_plan::HAS_MAX) && v > sub.num_max) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              if ((f & od_plan::HAS_EX_MIN) && v <= sub.num_ex_min) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              if ((f & od_plan::HAS_EX_MAX) && v >= sub.num_ex_max) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              if (f & od_plan::HAS_MUL) {
+                if (!multiple_of_ok(v, sub.num_mul)) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              }
+              if (sub.enum_check) {
+                bool em = false;
+                for (auto i2 : sub.enum_check->integers) if (got_int ? i2 == iv : static_cast<double>(i2) == v) { em = true; break; }
+                if (!em) for (auto d : sub.enum_check->doubles) if (d == v) { em = true; break; }
+                if (!em) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              }
+              break;
+            }
+            case od_plan::fast_kind::STRING: {
+              std::string_view sv;
+              { auto _e = field.value().get(sv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+              auto& sub = *e.sub;
+              if (sub.min_length || sub.max_length) {
+                uint64_t len = utf8_length_fast(sv);
+                if (sub.min_length && len < *sub.min_length) return od_fail(obj, e.key, raw_key.raw(), io_err);
+                if (sub.max_length && len > *sub.max_length) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              }
+              if (sub.digit_pattern) {
+                auto& dp = *sub.digit_pattern;
+                if (sv.size() < dp.min_len || sv.size() > dp.max_len) return od_fail(obj, e.key, raw_key.raw(), io_err);
+                const uint8_t* sp = reinterpret_cast<const uint8_t*>(sv.data());
+                for (size_t i = 0, n = sv.size(); i < n; i++) {
+                  if (sp[i] < '0' || sp[i] > '9') return od_fail(obj, e.key, raw_key.raw(), io_err);
+                }
+              }
+#ifndef ATA_NO_RE2
+              else if (sub.pattern) {
+                if (!re2::RE2::PartialMatch(re2::StringPiece(sv.data(), sv.size()), *sub.pattern))
+                  return od_fail(obj, e.key, raw_key.raw(), io_err);
+              }
+#endif
+              if (sub.format_id != 255) {
+                if (!check_format_by_id(sv, sub.format_id)) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              }
+              if (sub.enum_check) {
+                bool em = false;
+                for (auto& s : sub.enum_check->strings) {
+                  if (sv.size() == s.size() && std::memcmp(sv.data(), s.data(), s.size()) == 0) {
+                    em = true;
+                    break;
+                  }
+                }
+                if (!em) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              }
+              break;
+            }
+            case od_plan::fast_kind::BOOLEAN: {
+              bool bv;
+              { auto _e = field.value().get(bv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+              if (e.sub->enum_check) {
+                if (bv ? !e.sub->enum_check->has_true : !e.sub->enum_check->has_false) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              }
+              break;
+            }
+            case od_plan::fast_kind::OBJECT: {
+              simdjson::ondemand::value fv;
+              { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+              if (!od_exec_plan(*e.sub, fv,
+                                simdjson::ondemand::json_type::object, io_err)) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              break;
+            }
+            case od_plan::fast_kind::ARRAY: {
+              simdjson::ondemand::value fv;
+              { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+              if (!od_exec_plan(*e.sub, fv,
+                                simdjson::ondemand::json_type::array, io_err)) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              break;
+            }
+            case od_plan::fast_kind::OTHER:
+            default: {
+              simdjson::ondemand::value fv;
+              { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+              if (!od_exec_plan(*e.sub, fv, std::nullopt, io_err)) return od_fail(obj, e.key, raw_key.raw(), io_err);
+            }
+          }
+        }
+        matched = true;
+        break;
+      }
+    }
+    // Safety net: if no match via raw byte compare, the JSON key may be
+    // escaped (e.g., "aname"). Fall back to a properly-unescaped
+    // compare so escaped keys still match the unescaped schema keys.
+    if (!matched) {
+      std::string_view raw_view = field.escaped_key();
+      const bool escaped = raw_view.find('\\') != std::string_view::npos;
+      if (escaped) {
+        std::string_view ukey;
+        if (field.unescaped_key().get(ukey) == SUCCESS) {
+          for (auto& e : op.entries) {
+            if (ukey == e.key) {
+              if (od_mark<Mode>(seen_first, seen_rest, static_cast<size_t>(&e - op.entries.data()))) { mark_needs_js(); return false; }
+              if (e.required_idx >= 0)
+                required_found |= (1ULL << e.required_idx);
+              if (e.sub) {
+                simdjson::ondemand::value fv;
+                { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
+                if (!od_exec_plan(*e.sub, fv, std::nullopt, io_err)) return od_fail(obj, e.key, raw_key.raw(), io_err);
+              }
+              matched = true;
+              break;
+            }
+          }
+        }
+      }
+      // A name no entry lists, kept for a minimum count until there are
+      // `want` distinct ones (escaped_key may be read once per field, so the
+      // view above is the one kept). One with an escape is not kept.
+      if constexpr (Mode == 1) {
+        if (!matched && !escaped && others_n < want) {
+          bool again = false;
+          for (size_t k = 0; k < others_n; ++k)
+            if (others[k].n == raw_view.size() && std::memcmp(others[k].p, raw_view.data(), raw_view.size()) == 0) { again = true; break; }
+          if (!again) others[others_n++] = {raw_view.data(), raw_view.size()};
+        }
+      }
+    }
+    if (!matched && op.no_additional) return false;
+  }
+  if constexpr (Mode != 0) {
+    // Read again, names only, where a repeat can change the answer and the
+    // loop could not rule one out: a list past the 256 it marks, a minimum
+    // the count reaches without as many distinct names seen, a maximum it
+    // passes. A name with an escape counts as a repeat there.
+    const bool counts = op.min_props || op.max_props;
+    bool reread = Mode == 2 && op.entries.size() > 256;
+    if (counts && op.max_props && prop_count > *op.max_props) reread = true;
+    if (counts && op.min_props && prop_count >= *op.min_props) {
+      if constexpr (Mode == 1) {
+        if (static_cast<uint64_t>(std::popcount(seen_first)) + others_n < *op.min_props) reread = true;
+      } else {
+        reread = true;
+      }
+    }
+    if (reread && od_names_repeat(obj)) { mark_needs_js(); return false; }
+  }
+
+  uint64_t required_mask = (op.required_count >= 64)
+      ? ~0ULL : ((1ULL << op.required_count) - 1);
+  if ((required_found & required_mask) != required_mask) return false;
+  if (op.min_props && prop_count < *op.min_props) return false;
+  if (op.max_props && prop_count > *op.max_props) return false;
+  return true;
+}
+
+// The loops with count state, out of od_exec_plan so its own stays the plain one.
+// The last, for an object with a count bound and nothing listed (no value to
+// read): its names are counted, and the first ones kept until there are as
+// many distinct ones as the minimum asks, so a repeat is looked for only when
+// the count passes a bound and too few distinct names were seen.
+ATA_NOINLINE static bool od_count_fields(const od_plan::obj_plan& op, simdjson::ondemand::object& obj) {
+  uint64_t n = 0;
+  distinct_raw_names d(op.min_props ? *op.min_props : 0);
+  for (auto field : obj) {
+    simdjson::ondemand::raw_json_string rk;
+    if (field.key().get(rk) != SUCCESS) return false;
+    ++n;
+    if (!d.full()) d.add(rk.raw());
+  }
+  if (op.min_props && n < *op.min_props) return false;
+  const bool reread = (op.max_props && n > *op.max_props) || (op.min_props && d.n < *op.min_props);
+  if (reread && od_names_repeat(obj)) { mark_needs_js(); return false; }
+  if (op.max_props && n > *op.max_props) return false;
+  return true;
+}
+
+ATA_NOINLINE static bool od_fields_counted(const od_plan::obj_plan& op, simdjson::ondemand::object& obj, bool* io_err) {
+  return op.loop == 1 ? od_fields<1>(op, obj, io_err) : op.loop == 3 ? od_count_fields(op, obj) : od_fields<2>(op, obj, io_err);
 }
 
 // Execute an od_plan against a simdjson On-Demand value.
@@ -3439,8 +3830,8 @@ ATA_NOINLINE static bool od_names_counted_twice(const od_plan::obj_plan& op, sim
 // the document to find out which it was, which made rejecting a document cost
 // several times more than accepting one.
 static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
-                         std::optional<simdjson::ondemand::json_type> pre_type = std::nullopt,
-                         bool* io_err = nullptr) {
+                         std::optional<simdjson::ondemand::json_type> pre_type,
+                         bool* io_err) {
   using sjt = simdjson::ondemand::json_type;
   sjt st;
   if (pre_type) {
@@ -3564,189 +3955,7 @@ static bool od_exec_plan(const od_plan& plan, simdjson::ondemand::value value,
     simdjson::ondemand::object obj;
     { auto _e = value.get(obj); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
 
-    uint64_t required_found = 0;
-    // A listed name twice is left to the JS path (mark_needs_js): JSON.parse
-    // keeps the last value, and this reads each. The first 256 entries are
-    // marked here, the rest read again after the loop; a value that fails is
-    // looked for again in the object (od_fail). With a minimum count and other
-    // names allowed, up to 16 of the other names are kept to count once each.
-    uint64_t seen_first = 0;
-    uint64_t seen_rest[3];
-    if (op.entries.size() > 64) seen_rest[0] = seen_rest[1] = seen_rest[2] = 0;
-    const bool count_names = (op.min_props || op.max_props) && !op.no_additional;
-    name_span others[16];  // left uninitialized; only `others_n` are read
-    size_t others_n = 0;
-    uint64_t prop_count = 0;
-
-    for (auto field : obj) {
-      // Fast key compare: use raw_json_string against schema keys directly,
-      // skipping the unescape pass. Schema keys are assumed to have no
-      // unescaped quotes (true for any well-formed JSON Schema).
-      simdjson::ondemand::raw_json_string raw_key;
-      if (field.key().get(raw_key) != SUCCESS) return false;
-      prop_count++;
-
-      bool matched = false;
-      for (auto& e : op.entries) {
-        if (raw_key.unsafe_is_equal(e.key)) {
-          if (od_seen_before(seen_first, seen_rest, static_cast<size_t>(&e - op.entries.data()))) { mark_needs_js(); return false; }
-          if (e.required_idx >= 0)
-            required_found |= (1ULL << e.required_idx);
-          if (e.sub) {
-            // Fast dispatch: skip recursive od_exec_plan + type().get + switch
-            // for primitive sub-plans. Mirrors the constraint code in od_exec_plan.
-            switch (e.fk) {
-              case od_plan::fast_kind::INTEGER: {
-                int64_t iv = 0;
-                double v;
-                bool got_int = true;
-                {
-                  auto fv = field.value();
-                  auto _e = fv.get(iv);
-                  if (_e == SUCCESS) {
-                    v = static_cast<double>(iv);
-                  } else if (_e == simdjson::INCORRECT_TYPE && fv.get(v) == SUCCESS) {
-                    // "1.0" is an integer; "1.5" is not.
-                    if (!is_integral(v)) return od_fail(obj, e.key, io_err);
-                    got_int = false;
-                  } else {
-                    if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true;
-                    return od_fail(obj, e.key, io_err);
-                  }
-                }
-                auto& sub = *e.sub;
-                uint8_t f = sub.num_flags;
-                if ((f & od_plan::HAS_MIN) && v < sub.num_min) return od_fail(obj, e.key, io_err);
-                if ((f & od_plan::HAS_MAX) && v > sub.num_max) return od_fail(obj, e.key, io_err);
-                if ((f & od_plan::HAS_EX_MIN) && v <= sub.num_ex_min) return od_fail(obj, e.key, io_err);
-                if ((f & od_plan::HAS_EX_MAX) && v >= sub.num_ex_max) return od_fail(obj, e.key, io_err);
-                if (f & od_plan::HAS_MUL) {
-                  if (!multiple_of_ok(v, sub.num_mul)) return od_fail(obj, e.key, io_err);
-                }
-                if (sub.enum_check) {
-                  bool em = false;
-                  for (auto i2 : sub.enum_check->integers) if (got_int ? i2 == iv : static_cast<double>(i2) == v) { em = true; break; }
-                  if (!em) for (auto d : sub.enum_check->doubles) if (d == v) { em = true; break; }
-                  if (!em) return od_fail(obj, e.key, io_err);
-                }
-                break;
-              }
-              case od_plan::fast_kind::STRING: {
-                std::string_view sv;
-                { auto _e = field.value().get(sv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
-                auto& sub = *e.sub;
-                if (sub.min_length || sub.max_length) {
-                  uint64_t len = utf8_length_fast(sv);
-                  if (sub.min_length && len < *sub.min_length) return od_fail(obj, e.key, io_err);
-                  if (sub.max_length && len > *sub.max_length) return od_fail(obj, e.key, io_err);
-                }
-                if (sub.digit_pattern) {
-                  auto& dp = *sub.digit_pattern;
-                  if (sv.size() < dp.min_len || sv.size() > dp.max_len) return od_fail(obj, e.key, io_err);
-                  const uint8_t* sp = reinterpret_cast<const uint8_t*>(sv.data());
-                  for (size_t i = 0, n = sv.size(); i < n; i++) {
-                    if (sp[i] < '0' || sp[i] > '9') return od_fail(obj, e.key, io_err);
-                  }
-                }
-#ifndef ATA_NO_RE2
-                else if (sub.pattern) {
-                  if (!re2::RE2::PartialMatch(re2::StringPiece(sv.data(), sv.size()), *sub.pattern))
-                    return od_fail(obj, e.key, io_err);
-                }
-#endif
-                if (sub.format_id != 255) {
-                  if (!check_format_by_id(sv, sub.format_id)) return od_fail(obj, e.key, io_err);
-                }
-                if (sub.enum_check) {
-                  bool em = false;
-                  for (auto& s : sub.enum_check->strings) {
-                    if (sv.size() == s.size() && std::memcmp(sv.data(), s.data(), s.size()) == 0) {
-                      em = true;
-                      break;
-                    }
-                  }
-                  if (!em) return od_fail(obj, e.key, io_err);
-                }
-                break;
-              }
-              case od_plan::fast_kind::BOOLEAN: {
-                bool bv;
-                { auto _e = field.value().get(bv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
-                if (e.sub->enum_check) {
-                  if (bv ? !e.sub->enum_check->has_true : !e.sub->enum_check->has_false) return od_fail(obj, e.key, io_err);
-                }
-                break;
-              }
-              case od_plan::fast_kind::OBJECT: {
-                simdjson::ondemand::value fv;
-                { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
-                if (!od_exec_plan(*e.sub, fv,
-                                  simdjson::ondemand::json_type::object, io_err)) return od_fail(obj, e.key, io_err);
-                break;
-              }
-              case od_plan::fast_kind::ARRAY: {
-                simdjson::ondemand::value fv;
-                { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
-                if (!od_exec_plan(*e.sub, fv,
-                                  simdjson::ondemand::json_type::array, io_err)) return od_fail(obj, e.key, io_err);
-                break;
-              }
-              case od_plan::fast_kind::OTHER:
-              default: {
-                simdjson::ondemand::value fv;
-                { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
-                if (!od_exec_plan(*e.sub, fv, std::nullopt, io_err)) return od_fail(obj, e.key, io_err);
-              }
-            }
-          }
-          matched = true;
-          break;
-        }
-      }
-      // Safety net: if no match via raw byte compare, the JSON key may be
-      // escaped (e.g., "aname"). Fall back to a properly-unescaped
-      // compare so escaped keys still match the unescaped schema keys.
-      if (!matched) {
-        std::string_view raw_view = field.escaped_key();
-        if (raw_view.find('\\') != std::string_view::npos) {
-          std::string_view ukey;
-          if (field.unescaped_key().get(ukey) == SUCCESS) {
-            for (auto& e : op.entries) {
-              if (ukey == e.key) {
-                if (od_seen_before(seen_first, seen_rest, static_cast<size_t>(&e - op.entries.data()))) { mark_needs_js(); return false; }
-                if (e.required_idx >= 0)
-                  required_found |= (1ULL << e.required_idx);
-                if (e.sub) {
-                  simdjson::ondemand::value fv;
-                  { auto _e = field.value().get(fv); if (_e != SUCCESS) { if (io_err && _e != simdjson::INCORRECT_TYPE) *io_err = true; return false; } }
-                  if (!od_exec_plan(*e.sub, fv, std::nullopt, io_err)) return od_fail(obj, e.key, io_err);
-                }
-                matched = true;
-                break;
-              }
-            }
-          }
-        }
-        // A name no entry lists, kept for a minimum count (escaped_key may be
-        // read once per field, so the view above is the one kept). One with
-        // an escape counts as more than 16, which reads the object again.
-        if (!matched && count_names) {
-          if (others_n < 16 && raw_view.find('\\') == std::string_view::npos) others[others_n++] = {raw_view.data(), raw_view.size()};
-          else others_n = 17;
-        }
-      }
-      if (!matched && op.no_additional) return false;
-    }
-    if ((count_names || op.entries.size() > 256) && od_names_counted_twice(op, obj, prop_count, others, others_n)) {
-      mark_needs_js();
-      return false;
-    }
-
-    uint64_t required_mask = (op.required_count >= 64)
-        ? ~0ULL : ((1ULL << op.required_count) - 1);
-    if ((required_found & required_mask) != required_mask) return false;
-    if (op.min_props && prop_count < *op.min_props) return false;
-    if (op.max_props && prop_count > *op.max_props) return false;
+    if (!(op.loop == 0 ? od_fields<0>(op, obj, io_err) : od_fields_counted(op, obj, io_err))) return false;
     break;
   }
   case sjt::array: {
@@ -3908,8 +4117,10 @@ bool is_valid_prepadded(const schema_ref& schema, const char* data, size_t lengt
     if (!od_result.error()) {
       simdjson::ondemand::value root_val;
       if (od_result.get_value().get(root_val) == SUCCESS) {
-        bool od_err = false;
-        if (od_exec_plan(*schema.impl->od, root_val, std::nullopt, &od_err)) {
+        od_io io;
+        io.end = psv.data() + psv.length();
+        bool& od_err = io.err;
+        if (od_exec_plan(*schema.impl->od, root_val, std::nullopt, &io.err)) {
           return true;
         }
         // A plan built with `supported` covers the whole schema, so a failure
