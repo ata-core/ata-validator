@@ -390,6 +390,7 @@ const FILES = [
   "tests/test_dual_path.js",
   "tests/test_keywords_codegen.js",
   "tests/test_ref_cross.js",
+  "tests/test_unresolved_ref_fail_closed.js",
   "tests/test_shape_classifier.js",
   "tests/test_tier0.js",
   "benchmark/bench_aot_size.mjs",
