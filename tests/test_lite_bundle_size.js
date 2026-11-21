@@ -288,7 +288,9 @@ const esbuild = require('esbuild')
 // 63040 (63032 measured): the removal pass and the defaults module load only
 // for a schema with a closed object in its text, which kept 0.25 ms off a
 // server's first validated request; 56 bytes.
-const BUDGET = 63040
+// 63090 (63083 measured): a lone high surrogate counts as its own code
+// point, and length bounds stop scanning once decided; 51 bytes.
+const BUDGET = 63090
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
