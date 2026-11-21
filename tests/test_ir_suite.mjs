@@ -18,8 +18,13 @@ const SUITE = path.join(here, 'suite/tests')
 const DIALECTS = { v1: 'https://json-schema.org/v1', 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', 'draft2019-09': 'https://json-schema.org/draft/2019-09/schema', draft7: 'http://json-schema.org/draft-07/schema#', draft6: 'http://json-schema.org/draft-06/schema#', draft4: 'http://json-schema.org/draft-04/schema#' }
 // What the IR must cover, so coverage cannot shrink unnoticed.
 // Every group, on both backends; the module writer refuses four v1 groups
-// (a $dynamicRef that resolves only on the scope needs the closures).
-const MIN_GROUPS = { v1: 348, 'draft2020-12': 384, 'draft2019-09': 373, draft7: 258, draft6: 233, draft4: 160 }
+// (a $dynamicRef that resolves only on the scope needs the closures). Three
+// draft2020-12 groups are refused on every backend: they reach the meta-schema,
+// whose $dynamicRef "#meta" has the suite's registered format-assertion
+// documents among its candidates, and those reference meta/format-assertion,
+// which nothing registers. A reference that resolves to nothing is refused
+// (lib/ir/front.mjs), since reaching one ends the whole validation.
+const MIN_GROUPS = { v1: 348, 'draft2020-12': 382, 'draft2019-09': 373, draft7: 258, draft6: 233, draft4: 160 }
 const MIN_MODULES = { v1: 344 }
 
 const registry = {}

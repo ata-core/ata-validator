@@ -297,7 +297,10 @@ const esbuild = require('esbuild')
 // relative $ref at its document's base, not by path suffix, so they no longer
 // act on a different registered document; 71 bytes.
 // 63180 (63171 measured): the three fixes above together in one tree.
-const BUDGET = 63180
+// 63370 (63362 measured): a $ref that resolves to nothing ends the whole
+// validation when reached, reported at its own place, rather than failing
+// only the subschema that holds it, which under `not` accepted; 191 bytes.
+const BUDGET = 63370
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
