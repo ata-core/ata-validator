@@ -288,7 +288,10 @@ const esbuild = require('esbuild')
 // 63040 (63032 measured): the removal pass and the defaults module load only
 // for a schema with a closed object in its text, which kept 0.25 ms off a
 // server's first validated request; 56 bytes.
-const BUDGET = 63040
+// 63110 (63103 measured): the defaults, removal and coercion passes resolve a
+// relative $ref at its document's base, not by path suffix, so they no longer
+// act on a different registered document; 71 bytes.
+const BUDGET = 63110
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

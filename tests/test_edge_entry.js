@@ -152,7 +152,10 @@ const root = path.resolve(__dirname, '..');
     // validator of one's own (issue #122); 23 bytes.
     // 67340 bytes (67332 measured): the removal pass loads only for a schema
     // with a closed object in its text; 38 bytes.
-    assert.ok(size < 67340, `the Workers bundle is ${size} bytes gzipped, over 67340`);
+    // 67420 bytes (67416 measured): the defaults, removal and coercion passes
+    // resolve a relative $ref at its document's base, not by path suffix, so
+    // they no longer act on a different registered document; 84 bytes.
+    assert.ok(size < 67420, `the Workers bundle is ${size} bytes gzipped, over 67420`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

@@ -204,6 +204,33 @@ cases().forEach(([name, c, docs, resolves], i) => check(name, c, docs, resolves,
   }
 }
 
+// The defaults, removal and coercion passes read a referenced document's
+// shape through resolveRefForPreprocess, which matched a relative reference by
+// path suffix: with https://other.org/b.json registered before
+// https://example.com/b.json, `b.json` in https://example.com/root.json read
+// the other one. Both engines filled its default, removed by its
+// additionalProperties and coerced by its types.
+{
+  const other = { $id: 'https://other.org/pp/b.json', type: 'object', properties: { x: { type: 'string', default: 'FROM-OTHER' }, n: { type: 'number' } }, additionalProperties: false }
+  const real = { $id: 'https://example.com/pp/b.json', type: 'object', properties: { x: { type: 'string', default: 'REAL' }, keep: { type: 'string' }, n: { type: 'string' } } }
+  const roots = [
+    { $id: 'https://example.com/pp/root.json', type: 'object', properties: { p: { $ref: 'b.json' } } },
+    { $ref: 'https://example.com/pp/root2.json' },
+  ]
+  const root2 = { $id: 'https://example.com/pp/root2.json', type: 'object', properties: { p: { $ref: 'b.json' } } }
+  const expect = [
+    [{}, { p: {} }, { p: { x: 'REAL' } }],
+    [{ removeAdditional: true }, { p: { keep: 'k' } }, { p: { keep: 'k', x: 'REAL' } }],
+    [{ coerceTypes: true }, { p: { n: 5 } }, { p: { n: '5', x: 'REAL' } }],
+  ]
+  for (const root of roots) for (const engine of ['auto', 'interpreter']) for (const [opts, data, want] of expect) {
+    checks++
+    const d = JSON.parse(JSON.stringify(data))
+    const r = new Validator(root, { schemas: [other, real, root2], engine, ...opts }).validate(d)
+    if (!r.valid || JSON.stringify(d) !== JSON.stringify(want)) fail(`preprocess ${engine} ${JSON.stringify(opts)} on ${JSON.stringify(data)} gave ${JSON.stringify(d)} valid=${r.valid}, expected ${JSON.stringify(want)} from https://example.com/pp/b.json`)
+  }
+}
+
 console.log(`  ${checks} checks`)
 if (failures) {
   console.log(`\n${failures} failures`)
