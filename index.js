@@ -42,6 +42,18 @@ if (typeof warm === 'object' && typeof warm.unref === 'function') warm.unref();
 // loop turns: a script that builds one and checks in the same tick never runs
 // it, and the timer is unref'd, so a finished script does not stay for it.
 // ATA_NO_WARM=1 turns it off.
+// Whether a validator's preprocess pass can be left out of a verdict, read
+// before its buffer APIs take the native walker: defaults only, none of
+// which can change one (lib/defaults-safety.js). coerceTypes and
+// removeAdditional change values and names, and always count. Only here,
+// where the addon can load; package.json's browser field leaves the module
+// out of a page, and the edge and lite entries do not name it.
+core._registerDefaultsSafety((v) => {
+  const o = v._options || {};
+  if (o.coerceTypes || o.removeAdditional) return false;
+  return require('./lib/defaults-safety.js').defaultsCannotChangeVerdict(v._schemaObj, v._schemaMap, core.Validator);
+});
+
 let built = null;
 core._registerBuiltHook((v) => {
   if (built === null) {

@@ -163,6 +163,10 @@ const root = path.resolve(__dirname, '..');
     // 67520 bytes (67509 measured): a count bound that is not a whole number
     // from zero keeps the buffer APIs off the native walker, which skipped it;
     // 35 bytes, in a bundle that never loads the addon.
+
+    // 67520 bytes (67510 measured): a validator with a preprocess pass answers
+    // its buffer APIs through validate() unless the Node entry says its
+    // defaults cannot change a verdict; 36 bytes, the check left out here.
     assert.ok(size < 67520, `the Workers bundle is ${size} bytes gzipped, over 67520`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');

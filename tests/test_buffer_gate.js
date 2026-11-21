@@ -77,6 +77,25 @@ check('an external schema with a routed shape routes the validator', () => {
   assert.strictEqual(bufferNeedsSlowPath({ type: 'object' }, map), true)
 })
 
+check('a validator with defaults, coerceTypes or removeAdditional answers the buffer APIs as validate()', () => {
+  // The native walker reads the bytes as they came; these passes change the
+  // document before it is judged.
+  const cases = [
+    [{ type: 'object', required: ['a'], properties: { a: { default: 1 } } }, '{}', {}],
+    [{ type: 'object', properties: { a: { type: 'boolean', default: 'false' } } }, '{}', {}],
+    [{ type: 'object', properties: { n: { type: 'integer' } } }, '{"n":"1"}', { coerceTypes: true }],
+    [{ type: 'object', properties: { a: {} }, additionalProperties: false }, '{"a":1,"b":2}', { removeAdditional: true }],
+  ]
+  for (const [s, text, opts] of cases) {
+    const v = new Validator(s, opts)
+    const want = v.validate(JSON.parse(text)).valid
+    assert.strictEqual(v.isValid(Buffer.from(text)), want, `isValid ${JSON.stringify(s)}`)
+    assert.strictEqual(v.countValid(Buffer.from(text + '\n' + text)), want ? 2 : 0, `countValid ${JSON.stringify(s)}`)
+    assert.strictEqual(v.batchIsValid([Buffer.from(text)]), want ? 1 : 0, `batchIsValid ${JSON.stringify(s)}`)
+    assert.deepStrictEqual(v.isValidParallel(Buffer.from(text + '\n' + text)), [want, want], `isValidParallel ${JSON.stringify(s)}`)
+  }
+})
+
 check('routed APIs give the validate() verdict', () => {
   const v = new Validator({ type: 'array', contains: { type: 'integer' }, minContains: 2 })
   // Works with or without the native addon: the slow APIs only need validate().
