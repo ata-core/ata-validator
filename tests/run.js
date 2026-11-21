@@ -263,6 +263,7 @@ const FILES = [
   "tests/test_rejection_shape.js",
   "tests/test_lazy_normalization.js",
   "tests/test_value_equality.js",
+  "tests/test_closure_equality.js",
   "tests/test_vocabulary.js",
   "tests/test_schema_scan.js",
   "tests/test_lazy_errors.js",
