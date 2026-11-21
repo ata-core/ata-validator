@@ -201,11 +201,16 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
     ['file name matching another host', doc('b.json'), [{ $id: 'https://other.org/agree/b.json', type: 'string' }]],
     ['mdxlintrc shape', { $schema: 'http://json-schema.org/draft-07/schema#', $id: 'https://example.com/agree/mdxlintrc.json', properties: { plugins: { $ref: 'remarkrc.json#/properties/plugins' } } }, []],
   ]
-  for (const [description, target, extra] of groups) {
-    const schema = { $ref: target.$id }
+  // A fragment-only reference two documents from the root, which has a
+  // definition of that name and b.json does not.
+  groups.push(['local pointer two documents away', { $id: 'https://example.com/agree/a.json', properties: { p: { $ref: 'https://example.com/agree/b.json' } } },
+    [{ $id: 'https://example.com/agree/b.json', properties: { r: { $ref: '#/definitions/nope' } } }],
+    { definitions: { nope: { type: 'number' } }, properties: { q: { $ref: 'https://example.com/agree/a.json' } } }])
+  for (const [description, target, extra, root] of groups) {
+    const schema = root || { $ref: target.$id }
     const map = new Map([[target.$id, target], ...extra.map((d) => [d.$id, d])])
     const interp = new Validator(schema, { schemas: [target, ...extra], engine: 'interpreter' })
-    const docs = [{ p: 1 }, { p: 's' }, { plugins: 42 }, {}]
+    const docs = [{ p: 1 }, { p: 's' }, { plugins: 42 }, {}, { q: { p: { r: 1 } } }]
     for (const entry of ENTRY_POINTS) {
       let fn
       try { fn = entry.build(schema, map) } catch { declined++; continue }
