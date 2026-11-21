@@ -23,8 +23,8 @@ const OneX = require('..').Validator
 const { Validator } = require('../lib/validator-small.js')
 const { codegen } = require('../lib/features/codegen.js')
 const { metaschemas } = require('../lib/features/metaschemas.js')
-const { errorMessages } = require('../lib/features/error-messages.js')
-const { richErrors } = require('../lib/features/rich-errors.js')
+const { errorMessages } = require('../lib/features/errorMessages.js')
+const { richErrors } = require('../lib/features/richErrors.js')
 const { verbose } = require('../lib/features/verbose.js')
 const fresh = () => {
   // The registry is the module's and the groups' (lib/groups.js), which the engine reads.

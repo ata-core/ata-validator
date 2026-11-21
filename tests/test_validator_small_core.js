@@ -19,7 +19,7 @@ const feature = require('../lib/core/feature.js')
 // The core, counting the engines it builds, so the test knows it ran.
 let built = 0
 const core = (schema, args) => { if (args !== undefined) built++; return feature(schema, args) }
-const F = require('../lib/features/error-messages.js')
+const F = require('../lib/features/errorMessages.js')
 const M = require('../lib/features/metaschemas.js')
 const { Validator } = small
 for (const m of [F, M]) for (const k of Object.keys(m)) try { Validator.use(m[k]) } catch {}

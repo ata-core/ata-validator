@@ -1,6 +1,7 @@
 'use strict'
 
-// The per-feature exports of the 2.0 Validator (package.json "exports"):
+// The per-feature exports of the 2.0 Validator (package.json "exports", the
+// pattern ./features/* over lib/features/*.js, imported by name):
 // ata-validator/features/<name> for each feature and featuresFor() from
 // ata-validator/features. Each resolves through the package's own exports,
 // registers on the plugin's core (lib/validator-small.js, a copy of its own
@@ -26,14 +27,14 @@ const CASES = {
   uri: ['uri.js', { format: 'uri' }, {}, 'x y'],
   draft7: ['draft7.js', { $schema: 'http://json-schema.org/draft-07/schema#', items: [{ type: 'string' }] }, {}, [1]],
   defaults: ['defaults.js', { properties: { a: { default: 1 } } }, {}, {}],
-  uniqueItems: ['unique-items.js', { uniqueItems: true }, {}, [1, 1]],
-  branchCollapse: ['branch-collapse.js', { anyOf: [{ type: 'string' }] }, {}, 1],
-  richErrors: ['rich-errors.js', { type: 'string' }, { richErrors: true }, 1],
+  uniqueItems: ['uniqueItems.js', { uniqueItems: true }, {}, [1, 1]],
+  branchCollapse: ['branchCollapse.js', { anyOf: [{ type: 'string' }] }, {}, 1],
+  richErrors: ['richErrors.js', { type: 'string' }, { richErrors: true }, 1],
   verbose: ['verbose.js', { type: 'string' }, { verbose: true }, 1],
   metaschemas: ['metaschemas.js', { $ref: 'https://json-schema.org/draft/2020-12/schema' }, {}, { type: 1 }],
-  errorMessages: ['error-messages.js', { type: 'string', errorMessage: 'a string' }, {}, 1],
-  coerceTypes: ['coerce-types.js', { type: 'number' }, { coerceTypes: true }, '1'],
-  removeAdditional: ['remove-additional.js', { type: 'object', additionalProperties: false }, { removeAdditional: true }, { a: 1 }],
+  errorMessages: ['errorMessages.js', { type: 'string', errorMessage: 'a string' }, {}, 1],
+  coerceTypes: ['coerceTypes.js', { type: 'number' }, { coerceTypes: true }, '1'],
+  removeAdditional: ['removeAdditional.js', { type: 'object', additionalProperties: false }, { removeAdditional: true }, { a: 1 }],
   codegen: ['codegen.js', null, null, null],
 }
 
@@ -43,7 +44,8 @@ const CASES = {
   for (const [name, [file, schema, opts, doc]] of Object.entries(CASES)) {
     const m = await import('ata-validator/features/' + name)
     assert.ok(m[name] && typeof m[name] === 'object', name + ': exported by name')
-    assert.strictEqual(m.default, m[name], name + ': and as the default')
+    // The export is the CommonJS module itself, no layer over it.
+    assert.strictEqual(require.resolve('ata-validator/features/' + name), path.join(ROOT, 'lib/features', name + '.js'), name + ': resolves to lib/features/' + name + '.js')
     assert.strictEqual(m[name], require(path.join(ROOT, 'lib/features', file))[name], name + ': the feature of lib/features/' + file)
     const V = fresh()
     if (name === 'codegen') {

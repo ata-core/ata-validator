@@ -13,7 +13,7 @@ import { metaschemas } from 'ata-validator/features/metaschemas'
 import { errorMessages } from 'ata-validator/features/errorMessages'
 import { coerceTypes } from 'ata-validator/features/coerceTypes'
 import { removeAdditional } from 'ata-validator/features/removeAdditional'
-import codegen from 'ata-validator/features/codegen'
+import { codegen } from 'ata-validator/features/codegen'
 const names: FeatureName[] = featuresFor({ format: 'date' }, { verbose: true }, [{ $id: 'x' }])
 const all: Feature[] = [formats, uri, draft7, defaults, uniqueItems, branchCollapse, richErrors, verbose, metaschemas, errorMessages, coerceTypes, removeAdditional, codegen]
 const one: Feature<'formats'> = formats

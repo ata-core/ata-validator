@@ -95,7 +95,7 @@
     },
     "./features/*": {
       "types": "./features/*.d.ts",
-      "import": "./features/*.mjs"
+      "default": "./lib/features/*.js"
     },
     "./v2/plugin-core": {
       "import": "./index.v2.core.mjs"
