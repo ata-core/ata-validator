@@ -31,6 +31,7 @@ const FILES = [
   "tests/test_trial_restore_counts.js",
   "tests/test_compiled_extension_parity.js",
   "tests/test_buffer_gate.js",
+  "tests/test_buffer_defaults_static.js",
   "tests/test_native_formats.js",
   "tests/test_user_format_precedence.js",
   "tests/test_native_findings.js",
