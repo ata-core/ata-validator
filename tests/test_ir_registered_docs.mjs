@@ -38,6 +38,9 @@ for (let i = 0; i < 12; i++) many.properties['f' + i] = { type: 'integer' }
 // it, and the IR registered such a document under no name, so every reference
 // to it failed and every document was refused.
 const d7 = { $schema: 'http://json-schema.org/draft-07/schema#', $id: 'https://e.x/d7', $ref: '#/definitions/s', type: 'number', definitions: { s: { type: 'string' } } }
+// A default no reference reaches (under $defs, under anyOf): the shared default
+// pass has nothing to do and returns null, and the module called it anyway.
+const unreached = { $id: 'https://e.x/fd', type: 'object', $defs: { u: { properties: { q: { default: 1 } } } }, anyOf: [{ properties: { r: { default: 2 } } }] }
 const registered = [t, u, many]
 const M20 = 'https://json-schema.org/draft/2020-12/schema'
 const M19 = 'https://json-schema.org/draft/2019-09/schema'
@@ -56,6 +59,7 @@ const cases = [
   [{ $ref: 'https://e.x/m' }, registered],
   [{ $ref: 'https://e.x/d7' }, [d7]],
   [{ properties: { p: { $ref: 'https://e.x/d7' } } }, [d7]],
+  [{ $ref: 'https://e.x/fd' }, [unreached]],
   // A reference beside keywords of its own, in one document: `#/required` ranks before `#/properties/a/type`.
   [{ $ref: '#/$defs/t', properties: { x: { type: 'integer' } }, $defs: { t: { type: 'object', properties: { a: { type: 'string' } }, required: ['c'] } } }, null],
   [{ $ref: M20 }, null],
