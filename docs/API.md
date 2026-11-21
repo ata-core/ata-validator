@@ -917,3 +917,12 @@ import 'ata-validator/idna';
 Without it a browser bundle checks a `hostname` for letters, digits and
 hyphens only and treats `idn-hostname` as an annotation, as releases before
 1.64.0 did everywhere.
+
+The `patternFallback` option works the same way. Node has it with no setup; a
+bundle for a page or a Worker leaves it out, and refuses the option, until the
+application imports it once (672 bytes gzipped in a browser bundle, 731 in a
+Workers bundle):
+
+```javascript
+import 'ata-validator/pattern-fallback';
+```

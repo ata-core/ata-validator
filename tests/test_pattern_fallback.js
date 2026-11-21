@@ -155,6 +155,10 @@ check("'reject' refuses a pattern a custom keyword's macro writes, when it compi
     keywords: { twice: { macro: () => ({ pattern: BACKREF }) } },
   })
   assert.throws(() => v.validate('aa'), (e) => e.message.includes(JSON.stringify(BACKREF)))
+  for (const call of [(w) => w.isValidObject('aa'), (w) => w.isValidJSON('"aa"'), (w) => w.validateJSON('"aa"')]) {
+    const w = new Validator({ type: 'string', twice: true }, { patternFallback: 'reject', keywords: { twice: { macro: () => ({ pattern: BACKREF }) } } })
+    assert.throws(() => call(w), (e) => e.message.includes(JSON.stringify(BACKREF)))
+  }
 })
 
 // --- a function ---
@@ -290,7 +294,42 @@ check('a pattern a macro writes is resolved through the function when it compile
   })
   assert.strictEqual(v.validate('magic').valid, true)
   assert.strictEqual(v.validate('aa').valid, false)
+  assert.strictEqual(v.isValidObject('aa'), false)
+  assert.strictEqual(v.isValidJSON('"magic"'), true)
+  assert.strictEqual(v.validateJSON('"aa"').valid, false)
   assert.strictEqual(log.length, 1)
+})
+check("what 'reject' lets through runs on the linear engine or a RegExp shown linear, on every path (official suite patterns)", () => {
+  const { _compilePattern } = require(path.join(ROOT, 'lib', 'interpreter-core'))
+  const { _internal } = require(path.join(ROOT, 'lib', 'js-compiler'))
+  const { nativeIsLinear } = require(path.join(ROOT, 'lib', 'regex-linear'))
+  const { safeKeyMatcher } = require(path.join(ROOT, 'lib', 'defaults'))
+  const OUT = {}
+  const outside = (s) => { try { return _compilePattern(s, () => OUT) === OUT } catch { return false } }
+  const pats = new Set()
+  const walk = (n) => {
+    if (n === null || typeof n !== 'object') return
+    for (const k of Object.keys(n)) {
+      const v = n[k]
+      if (k === 'pattern' && typeof v === 'string') pats.add(v)
+      if (k === 'patternProperties' && v && typeof v === 'object') for (const p of Object.keys(v)) pats.add(p)
+      walk(v)
+    }
+  }
+  const files = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? files(path.join(d, e.name)) : e.name.endsWith('.json') ? [path.join(d, e.name)] : [])
+  for (const f of files(path.join(__dirname, 'suite', 'tests'))) walk(JSON.parse(fs.readFileSync(f, 'utf8')))
+  let survivors = 0, out = 0
+  for (const p of pats) {
+    try { new RegExp(p, 'u') } catch { try { new RegExp(p) } catch { continue } }
+    if (outside(p)) { out++; continue }
+    survivors++
+    // Generated code: the linear engine, a RegExp shown linear, or declined.
+    assert.ok(_internal.useSafeEngine(p) || nativeIsLinear(p) || !_internal.patternEngineOk(p), p)
+    // The defaults pass's key matcher.
+    const m = safeKeyMatcher(p)
+    assert.ok((m && m.__ataSafe) || nativeIsLinear(p), p)
+  }
+  assert.ok(survivors >= 30 && out >= 5, survivors + ' ' + out)
 })
 check('the matcher contract: an object with test, a boolean answer, errors propagate', () => {
   for (const bad of [undefined, null, 1, 'x', {}, { test: 1 }]) {
