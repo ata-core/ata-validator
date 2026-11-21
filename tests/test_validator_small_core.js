@@ -23,6 +23,8 @@ const F = require('../lib/features/error-messages.js')
 const M = require('../lib/features/metaschemas.js')
 const { Validator } = small
 for (const m of [F, M]) for (const k of Object.keys(m)) try { Validator.use(m[k]) } catch {}
+// Every schema-decided group (lib/groups.js), as the full 2.0 entries register them.
+Validator.use(...require('../lib/features/groups.js').all)
 class Edge extends Validator {}
 Edge.prototype.core = core
 
