@@ -127,6 +127,7 @@ const FILES = [
   "tests/test_encoded_refs.js",
   "tests/test_cross_doc_root_ref.js",
   "tests/test_codegen_entrypoint_agreement.js",
+  "tests/test_registered_ref_resolution.js",
   "tests/test_schema_code_injection.js",
   "tests/test_aot_html_safe.js",
   "tests/test_ref_annotation_siblings.js",
