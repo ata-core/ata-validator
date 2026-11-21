@@ -51,8 +51,24 @@ for (const s of strings) {
     cases.push({ s, schema: { type: 'string', minLength: k, maxLength: k }, want: c === k });
     cases.push({ s, schema: { type: 'object', properties: { p: { type: 'string', maxLength: k } } }, data: { p: s }, want: c <= k });
     cases.push({ s, schema: { type: 'object', properties: { p: { type: 'string', minLength: k } } }, data: { p: s }, want: c >= k });
+    // A property name is counted the same way (propertyNames).
+    cases.push({ s, schema: { type: 'object', propertyNames: { maxLength: k } }, data: { [s]: 1 }, want: c <= k });
+    cases.push({ s, schema: { type: 'object', propertyNames: { minLength: k } }, data: { [s]: 1 }, want: c >= k });
+    cases.push({ s, schema: { type: 'object', propertyNames: { minLength: k, maxLength: k + 1 }, properties: { z: {} } }, data: { [s]: 1 }, want: c >= k && c <= k + 1 });
+  }
+  // A bound that is not a whole number is compared as written.
+  if (s.length <= 12) {
+    for (const k of [0.5, 1.5, 2.5]) {
+      cases.push({ s, schema: { type: 'string', minLength: k }, want: c >= k });
+      cases.push({ s, schema: { type: 'string', maxLength: k }, want: c <= k });
+      cases.push({ s, schema: { type: 'object', propertyNames: { minLength: k } }, data: { [s]: 1 }, want: c >= k });
+    }
   }
 }
+// A negative bound is a bound: the small engine read -1 as none.
+cases.push({ s: 'a', schema: { type: 'string', maxLength: -1 }, want: false });
+cases.push({ s: '', schema: { type: 'string', maxLength: -0.5 }, want: false });
+cases.push({ s: 'a', schema: { type: 'object', properties: { p: { type: 'string', maxLength: -1 } } }, data: { p: 'a' }, want: false });
 
 // The JSON text as JSON.stringify writes it (lone surrogates escaped) and, where
 // the string needs no escape, with the units written raw.
@@ -90,6 +106,22 @@ function runAll() {
   const configs = [['default', undefined], ['interpreter', { engine: 'interpreter' }], ['richErrors:false', { richErrors: false }], ['abortEarly', { abortEarly: true }]];
   const entries = [['index.js', require(path.join(ROOT, 'index.js'))], ['lite.js', require(path.join(ROOT, 'lite.js'))], ['index.edge.js', require(path.join(ROOT, 'index.edge.js'))]];
   for (const [entry, mod] of entries) for (const [cfg, opts] of configs) runValidator(`${entry} ${cfg}`, mod.Validator, opts);
+}
+
+// The three code generators, called directly as the runtime calls them.
+function runEntryPoints() {
+  const jc = require(path.join(ROOT, 'lib/js-compiler.js'));
+  const VALID = { valid: true, errors: [] };
+  for (const c of cases) {
+    const d = c.data !== undefined ? c.data : c.s;
+    const cg = jc.compileToJSCodegen(c.schema, null);
+    const er = jc.compileToJSCodegenWithErrors(c.schema, null);
+    const co = jc.compileToJSCombined(c.schema, VALID, null);
+    assert.ok(cg && er && co, `the generators compile ${JSON.stringify(c.schema)}`);
+    check('compileToJSCodegen', !!cg(d), c);
+    check('compileToJSCodegenWithErrors', er(d, true).valid, c);
+    check('compileToJSCombined', co(d).valid, c);
+  }
 }
 
 function runModules() {
@@ -151,6 +183,7 @@ if (CHILD) {
   }
   console.log(`ok child ${MODE}: ${checked} answers`);
 } else {
+  runEntryPoints();
   runModules();
   const children = [
     ['blocked', ['--disallow-code-generation-from-strings'], { ATA_NO_NATIVE: '1' }],
