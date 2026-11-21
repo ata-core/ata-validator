@@ -14,8 +14,8 @@ for (const [f, src] of Object.entries(render())) {
 const full = require('../lib/formats.js').formatChecks();
 const core = require('../lib/formats-core.js').formatChecks();
 const uri = require('../lib/uri-checks.js');
-const { FORMATS, URI_FORMATS, formatGroup } = require('../lib/groups.js');
-assert.deepStrictEqual(Object.keys(full).sort(), [...FORMATS, ...URI_FORMATS].sort(), 'lib/groups.js names every built-in format');
+const { FORMATS, URI_FORMATS, formatGroup } = require('../lib/gates.js');
+assert.deepStrictEqual(Object.keys(full).sort(), [...FORMATS, ...URI_FORMATS].sort(), 'lib/gates.js names every built-in format');
 assert.deepStrictEqual(Object.keys(core).sort(), [...FORMATS].sort(), 'the formats group checks every name but the URI ones');
 assert.deepStrictEqual(Object.keys(uri).sort(), [...URI_FORMATS].sort(), 'the uri group checks the URI names');
 for (const n of Object.keys(full)) assert.strictEqual(formatGroup(n), URI_FORMATS.has(n) ? 'uri' : 'formats', n);

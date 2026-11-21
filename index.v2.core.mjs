@@ -5,6 +5,4 @@
 // user entry: a schema that needs a group this module was not given is
 // refused with "ata2: <feature>, Validator.use(<feature>)".
 import small from './lib/validator-small.js';
-import gates from './lib/gates.js';
-small._gate(gates);
 export const Validator = small.Validator;

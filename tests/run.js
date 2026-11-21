@@ -343,6 +343,7 @@ const FILES = [
   "tests/test_engine_shared_sync.js",
   "tests/test_rejection_core_sync.js",
   "tests/test_group_copies_sync.js",
+  "tests/test_validator_full_sync.js",
   "tests/test_schema_shape.js",
   "tests/test_dynamic_ref_unresolved.js",
   "tests/test_defaults_schemas_doc.js",

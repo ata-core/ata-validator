@@ -23,8 +23,6 @@ function coreWith (names) {
   if (V === undefined) {
     for (const f of FRESH) delete require.cache[f]
     const small = require(FRESH[0]); V = small.Validator
-    // As index.v2.core.mjs: with the questions asked before the engine is built.
-    small._gate(require('../lib/gates.js'))
     if (names.length) V.use(...names.map((n) => F[n]))
     for (const f of FRESH) delete require.cache[f]
     cores.set(key, V)

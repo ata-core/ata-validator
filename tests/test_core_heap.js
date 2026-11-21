@@ -32,7 +32,7 @@ if (typeof globalThis.gc !== 'function') {
 // STALE entries), and fixed tables of keyword names and checks.
 const KNOWN = {
   'verdict.js': {
-    mutable: ['IA', 'linear', 'loadMore', 'moreModule', 'rootEntries', 'rootProps'],
+    mutable: ['IA', 'linear', 'loadMore', 'moreModule', 'rootEntries', 'rootProps', 'table'],
     collections: ['CHECKS', 'CODE', 'KW', 'LISTS', 'MAPS', 'NONE', 'SUBS', 'gone', 'leaves', 'patterns'],
   },
   'verdict-more.js': {
@@ -58,8 +58,6 @@ for (const [file, known] of Object.entries(KNOWN)) {
 const C = require('../lib/core/verdict.js')
 const core = require('../lib/core/feature.js')
 const more = require('../lib/core/verdict-more.js')
-// Every schema-decided group (lib/groups.js), as the full 2.0 entries register them.
-require('../lib/validator-small.js').Validator.use(...require('../lib/features/groups.js').all)
 
 function schema (i) {
   return {

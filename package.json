@@ -250,6 +250,8 @@
     "!lib/formats-core.js",
     "!lib/uri-checks.js",
     "!lib/validator-small.js",
+    "!lib/validator-full.js",
+    "!lib/engine-full.js",
     "!lib/small-tier.js",
     "!lib/features/",
     "!lib/core/",
