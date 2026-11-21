@@ -388,6 +388,9 @@ const FILES = [
   "tests/test_ref_cross.js",
   "tests/test_shape_classifier.js",
   "tests/test_tier0.js",
+  "tests/test_multiple_of_exact.js",
+  "tests/test_unique_items_collisions.js",
+  "tests/test_safe_regex_property_escapes.js",
   "benchmark/bench_aot_size.mjs",
 ]
 

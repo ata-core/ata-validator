@@ -352,6 +352,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // members and the values under patternProperties, additionalProperties and
 // dependentSchemas (#116), lib/remove-additional.js and its notes.
 // Measured 664.7 KB.
-assert.ok(manifest.size < 666 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 670 KB with exact decimal multipleOf (lib/multiple-of.js), O(n log n)
+// uniqueItems under hash collisions, and \p{...}/\P{...}/\cX in lib/safe-regex.js.
+assert.ok(manifest.size < 670 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

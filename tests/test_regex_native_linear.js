@@ -174,7 +174,7 @@ for (const p of ['^(\\p{L}+)+$', '^(\\p{L}|\\p{Ll})*x$', '(\\p{L}+)+$', '^\\p{L}
   const { compileToJSCodegen, compileToJSCodegenWithErrors, compileToJSCombined } = require('../lib/js-compiler')
   const VALID = { valid: true, errors: [] }
   const docs = ['ab', 'ab1', '', 'éè', 'a!', { ab: 1 }, { ab: 'x' }, { a1: 1 }, { 'é': 2 }]
-  for (const [p, engine] of [['^\\p{L}+$', 'codegen'], ['\\p{L}+', 'codegen'], ['^(\\p{L}+)+$', 'interpreter'], ['^(\\p{L}+\\s?)*$', 'interpreter']]) {
+  for (const [p, engine] of [['^\\p{L}+$', 'codegen'], ['\\p{L}+', 'codegen'], ['^(\\p{L}+)+$', 'codegen'], ['^(\\p{L}+\\s?)*$', 'codegen']]) {
     for (const schema of [{ type: 'string', pattern: p }, { type: 'object', patternProperties: { [p]: { type: 'number' } } }, { type: 'object', propertyNames: { pattern: p } }, { type: 'object', properties: { a: { allOf: [{ pattern: p }] } } }]) {
       const label = `${p} in ${JSON.stringify(schema)}`
       const v = new Validator(schema)

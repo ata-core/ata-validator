@@ -288,7 +288,10 @@ const esbuild = require('esbuild')
 // 63040 (63032 measured): the removal pass and the defaults module load only
 // for a schema with a closed object in its text, which kept 0.25 ms off a
 // server's first validated request; 56 bytes.
-const BUDGET = 63040
+// 63800 (63765 measured): exact decimal multipleOf (lib/multiple-of.js),
+// O(n log n) uniqueItems under hash collisions, and \p{...}/\P{...}/\cX in
+// lib/safe-regex.js.
+const BUDGET = 63800
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

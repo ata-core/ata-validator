@@ -11,6 +11,7 @@
 #endif
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -433,16 +434,63 @@ static bool is_integer_value(dom::element el) {
   }
 }
 
-// multipleOf as validate() decides it (multipleOfOk in lib/interpreter.js):
-// the quotient is an integer, or within 1e-9 of one. The engine used an
-// absolute remainder test, which disagreed on large values: 1e308 against
-// multipleOf 0.5 has a remainder of 0, but the quotient overflows to infinity
-// and validate() rejects it.
+// Exact decimal multipleOf, matching lib/multiple-of.js: each double is read
+// as its shortest round-trip decimal via std::to_chars (at most 17 significant
+// digits, so digits and rem * 10 never overflow uint64_t) and checked for exact
+// divisibility over a common power of ten.
+static bool parse_decimal_double(double v, uint64_t& digits, int& exp10) {
+  char buf[32];
+  auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), std::abs(v));
+  if (ec != std::errc{}) return false;
+  uint64_t d = 0;
+  int frac = 0;
+  bool seen_dot = false;
+  int e = 0;
+  const char* p = buf;
+  while (p < ptr && *p != 'e' && *p != 'E') {
+    if (*p == '.') { seen_dot = true; }
+    else { d = d * 10 + static_cast<uint64_t>(*p - '0'); if (seen_dot) frac++; }
+    p++;
+  }
+  if (p < ptr && (*p == 'e' || *p == 'E')) {
+    p++;
+    int sign = 1;
+    if (p < ptr && (*p == '+' || *p == '-')) { if (*p == '-') sign = -1; p++; }
+    while (p < ptr) { e = e * 10 + (*p - '0'); p++; }
+    e *= sign;
+  }
+  e -= frac;
+  while (d > 0 && d % 10 == 0) { d /= 10; e++; }
+  digits = d;
+  exp10 = e;
+  return true;
+}
+
 static bool multiple_of_ok(double d, double m) {
-  if (m == 0) return false;
-  double q = d / m;
-  if (std::isfinite(q) && std::floor(q) == q) return true;
-  return std::abs(q - std::round(q)) < 1e-9;
+  if (!std::isfinite(d) || !std::isfinite(m) || m == 0.0) return false;
+  if (d == 0.0) return true;
+  constexpr double kMaxSafe = 9007199254740991.0;
+  if (std::abs(d) <= kMaxSafe && std::abs(m) <= kMaxSafe && std::floor(d) == d && std::floor(m) == m) {
+    return static_cast<int64_t>(d) % static_cast<int64_t>(m) == 0;
+  }
+  uint64_t da = 0, db = 0;
+  int ea = 0, eb = 0;
+  if (!parse_decimal_double(d, da, ea) || !parse_decimal_double(m, db, eb) || db == 0) return false;
+  if (ea < eb) {
+    int diff = eb - ea;
+    if (diff >= 20) return false;
+    for (int i = 0; i < diff; i++) {
+      if (da % 10 != 0) return false;
+      da /= 10;
+    }
+    return da % db == 0;
+  }
+  uint64_t rem = da % db;
+  int diff = ea - eb;
+  for (int i = 0; i < diff && rem != 0; i++) {
+    rem = (rem * 10) % db;
+  }
+  return rem == 0;
 }
 
 // One spelling per numeric value, so enum, const and uniqueItems compare the
