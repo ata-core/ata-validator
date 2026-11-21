@@ -56,12 +56,20 @@ for (let i = 0; i < 20000; i++) {
 }
 
 let checks = 0;
+let left = 0;
 for (const f of FORMATS) {
   const slot = native.fastRegister(JSON.stringify({ type: 'string', format: f }));
   for (const s of samples) {
     const got = native.rawFastValidate(slot, Buffer.from(JSON.stringify(s)));
+    // null: the addon leaves the document to the JS path, which it does for a
+    // surrogate escape outside a pair (simdjson refuses those) and nothing else here.
+    if (got === null) {
+      assert.ok(/[\ud800-\udfff]/.test(s.replace(/[\ud800-\udbff][\udc00-\udfff]/g, '')), `format ${f}: native null for ${JSON.stringify(s)}`);
+      left++;
+      continue;
+    }
     assert.strictEqual(got, !!F[f](s), `format ${f}: native ${got} for ${JSON.stringify(s)}`);
     checks++;
   }
 }
-console.log(`ok: the native format checks answer as lib/formats.js on ${checks} strings across ${FORMATS.length} formats`);
+console.log(`ok: the native format checks answer as lib/formats.js on ${checks} strings across ${FORMATS.length} formats (${left} with a lone surrogate left to the JS path)`);
