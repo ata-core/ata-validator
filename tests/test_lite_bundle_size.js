@@ -291,7 +291,9 @@ const esbuild = require('esbuild')
 // 63064 (63059 measured): deep equality (enum, const, uniqueItems) reads the
 // enumerable own keys of both sides, so an object with a non-enumerable key no
 // longer compares differently by argument order; 27 bytes.
-const BUDGET = 63064
+// 63090 (63083 measured): a lone high surrogate counts as its own code
+// point, and length bounds stop scanning once decided; 51 bytes.
+const BUDGET = 63090
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

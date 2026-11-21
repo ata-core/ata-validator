@@ -154,7 +154,9 @@ const root = path.resolve(__dirname, '..');
     // with a closed object in its text; 38 bytes.
     // 67360 bytes (67355 measured): deep equality reads the enumerable own keys
     // of both sides; 23 bytes.
-    assert.ok(size < 67360, `the Workers bundle is ${size} bytes gzipped, over 67360`);
+    // 67380 bytes (67374 measured): a lone high surrogate counts as its own
+    // code point, and length bounds stop scanning once decided; 42 bytes.
+    assert.ok(size < 67380, `the Workers bundle is ${size} bytes gzipped, over 67380`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
