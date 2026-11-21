@@ -357,7 +357,8 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // and the verdict and combined generators declining a reference they cannot
 // resolve. Measured 667.2 KB; 667.7 KB with the preprocess passes resolving
 // a relative $ref at its document's base and the cross-document cycle
-// declined (+508 B).
+// declined (+508 B); 667.9 KB with a local definition re-entered on an
+// undetected cycle declined (+197 B).
 assert.ok(manifest.size < 668 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
