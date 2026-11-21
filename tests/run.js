@@ -94,6 +94,7 @@ const FILES = [
   "tests/test_aot_cli_build.js",
   "tests/test_aot_cli_smoke.js",
   "tests/test_bundle_standalone.js",
+  "tests/test_from_standalone_defaults.js",
   "tests/test_standalone_anyof.js",
   "tests/test_standalone_formats.js",
   "tests/test_aot_format_mode.js",

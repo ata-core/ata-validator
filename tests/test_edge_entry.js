@@ -168,6 +168,9 @@ const root = path.resolve(__dirname, '..');
     // defaults cannot change a verdict; 36 bytes, the check left out here.
     // 67650 bytes (67645 measured): a schema holding a value JSON cannot carry
     // gets a compile cache key of its own; 171 bytes.
+    // 67520 bytes (67516 measured): Validator.fromStandalone fills defaults
+    // from the documents given through `schemas` and before every verdict, as
+    // a Validator does; 42 bytes.
     assert.ok(size < 67650, `the Workers bundle is ${size} bytes gzipped, over 67650`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');

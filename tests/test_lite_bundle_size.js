@@ -302,6 +302,9 @@ const esbuild = require('esbuild')
 // cannot change a verdict; 31 bytes, the check itself left out of lite.
 // 63350 (63345 measured): a schema holding a value JSON cannot carry gets a
 // compile cache key of its own, read from the normalization walk; 174 bytes.
+// 63230 (63226 measured): Validator.fromStandalone fills defaults from the
+// documents given through `schemas` and before every verdict, as a Validator
+// does; 55 bytes.
 const BUDGET = 63350
 
 const result = esbuild.buildSync({
