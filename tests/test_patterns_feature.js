@@ -14,7 +14,7 @@
 //   as the full entry answers, through validate() and `~standard`; every other
 //   (linear patterns only) is answered without it as the full entry answers;
 // - the passes refuse loudly without it: defaults (lib/defaults-core.js),
-//   removeAdditional and propertyNames, and a pattern the JSON text does not
+//   removeAdditional (with the Validator's matcher) and propertyNames, and a pattern the JSON text does not
 //   show is refused where the engine compiles it;
 // - the full entries match every pattern with the engine built in and refuse
 //   to register the feature;
@@ -185,6 +185,10 @@ const HAND = ['^(/|\\./|[A-Za-z]:\\\\)?[^/]+$', '^[^\\u0000]*$', '^(?:a|bc)?x*$'
   const ra = { type: 'object', patternProperties: { [deep]: {} }, additionalProperties: false }
   assert.throws(() => new (coreWith(['removeAdditional', 'branchCollapse']))(ra, { removeAdditional: true }).validate({ xz: 1, q: 2 }), REFUSED, 'removeAdditional: refused without patterns')
   assert.strictEqual(answer(coreWith(['removeAdditional', 'patterns']), ra, [{ xz: 1, q: 2, yxz: 3 }], { removeAdditional: true }), answer(FULL.use(F.removeAdditional), ra, [{ xz: 1, q: 2, yxz: 3 }], { removeAdditional: true }), 'removeAdditional: keys removed as the full entry')
+  // The pass takes the Validator's matcher; the core's refuses with no engine.
+  const hiddenPP = Object.defineProperty({ type: 'object', additionalProperties: false }, 'patternProperties', { value: { [deep]: {} }, enumerable: false })
+  assert.throws(() => new (coreWith(['removeAdditional']))(hiddenPP, { removeAdditional: true }).validate({ xz: 1 }), REFUSED, 'removeAdditional pass: refused where it compiles a name')
+  assert.throws(() => F.removeAdditional.build(ra, (src) => core.compilePattern(src, null)), REFUSED)
   const pn = { propertyNames: { pattern: deep } }
   assert.throws(() => new (coreWith([]))(pn).validate({ xz: 1 }), REFUSED, 'propertyNames: refused without patterns')
   assert.strictEqual(answer(coreWith(['patterns']), pn, [{ xz: 1 }, { q: 1 }]), answer(FULL, pn, [{ xz: 1 }, { q: 1 }]), 'propertyNames: answered as the full entry')
