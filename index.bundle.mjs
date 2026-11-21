@@ -6,11 +6,12 @@
 // CommonJS module and keeps all of them.
 import core from './lib/validator-core.js';
 import engine from './lib/codegen-engine.js';
+import patternFallback from './lib/pattern-fallback.js';
 import { toTypeScript, renderPretty, renderCompact, toOutput, toRetryMessage, describeSchema, renderJSON } from './lib/tools.mjs';
 import { defineSchema, schemaOf } from './lib/schema-helpers.mjs';
 
 // Pure-marked reads, so a bundler drops what goes unused (lib/schema-helpers.mjs).
-const api = /* @__PURE__ */ (() => { core._registerCodegen(engine); return core; })();
+const api = /* @__PURE__ */ (() => { core._registerCodegen(engine); core._internals._registerPatternFallback(() => patternFallback); return core; })();
 export const Validator = /* @__PURE__ */ (() => api.Validator)();
 export const compile = /* @__PURE__ */ (() => api.compile)();
 export const validate = /* @__PURE__ */ (() => api.validate)();

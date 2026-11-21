@@ -152,7 +152,11 @@ const root = path.resolve(__dirname, '..');
     // validator of one's own (issue #122); 23 bytes.
     // 67340 bytes (67332 measured): the removal pass loads only for a schema
     // with a closed object in its text; 38 bytes.
-    assert.ok(size < 67340, `the Workers bundle is ${size} bytes gzipped, over 67340`);
+    // 67590 bytes (67576 measured): the patternFallback option's hook and
+    // refusal (issue #131); the option itself comes with
+    // ata-validator/pattern-fallback, which a Worker imports to use it; 244
+    // bytes.
+    assert.ok(size < 67590, `the Workers bundle is ${size} bytes gzipped, over 67590`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

@@ -659,12 +659,30 @@ const v = new Validator(schema, {
   schemas: [otherSchema],  // cross-schema $ref registry
   abortEarly: true,        // skip detailed error collection on failure (~4x faster on invalid data)
   engine: 'interpreter',   // eval-free interpreted engine only: for a schema from outside the trust boundary
+  patternFallback: 'reject', // refuse a pattern the linear-time engine cannot run, instead of a RegExp that can backtrack
 });
 ```
 
 `abortEarly` returns a shared `{ valid: false, errors: [{ message: 'validation failed' }] }` on failure instead of running the detailed error collector. Useful when the caller only needs a pass/fail decision (Fastify route guards, high-throughput gatekeepers, request rejection at the edge).
 
 `engine: 'interpreter'` keeps one validator off code generation: no `new Function`, no shared compile cache, the interpreted engine answers every call. The default turns a schema into JavaScript source, which is the right trade for a schema you wrote; a schema that arrives at runtime from a plugin or a tenant is input, and this option validates against it without ever executing anything derived from it. Same verdict, higher per-call cost; `ATA_FORCE_NAPI=1` does the same for a whole process.
+
+`patternFallback` decides what happens to a `pattern`, `patternProperties` key or `propertyNames` pattern that ata's linear-time regex engine cannot run: one with a backreference, a lookaround, `\B`, `\c`, `\k`, a Unicode property escape (`\p{...}`, all of them, `^\p{L}+$` included) or counted repeats past the engine's budget. By default (`'platform'`) such a pattern runs on the platform RegExp, which can backtrack. `'reject'` makes the constructor throw, with the pattern and where it sits in the schema:
+
+```javascript
+new Validator({ properties: { a: { pattern: '^(a+)+\\1$' } } }, { patternFallback: 'reject' })
+// Error: patternFallback: the pattern "^(a+)+\\1$" at #/properties/a/pattern is outside
+// the linear-time engine and would run on a RegExp that can backtrack
+```
+
+A function hands those patterns to a matcher of your own, such as a binding to RE2. It is called once per pattern when the validator is built, with the pattern and the flags the RegExp would use, and returns an object whose `test(input)` returns a boolean; anything else throws. That validator then answers on the interpreted engine on every entry point, the buffer methods included:
+
+```javascript
+const RE2 = require('re2');
+const v = new Validator(toolSchema, { patternFallback: (source, flags) => new RE2(source, flags) });
+```
+
+Patterns the linear engine runs are not affected, and with no such pattern in the schema a validator compiles as it would without the option. The schema is scanned when the validator is built, every object in it, `default`, `const` and `enum` values included, since a `$ref` can point anywhere. The Node entry carries the option; a bundle for a page or a Worker adds it with `import 'ata-validator/pattern-fallback'` once (731 bytes gzipped in a Workers bundle, 672 in a browser bundle) and refuses it without that import. `ata build --pattern-fallback reject` and `build({ patternFallback: 'reject' })` fail an input with such a pattern. A function cannot be written into a compiled module, so `ata build`, the bundle methods and `Validator.fromStandalone()` throw for one.
 
 ### Build-time compile (`ata compile`)
 

@@ -77,6 +77,7 @@ const FILES = [
   "tests/test_async_refine.js",
   "tests/test_safe_regex.js",
   "tests/test_safe_regex_integration.js",
+  "tests/test_pattern_fallback.js",
   "tests/test_regex_ecma_whitespace.js",
   "tests/test_regex_native_linear.js",
   "tests/test_aot_build.js",

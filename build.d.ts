@@ -25,6 +25,13 @@ export interface BuildOptions {
    * Set explicitly to override the environment default.
    */
   source?: boolean;
+  /**
+   * `'reject'` fails each input whose schema has a pattern outside the
+   * linear-time engine, which would run on the platform RegExp and can
+   * backtrack (see `patternFallback` on `ValidatorOptions`). Default
+   * `'platform'`. A function cannot be written into a module and throws.
+   */
+  patternFallback?: 'platform' | 'reject';
 }
 
 export interface CompiledEntry {
@@ -86,9 +93,13 @@ export interface BundleStandaloneOptions {
    */
   formatMode?: 'embed' | 'inject';
   verbose?: boolean;
+  /** `'reject'` refuses a schema with a pattern outside the linear-time engine; a function throws. */
+  patternFallback?: 'platform' | 'reject';
 }
 
 export interface ToStandaloneModuleOptions {
+  /** `'reject'` refuses a schema with a pattern outside the linear-time engine; a function throws. */
+  patternFallback?: 'platform' | 'reject';
   /**
    * Run the authoring-time schema checks before emitting: unknown keywords
    * (with a spelling suggestion), inert keywords, unsatisfiable required

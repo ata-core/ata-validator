@@ -120,6 +120,11 @@
       "import": "./codegen.mjs",
       "require": "./codegen.js"
     },
+    "./pattern-fallback": {
+      "types": "./pattern-fallback.d.ts",
+      "import": "./pattern-fallback.mjs",
+      "require": "./pattern-fallback.js"
+    },
     "./kernels": {
       "import": "./lib/kernels/index.mjs"
     },
@@ -143,6 +148,8 @@
   "sideEffects": [
     "./codegen.js",
     "./codegen.mjs",
+    "./pattern-fallback.js",
+    "./pattern-fallback.mjs",
     "./lib/aot-mark.js",
     "./index.aot.js",
     "./index.aot.mjs",
@@ -284,7 +291,10 @@
     "LICENSE",
     "codegen.js",
     "codegen.mjs",
-    "codegen.d.ts"
+    "codegen.d.ts",
+    "pattern-fallback.js",
+    "pattern-fallback.mjs",
+    "pattern-fallback.d.ts"
   ],
   "optionalDependencies": {
     "@ata-validator/native-darwin-arm64": "1.65.0",

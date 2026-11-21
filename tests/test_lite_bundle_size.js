@@ -288,7 +288,12 @@ const esbuild = require('esbuild')
 // 63040 (63032 measured): the removal pass and the defaults module load only
 // for a schema with a closed object in its text, which kept 0.25 ms off a
 // server's first validated request; 56 bytes.
-const BUDGET = 63040
+// 63250 (63236 measured): the patternFallback option (issue #131): the hook
+// through the interpreted engine's pattern compile, the defaults and removal
+// passes and the buffer APIs, and the refusal that names the import; the
+// option itself is not in lite unless ata-validator/pattern-fallback is
+// imported; 204 bytes.
+const BUDGET = 63250
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
