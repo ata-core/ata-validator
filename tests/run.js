@@ -100,6 +100,7 @@ const FILES = [
   "tests/test_engine_routing.js",
   "tests/test_engine_option.js",
   "tests/test_compile_cache_order.js",
+  "tests/test_compile_cache_unfaithful.js",
   "tests/test_engine_diagnostic.js",
   "tests/test_format_engine_parity.js",
   "tests/test_error_accumulator_collision.js",
