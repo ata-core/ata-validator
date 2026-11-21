@@ -56,6 +56,14 @@ for (const s of strings) {
     cases.push({ s, schema: { type: 'object', propertyNames: { minLength: k } }, data: { [s]: 1 }, want: c >= k });
     cases.push({ s, schema: { type: 'object', propertyNames: { minLength: k, maxLength: k + 1 }, properties: { z: {} } }, data: { [s]: 1 }, want: c >= k && c <= k + 1 });
   }
+  // A bound that is not a whole number is compared as written.
+  if (s.length <= 12) {
+    for (const k of [0.5, 1.5, 2.5]) {
+      cases.push({ s, schema: { type: 'string', minLength: k }, want: c >= k });
+      cases.push({ s, schema: { type: 'string', maxLength: k }, want: c <= k });
+      cases.push({ s, schema: { type: 'object', propertyNames: { minLength: k } }, data: { [s]: 1 }, want: c >= k });
+    }
+  }
 }
 
 // The JSON text as JSON.stringify writes it (lone surrogates escaped) and, where
