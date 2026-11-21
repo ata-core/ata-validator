@@ -244,6 +244,7 @@
     "!lib/engine-shared.js",
     "!lib/rejection-core.js",
     "!lib/groups.js",
+    "!lib/gates.js",
     "!lib/deq.js",
     "!lib/unique-dup.js",
     "!lib/formats-core.js",

@@ -26,6 +26,7 @@ export const defaults = df.defaults;
 export const uniqueItems = uq.uniqueItems;
 export const branchCollapse = bc.branchCollapse;
 import small from './lib/validator-small.js';
+import gates from './lib/gates.js';
 // Every feature by the name the Validator registers it under.
 const ALL = { errorMessage: em.errorMessages, metaschemas: ms.metaschemas, coerceTypes: mu.coerceTypes, removeAdditional: mu.removeAdditional, codegen: cg.codegen, richErrors: re.richErrors, verbose: vb.verbose, formats: fo.formats, uri: ur.uri, draft7: d7.draft7, defaults: df.defaults, uniqueItems: uq.uniqueItems, branchCollapse: bc.branchCollapse };
 // The features a Validator built from `schema` with `options`, and given
@@ -39,6 +40,7 @@ const ALL = { errorMessage: em.errorMessages, metaschemas: ms.metaschemas, coerc
 // stops before it builds the engine.
 export function featuresFor (schema, options, schemas) {
   const got = new Set();
+  small._gate(gates);
   small._probe({ all: ALL, got });
   try {
     const v = new small.Validator(schema, options);
