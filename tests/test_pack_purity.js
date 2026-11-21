@@ -352,9 +352,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // members and the values under patternProperties, additionalProperties and
 // dependentSchemas (#116), lib/remove-additional.js and its notes.
 // Measured 664.7 KB.
-// 668 KB with references inside registered documents resolved at their own
-// base before code generation trusts them, and the verdict and combined
-// generators declining a reference they cannot resolve. Measured 667.2 KB.
+// 668 KB for a silent accept fix, +1,476 B: references inside registered
+// documents resolved at their own base before code generation trusts them,
+// and the verdict and combined generators declining a reference they cannot
+// resolve. Measured 667.2 KB.
 assert.ok(manifest.size < 668 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
