@@ -187,6 +187,54 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
   }
 }
 
+// References inside a registered document, reached through another one. Every
+// entry point once agreed here, on true: the reference that cannot be resolved
+// emitted no check in each of them that compiled, so agreement between them
+// showed nothing. These are held to the interpreted engine's answer as well.
+{
+  const { Validator } = require('..')
+  const doc = (ref) => ({ $id: 'https://example.com/agree/a.json', type: 'object', properties: { p: { $ref: ref } } })
+  const groups = [
+    ['unresolved relative pointer', doc('missing.json#/definitions/x'), []],
+    ['unresolved absolute pointer', doc('https://example.com/agree/missing.json#/definitions/x'), []],
+    ['pointer missing in a registered target', doc('missing.json#/definitions/zz'), [{ $id: 'https://example.com/agree/missing.json', definitions: { x: { type: 'string' } } }]],
+    ['file name matching another host', doc('b.json'), [{ $id: 'https://other.org/agree/b.json', type: 'string' }]],
+    ['mdxlintrc shape', { $schema: 'http://json-schema.org/draft-07/schema#', $id: 'https://example.com/agree/mdxlintrc.json', properties: { plugins: { $ref: 'remarkrc.json#/properties/plugins' } } }, []],
+  ]
+  // A fragment-only reference two documents from the root, which has a
+  // definition of that name and b.json does not.
+  groups.push(['local pointer two documents away', { $id: 'https://example.com/agree/a.json', properties: { p: { $ref: 'https://example.com/agree/b.json' } } },
+    [{ $id: 'https://example.com/agree/b.json', properties: { r: { $ref: '#/definitions/nope' } } }],
+    { definitions: { nope: { type: 'number' } }, properties: { q: { $ref: 'https://example.com/agree/a.json' } } }])
+  for (const [description, target, extra, root] of groups) {
+    const schema = root || { $ref: target.$id }
+    const map = new Map([[target.$id, target], ...extra.map((d) => [d.$id, d])])
+    const interp = new Validator(schema, { schemas: [target, ...extra], engine: 'interpreter' })
+    const docs = [{ p: 1 }, { p: 's' }, { plugins: 42 }, {}, { q: { p: { r: 1 } } }]
+    for (const entry of ENTRY_POINTS) {
+      let fn
+      try { fn = entry.build(schema, map) } catch { declined++; continue }
+      if (typeof fn !== 'function') { declined++; continue }
+      compiled++
+      for (const data of docs) {
+        let v
+        try { v = entry.verdict(fn, data) } catch { continue }
+        if (v === null) continue
+        checked++
+        const expected = interp.validate(data).valid
+        if (v !== expected) {
+          disagreements.push({
+            where: `registered documents :: ${description} :: ${JSON.stringify(data)}`,
+            answers: `${entry.name}=${v}  interpreter=${expected}`,
+            expected,
+            schema: JSON.stringify(target).slice(0, 150),
+          })
+        }
+      }
+    }
+  }
+}
+
 console.log('\ncodegen entry point agreement\n')
 console.log(`  ${compiled} compiles accepted, ${declined} declined`)
 console.log(`  ${checked} instances where at least two entry points both answered`)

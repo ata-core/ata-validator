@@ -156,7 +156,11 @@ const root = path.resolve(__dirname, '..');
     // of both sides; 23 bytes.
     // 67380 bytes (67374 measured): a lone high surrogate counts as its own
     // code point, and length bounds stop scanning once decided; 42 bytes.
-    assert.ok(size < 67380, `the Workers bundle is ${size} bytes gzipped, over 67380`);
+    // 67420 bytes (67416 measured): the defaults, removal and coercion passes
+    // resolve a relative $ref at its document's base, not by path suffix, so
+    // they no longer act on a different registered document; 84 bytes.
+    // 67480 bytes (67474 measured): the three fixes above together in one tree.
+    assert.ok(size < 67480, `the Workers bundle is ${size} bytes gzipped, over 67480`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

@@ -293,7 +293,11 @@ const esbuild = require('esbuild')
 // longer compares differently by argument order; 27 bytes.
 // 63090 (63083 measured): a lone high surrogate counts as its own code
 // point, and length bounds stop scanning once decided; 51 bytes.
-const BUDGET = 63090
+// 63110 (63103 measured): the defaults, removal and coercion passes resolve a
+// relative $ref at its document's base, not by path suffix, so they no longer
+// act on a different registered document; 71 bytes.
+// 63180 (63171 measured): the three fixes above together in one tree.
+const BUDGET = 63180
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
