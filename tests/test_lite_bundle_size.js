@@ -300,7 +300,9 @@ const esbuild = require('esbuild')
 // 63210 (63202 measured): a validator with a preprocess pass answers its
 // buffer APIs through validate() unless the Node entry says its defaults
 // cannot change a verdict; 31 bytes, the check itself left out of lite.
-const BUDGET = 63210
+// 63350 (63345 measured): a schema holding a value JSON cannot carry gets a
+// compile cache key of its own, read from the normalization walk; 174 bytes.
+const BUDGET = 63350
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
