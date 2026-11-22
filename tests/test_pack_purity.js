@@ -376,6 +376,16 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // README and the CHANGELOG. Measured 670.5 KB.
 // 682 KB with the sweep's fixes, the unresolved $ref fix and the
 // patternFallback option together in one tree. Measured 681.3 KB.
-assert.ok(manifest.size < 682 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 674 KB with ata-validator/ir and ata-validator/kernels giving a pattern
+// the engine the Validator gives it: the linear engine as an ES module for
+// the modules the ir writes (lib/kernels/safe-re.mjs, a copy of
+// lib/safe-regex.js's engine without its comments, since the kernels reach
+// no CommonJS file), the interpreted engine's choice as one for the ir's
+// removeAdditional pass, and the code generator's choice in a file of its own
+// that both read (lib/pattern-choice.js). Measured 673.0 KB.
+// 689 KB with the sweep's fixes, the unresolved $ref fix, the
+// patternFallback option and the ir and kernels pattern engine together in
+// one tree. Measured 688.5 KB.
+assert.ok(manifest.size < 689 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

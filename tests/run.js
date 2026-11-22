@@ -178,6 +178,8 @@ const FILES = [
   "tests/test_ir_small_formats.mjs",
   "tests/test_kernels_rank_sync.js",
   "tests/test_ir_emit_deps_sync.js",
+  "tests/test_kernels_pattern_sync.js",
+  "tests/test_ir_pattern_engine.js",
   "tests/test_ir_key_walk.mjs",
   "tests/test_ir_object_flag.mjs",
   "tests/test_deep_equal_enumerable.js",
