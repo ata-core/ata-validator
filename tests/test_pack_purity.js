@@ -352,6 +352,13 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // members and the values under patternProperties, additionalProperties and
 // dependentSchemas (#116), lib/remove-additional.js and its notes.
 // Measured 664.7 KB.
-assert.ok(manifest.size < 666 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 674 KB with ata-validator/ir and ata-validator/kernels giving a pattern
+// the engine the Validator gives it: the linear engine as an ES module for
+// the modules the ir writes (lib/kernels/safe-re.mjs, a copy of
+// lib/safe-regex.js's engine without its comments, since the kernels reach
+// no CommonJS file), the interpreted engine's choice as one for the ir's
+// removeAdditional pass, and the code generator's choice in a file of its own
+// that both read (lib/pattern-choice.js). Measured 673.0 KB.
+assert.ok(manifest.size < 674 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
