@@ -87,6 +87,20 @@ An invalid payload comes back with the same errors you get anywhere else:
 }
 ```
 
+A Worker that validates against schemas it receives at runtime, such as an MCP
+host checking tool arguments against a remote server's schemas, can keep
+patterns the linear-time regex engine cannot run off the platform RegExp with
+the `patternFallback` option (see docs/API.md). The edge entry leaves the
+option out of the bundle, and refuses it, until the Worker imports it once;
+the import adds 3442 bytes gzipped:
+
+```js
+import 'ata-validator/pattern-fallback'
+import { Validator } from 'ata-validator'
+
+const v = new Validator(remoteSchema, { patternFallback: 'reject' })
+```
+
 ## Compile schemas ahead of time
 
 The example above ships the whole library so it can compile the schema when the

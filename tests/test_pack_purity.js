@@ -371,6 +371,11 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // end it). Measured 670.6 KB.
 // 677 KB with the sweep's fixes and the unresolved $ref fix together in
 // one tree. Measured 676.4 KB.
-assert.ok(manifest.size < 677 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 671 KB with the patternFallback option (#131): lib/pattern-fallback.js,
+// the ata-validator/pattern-fallback entry, its types and its notes in the
+// README and the CHANGELOG. Measured 670.5 KB.
+// 682 KB with the sweep's fixes, the unresolved $ref fix and the
+// patternFallback option together in one tree. Measured 681.3 KB.
+assert.ok(manifest.size < 682 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

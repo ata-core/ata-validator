@@ -176,7 +176,13 @@ const root = path.resolve(__dirname, '..');
     // where failing it could be inverted, ends the whole validation; 464 bytes.
     // 68420 bytes (68402 measured): the sweep's fixes and the unresolved
     // $ref fix together in one tree.
-    assert.ok(size < 68420, `the Workers bundle is ${size} bytes gzipped, over 68420`);
+    // 67510 bytes (67498 measured): the patternFallback option's hook and
+    // refusal (issue #131); the option itself comes with
+    // ata-validator/pattern-fallback, which a Worker imports to use it; 166
+    // bytes.
+    // 68580 bytes (68566 measured): the sweep's fixes, the unresolved
+    // $ref fix and the patternFallback option together in one tree.
+    assert.ok(size < 68580, `the Workers bundle is ${size} bytes gzipped, over 68580`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

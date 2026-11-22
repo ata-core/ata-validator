@@ -465,9 +465,42 @@ export interface ValidatorOptions {
    * does not affect; without it they answer through the engine it picks.
    */
   engine?: 'auto' | 'interpreter';
+  /**
+   * What a pattern ata cannot show to run in linear time gets: one the
+   * linear-time engine cannot represent (a backreference, a lookaround, `\B`,
+   * `\c`, `\k`, a Unicode property escape, counted repeats past the engine's
+   * budget) and that the platform RegExp is not proven to run in linear time
+   * either. `^\p{L}+$` is proven and unaffected; `^(\p{L}+)+$` is not. The
+   * same holds for `patternProperties` keys and `propertyNames`.
+   *
+   * - `'platform'` (default): the platform RegExp runs it, which can backtrack.
+   * - `'reject'`: the constructor (and `addSchema()`) throws, naming the
+   *   pattern and its location in the schema.
+   * - a function: called once per such pattern when the validator is built,
+   *   with the source and the flags the RegExp would use (`'u'` where the
+   *   pattern is valid with it, else `''`). It returns an object whose
+   *   `test(input)` answers for that pattern on every path, and must return a
+   *   boolean. The validator then runs on the interpreted engine.
+   *
+   * Every object in the schema is scanned, `default`, `const` and `enum`
+   * values included, because a `$ref` can point anywhere. On Node the option
+   * is always available; a bundle for a page or a Worker needs
+   * `import 'ata-validator/pattern-fallback'` once, and refuses the option
+   * without it. A function cannot be compiled into a module (`ata build`,
+   * the bundle methods), which throw for one.
+   */
+  patternFallback?: 'platform' | 'reject' | PatternFallbackFunction;
 }
 
-export interface BundleStandaloneOptions extends ValidatorOptions {
+/** The matcher a `patternFallback` function returns for one pattern. */
+export interface PatternMatcher {
+  test(input: string): boolean;
+}
+export type PatternFallbackFunction = (source: string, flags: string) => PatternMatcher;
+
+export interface BundleStandaloneOptions extends Omit<ValidatorOptions, 'patternFallback'> {
+  /** `'reject'` refuses a schema with a pattern outside the linear-time engine; a function throws. */
+  patternFallback?: 'platform' | 'reject';
   /** Module format for the emitted bundle. Default: 'cjs'. */
   format?: 'esm' | 'cjs';
 }

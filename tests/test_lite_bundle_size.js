@@ -312,7 +312,14 @@ const esbuild = require('esbuild')
 // accept; 408 bytes.
 // 63870 (63853 measured): the sweep's fixes and the unresolved $ref
 // fix together in one tree.
-const BUDGET = 63870
+// 63180 (63173 measured): the patternFallback option (issue #131): one
+// optional hook argument through the interpreted engine's pattern compile, a
+// key matcher for the defaults and removal passes, and the refusal that names
+// the import; the option itself is in lib/pattern-fallback.js, which lite
+// carries only when ata-validator/pattern-fallback is imported; 141 bytes.
+// 64030 (64016 measured): the sweep's fixes, the unresolved $ref fix
+// and the patternFallback option together in one tree.
+const BUDGET = 64030
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
