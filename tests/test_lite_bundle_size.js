@@ -297,7 +297,16 @@ const esbuild = require('esbuild')
 // relative $ref at its document's base, not by path suffix, so they no longer
 // act on a different registered document; 71 bytes.
 // 63180 (63171 measured): the three fixes above together in one tree.
-const BUDGET = 63180
+// 63210 (63202 measured): a validator with a preprocess pass answers its
+// buffer APIs through validate() unless the Node entry says its defaults
+// cannot change a verdict; 31 bytes, the check itself left out of lite.
+// 63350 (63345 measured): a schema holding a value JSON cannot carry gets a
+// compile cache key of its own, read from the normalization walk; 174 bytes.
+// 63230 (63226 measured): Validator.fromStandalone fills defaults from the
+// documents given through `schemas` and before every verdict, as a Validator
+// does; 55 bytes.
+// 63440 (63434 measured): the sweep's fixes together in one tree.
+const BUDGET = 63440
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

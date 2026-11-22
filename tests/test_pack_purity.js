@@ -361,6 +361,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // undetected cycle declined (+197 B).
 // 670 KB with the deep equality and code point fixes in the same release.
 // Measured 668.3 KB.
-assert.ok(manifest.size < 670 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 672 KB with lib/defaults-safety.js, the static check that keeps a
+// validator's buffer APIs on the native walker when its defaults cannot
+// change a verdict. Measured 671.9 KB.
+// 675 KB with the sweep's fixes together in one tree. Measured 674.0 KB.
+assert.ok(manifest.size < 675 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

@@ -160,7 +160,19 @@ const root = path.resolve(__dirname, '..');
     // resolve a relative $ref at its document's base, not by path suffix, so
     // they no longer act on a different registered document; 84 bytes.
     // 67480 bytes (67474 measured): the three fixes above together in one tree.
-    assert.ok(size < 67480, `the Workers bundle is ${size} bytes gzipped, over 67480`);
+    // 67520 bytes (67509 measured): a count bound that is not a whole number
+    // from zero keeps the buffer APIs off the native walker, which skipped it;
+    // 35 bytes, in a bundle that never loads the addon.
+    // 67520 bytes (67510 measured): a validator with a preprocess pass answers
+    // its buffer APIs through validate() unless the Node entry says its
+    // defaults cannot change a verdict; 36 bytes, the check left out here.
+    // 67650 bytes (67645 measured): a schema holding a value JSON cannot carry
+    // gets a compile cache key of its own; 171 bytes.
+    // 67520 bytes (67516 measured): Validator.fromStandalone fills defaults
+    // from the documents given through `schemas` and before every verdict, as
+    // a Validator does; 42 bytes.
+    // 67960 bytes (67947 measured): the sweep's fixes together in one tree.
+    assert.ok(size < 67960, `the Workers bundle is ${size} bytes gzipped, over 67960`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
