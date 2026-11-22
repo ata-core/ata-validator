@@ -53,7 +53,7 @@ const CONTEXTS = [
   ['else', (R) => ({ if: { type: 'string' }, else: R }), 1, 'reject'],
   ['oneOf', (R) => ({ oneOf: [{ type: 'string' }, R] }), 'x', 'abort'],
   ['oneOf after two passing branches', (R) => ({ oneOf: [{}, {}, R] }), 1, 'abort'],
-  ['oneOf after two passing branches, under not', (R) => ({ not: { oneOf: [{}, {}, R] } }), 1, 'abort'],
+  ['oneOf after two passing branches, under not', (R) => ({ not: { oneOf: [{}, {}, R] } }), 1, 'accept'],
   ['anyOf after a passing branch', (R) => ({ anyOf: [{ type: 'string' }, R] }), 'x', 'accept'],
   ['anyOf, the reference first', (R) => ({ anyOf: [R, { type: 'string' }] }), 'x', 'accept'],
   ['anyOf, no branch passes', (R) => ({ anyOf: [{ type: 'string' }, R] }), 1, 'reject'],
@@ -61,7 +61,11 @@ const CONTEXTS = [
   ['anyOf under not, a branch passes first', (R) => ({ not: { anyOf: [{ type: 'string' }, R] } }), 'x', 'reject'],
   ['anyOf under not, the reference reached', (R) => ({ not: { anyOf: [{ type: 'string' }, R] } }), 1, 'abort'],
   ['allOf', (R) => ({ allOf: [{ type: 'string' }, R] }), 'x', 'reject'],
-  ['allOf after a failing branch, under not', (R) => ({ not: { allOf: [{ type: 'number' }, R] } }), 'x', 'abort'],
+  // Your Kleene cases: a branch that settles the answer makes the reference
+  // irrelevant; one that does not leaves the answer depending on it.
+  ['allOf with a passing branch, under not', (R) => ({ not: { allOf: [{ type: 'string' }, R] } }), 'x', 'abort'],
+  ['oneOf, one passing and one failing branch, then the reference', (R) => ({ oneOf: [{}, { type: 'string' }, R] }), 1, 'abort'],
+  ['allOf after a failing branch, under not', (R) => ({ not: { allOf: [{ type: 'number' }, R] } }), 'x', 'accept'],
   ['contains', (R) => ({ contains: R }), [1], 'reject'],
   ['contains with maxContains', (R) => ({ contains: R, maxContains: 1 }), [1], 'abort'],
   ['contains under not', (R) => ({ not: { contains: R } }), [1], 'abort'],
@@ -87,22 +91,23 @@ const CONTEXTS = [
   ['two negations deep in a branch', (R) => ({ oneOf: [{ type: 'string' }, { not: { not: R } }] }), 'x', 'abort'],
   ['two negations, no branch', (R) => ({ not: { not: R } }), 1, 'abort'],
   ['draft-07 dependencies', (R) => ({ $schema: D7, dependencies: { a: R } }), { a: 1 }, 'reject'],
-  // After a sibling that already failed, under `not`: the walk does not stop
-  // at the failure there.
-  ['properties after a failing property, under not', (R) => ({ not: { properties: { a: { type: 'string' }, b: R } } }), { a: 1, b: 1 }, 'abort'],
-  ['properties after a failing required, under not', (R) => ({ not: { required: ['zz'], properties: { a: R } } }), { a: 1 }, 'abort'],
-  ['prefixItems after a failing item, under not', (R) => ({ not: { prefixItems: [{ type: 'string' }, R] } }), [1, 2], 'abort'],
-  ['items after a failing type, under not', (R) => ({ not: { type: 'string', items: R } }), [1], 'abort'],
-  ['additionalProperties after a failing property, under not', (R) => ({ not: { properties: { a: { type: 'string' } }, additionalProperties: R } }), { a: 1, b: 1 }, 'abort'],
-  ['patternProperties after a failing property, under not', (R) => ({ not: { properties: { a: { type: 'string' } }, patternProperties: { '^b': R } } }), { a: 1, b: 1 }, 'abort'],
-  ['dependentSchemas after a failing one, under not', (R) => ({ not: { dependentSchemas: { a: { required: ['zz'] }, b: R } } }), { a: 1, b: 1 }, 'abort'],
+  // After a sibling that already failed, under `not`: the answer no longer
+  // depends on the reference, and the closure tree, which answers once the
+  // walk has met one, stops at the failure.
+  ['properties after a failing property, under not', (R) => ({ not: { properties: { a: { type: 'string' }, b: R } } }), { a: 1, b: 1 }, 'accept'],
+  ['properties after a failing required, under not', (R) => ({ not: { required: ['zz'], properties: { a: R } } }), { a: 1 }, 'accept'],
+  ['prefixItems after a failing item, under not', (R) => ({ not: { prefixItems: [{ type: 'string' }, R] } }), [1, 2], 'accept'],
+  ['items after a failing type, under not', (R) => ({ not: { type: 'string', items: R } }), [1], 'accept'],
+  ['additionalProperties after a failing property, under not', (R) => ({ not: { properties: { a: { type: 'string' } }, additionalProperties: R } }), { a: 1, b: 1 }, 'accept'],
+  ['patternProperties after a failing property, under not', (R) => ({ not: { properties: { a: { type: 'string' } }, patternProperties: { '^b': R } } }), { a: 1, b: 1 }, 'accept'],
+  ['dependentSchemas after a failing one, under not', (R) => ({ not: { dependentSchemas: { a: { required: ['zz'] }, b: R } } }), { a: 1, b: 1 }, 'accept'],
   ['propertyNames in a branch, under not', (R) => ({ not: { propertyNames: { anyOf: [{ maxLength: 0 }, R] } } }), { ab: 1 }, 'abort'],
-  ['contains after a matching item, under not', (R) => ({ not: { contains: { anyOf: [{ type: 'string' }, R] } } }), ['x', 1], 'abort'],
-  ['then after a failing minimum, under not', (R) => ({ not: { if: { type: 'number' }, then: { allOf: [{ minimum: 5 }, R] } } }), 1, 'abort'],
+  ['contains after a matching item, under not', (R) => ({ not: { contains: { anyOf: [{ type: 'string' }, R] } } }), ['x', 1], 'reject'],
+  ['then after a failing minimum, under not', (R) => ({ not: { if: { type: 'number' }, then: { allOf: [{ minimum: 5 }, R] } } }), 1, 'accept'],
   ['if in an anyOf branch after one that passes', (R) => ({ anyOf: [{ type: 'string' }, { if: R }] }), 'x', 'accept'],
   ['two items reaching it, under not', (R) => ({ not: { items: { anyOf: [{ type: 'string' }, R] } } }), [1, 2], 'abort'],
   ['two properties reaching it, under not', (R) => ({ not: { properties: { a: R, b: R } } }), { b: 1, a: 1 }, 'abort'],
-  ['oneOf in a not, after a passing branch', (R) => ({ not: { oneOf: [{ type: 'string' }, { allOf: [{ type: 'number' }, R] }] } }), 'x', 'abort'],
+  ['oneOf in a not, after a passing branch', (R) => ({ not: { oneOf: [{ type: 'string' }, { allOf: [{ type: 'number' }, R] }] } }), 'x', 'reject'],
 ]
 
 // [label, schema, document, ref, keyword, answer]
@@ -205,7 +210,7 @@ check(`${REACHED.length} reached cases: validate and isValidObject, on every eng
     answers(it.validate(d), c, 'tier 0 validate')
     const neg = hasNegativeRef(v._schemaObj, null)
     if (c[5] === 'abort') assert.ok(neg, `${label}: a reference whose failure could be inverted`)
-    assert.strictEqual(it._fast === null, neg, `${label}: closure tree ${it._fast === null ? 'not ' : ''}built`)
+    assert.notStrictEqual(it._fast, null, `${label}: the closure tree is built`)
   }
 })
 
@@ -282,6 +287,20 @@ check('reached cases: every generator and module form declines, as at 0eff4af', 
     // A bundle's empty slot is answered at load by a Validator.
     const [loaded] = Validator.loadBundle([null], [s])
     assert.strictEqual(loaded.isValidObject(d), ok(c), `${label}: loadBundle`)
+  }
+})
+
+check('an abort leaves nothing behind: the next document is answered on its own', () => {
+  // A schema whose reference a document may or may not reach.
+  const s = { $schema: D2020, properties: { a: { not: { $ref: '#/$defs/nope' } } } }
+  for (const opts of [{}, { engine: 'interpreter' }]) {
+    const v = new Validator(s, opts)
+    for (let i = 0; i < 1100; i++) {
+      assert.strictEqual(v.isValidObject({ a: 1 }), false, 'reaches it')
+      assert.strictEqual(v.isValidObject({ b: 1 }), true, 'a clean document after one that reached it')
+      assert.strictEqual(v.validate({ b: 1 }).valid, true, 'and through validate()')
+      assert.strictEqual(v.validate({ a: 1 }).valid, false, 'reaches it again')
+    }
   }
 })
 
@@ -383,11 +402,29 @@ function withPlanMutant (from, to, fn) {
 }
 const tree = (s) => core.createInterpreter(new Validator(s)._schemaObj, { tier: 0 })
 
-check('mutant: the closure tree built for a reference whose failure could be inverted', () => {
-  withPlanMutant('if (ctx.inv > 0) ctx.neg = true;', '', () => {
+check('mutant: the closure tree compiling a reference whose failure could be inverted as failing in place', () => {
+  withPlanMutant('        if (ctx.inv > 0) {\n', '        if (false) {\n', () => {
     for (const [label, s, d] of NOT_IF()) assert.strictEqual(tree(s).isValid(d), true, `${label}: the mutant tree accepts, so this case catches it`)
   })
   for (const [label, s, d] of NOT_IF()) assert.strictEqual(tree(s).isValid(d), false, `${label}: the engine refuses`)
+})
+
+check('mutant: the abort closure failing without setting the flag', () => {
+  withPlanMutant("if (interp._abort === null) interp._abort = err(kw, kw, '', '#',", "if (false) interp._abort = err(kw, kw, '', '#',", () => {
+    for (const [label, s, d] of NOT_IF()) assert.strictEqual(tree(s).isValid(d), true, `${label}: the mutant tree accepts, so this case catches it`)
+  })
+})
+
+check('mutant: the flag not set afresh by each call', () => {
+  const s = { $schema: D2020, properties: { a: { not: { $ref: '#/$defs/nope' } } } }
+  withPlanMutant('const V = (d, st) => { interp._abort = null; return', 'const V = (d, st) => { return', () => {
+    const it = tree(s)
+    assert.strictEqual(it.isValid({ a: 1 }), false)
+    assert.strictEqual(it.isValid({ b: 1 }), false, 'the mutant refuses a clean document after an abort, so this case catches it')
+  })
+  const it = tree(s)
+  assert.strictEqual(it.isValid({ a: 1 }), false)
+  assert.strictEqual(it.isValid({ b: 1 }), true)
 })
 
 check('mutant: the verdict walk trying anyOf branches after one that passes', () => {

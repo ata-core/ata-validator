@@ -160,9 +160,9 @@ const root = path.resolve(__dirname, '..');
     // resolve a relative $ref at its document's base, not by path suffix, so
     // they no longer act on a different registered document; 84 bytes.
     // 67480 bytes (67474 measured): the three fixes above together in one tree.
-    // 67745 bytes (67735 measured): a $ref that resolves to nothing, reached
-    // where failing it could be inverted, ends the whole validation; 261 bytes.
-    assert.ok(size < 67745, `the Workers bundle is ${size} bytes gzipped, over 67745`);
+    // 67950 bytes (67938 measured): a $ref that resolves to nothing, reached
+    // where failing it could be inverted, ends the whole validation; 464 bytes.
+    assert.ok(size < 67950, `the Workers bundle is ${size} bytes gzipped, over 67950`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
