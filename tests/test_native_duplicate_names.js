@@ -71,16 +71,17 @@ for (const schema of schemas) {
 }
 
 // What the addon answers itself stays answered by it: an ordinary document
-// gives a boolean, and so does a repeated name whose last value decides (the
-// one JSON.parse keeps). A failed value with a later one of its name gives
-// null for the JS path to answer, and so does a lone surrogate escape.
+// gives a boolean, and so does a repeated name whose values all pass. A
+// failed value whose name comes more than once gives null for the JS path to
+// answer (this short text takes the DOM walker, which does not ask whether
+// the other value came before or after), and so does a lone surrogate escape.
 const native = require('../lib/native-load')()
 if (native) {
   const slot = native.fastRegister(JSON.stringify({ type: 'object', properties: { a: { type: 'integer' } } }))
   assert.strictEqual(native.rawFastValidate(slot, Buffer.from('{"a":1}')), true)
   assert.strictEqual(native.rawFastValidate(slot, Buffer.from('{"a":"x"}')), false)
   assert.strictEqual(native.rawFastValidate(slot, Buffer.from('{"a":"x","a":1}')), null)
-  assert.strictEqual(native.rawFastValidate(slot, Buffer.from('{"a":1,"a":"x"}')), false)
+  assert.strictEqual(native.rawFastValidate(slot, Buffer.from('{"a":1,"a":"x"}')), null)
   assert.strictEqual(native.rawFastValidate(slot, Buffer.from('{"a":1,"a":2}')), true)
   assert.strictEqual(native.rawFastValidate(slot, Buffer.from('{"a":"\\ud800"}')), null)
   assert.strictEqual(native.rawFastValidate(slot, Buffer.from('{"a":1,"b":2,"b":3}')), true)
