@@ -172,7 +172,11 @@ const root = path.resolve(__dirname, '..');
     // from the documents given through `schemas` and before every verdict, as
     // a Validator does; 42 bytes.
     // 67960 bytes (67947 measured): the sweep's fixes together in one tree.
-    assert.ok(size < 67960, `the Workers bundle is ${size} bytes gzipped, over 67960`);
+    // 67950 bytes (67938 measured): a $ref that resolves to nothing, reached
+    // where failing it could be inverted, ends the whole validation; 464 bytes.
+    // 68420 bytes (68402 measured): the sweep's fixes and the unresolved
+    // $ref fix together in one tree.
+    assert.ok(size < 68420, `the Workers bundle is ${size} bytes gzipped, over 68420`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

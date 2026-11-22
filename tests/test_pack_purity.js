@@ -365,6 +365,12 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // validator's buffer APIs on the native walker when its defaults cannot
 // change a verdict. Measured 671.9 KB.
 // 675 KB with the sweep's fixes together in one tree. Measured 674.0 KB.
-assert.ok(manifest.size < 675 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 671 KB for a silent accept fix, +2,363 B over that tree: a $ref that
+// resolves to nothing, reached where failing it in place could be inverted,
+// ends the whole validation (lib/negative-refs.js for the paths that cannot
+// end it). Measured 670.6 KB.
+// 677 KB with the sweep's fixes and the unresolved $ref fix together in
+// one tree. Measured 676.4 KB.
+assert.ok(manifest.size < 677 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

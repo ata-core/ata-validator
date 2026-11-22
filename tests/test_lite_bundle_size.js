@@ -306,7 +306,13 @@ const esbuild = require('esbuild')
 // documents given through `schemas` and before every verdict, as a Validator
 // does; 55 bytes.
 // 63440 (63434 measured): the sweep's fixes together in one tree.
-const BUDGET = 63440
+// 63590 (63579 measured): a $ref that resolves to nothing, reached under not,
+// an if condition, a oneOf branch, a contains with maxContains or unevaluated*,
+// ends the whole validation instead of failing in place, which there could
+// accept; 408 bytes.
+// 63870 (63853 measured): the sweep's fixes and the unresolved $ref
+// fix together in one tree.
+const BUDGET = 63870
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
