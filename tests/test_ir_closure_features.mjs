@@ -33,11 +33,11 @@ const CASES = [
     nothing: { macro: () => undefined },
     never: { macro: (v) => v ? false : true, post: true },
   } }],
-  // An $id with a pointer fragment opens no resource; baseURI is the base of
-  // a schema without an $id. (References that name nothing are refused, see
-  // REFUSED below.)
-  [{ $schema: 'http://json-schema.org/draft-07/schema#', definitions: { e: { $id: '#/definitions/e', type: 'string', minLength: 2 } }, properties: { a: { $ref: '#/definitions/e' } } }, {}],
-  [{ properties: { a: { $ref: 'defs/item.json' } } }, { baseURI: 'https://ex.com/root.json', schemas: [{ $id: 'https://ex.com/defs/item.json', type: 'string', minLength: 2 }] }],
+  // References that name nothing fail where they run (ATA5001); an $id with a
+  // pointer fragment opens no resource; baseURI is the base of a schema
+  // without an $id.
+  [{ $schema: 'http://json-schema.org/draft-07/schema#', definitions: { e: { $id: '#/definitions/e', type: 'string', minLength: 2 } }, properties: { a: { $ref: '#/definitions/e' }, b: { $ref: 'defs/x.json' }, c: { $ref: '#/nope' }, t: { $ref: '#noanchor' }, x: { $ref: 'https://other.example/y.json#/z' } } }, {}],
+  [{ properties: { a: { $ref: 'defs/item.json' }, b: { $ref: 'defs/missing.json' } } }, { baseURI: 'https://ex.com/root.json', schemas: [{ $id: 'https://ex.com/defs/item.json', type: 'string', minLength: 2 }] }],
   // The other values of coerceTypes and removeAdditional, and both with
   // documents registered under relative names (Fastify's `shared`).
   [{ type: 'object', properties: { tags: { type: 'array', items: { type: 'integer' } }, n: { type: 'number' }, o: { type: 'object', properties: { k: { type: 'boolean' } }, additionalProperties: false } }, additionalProperties: false }, { coerceTypes: 'array', removeAdditional: 'failing' }],
@@ -77,24 +77,6 @@ const shape = (r) => JSON.stringify([r.valid, Object.isFrozen(r), (r.errors || [
 const dump = (d) => { try { return JSON.stringify(d) } catch { return String(d) } }
 
 let failed = 0; let checked = 0
-// References that name nothing: reaching one ends the whole validation in
-// the current engine (tests/test_unresolved_ref_fail_closed.js), which the
-// closures cannot express, so the schema is refused rather than compiled to
-// fail in place, which under `not` or in a branch accepted.
-const REFUSED = [
-  [{ $schema: 'http://json-schema.org/draft-07/schema#', properties: { b: { $ref: 'defs/x.json' } } }, {}],
-  [{ properties: { c: { $ref: '#/nope' } } }, {}],
-  [{ properties: { t: { $ref: '#noanchor' } } }, {}],
-  [{ properties: { x: { $ref: 'https://other.example/y.json#/z' } } }, {}],
-  [{ properties: { b: { $ref: 'defs/missing.json' } } }, { baseURI: 'https://ex.com/root.json', schemas: [{ $id: 'https://ex.com/defs/item.json', type: 'string' }] }],
-]
-for (const [schema, opts] of REFUSED) {
-  let refused = false
-  try { compile(schema, opts) } catch (e) { refused = e.message.startsWith('ir:') }
-  checked++
-  if (!refused && failed++ < 3) console.log('FAIL not refused', dump(schema))
-}
-
 for (const [schema, opts] of CASES) {
   const ata = new Validator(schema, opts)
   const ir = compile(schema, opts)
@@ -109,4 +91,4 @@ for (const [schema, opts] of CASES) {
   }
 }
 if (failed) { console.log(`${failed} of ${checked} differ`); process.exit(1) }
-console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats, custom keywords, verbose, abortEarly, baseURI, option values, relative schema names and keywords that change the data`)
+console.log(`ok: the closure backend matches the current engine on ${checked} documents across errorMessage, discriminator, nullable, coerceTypes, removeAdditional, custom formats, custom keywords, verbose, abortEarly, unresolved references, baseURI, option values, relative schema names and keywords that change the data`)
