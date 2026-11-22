@@ -595,10 +595,24 @@ static inline uint64_t dom_count(dom::object o) {
 // only until they do: false for a minimum past 16, which the caller then
 // asks of every name.
 static inline bool dom_distinct_at_least(dom::object o, uint64_t min) {
+  if (min == 2) {  // the common bound: the first two names
+    auto it = o.begin();
+    const std::string_view k0 = it.key();
+    ++it;
+    return k0 != it.key();
+  }
   distinct_names d(min);
   if (d.full()) return true;
   for (auto [k, v] : o) { (void)v; d.add(k, false); if (d.full()) return d.n >= min; }
   return false;
+}
+
+// A value of `key` failed in a DOM walker: the object is left to the JS
+// path if it holds the name more than once, since the value JSON.parse keeps
+// may be another. Out of line, so the walker's loop keeps its shape.
+ATA_NOINLINE static void dom_fail_repeat(dom::object o, std::string_view key) {
+  int n = 0;
+  for (auto [k, v] : o) { (void)v; if (k == key && ++n == 2) { mark_needs_js(); return; } }
 }
 
 // Whether a DOM object holds a name twice, name by name. Off the walkers'
@@ -608,6 +622,17 @@ ATA_NOINLINE static bool dom_names_repeat(dom::object obj) {
   name_list names;
   for (auto [k, v] : obj) { (void)v; names.add(k, false); }
   return names.has_repeat();
+}
+
+ATA_NOINLINE static bool dom_repeat_deep(dom::element el) {
+  dom::object o; dom::array a;
+  if (el.get(o) == SUCCESS) {
+    if (dom_names_repeat(o)) return true;
+    for (auto [k, v] : o) { (void)k; if (dom_repeat_deep(v)) return true; }
+  } else if (el.get(a) == SUCCESS) {
+    for (auto v : a) if (dom_repeat_deep(v)) return true;
+  }
+  return false;
 }
 
 // The same for an on-demand object, read again from its start (below).
@@ -646,7 +671,14 @@ static void append_json_key(std::string& r, std::string_view k) {
   r += '"';
 }
 
-static std::string canonical_json(dom::element el) {
+// The canonical text of a value: object names sorted, numbers in one form.
+// `Mark`: a name twice in an object leaves the document to the JS path
+// (JSON.parse keeps one, this form would keep both). uniqueItems asks for
+// that, since a repeat can make two items read alike or apart; enum and const
+// only ask on a mismatch (canonical_mismatch), since an object with a name
+// twice never equals an entry.
+template <bool Mark>
+static std::string canonical_json_t(dom::element el) {
   switch (el.type()) {
     case dom::element_type::OBJECT: {
       dom::object obj; type_checked(el.get(obj));
@@ -654,15 +686,15 @@ static std::string canonical_json(dom::element el) {
       for (auto [k, v] : obj) entries.push_back({k, v});
       std::sort(entries.begin(), entries.end(),
                 [](const auto& a, const auto& b) { return a.first < b.first; });
-      // A name twice: JSON.parse keeps one, this form would keep both.
-      for (size_t i = 1; i < entries.size(); ++i)
-        if (entries[i].first == entries[i - 1].first) { mark_needs_js(); break; }
       std::string r = "{";
       for (size_t i = 0; i < entries.size(); ++i) {
-        if (i) r += ',';
+        if (i) {
+          r += ',';
+          if constexpr (Mark) { if (entries[i].first == entries[i - 1].first) mark_needs_js(); }
+        }
         append_json_key(r, entries[i].first);
         r += ':';
-        r += canonical_json(entries[i].second);
+        r += canonical_json_t<Mark>(entries[i].second);
       }
       r += '}';
       return r;
@@ -674,7 +706,7 @@ static std::string canonical_json(dom::element el) {
       for (auto v : arr) {
         if (!first) r += ',';
         first = false;
-        r += canonical_json(v);
+        r += canonical_json_t<Mark>(v);
       }
       r += ']';
       return r;
@@ -683,6 +715,18 @@ static std::string canonical_json(dom::element el) {
       if (is_number_type(el.type())) return canonical_number(to_double(el));
       return std::string(minify(el));
   }
+}
+
+static std::string canonical_json(dom::element el) { return canonical_json_t<false>(el); }
+static std::string canonical_json_marked(dom::element el) { return canonical_json_t<true>(el); }
+
+// Whether a value holds an object with a name twice, at any depth.
+static bool dom_repeat_deep(dom::element el);
+// An enum or const that did not match: a value holding a name twice is left
+// to the JS path, where the copy JSON.parse keeps may match. Out of line.
+ATA_NOINLINE static void canonical_mismatch(dom::element el) {
+  const auto t = el.type();
+  if ((t == dom::element_type::OBJECT || t == dom::element_type::ARRAY) && dom_repeat_deep(el)) mark_needs_js();
 }
 
 // JSON Schema type enum — avoids string comparisons on the hot path.
@@ -1972,6 +2016,7 @@ static void validate_node(const schema_node_ptr& node,
       }
     }
     if (!found) {
+      canonical_mismatch(value);
       errors.push_back({error_code::enum_mismatch, path,
                         "value not in enum"});
     }
@@ -1981,6 +2026,7 @@ static void validate_node(const schema_node_ptr& node,
   if (node->const_value_raw.has_value()) {
     std::string val_str = canonical_json(value);
     if (val_str != node->const_value_raw.value()) {
+      canonical_mismatch(value);
       errors.push_back({error_code::const_mismatch, path,
                         "value does not match const"});
       ATA_CHECK_EARLY();
@@ -2105,7 +2151,7 @@ static void validate_node(const schema_node_ptr& node,
         } else {
           std::set<std::string> seen;
           for (auto item : arr) {
-            if (!seen.insert(canonical_json(item)).second) { has_dup = true; break; }
+            if (!seen.insert(canonical_json_marked(item)).second) { has_dup = true; break; }
           }
         }
       }
@@ -2238,11 +2284,7 @@ static void validate_node(const schema_node_ptr& node,
                         path + "/" + key_str, ctx, errors, all_errors, dynamic_scope);
         }
       }
-      if (track_names && errors.size() > errors_before) {
-        auto later = oit;
-        for (++later; later != obj.end(); ++later)
-          if (later.key() == key) { mark_needs_js(); break; }
-      }
+      if (track_names && errors.size() > errors_before) [[unlikely]] dom_fail_repeat(obj, key);
     }
     // propertyNames — validate key as string directly when possible
     if (node->property_names_schema) {
@@ -2458,12 +2500,12 @@ static bool validate_fast(const schema_node_ptr& node,
     for (const auto& ev : node->enum_values_minified) {
       if (ev == val_str) { found = true; break; }
     }
-    if (!found) [[unlikely]] return false;
+    if (!found) [[unlikely]] { canonical_mismatch(value); return false; }
   }
 
   // const
   if (node->const_value_raw.has_value()) {
-    if (canonical_json(value) != node->const_value_raw.value()) [[unlikely]] return false;
+    if (canonical_json(value) != node->const_value_raw.value()) [[unlikely]] { canonical_mismatch(value); return false; }
   }
 
   auto vtype = value.type();
@@ -2523,7 +2565,7 @@ static bool validate_fast(const schema_node_ptr& node,
           for (auto item : arr) { if (!seen.insert(to_double(item)).second) return false; }
         } else {
           std::set<std::string> seen;
-          for (auto item : arr) { if (!seen.insert(canonical_json(item)).second) return false; }
+          for (auto item : arr) { if (!seen.insert(canonical_json_marked(item)).second) return false; }
         }
       }
     }
@@ -2784,6 +2826,18 @@ static void cg_compile(const schema_node* n, cg::plan& p,
 
 // --- Codegen executor ---
 
+// What is_valid_prepadded hands cg_exec as `undecidable`: the flag first,
+// then the objects and names whose value failed, innermost first, so a
+// rejection can ask each of them whether the name comes twice (JSON.parse
+// keeps the last value, and another may pass). A store on the failing path
+// costs the loop nothing measurable; a call there cost it several percent.
+struct cg_io {
+  bool undecidable = false;  // first: cg_exec is handed a pointer to it
+  uint8_t n = 0;
+  bool overflow = false;
+  struct failed { dom::object o; std::string_view key; } at[8];
+};
+
 static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
                      dom::element value, bool* undecidable = nullptr) {
   auto t = value.type();
@@ -2819,7 +2873,7 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::CHECK_FORMAT: if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));if(!check_format_by_id(sv,p.format_ids[c.a]))return false;} break;
     case cg::op::CHECK_MIN_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s<c.a)return false;} break;
     case cg::op::CHECK_MAX_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));uint64_t s=0;for([[maybe_unused]]auto _:a)++s;if(s>c.a)return false;} break;
-    case cg::op::CHECK_UNIQUE_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));std::set<std::string> seen;for(auto x:a)if(!seen.insert(canonical_json(x)).second)return false;} break;
+    case cg::op::CHECK_UNIQUE_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));std::set<std::string> seen;for(auto x:a)if(!seen.insert(canonical_json_marked(x)).second)return false;} break;
     case cg::op::ARRAY_ITEMS: if(t==et::ARRAY){dom::array a;type_checked(value.get(a));for(auto x:a)if(!cg_exec(p,p.subs[c.a],x,undecidable))return false;} break;
     case cg::op::CHECK_REQUIRED: if(t==et::OBJECT){dom::object o;type_checked(value.get(o));dom::element d;if(o[p.strings[c.a]].get(d)!=SUCCESS)return false;} break;
     // A name twice is counted twice here and once by JSON.parse: a minimum
@@ -2838,20 +2892,13 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
         else if(code[j].o==cg::op::CHECK_NO_ADDITIONAL) no_add=true;
       }
       // JSON.parse keeps the last value of a name, and this reads each. While
-      // every value passes that changes nothing; a value that fails is looked
-      // for again in the rest of the object, where a later one would undo it.
-      for(auto it=o.begin();it!=o.end();++it){
-        std::string_view key=it.key(); dom::element val=it.value();
+      // every value passes that changes nothing; a value that fails is noted
+      // (cg_io) for the caller to ask whether its name comes again.
+      for(auto [key,val]:o){
         bool matched=false;
-        for(size_t q=0;q<props.size();++q){
-          if(key==props[q].nm){
-            if(!cg_exec(p,p.subs[props[q].si],val,undecidable)){
-              for(++it;it!=o.end();++it) if(it.key()==key){mark_needs_js();break;}
-              return false;
-            }
-            matched=true;break;
-          }
-        }
+        for(auto& pp:props){if(key==pp.nm){if(!cg_exec(p,p.subs[pp.si],val,undecidable)){
+          if(undecidable){auto* io=reinterpret_cast<cg_io*>(undecidable); if(io->n<8) io->at[io->n++]={o,key}; else io->overflow=true;}
+          return false;}matched=true;break;}}
         if(!matched&&no_add)return false;
       }
       i=j; break;
@@ -2864,7 +2911,7 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
     case cg::op::CHECK_ENUM_STR: {
       auto& es=p.enum_sets[c.a]; bool f=false;
       if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.find('\\')==std::string::npos&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
-      if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
+      if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}if(!f)canonical_mismatch(value);}
       if(!f)return false;
       break;
     }
@@ -2872,11 +2919,11 @@ static bool cg_exec(const cg::plan& p, const std::vector<cg::ins>& code,
       auto& es=p.enum_sets[c.a]; bool f=false;
       if(t==et::STRING){std::string_view sv;type_checked(value.get(sv));for(auto& e:es)if(e.size()==sv.size()+2&&e[0]=='"'&&e.back()=='"'&&e.find('\\')==std::string::npos&&e.compare(1,sv.size(),sv)==0){f=true;break;}}
       if(!f&&value.is<int64_t>()){int64_t v=0;type_checked(value.get(v));auto s=std::to_string(v);for(auto& e:es)if(e==s){f=true;break;}}
-      if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}}
+      if(!f){std::string v=canonical_json(value);for(auto& e:es)if(e==v){f=true;break;}if(!f)canonical_mismatch(value);}
       if(!f)return false;
       break;
     }
-    case cg::op::CHECK_CONST: if(canonical_json(value)!=p.strings[c.a])return false; break;
+    case cg::op::CHECK_CONST: if(canonical_json(value)!=p.strings[c.a]){canonical_mismatch(value);return false;} break;
     case cg::op::FAIL: return false;
     case cg::op::COMPOSITION:
       if (undecidable) *undecidable = true;
@@ -4150,9 +4197,10 @@ bool is_valid_prepadded(const schema_ref& schema, const char* data, size_t lengt
   // this reason; returning it directly here rejected valid documents whenever
   // the schema used one of those keywords.
   if (!schema.impl->gen_plan.code.empty()) {
-    bool undecidable = false;
+    cg_io io;
+    bool& undecidable = io.undecidable;
     if (cg_exec(schema.impl->gen_plan, schema.impl->gen_plan.code, result.value_unsafe(),
-                &undecidable)) {
+                &io.undecidable)) {
       return true;
     }
     // Every check the plan compiles mirrors the tree walker exactly (same
@@ -4160,7 +4208,14 @@ bool is_valid_prepadded(const schema_ref& schema, const char* data, size_t lengt
     // table), so a false that never touched a COMPOSITION opcode is the tree
     // walker's answer too. Without this the whole DOM was walked a second
     // time on every rejection, costing about twice an acceptance.
-    if (!undecidable) return false;
+    // A value that failed may be undone by another value of its name, the
+    // one JSON.parse keeps: each failed name is asked of its object, and the
+    // whole document past eight of them.
+    if (!undecidable) {
+      if (io.overflow) { if (dom_repeat_deep(result.value_unsafe())) mark_needs_js(); }
+      else for (uint8_t i = 0; i < io.n; ++i) dom_fail_repeat(io.at[i].o, io.at[i].key);
+      return false;
+    }
   }
 
   // validate_fast was a second, simpler walker, and it disagreed with the one
