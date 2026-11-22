@@ -369,6 +369,13 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // functions, schemas resolved at build time and assertFormat read as the
 // runtime reads it (compiledBuildOptions), and verify takes a module's
 // options (686031 bytes, 670.0 KB; 684179 before).
-assert.ok(manifest.size < 670.5 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 678.5 KB: ata-validator/ir and ata-validator/kernels give a pattern the
+// engine the Validator gives it, with the linear engine as an ES module for
+// the modules the ir writes (lib/kernels/safe-re.mjs, a copy of
+// lib/safe-regex.js's engine without its comments), the interpreted engine's
+// choice copied for the ir's removeAdditional pass, and the code generator's
+// choice in a file both read (lib/pattern-choice.js) (694152 bytes, 677.9 KB;
+// 686036 before).
+assert.ok(manifest.size < 678.5 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

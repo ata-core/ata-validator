@@ -14,6 +14,7 @@ import { tableModule, tablePlan } from '../lib/ir/table.mjs'
 import { fromPlan } from '../lib/kernels/plan-rich.mjs'
 import { fromPlan as fromPlainPlan } from '../lib/kernels/plan.mjs'
 import * as K from '../lib/kernels/index.mjs'
+import choice from '../lib/pattern-choice.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const SUITE = path.join(here, 'suite/tests')
@@ -22,7 +23,16 @@ const loadModule = (src) => new Function('K', functionBody(src))(K)
 const FIELDS = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'message', 'expected', 'received', 'detail', 'suggestion', 'related', 'rank', 'docUrl']
 const shape = (r) => JSON.stringify([r.valid, (r.errors || []).map((e) => FIELDS.map((f) => e[f] === undefined ? '<undef>' : e[f]))])
 
-let groups = 0; let taken = 0; let cases = 0
+let groups = 0; let taken = 0; let cases = 0; let unplanned = 0
+// A plan sent as data cannot carry the linear pattern engine, so a schema
+// with a pattern the Validator gives that engine has a module and no plan.
+const enginePatterns = (n) => {
+  if (Array.isArray(n)) return n.some(enginePatterns)
+  if (n === null || typeof n !== 'object') return false
+  if (typeof n.pattern === 'string' && choice.useSafeEngine(n.pattern)) return true
+  if (n.patternProperties && typeof n.patternProperties === 'object' && Object.keys(n.patternProperties).some(choice.useSafeEngine)) return true
+  return Object.keys(n).some((k) => enginePatterns(n[k]))
+}
 async function compare (schema, docs, label) {
   for (const rich of [true, false]) for (const useDefaults of [true, false]) {
     const t = tableModule(schema, { richErrors: rich, useDefaults })
@@ -31,16 +41,19 @@ async function compare (schema, docs, label) {
     try { m = loadModule(specialize(schema, { verdict: true, richErrors: rich, useDefaults })) } catch { return false }
     const tb = loadTable(t)
     // The same plan as JSON, over the wire to ata-validator/plan.
-    const wire = await fromPlan(JSON.parse(JSON.stringify(tablePlan(schema, { richErrors: rich, useDefaults }))))
+    const plan = tablePlan(schema, { richErrors: rich, useDefaults })
+    if (plan === null) { assert.ok(enginePatterns(schema), `${label}: a module and no plan`); unplanned++ }
+    const wire = plan === null ? null : await fromPlan(JSON.parse(JSON.stringify(plan)))
     for (const d of docs) {
       const a = structuredClone(d); const b = structuredClone(d); const c = structuredClone(d); const g = structuredClone(d); const w = structuredClone(d)
       assert.strictEqual(shape(tb.validate(b)), shape(m.validate(a)), `${label} (${rich ? 'rich' : 'plain'}): ${JSON.stringify(d).slice(0, 120)}`)
       assert.strictEqual(tb.isValid(g), m.isValid(c), `${label}: verdict`)
       assert.strictEqual(JSON.stringify(b), JSON.stringify(a), `${label}: the filled document`)
+      cases++
+      if (wire === null) continue
       assert.strictEqual(shape(wire.validate(w)), shape(m.validate(structuredClone(d))), `${label} (${rich ? 'rich' : 'plain'}, plan over the wire): ${JSON.stringify(d).slice(0, 120)}`)
       assert.strictEqual(JSON.stringify(w), JSON.stringify(a), `${label}: the document a plan filled`)
       assert.strictEqual(wire.isValid(structuredClone(d)), m.isValid(structuredClone(d)), `${label}: the plan's verdict`)
-      cases++
     }
   }
   return true
@@ -112,4 +125,4 @@ for (const [i, s] of FORMS.entries()) assert.ok(await compare(s, DOCS, 'form ' +
 
 // Coverage must not shrink unnoticed.
 assert.ok(taken >= 1295, `the table took ${taken} suite groups`)
-console.log(`ok: the table backend, as a module and as a plan over the wire, answers as the module writer on ${taken} of ${groups} suite groups and ${FORMS.length} forms (${cases} cases)`)
+console.log(`ok: the table backend, as a module and as a plan over the wire, answers as the module writer on ${taken} of ${groups} suite groups and ${FORMS.length} forms (${cases} cases; ${unplanned} runs with a pattern for the linear engine have a module and no plan)`)
