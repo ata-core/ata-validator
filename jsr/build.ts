@@ -12,4 +12,4 @@
  *
  * @module
  */
-export * from "npm:ata-validator@1.66.0/build";
+export * from "npm:ata-validator@2.0.0/build";
