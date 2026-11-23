@@ -148,6 +148,10 @@ entries still do.
 | `source` | errors carried a `schemaSource` frame | refused: `ata2: option source` | Delete it. The frame is on the Node entry. |
 | any key 1.x did not know | ignored | refused: `ata2: option <name>` | Delete it. |
 
+The build plugin does not remove these options. It keeps such a validator on
+the runtime and says so in its report, and the page throws the refusal when
+the validator is constructed.
+
 None of the five is accepted and ignored. Two of them change the answer
 (`keywords`, `strictSchema: true`). For the others the cost decided: each
 accepted name adds 5 to 7 B gzip to every page that carries the Validator
