@@ -2,8 +2,7 @@
 // 2.0 Validator, by the names ata-validator/features/<name> exports them
 // under. It carries the three features its answer depends on (draft7 and
 // formatsOff, which rewrite a schema before the other questions are asked of
-// it, and the meta-schemas a schema can reference) and no other. Work in
-// progress; not in the published package until 2.0.
+// it, and the meta-schemas a schema can reference) and no other.
 import small from '../lib/validator-small.js';
 import d7 from '../lib/features/draft7.js';
 import ms from '../lib/features/metaschemas.js';

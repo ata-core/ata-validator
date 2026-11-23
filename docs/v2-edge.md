@@ -1,7 +1,8 @@
 # The 2.0 edge entry
 
-Work in progress on the 2.0 branch. This page is new; there is no other 2.0
-document yet.
+From 2.0.0 this is what `ata-validator` resolves to under the `workerd` and
+`edge-light` conditions. What changes for code written for 1.x is in
+[migration-2.0.md](migration-2.0.md).
 
 `index.v2.edge.mjs` is the entry for servers and edge runtimes: Cloudflare
 Workers, a process run with `--disallow-code-generation-from-strings`, an MCP
