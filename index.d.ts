@@ -619,8 +619,9 @@ export interface ValidatorConstructor {
   /**
    * Registers features on the 2.0 Validator of a browser or worker bundle
    * (`ata-validator/features/<name>`). This Validator carries every feature,
-   * so here the call does nothing and returns the class: code that runs on
-   * both sides can call it unconditionally.
+   * so on the Node entries the call does nothing and returns the class: code
+   * that runs on both sides can call it unconditionally. The 1.x browser and
+   * edge entries (`ata-validator/v1` in a bundle) do not have it.
    */
   use(...features: import('./features/index.js').Feature[]): ValidatorConstructor;
 

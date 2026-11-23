@@ -33,13 +33,22 @@ const before = JSON.stringify(new Validator({ type: 'string' }).validate(1).erro
 Validator.use(richErrors);
 assert.strictEqual(JSON.stringify(new Validator({ type: 'string' }).validate(1).errors), before);
 (async () => {
-  for (const f of ['index.mjs', 'index.node.mjs', 'index.bundle.mjs', 'index.edge.mjs', 'index.browser.mjs']) {
+  for (const f of ['index.mjs', 'index.node.mjs', 'index.bundle.mjs']) {
     const m = await import(require('node:url').pathToFileURL(path.join(ROOT, f)).href);
     assert.strictEqual(m.Validator.use(richErrors), m.Validator, f);
   }
-  assert.strictEqual(require(path.join(ROOT, 'index.edge.js')).Validator.use(), require(path.join(ROOT, 'index.edge.js')).Validator);
+  // Only the Node entries assign it: the 1.x edge, browser and lite entries
+  // load the class without it, each asked in a process of its own.
+  for (const f of ['index.edge.js', 'lite.js']) {
+    const out = execFileSync(process.execPath, ['-e', `console.log(typeof require(${JSON.stringify(path.join(ROOT, f))}).Validator.use)`], { encoding: 'utf8' }).trim();
+    assert.strictEqual(out, 'undefined', f);
+  }
+  for (const f of ['index.edge.mjs', 'index.browser.mjs']) {
+    const out = execFileSync(process.execPath, ['--input-type=module', '-e', `console.log(typeof (await import(${JSON.stringify(require('node:url').pathToFileURL(path.join(ROOT, f)).href)})).Validator.use)`], { encoding: 'utf8' }).trim();
+    assert.strictEqual(out, 'undefined', f);
+  }
   // ata-validator/v1 from Node is the Node entry.
   assert.strictEqual(require('ata-validator/v1'), require('ata-validator'));
   assert.strictEqual((await import('ata-validator/v1')).Validator, (await import('ata-validator')).Validator);
-  console.log('ok: the Node declarations and the 2.0 declarations type-check under their conditions, and Validator.use() on the 1.x class returns it');
+  console.log('ok: the Node declarations and the 2.0 declarations type-check under their conditions, and Validator.use() on the Node entries returns the class');
 })().catch((e) => { console.error(e); process.exit(1); });
