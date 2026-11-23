@@ -75,20 +75,38 @@ const root = path.resolve(__dirname, '..');
   console.log('ok: modules from ata build load through the edge entry; the emitters point to ata-validator/aot');
 }
 
-// Bundled for Workers, `ata-validator` is the edge entry and carries no code
-// generator; for a browser it is still the full package.
+// From 2.0 the worker conditions of the package name the 2.0 edge entry
+// (index.v2.edge.mjs) and the browser condition the 2.0 browser entry; the
+// 1.x edge entry (index.edge.mjs) is still in the package, and is bundled
+// here by its path with the conditions a Workers build uses, to keep the
+// size it had.
 {
   let esbuild;
   try { esbuild = require('esbuild'); } catch { console.log('skip: esbuild is not installed'); return; }
   const entry = path.join(root, 'tests', '.edge-entry-probe.mjs');
-  fs.writeFileSync(entry, "import { Validator } from 'ata-validator'\nglobalThis.V = Validator\n");
+  const named = path.join(root, 'tests', '.edge-entry-named.mjs');
+  fs.writeFileSync(named, "import { Validator } from 'ata-validator'\nglobalThis.V = Validator\n");
+  fs.writeFileSync(entry, "import { Validator } from '../index.edge.mjs'\nglobalThis.V = Validator\n");
   try {
-    const build = (conditions, platform) => esbuild.buildSync({ entryPoints: [entry], bundle: true, minify: true, format: 'esm', platform, conditions, mainFields: ['browser', 'module', 'main'], write: false, metafile: true, logLevel: 'silent'});
+    const build = (conditions, platform, from = entry) => esbuild.buildSync({ entryPoints: [from], bundle: true, minify: true, format: 'esm', platform, conditions, mainFields: ['browser', 'module', 'main'], write: false, metafile: true, logLevel: 'silent'});
     const worker = build(['workerd', 'worker', 'browser'], 'neutral');
     // Inputs a bundler shook out entirely are listed with no bytes in the output.
     const shipped = (r) => Object.entries(Object.values(r.metafile.outputs)[0].inputs).filter(([, v]) => v.bytesInOutput > 0).map(([k]) => k);
     const inputs = shipped(worker);
-    assert.ok(inputs.some((k) => /index\.edge\.m?js$/.test(k)), 'the workerd condition selects the edge entry');
+    assert.ok(inputs.some((k) => /index\.edge\.m?js$/.test(k)), 'the 1.x edge entry, by its path');
+    for (const c of ['workerd', 'edge-light']) {
+      const w2 = build([c, 'worker', 'browser'], 'neutral', named);
+      const in2 = shipped(w2);
+      assert.ok(in2.some((k) => /index\.v2\.edge\.mjs$/.test(k)), `the ${c} condition selects the 2.0 edge entry`);
+      assert.ok(!in2.some((k) => /js-compiler|codegen-engine|interpreter-core|validator-core/.test(k)), `no code generator and no 1.x engine in a ${c} bundle`);
+      const size2 = require('zlib').gzipSync(w2.outputFiles[0].contents, { level: 9 }).length;
+      // 50800 bytes (50713 measured at 2.0.0): the 2.0 Validator with the
+      // verdict core and the small engine, every schema-decided group wired
+      // in, and IDNA2008, which a Workers build keeps because it does not
+      // apply the package's `browser` map. The 1.x edge entry below is 67622.
+      assert.ok(size2 < 50800, `the 2.0 ${c} bundle is ${size2} bytes gzipped, over 50800`);
+      if (c === 'workerd') console.log(`ok: the worker conditions resolve to the 2.0 edge entry, ${size2} bytes gzipped, no code generator`);
+    }
     assert.ok(!inputs.some((k) => /ts-gen|render-pretty|output-format|describe-schema/.test(k)), 'tools the application does not import stay out');
     assert.ok(!inputs.some((k) => /js-compiler|codegen-engine/.test(k)), 'no code generator in a Workers bundle');
     const size = require('zlib').gzipSync(worker.outputFiles[0].contents, { level: 9 }).length;
@@ -200,17 +218,19 @@ const root = path.resolve(__dirname, '..');
     // parameters left whole (lib/keywords.js KIND); 17 bytes (15 on its own
     // base, 67623 to 67638).
     assert.ok(size < 68830, `the Workers bundle is ${size} bytes gzipped, over 68830`);
-    const browser = build(['browser'], 'browser');
-    assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
+    const browser = build(['browser'], 'browser', named);
+    assert.ok(shipped(browser).some((k) => /index\.v2\.browser\.mjs$/.test(k)), 'the browser condition selects the 2.0 browser entry');
+    assert.ok(!shipped(browser).some((k) => /js-compiler|codegen-engine|interpreter-core|validator-core/.test(k)), 'no code generator and no 1.x engine in a browser bundle');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
     // webpack match and Node does not) reads index.bundle.mjs: the tools the
     // application does not import stay out, as in a browser bundle.
-    const server = esbuild.buildSync({ entryPoints: [entry], bundle: true, minify: true, format: 'esm', platform: 'node', write: false, metafile: true, logLevel: 'silent' });
+    const server = esbuild.buildSync({ entryPoints: [named], bundle: true, minify: true, format: 'esm', platform: 'node', write: false, metafile: true, logLevel: 'silent' });
     const serverInputs = shipped(server);
     assert.ok(serverInputs.some((k) => /index\.bundle\.mjs$/.test(k)), 'a Node bundle selects index.bundle.mjs');
     assert.ok(!serverInputs.some((k) => /ts-gen|render-pretty|output-format|describe-schema/.test(k)), 'a Node bundle leaves unimported tools out');
-    console.log(`ok: a Workers bundle resolves to the edge entry, ${size} bytes gzipped, no code generator`);
+    console.log(`ok: the 1.x edge entry in a Workers bundle, ${size} bytes gzipped, no code generator`);
   } finally {
     fs.rmSync(entry, { force: true });
+    fs.rmSync(named, { force: true });
   }
 }

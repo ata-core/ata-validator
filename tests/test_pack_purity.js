@@ -431,6 +431,13 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 700 KB: the two above with the 2.0 branch's `assertFormat: false` fix
 // (lib/format-off.js, the formatsOff feature; 714660 bytes, 697.9 KB) in one
 // tree (715554 bytes, 698.8 KB; 698 KB ceiling before).
-assert.ok(manifest.size < 700 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 774 KB at 2.0.0: the 2.0 entries ship. The browser and worker conditions of
+// the root export name them (index.v2.browser.mjs, index.v2.edge.mjs and
+// their require forms), with the small and full Validator, their engines,
+// lib/core/, lib/fmt/, lib/features/ and features/, 102 files that the 1.x
+// tarballs left out (792021 bytes, 773.5 KB, on the 2.0 branch with 1.66.0
+// merged; 764875 bytes on the branch before it). lib/core/engine.js
+// stays out: no entry imports it.
+assert.ok(manifest.size < 774 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

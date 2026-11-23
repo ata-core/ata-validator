@@ -15,18 +15,18 @@
       },
       "workerd": {
         "types": "./index.d.ts",
-        "import": "./index.edge.mjs",
-        "require": "./index.edge.js"
+        "import": "./index.v2.edge.mjs",
+        "require": "./index.v2.edge.js"
       },
       "edge-light": {
         "types": "./index.d.ts",
-        "import": "./index.edge.mjs",
-        "require": "./index.edge.js"
+        "import": "./index.v2.edge.mjs",
+        "require": "./index.v2.edge.js"
       },
       "types": "./index.d.ts",
       "browser": {
-        "import": "./index.browser.mjs",
-        "require": "./index.js"
+        "import": "./index.v2.browser.mjs",
+        "require": "./index.v2.browser.js"
       },
       "import": {
         "module": "./index.bundle.mjs",
@@ -250,29 +250,19 @@
     "index.browser.mjs",
     "index.edge.js",
     "index.edge.mjs",
+    "index.v2.browser.mjs",
+    "index.v2.browser.js",
+    "index.v2.edge.mjs",
+    "index.v2.edge.js",
+    "index.v2.core.mjs",
+    "features/",
     "index.d.ts",
     "aot.js",
     "aot.mjs",
     "aot.d.ts",
     "lib/",
     "!lib/plan-source.js",
-    "!lib/engine-small.js",
-    "!lib/engine-shared.js",
-    "!lib/engine-shared-core.js",
-    "!lib/defaults-core.js",
-    "!lib/defaults-match.js",
-    "!lib/rejection-core.js",
-    "!lib/groups.js",
-    "!lib/gates.js",
-    "!lib/deq.js",
-    "!lib/unique-dup.js",
-    "!lib/fmt/",
-    "!lib/validator-small.js",
-    "!lib/validator-full.js",
-    "!lib/engine-full.js",
-    "!lib/small-tier.js",
-    "!lib/features/",
-    "!lib/core/",
+    "!lib/core/engine.js",
     "compat.js",
     "compat.mjs",
     "compat.d.ts",
