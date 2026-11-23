@@ -6,6 +6,22 @@
 const { Validator } = require('ata-validator');
 ```
 
+This page describes the Validator of the Node entries. From 2.0 a browser bundle
+(the `browser` export condition) and a Workers or Vercel Edge bundle (`workerd`,
+`edge-light`) resolve `ata-validator` to the 2.0 entries, which export
+`Validator` alone with `validate`, `isValidObject`, `validateJSON`,
+`isValidJSON`, `addSchema`, `~standard` and `Validator.use()`. What they take
+and what they refuse is in [migration-2.0.md](migration-2.0.md). Everything on this
+page is also `ata-validator/v1`, under every condition.
+
+### Validator.use(...features)
+
+On the 2.0 entries, registers features (`ata-validator/features/<name>`) for
+every Validator of the bundle: `richErrors`, `verbose`, `coerceTypes`,
+`removeAdditional`, `errorMessages`, `metaschemas`. On the Node entries the
+Validator carries all of them, and the call does nothing and returns the class,
+so code that runs on both sides can call it unconditionally.
+
 ### new Validator(schema, options?)
 
 Creates a validator instance. Does not compile anything until first use (lazy compilation).

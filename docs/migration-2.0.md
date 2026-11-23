@@ -20,10 +20,21 @@ same files as before. New in 2.0: `ata-validator/features`,
 `ata-validator/features/<name>` and `ata-validator/v2/plugin-core`, which the
 build plugin uses.
 
-The 1.x browser and edge entry files (`index.browser.mjs`, `index.edge.mjs`,
-`index.edge.js`) are still in the package, but no export names them. A page
-that needs something this page lists as gone, and cannot move it to Node or
-to build time, stays on `ata-validator@1`.
+## The 1.x Validator: ata-validator/v1
+
+`ata-validator/v1` is the Validator of 1.x under every condition: the 1.x
+browser entry in a browser bundle, the 1.x edge entry under `workerd` and
+`edge-light`, and the Node entry in Node, where it is the same module as
+`ata-validator`. A page that needs something this note lists as gone changes
+one line:
+
+```js
+import { Validator, validate } from 'ata-validator/v1'
+```
+
+It costs what the 1.x entry cost, the figures in the next table. A page that
+does not import it carries none of it. A bundle that imports both holds both
+Validators.
 
 ## Why
 
@@ -63,11 +74,12 @@ On the class:
 Modules written by `ata build` do not go through the Validator class. They
 load through `ata-validator/compiled` and its siblings, as before.
 
-`index.d.ts` still describes the Node entry for every condition. It does not
-declare `Validator.use`, and it declares the names above although a browser
-or worker bundle no longer has them. A missing named import is an error
-from the bundler in an ES module, and `undefined` at run time through
-`require`. It is not a type error.
+Types follow the conditions. Under `browser`, `workerd` and `edge-light` the
+root import is typed by `index.v2.d.ts`, the surface above, so a removed
+name or a refused option is a type error. TypeScript reads those conditions
+only where the project sets them (`customConditions` in tsconfig, with
+`moduleResolution: "bundler"`); without them it reads the Node declarations,
+and a missing named import then shows as an error from the bundler.
 
 ## Errors
 
@@ -91,11 +103,11 @@ Validator.use(richErrors)
 `Validator.use()` registers a feature for every Validator of the bundle. Call
 it once, before the first validator is used.
 
-The Validator of the Node entries has no `use`: there `Validator.use` is
-`undefined`, and every feature is already in. A module that runs on both
-sides, in a server render and in the page, calls it as
-`Validator.use?.(richErrors)`. For the same reason a test run in Node does
-not see the refusals of this page. They show in the bundle.
+The Validator of the Node entries carries every feature. `Validator.use()`
+there does nothing and returns the class, so a module that runs on both
+sides, in a server render and in the page, calls it the same way. A test
+run in Node therefore does not see the refusals of this page. They show in
+the bundle.
 
 `validateJSON()` on text that is not JSON returns the `__parse__` error with
 the same five fields. The frame of the text that 1.x attached is not there.
@@ -142,10 +154,10 @@ entries still do.
 | Option | 1.x | 2.0 browser and worker entries | What to do |
 |---|---|---|---|
 | `engine` | `'interpreter'` kept a schema off generated code; other values than `'auto'` threw | refused: `ata2: option engine` | Delete it. These entries generate no code unless the page registers `codegen`. |
-| `keywords` | custom keywords, on the interpreted engine | refused: `ata2: option keywords` | No custom keywords on these entries. Validate with the Node entry, or express the check as a `formats` function where it reads one string. |
+| `keywords` | custom keywords, on the interpreted engine | refused: `ata2: option keywords` | No custom keywords on these entries. Import the Validator from `ata-validator/v1`, or express the check as a `formats` function where it reads one string. |
 | `strictSchema` | `true` threw on authoring mistakes, `'log'` warned | refused: `ata2: option strictSchema`, for `false` as well | Delete it, and run the check where the schema is written: a test or a build step on the Node entry. |
 | `logger` | received `strictSchema: 'log'` warnings | refused: `ata2: option logger` | Delete it with `strictSchema`. |
-| `source` | errors carried a `schemaSource` frame | refused: `ata2: option source` | Delete it. The frame is on the Node entry. |
+| `source` | errors carried a `schemaSource` frame | refused: `ata2: option source` | Delete it. The frame is on the Node entry and on `ata-validator/v1`. |
 | any key 1.x did not know | ignored | refused: `ata2: option <name>` | Delete it. |
 
 The build plugin does not remove these options. It keeps such a validator on
@@ -189,7 +201,8 @@ stays on the 2.0 browser entry there.
 
 ## Checklist for a browser or worker bundle
 
-1. Replace a default import, and any named import other than `Validator`.
+1. Replace a default import, and any named import other than `Validator`,
+   or import them from `ata-validator/v1`.
 2. If the code reads `code`, `docUrl`, `expected`, `received` or another rich
    field of an error, register `richErrors`.
 3. Register the feature for each of `verbose`, `coerceTypes`,

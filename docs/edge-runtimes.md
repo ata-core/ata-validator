@@ -148,23 +148,29 @@ configuration.
 
 ## Without the code generator
 
-Cloudflare Workers and Vercel Edge refuse `new Function`, so the code
-generator in the full package could only fail there and fall back. When a
-bundler builds for one of them it says so through an export condition
-(`workerd`, `edge-light`), and `ata-validator` then resolves to an entry
-without the generator: nothing to change in the code, the same names, the
-same verdicts and errors as the full package gives in those runtimes. A
-Worker with one validated route, bundled by wrangler 4.149.0, went from
-912.8 KiB (179.1 KiB gzipped) to 376.4 KiB (70.4 KiB gzipped). Modules from
-`ata build` load through it; the emitters (`Validator.bundle` and the rest)
-point to `ata-validator/aot`, as they do in a browser bundle.
+Cloudflare Workers and Vercel Edge refuse `new Function`. When a bundler
+builds for one of them it says so through an export condition (`workerd`,
+`edge-light`), and from 2.0 `ata-validator` then resolves to the 2.0 edge
+entry: a Validator that generates no code, described in
+[v2-edge.md](v2-edge.md). A Workers bundle whose only import is
+`import { Validator } from 'ata-validator'` (esbuild with the `workerd`
+condition, minified, gzip level 9) is 50,713 B on 2.0.0 and was 67,332 B on
+1.65.0.
+
+The entry exports `Validator` alone. Its errors have five fields until the
+Worker registers `richErrors` (604 B more in that bundle), and `verbose`,
+`coerceTypes`, `removeAdditional`, the `errorMessage` keyword and
+meta-schema references are features registered the same way; anything
+missing is refused by name. The list, and what to change in code written for
+1.x, is in [migration-2.0.md](migration-2.0.md). Modules from `ata build`
+load through `ata-validator/compiled` as before. The 1.x edge entry, with
+`Validator.fromStandalone` and the other names, is `ata-validator/v1`.
 
 A page with a Content-Security-Policy that blocks `unsafe-eval`, or a
-browser extension under Manifest V3, needs nothing either. The browser
-build starts every schema on the interpreted engine and loads the code
-generator only for a validator that gets hot; before loading it, it checks
-whether generated code can run, and where it cannot, the generator chunk is
-never fetched. The same `import { Validator } from 'ata-validator'` works.
+browser extension under Manifest V3, needs nothing either. The 2.0 browser
+entry generates no code unless the page registers the `codegen` feature,
+which checks whether generated code can run before it loads the generator.
+The same `import { Validator } from 'ata-validator'` works.
 
 ## Deno and Deno Deploy
 

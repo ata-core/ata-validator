@@ -18,9 +18,13 @@ How to move a browser or worker bundle is in [docs/migration-2.0.md](docs/migrat
 - `require('ata-validator')` under the browser and worker conditions gives the same 2.0 Validator as `import` (`index.v2.browser.js`, `index.v2.edge.js`). Under `browser` it gave `index.js`, which put the code generator in the first load of a page that reached the package that way.
 - `ata-validator/features` (`featuresFor()`, `joinFeatures()`), `ata-validator/features/<name>` and `ata-validator/v2/plugin-core` are new exports. The build plugin reads them to keep a validator it cannot compile on a Validator with only the features its schema needs.
 
+- `ata-validator/v1`: the Validator of 1.x under every condition, with `validate()`, `compile()`, custom keywords, the buffer methods and the bundle statics, for a browser or worker bundle that needs what the 2.0 entries do not carry. A page that does not import it carries none of it.
+- `Validator.use()` on the Node entries, where the Validator carries every feature: it does nothing and returns the class, so code shared between a server and a page registers features the same way on both.
+- `index.v2.d.ts` types the root import under the `browser`, `workerd` and `edge-light` conditions, so a project that sets them (`customConditions`) gets a type error for a removed export or a refused option.
+
 ### Notes
 
-- The tarball is 764,854 B packed, from 681,769 B at 1.65.0: 106 more files, the 2.0 entries and what they import.
+- The tarball is 765,767 B packed, from 681,769 B at 1.65.0: 107 more files, the 2.0 entries and what they import.
 - `@rjsf/validator-ata` 6.11.1 depends on `ata-validator ^1.56.0` and keeps a 1.x copy. Forced onto 2.0.0 by an override it reads the `ata2: verbose` refusal as an invalid document, for every document.
 
 ## 1.66.0 - 2026-11-25
