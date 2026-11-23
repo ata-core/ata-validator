@@ -2,9 +2,9 @@
 // Bytes (gzip -9, minified) each way of registering format checks adds to the
 // plugin's core, which featuresFor() (features/index.mjs) reads to name the
 // per-name features or the formats and uri groups, whichever is smaller.
-export const FLOOR = 14592;
-export const OWN = {"formatEmail":380,"formatDate":179,"formatDateTime":441,"formatTime":409,"formatDuration":127,"formatUuid":221,"formatIpv4":47,"formatIpv6":48,"formatHostname":51,"formatRegex":85,"formatJsonPointer":54,"formatRelativeJsonPointer":130,"formatUriTemplate":344,"formatIdnEmail":241,"formatIdnHostname":74,"formatUri":64,"formatUriReference":78,"formatIri":66,"formatIriReference":80};
-export const PART = {"URI_FAST":119,"idna":139,"ipv4":98,"isDigit":51,"jsonPointer":96,"pair":76,"ipv6":406,"_uriWalk":1060,"hostname":208};
+export const FLOOR = 14579;
+export const OWN = {"formatEmail":376,"formatDate":179,"formatDateTime":440,"formatTime":409,"formatDuration":127,"formatUuid":214,"formatIpv4":46,"formatIpv6":46,"formatHostname":48,"formatRegex":84,"formatJsonPointer":55,"formatRelativeJsonPointer":133,"formatUriTemplate":342,"formatIdnEmail":240,"formatIdnHostname":74,"formatUri":62,"formatUriReference":80,"formatIri":64,"formatIriReference":82};
+export const PART = {"URI_FAST":119,"idna":139,"ipv4":98,"isDigit":51,"jsonPointer":95,"pair":76,"ipv6":405,"_uriWalk":1059,"hostname":211};
 export const PARTS = {"formatEmail":["hostname","idna","ipv4","ipv6","isDigit"],"formatDate":["pair"],"formatDateTime":["pair"],"formatTime":[],"formatDuration":[],"formatUuid":[],"formatIpv4":["ipv4"],"formatIpv6":["ipv6","isDigit"],"formatHostname":["hostname","idna","isDigit"],"formatRegex":[],"formatJsonPointer":["jsonPointer"],"formatRelativeJsonPointer":["jsonPointer"],"formatUriTemplate":[],"formatIdnEmail":[],"formatIdnHostname":["idna"],"formatUri":["URI_FAST","_uriWalk","ipv6","isDigit"],"formatUriReference":["_uriWalk","ipv6","isDigit"],"formatIri":["URI_FAST","_uriWalk","ipv6","isDigit"],"formatIriReference":["_uriWalk","ipv6","isDigit"]};
-export const GROUP = {"formats":2730,"uri":3818,"both":3824};
-export const SHARE = 23.6;
+export const GROUP = {"formats":2722,"uri":3814,"both":3824};
+export const SHARE = 23.1;
