@@ -386,6 +386,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // 689 KB with the sweep's fixes, the unresolved $ref fix, the
 // patternFallback option and the ir and kernels pattern engine together in
 // one tree. Measured 688.5 KB.
-assert.ok(manifest.size < 689 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 690 KB with the code only some schemas or calls need read on first need
+// (lib/ref-bindings.js, Validator.fromStandalone in lib/aot.browser.js, the
+// buffer API choice in lib/buffer-gate.js): one file more, and moved code
+// packs a little worse apart. Measured 689.7 KB.
+assert.ok(manifest.size < 690 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

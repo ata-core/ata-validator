@@ -35,6 +35,19 @@ const BOUND = 200; // ms
 const LONG = 'a'.repeat(28) + '!';
 const NESTED = '^(a+)+$';
 
+// The code generator keeps the unicode flag and the property-escape test
+// beside lib/pattern-choice.js's, so that a schema whose patterns it writes
+// inline does not load that module. Two copies: the same text, and the same
+// answer on a pattern with a property escape and on one without.
+{
+  const choice = require('../lib/pattern-choice.js');
+  assert.strictEqual(jsc.reFlags.toString(), choice.reFlags.toString(), 'reFlags differs between lib/js-compiler.js and lib/pattern-choice.js');
+  assert.strictEqual(jsc.reFlagArg.toString(), choice.reFlagArg.toString(), 'reFlagArg differs between lib/js-compiler.js and lib/pattern-choice.js');
+  for (const p of ['^[0-9]{5}$', NESTED, '^\\p{L}+$', '^(\\p{L}+)+$', '\\P{Lu}x', '[\\w-.]', 7, undefined]) {
+    assert.strictEqual(jsc.patternEngineOk(p), choice.patternEngineOk(p), 'patternEngineOk differs on ' + String(p));
+  }
+}
+
 let dir = null;
 let seq = 0;
 // A module's text, written to a file and imported, with the kernels by file

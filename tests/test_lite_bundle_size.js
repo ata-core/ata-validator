@@ -319,7 +319,12 @@ const esbuild = require('esbuild')
 // carries only when ata-validator/pattern-fallback is imported; 141 bytes.
 // 64030 (64016 measured): the sweep's fixes, the unresolved $ref fix
 // and the patternFallback option together in one tree.
-const BUDGET = 64030
+// 63500 (63479 measured): Validator.fromStandalone lives with the loader of
+// built modules (lib/aot.browser.js), which lite does not carry since it
+// refuses the method, and the choice between the native walker and validate()
+// for the buffer APIs lives in lib/buffer-gate.js, whose browser twin only
+// throws; 537 bytes less.
+const BUDGET = 63500
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
