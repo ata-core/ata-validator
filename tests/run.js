@@ -87,6 +87,7 @@ const FILES = [
   "tests/test_native_load_order.js",
   "tests/test_pack_purity.js",
   "tests/test_pack_exports.js",
+  "tests/test_entry_types.js",
   "tests/test_make_native_package.js",
   "tests/test_browser.js",
   "tests/test_browser_nofs.js",

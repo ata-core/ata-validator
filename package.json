@@ -14,19 +14,43 @@
         "require": "./index.aot.js"
       },
       "workerd": {
-        "types": "./index.d.ts",
+        "types": "./index.v2.d.ts",
         "import": "./index.v2.edge.mjs",
         "require": "./index.v2.edge.js"
       },
       "edge-light": {
-        "types": "./index.d.ts",
+        "types": "./index.v2.d.ts",
         "import": "./index.v2.edge.mjs",
         "require": "./index.v2.edge.js"
       },
-      "types": "./index.d.ts",
       "browser": {
+        "types": "./index.v2.d.ts",
         "import": "./index.v2.browser.mjs",
         "require": "./index.v2.browser.js"
+      },
+      "types": "./index.d.ts",
+      "import": {
+        "module": "./index.bundle.mjs",
+        "module-sync": "./index.node.mjs",
+        "default": "./index.mjs"
+      },
+      "require": "./index.js"
+    },
+    "./v1": {
+      "workerd": {
+        "types": "./index.d.ts",
+        "import": "./index.edge.mjs",
+        "require": "./index.edge.js"
+      },
+      "edge-light": {
+        "types": "./index.d.ts",
+        "import": "./index.edge.mjs",
+        "require": "./index.edge.js"
+      },
+      "types": "./index.d.ts",
+      "browser": {
+        "import": "./index.browser.mjs",
+        "require": "./index.js"
       },
       "import": {
         "module": "./index.bundle.mjs",
@@ -255,6 +279,7 @@
     "index.v2.edge.mjs",
     "index.v2.edge.js",
     "index.v2.core.mjs",
+    "index.v2.d.ts",
     "features/",
     "index.d.ts",
     "aot.js",

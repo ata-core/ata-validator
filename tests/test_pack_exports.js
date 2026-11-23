@@ -54,6 +54,26 @@ for (const c of ['workerd', 'edge-light']) {
   assert.strictEqual(dot[c].import, './index.v2.edge.mjs');
   assert.strictEqual(dot[c].require, './index.v2.edge.js');
 }
+for (const c of ['browser', 'workerd', 'edge-light']) assert.strictEqual(dot[c].types, './index.v2.d.ts');
+assert.ok(packed.has('index.v2.d.ts'));
+// ata-validator/v1: the 1.x entries under every condition, for code that
+// needs what the 2.0 entries do not carry.
+const v1 = pkg.exports['./v1'];
+assert.deepStrictEqual([v1.browser.import, v1.browser.require], ['./index.browser.mjs', './index.js']);
+for (const c of ['workerd', 'edge-light']) assert.deepStrictEqual([v1[c].import, v1[c].require], ['./index.edge.mjs', './index.edge.js']);
+assert.deepStrictEqual(v1.import, dot.import);
+assert.strictEqual(v1.require, dot.require);
+{
+  const entryOf = (spec, opts) => {
+    const r = esbuild.buildSync({ stdin: { contents: `import { Validator } from ${JSON.stringify(spec)}\nglobalThis.V = Validator\n`, resolveDir: root, sourcefile: 'in.mjs' }, bundle: true, write: false, metafile: true, format: 'esm', logLevel: 'silent', ...opts });
+    return Object.keys(r.metafile.inputs).filter((k) => /^index\.[\w.]+$/.test(k));
+  };
+  const WORKER = { platform: 'neutral', conditions: ['workerd', 'worker', 'browser'], mainFields: ['browser', 'module', 'main'] };
+  assert.deepStrictEqual(entryOf('ata-validator/v1', { platform: 'browser' }), ['index.browser.mjs']);
+  assert.deepStrictEqual(entryOf('ata-validator/v1', WORKER), ['index.edge.mjs']);
+  assert.deepStrictEqual(entryOf('ata-validator', { platform: 'browser' }), ['index.v2.browser.mjs']);
+  assert.deepStrictEqual(entryOf('ata-validator', WORKER), ['index.v2.edge.mjs']);
+}
 // Node keeps the entries it had.
 assert.strictEqual(dot.require, './index.js');
 assert.strictEqual(dot.import.default, './index.mjs');

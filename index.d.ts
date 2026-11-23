@@ -616,6 +616,14 @@ export interface ValidatorConstructor {
   /** Construct from a plain object/string schema, or with an explicit data type. */
   new <T = unknown>(schema: object | string | boolean, options?: ValidatorOptions): Validator<T>;
 
+  /**
+   * Registers features on the 2.0 Validator of a browser or worker bundle
+   * (`ata-validator/features/<name>`). This Validator carries every feature,
+   * so here the call does nothing and returns the class: code that runs on
+   * both sides can call it unconditionally.
+   */
+  use(...features: import('./features/index.js').Feature[]): ValidatorConstructor;
+
   /** Load a pre-compiled standalone module. Zero schema compilation at startup. */
   fromStandalone<T = unknown>(mod: StandaloneModule, schema: object | string, options?: ValidatorOptions): Validator<T>;
 
