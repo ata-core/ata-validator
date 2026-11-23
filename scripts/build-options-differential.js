@@ -19,7 +19,9 @@
 // that a reference reaches under a name that is not a keyword (SchemaStore's
 // travis, `#/definitions/notificationObject/webhooks`), which is the
 // runtime's bug: no format is asserted with that option. The table writer
-// asserts none. Remove the exclusion when the runtime is fixed.
+// asserts none. Such a difference is excused only where the plan answers as
+// the runtime does with every format given a function that accepts. Remove
+// the exclusion when the runtime is fixed.
 //
 // Two writers are held, each with its own counts: the module writer
 // (specialize) and the table writer (tableModule), which takes formats as
@@ -123,6 +125,7 @@ async function check(name, schema, docs, optionSets, stats, report, refs) {
       for (const m of [mp, mr]) if (typeof m.setFormats === 'function') m.setFormats(opts.formats || {});
       if (opts.formats && Object.keys(opts.formats).length && typeof mp.setFormats === 'function') S.withHoles++;
       S.compiled++;
+      let noFormat;
       for (const doc of docs) {
         S.docs++;
         const text = JSON.stringify(doc);
@@ -148,12 +151,19 @@ async function check(name, schema, docs, optionSets, stats, report, refs) {
           if (report.length < 40) report.push({ kind: counter, backend, key, doc: text.slice(0, 300), runtime: a, module: b, v2: c });
         };
         // The known runtime bug, and nothing wider: assertFormat is false,
-        // the runtime reports a format error, and the plan answers exactly
-        // as the runtime does with its format errors taken out (the verdict,
-        // every other error in order, plain and rich, and the document).
-        if (backend === 'table' && opts.assertFormat === false && !b.threw && !a.valid && a.r.errors.some((e) => e[0] === 'format')) {
-          const rest = a.r.errors.filter((e) => e[0] !== 'format'); const richRest = a.rich.filter((e) => e[1] !== 'format');
-          if (b.valid === (rest.length === 0) && b.r.valid === b.valid && show(b.r.errors) === show(rest) && show(b.rich) === show(richRest) && a.after === b.after) { note('runtimeFormatOff', 'runtimeFormatOffKeys'); continue; }
+        // the plan differs from the runtime, and it answers exactly (the
+        // verdict, the errors in order, plain and rich, and the document) as
+        // the runtime does when every format the schema names is given a
+        // function that accepts, which asserts no format by construction.
+        if (backend === 'table' && opts.assertFormat === false && !b.threw && !(verdictSame(a, b) && errorsSame(a, b, true))) {
+          if (noFormat === undefined) {
+            const accept = Object.fromEntries([...formatNames(schema)].filter((n) => n !== '__proto__').map((n) => [n, () => true]));
+            const { assertFormat, formats, ...rest } = opts;
+            try { noFormat = [new Validator(own(), { ...rest, formats: accept, richErrors: false }), new Validator(own(), { ...rest, formats: accept })]; } catch { noFormat = null; }
+          }
+          let want = null;
+          if (noFormat) { try { want = runtimeAnswer(noFormat[0], noFormat[1]); } catch { want = null; } }
+          if (want !== null && verdictSame(want, b) && errorsSame(want, b, true)) { note('runtimeFormatOff', 'runtimeFormatOffKeys'); continue; }
         }
         const runtimesSplitVerdict = c !== null && !verdictSame(a, c);
         const runtimesSplitErrors = c !== null && (runtimesSplitVerdict || !errorsSame(a, c, false));
