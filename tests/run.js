@@ -279,6 +279,7 @@ const FILES = [
   "tests/test_regex_plain_linear.js",
   "tests/test_plain_linear_scan.js",
   "tests/test_meta_ref_skip.js",
+  "tests/test_meta_ref_gate.js",
   "tests/test_aot_order_defaults.js",
   "tests/test_defaults_reach.js",
   "tests/test_hoisted_checks.js",

@@ -18,7 +18,12 @@ const { facts, scan } = require('../lib/core/verdict.js')
 const core = require('../lib/core/feature.js')
 // The questions as _build asks them of a text (the schema's, or the core's).
 const NOT_FLAT = /"\$(?:id|anchor|dynamicAnchor|recursiveAnchor)"/
-const META_REF = /"\$(?:ref|dynamicRef|recursiveRef)":"[^"]*json-schema\.org\//
+// The Validator's own expression, read from its source (it is not exported:
+// an export would be bytes on every page).
+const META_REF = new RegExp(/^const META_REF = \/(.+)\/;$/m.exec(fs.readFileSync(path.join(__dirname, '../lib/validator-small.js'), 'utf8'))[1])
+// A fact as the question's answer: the scan keeps the references that hold
+// `json-schema.org/` as text, for the Validator's expression to judge.
+const fact = (f, k) => k === 'metaRef' ? META_REF.test(f[k]) : f[k]
 const asked = (t) => ({ errorMessage: t.includes('"errorMessage"'), default: t.includes('"default"'), format: t.includes('"format"'), metaRef: t.includes('json-schema.org/') && META_REF.test(t), notFlat: NOT_FLAT.test(t) })
 // The same questions asked of the schema's own JSON text.
 const textFacts = (schema) => asked(JSON.stringify(schema) || '')
@@ -31,11 +36,11 @@ function same (schema, label) {
   const q = asked(core(schema))
   for (const k of FIELDS) assert.strictEqual(q[k], want[k], label + ': ' + k + ' as the Validator asks it')
   const st = scan(schema, true)
-  if (st.facts !== null) { scanned++; for (const k of FIELDS) assert.strictEqual(st.facts[k], want[k], label + ': ' + k + ' in the scan') }
+  if (st.facts !== null) { scanned++; for (const k of FIELDS) assert.strictEqual(fact(st.facts, k), want[k], label + ': ' + k + ' in the scan') }
   const f = facts(schema)
   if (f === null) { fellBack++; return }
   n++
-  for (const k of FIELDS) assert.strictEqual(f[k], want[k], label + ': ' + k)
+  for (const k of FIELDS) assert.strictEqual(fact(f, k), want[k], label + ': ' + k)
 }
 
 // Schemas as given, and as the Validator hands them on (normalised).
