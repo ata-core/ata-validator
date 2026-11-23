@@ -32,8 +32,8 @@ one line:
 import { Validator, validate } from 'ata-validator/v1'
 ```
 
-Measured as the table in the next section: 58,443 B first load in a browser
-bundle and 67,627 B in a Workers bundle. A page that does not import it
+Measured as the table in the next section: 58,436 B first load in a browser
+bundle and 67,622 B in a Workers bundle. A page that does not import it
 carries none of it. A bundle that imports both holds both
 Validators.
 
