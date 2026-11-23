@@ -27,7 +27,7 @@ function safeKeyMatcher(src) {
 }
 
 module.exports = {
-  buildDefaultsApplier: (schema) => buildDefaultsApplier(schema, safeKeyMatcher),
+  buildDefaultsApplier: (schema, match = safeKeyMatcher) => buildDefaultsApplier(schema, match),
   setOwn, localRef, resourceRoots, refTarget, reachGraph, reachesDefault, safeKeyMatcher, MAX_DEPTH, EMBED,
 };
 `;
@@ -44,7 +44,7 @@ function safeKeyMatcher(src, safe) {
 }
 
 module.exports = {
-  buildDefaultsApplier: (schema, safe) => buildDefaultsApplier(schema, (src) => safeKeyMatcher(src, safe)),
+  buildDefaultsApplier: (schema, safe, match = (src) => safeKeyMatcher(src, safe)) => buildDefaultsApplier(schema, match),
   setOwn, localRef, resourceRoots, refTarget, reachGraph, reachesDefault, safeKeyMatcher, MAX_DEPTH, EMBED,
 };
 `;

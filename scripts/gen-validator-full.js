@@ -17,7 +17,7 @@ const FULL = {
     "const need = (name, as) => features[name] || missing(name + ', Validator.use(' + (as || name) + ')');",
   ],
   features: [
-    "const features = { errorMessage: null, metaschemas: null, coerceTypes: null, removeAdditional: null, codegen: null, richErrors: null, verbose: null };",
+    "const features = { errorMessage: null, metaschemas: null, coerceTypes: null, removeAdditional: null, codegen: null, richErrors: null, verbose: null, patternFallback: null };",
   ],
   regroup: [],
   gates: ["    if (map !== null) require('./schema-order').registerDocuments(schemaObj, map);"],
@@ -43,7 +43,7 @@ const FULL = {
 // modules where the core reads them from what was registered (lib/groups.js).
 const ENGINE = [
   ["require('./engine-shared-core')\n", "require('./engine-shared')\n"],
-  ['compilePattern(src, G.safe)', 'compilePattern(src)'],
+  ['(opts.pf || compilePattern)(src, G.safe)', '(opts.pf || compilePattern)(src)'],
   ["const { G, refuse, builtinFormat } = require('./groups')\n", "const { _deq: eq, duplicatePair } = require('./unique-items')\nlet _collapse = null\nconst collapse = (kw, br, pp, sp, o) => (_collapse || (_collapse = require('./branch-collapse')._collapse))(kw, br, pp, sp, o)\nlet formatTable = null\n"],
   ['  // Enum and const equality, as the Validator set it (lib/groups.js).\n  const eq = G.eq\n', ''],
   ['      const name = s.format\n', "      const name = s.format; const table = formatTable || (formatTable = require('./formats').formatChecks())\n"],
@@ -69,7 +69,8 @@ function renderEngine () {
 // draft7 group (a full entry carries draft7 anyway).
 const SUBS = [
   ["const { createSmall } = require('./engine-small');", "const { createSmall } = require('./engine-full');"],
-  ["need('removeAdditional').build(pre, G.safe, require('./engine-shared-core'))", "need('removeAdditional').build(pre, null, require('./engine-shared'))"],
+  ["need('removeAdditional').build(pre, G.safe, this._pf || require('./engine-shared-core'))", "need('removeAdditional').build(pre, null, this._pf || require('./engine-shared'))"],
+  ["need('patternFallback').attach(this, require('./engine-shared-core'), G.safe)", "need('patternFallback').attach(this, require('./engine-shared'))"],
   ["const { needsNormalization, scan, DEFINITIONS } = require('./schema-scan');", "const { needsNormalization } = require('./schema-scan');"],
   ['  const k = (inherit || 0) + (shown ? 8 : 0), c = kept.get(s);', '  const c = kept.get(s);'],
   ['    let schemaObj = normalize(raw, 0, !!o.verbose);', '    let schemaObj = normalize(raw, 0);'],
@@ -78,7 +79,7 @@ const SUBS = [
   ['  if (code === 1 && !shown && scan(s) === DEFINITIONS) return s;\n', ''],
   ["  const d = need('draft7');", "  const d = require('./draft7');"],
   ["need('draft7').stripFormatAssertions", "require('./draft7').stripFormatAssertions"],
-  ["need('defaults').buildDefaultsApplier(pre, G.safe)", "require('./defaults').buildDefaultsApplier(pre)"],
+  ["need('defaults').buildDefaultsApplier(pre, G.safe, this._pf)", "require('./defaults').buildDefaultsApplier(pre, this._pf)"],
 ];
 
 function render () {

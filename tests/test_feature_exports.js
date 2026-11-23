@@ -34,6 +34,7 @@ const CASES = {
   uniqueItems: ['uniqueItems.js', { uniqueItems: true }, {}, [1, 1]],
   branchCollapse: ['branchCollapse.js', { anyOf: [{ type: 'string' }] }, {}, 1],
   patterns: ['patterns.js', { pattern: '(a+)+b' }, {}, 'aab'],
+  patternFallback: ['patternFallback.js', { pattern: '^(a)\\1$' }, { patternFallback: () => ({ test: (s) => s === 'magic' }) }, 'magic'],
   richErrors: ['richErrors.js', { type: 'string' }, { richErrors: true }, 1],
   verbose: ['verbose.js', { type: 'string' }, { verbose: true }, 1],
   metaschemas: ['metaschemas.js', { $ref: 'https://json-schema.org/draft/2020-12/schema' }, {}, { type: 1 }],

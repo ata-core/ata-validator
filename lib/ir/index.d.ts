@@ -15,6 +15,13 @@ export interface IROptions {
   schemas?: JSONSchema[] | Record<string, JSONSchema>;
   /** The base URI the schema's references resolve against. */
   baseURI?: string;
+  /**
+   * `'reject'` throws for a schema, or a document in `schemas`, with a pattern that would run on the platform RegExp
+   * without the proof that it runs in linear time there, naming the pattern and its location. Default `'platform'`.
+   * A function cannot be written into a module and throws a TypeError. `compileClosures` takes only `'platform'`:
+   * any other value throws an `ir:` error, and the Validator with the patternFallback feature honours it.
+   */
+  patternFallback?: 'platform' | 'reject';
 }
 
 /** Options `specialize` takes beyond IROptions. */
@@ -49,6 +56,8 @@ export interface TableOptions {
   richErrors?: boolean;
   useDefaults?: boolean;
   assertFormat?: boolean;
+  /** As in IROptions: `'reject'` throws rather than return null, and so does a function. */
+  patternFallback?: 'platform' | 'reject';
 }
 
 /** What `compileClosures` builds: the two methods a compiled module exports. */
@@ -70,7 +79,7 @@ export function tableModule(schema: JSONSchema, options?: TableOptions): string 
  * Plain errors only: `richErrors` must be `false`. Covers objects, arrays and value keywords; returns null for
  * anything else (references, branches, a default to fill), and the caller writes the plan or the module instead.
  */
-export function closureModule(schema: JSONSchema, options: { richErrors: false; assertFormat?: boolean; useDefaults?: false }): string | null;
+export function closureModule(schema: JSONSchema, options: { richErrors: false; assertFormat?: boolean; useDefaults?: false; patternFallback?: 'platform' | 'reject' }): string | null;
 
 /** The same plan as JSON, for `fromPlan` in `ata-validator/plan`, or null where the table backend does not cover the schema. */
 export function tablePlan(schema: JSONSchema, options?: TableOptions): Plan | null;
@@ -86,7 +95,7 @@ export interface PickedSource { kind: 'module' | 'table' | 'closures'; source: s
  */
 export function pickModules(
   schemas: JSONSchema[],
-  options: { richErrors?: boolean; useDefaults?: boolean; assertFormat?: boolean } | undefined,
+  options: { richErrors?: boolean; useDefaults?: boolean; assertFormat?: boolean; patternFallback?: 'platform' | 'reject' } | undefined,
   size: (text: string) => number,
   moduleOptions?: Record<string, unknown>,
 ): { backend: 'module' | 'table' | 'closures'; saving: number; sources: Array<PickedSource | null> };

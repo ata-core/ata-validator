@@ -18,12 +18,18 @@ import { formatDateTime } from 'ata-validator/features/formatDateTime'
 import { formatUri } from 'ata-validator/features/formatUri'
 import { standardSchema } from 'ata-validator/features/standardSchema'
 import { patterns } from 'ata-validator/features/patterns'
+import { patternFallback, type PatternFallback, type PatternMatcher } from 'ata-validator/features/patternFallback'
 const names: FeatureName[] = featuresFor({ format: 'date' }, { verbose: true }, [{ $id: 'x' }])
-const all: Feature[] = [formats, uri, draft7, defaults, uniqueItems, branchCollapse, richErrors, verbose, metaschemas, errorMessages, coerceTypes, removeAdditional, codegen, formatDateTime, formatUri, standardSchema, patterns]
+const all: Feature[] = [formats, uri, draft7, defaults, uniqueItems, branchCollapse, richErrors, verbose, metaschemas, errorMessages, coerceTypes, removeAdditional, codegen, formatDateTime, formatUri, standardSchema, patterns, patternFallback]
+const pf: Feature<'patternFallback'> = patternFallback
+const matcher: PatternMatcher = { test: (s) => s === 'x' }
+const modes: PatternFallback[] = ['platform', 'reject', () => matcher, (source, flags) => new RegExp(source, flags)]
+// @ts-expect-error: not a patternFallback value
+const badMode: PatternFallback = 'off'
 const pt: Feature<'patterns'> = patterns
 const dt: Feature<'formatDateTime'> = formatDateTime
 const one: Feature<'formats'> = formats
 // @ts-expect-error: not a feature name
 const bad: FeatureName = 'nope'
 const joined: FeatureName[] = joinFeatures(names, ['formats'], [])
-void names; void all; void pt; void one; void bad; void dt; void joined
+void pf; void modes; void badMode; void names; void all; void pt; void one; void bad; void dt; void joined
