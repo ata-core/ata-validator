@@ -70,7 +70,7 @@ function renderEngine () {
 const SUBS = [
   ["const { createSmall } = require('./engine-small');", "const { createSmall } = require('./engine-full');"],
   ["need('removeAdditional').build(pre, G.safe, this._pf || require('./engine-shared-core'))", "need('removeAdditional').build(pre, null, this._pf || require('./engine-shared'))"],
-  ["need('patternFallback').attach(this, require('./engine-shared-core'), G.safe)", "need('patternFallback').attach(this, require('./engine-shared'))"],
+  ["need(k).attach(this, require('./engine-shared-core'), G.safe)", "need(k).attach(this, require('./engine-shared'))"],
   ["const { needsNormalization, scan, DEFINITIONS } = require('./schema-scan');", "const { needsNormalization } = require('./schema-scan');"],
   ['  const k = (inherit || 0) + (shown ? 8 : 0), c = kept.get(s);', '  const c = kept.get(s);'],
   ['    let schemaObj = normalize(raw, 0, !!o.verbose);', '    let schemaObj = normalize(raw, 0);'],
