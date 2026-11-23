@@ -14,6 +14,17 @@
 // shows as a difference. A schema the build declines (an `ir:` error, a
 // reference that resolves to nothing) is counted, never guessed.
 //
+// One difference is known and counted apart (runtimeFormatOff), on the table
+// writer only: under assertFormat: false the runtime still asserts a format
+// that a reference reaches under a name that is not a keyword (SchemaStore's
+// travis, `#/definitions/notificationObject/webhooks`), which is the
+// runtime's bug: no format is asserted with that option. The table writer
+// asserts none. Remove the exclusion when the runtime is fixed.
+//
+// Two writers are held, each with its own counts: the module writer
+// (specialize) and the table writer (tableModule), which takes formats as
+// holes too, declines `schemas`, and returns null for what it does not cover.
+//
 //   node scripts/build-options-differential.js                  the official suite with its remotes
 //   node scripts/build-options-differential.js --schemastore <dir>   SchemaStore's samples as well
 //   node scripts/build-options-differential.js --every N [--offset k]   one schema group in N (SchemaStore in
@@ -83,56 +94,74 @@ async function check(name, schema, docs, optionSets, stats, report, refs) {
     catch { stats.runtimeRefuses++; continue; }
     let v2Plain = null;
     try { v2Plain = new refs.V2(own(), { ...opts, richErrors: false }); v2Plain.validate({}); } catch { v2Plain = null; }
-    const irOpts = { ...opts, holes: true, strictRefs: true, verdict: true };
-    let plainSrc, richSrc;
-    try {
-      plainSrc = refs.specialize(schema, { ...irOpts, richErrors: false });
-      richSrc = refs.specialize(schema, irOpts);
-    } catch (e) {
-      if (!/^ir/.test(e.message)) throw new Error(`${key}: specialize threw outside the IR's own refusals: ${e.message}`);
-      stats.declined++;
-      stats.declines[e.message.slice(0, 60)] = (stats.declines[e.message.slice(0, 60)] || 0) + 1;
-      continue;
-    }
-    if (refs.mutate) {
-      const out = refs.mutate(plainSrc);
-      if (out === plainSrc) continue;
-      plainSrc = out; richSrc = refs.mutate(richSrc);
-    }
-    const mp = await load(plainSrc); const mr = await load(richSrc);
-    for (const m of [mp, mr]) if (typeof m.setFormats === 'function') m.setFormats(opts.formats || {});
-    if (opts.formats && Object.keys(opts.formats).length && typeof mp.setFormats === 'function') stats.withHoles++;
-    stats.compiled++;
-    for (const doc of docs) {
-      stats.docs++;
-      const text = JSON.stringify(doc);
-      if (text === undefined) continue;
-      const fresh = () => JSON.parse(text);
-      const runtimeAnswer = (V, R) => { const d1 = fresh(); const r = V.validate(d1); const d2 = fresh(); return { valid: V.isValidObject(d2), r: { valid: r.valid, errors: r.valid ? [] : r.errors.map(pick(PLAIN)) }, after: JSON.stringify(d1), rich: R ? (() => { const d3 = fresh(); const x = R.validate(d3); return x.valid ? [] : x.errors.map(pick(RICH)); })() : null }; };
-      const moduleAnswer = () => { const d1 = fresh(); const r = mp.validate(d1); const d2 = fresh(); const x = mr.validate(fresh()); return { valid: mp.isValid(d2), r: { valid: r.valid, errors: r.valid ? [] : r.errors.map(pick(PLAIN)) }, after: JSON.stringify(d1), rich: x.valid ? [] : x.errors.map(pick(RICH)) }; };
-      let a, b, c = null;
-      try { a = runtimeAnswer(rtPlain, rtRich); } catch { stats.runtimeThrows++; continue; }
-      try { b = moduleAnswer(); } catch (e) { b = { threw: e.message }; }
-      if (v2Plain) { try { c = runtimeAnswer(v2Plain, null); } catch { c = null; } }
-      // The verdict and the document afterwards: no difference is allowed,
-      // from either runtime, unless the two runtimes give different verdicts
-      // themselves. The errors: none from the root Validator where the 2.0
-      // entry gives the same list; where the two runtimes list them
-      // differently (their order in a registered document) it is counted
-      // apart, as the runtimes' own disagreement.
-      const verdictSame = (x, y) => !x.threw && !y.threw && x.valid === y.valid && x.valid === x.r.valid && y.valid === y.r.valid && x.after === y.after;
-      const errorsSame = (x, y, rich) => show(x.r) === show(y.r) && (!rich || show(x.rich) === show(y.rich));
-      const note = (counter, keys) => {
-        stats[counter]++; stats[keys][key] = (stats[keys][key] || 0) + 1;
-        if (process.env.DIFFS_OUT) fs.appendFileSync(process.env.DIFFS_OUT, JSON.stringify({ kind: counter, key, doc: text, runtime: a, module: b, v2: c }) + '\n');
-        if (report.length < 40) report.push({ kind: counter, key, doc: text.slice(0, 300), runtime: a, module: b, v2: c });
-      };
-      const runtimesSplitVerdict = c !== null && !verdictSame(a, c);
-      const runtimesSplitErrors = c !== null && (runtimesSplitVerdict || !errorsSame(a, c, false));
-      if (runtimesSplitVerdict || runtimesSplitErrors) { stats.runtimesDisagree++; stats.disagreeKeys[key] = (stats.disagreeKeys[key] || 0) + 1; }
-      if (!verdictSame(a, b)) { if (runtimesSplitVerdict && verdictSame(c, b)) note('splitVerdict', 'splitKeys'); else note('diffs', 'diffKeys'); }
-      else if (c !== null && !verdictSame(c, b) && !runtimesSplitVerdict) note('v2Diffs', 'v2DiffKeys');
-      else if (!errorsSame(a, b, true)) { if (runtimesSplitErrors) note('splitErrors', 'splitKeys'); else note('diffs', 'diffKeys'); }
+    const irOpts = { ...opts, holes: true, strictRefs: true };
+    for (const backend of ['module', 'table']) {
+      const S = stats[backend];
+      let plainSrc, richSrc;
+      if (backend === 'module') {
+        try {
+          plainSrc = refs.specialize(schema, { ...irOpts, verdict: true, richErrors: false });
+          richSrc = refs.specialize(schema, { ...irOpts, verdict: true });
+        } catch (e) {
+          if (!/^ir/.test(e.message)) throw new Error(`${key}: specialize threw outside the IR's own refusals: ${e.message}`);
+          S.declined++;
+          S.declines[e.message.slice(0, 60)] = (S.declines[e.message.slice(0, 60)] || 0) + 1;
+          continue;
+        }
+      } else {
+        plainSrc = refs.tableModule(schema, { ...irOpts, richErrors: false });
+        richSrc = refs.tableModule(schema, irOpts);
+        if ((plainSrc === null) !== (richSrc === null)) throw new Error(`${key}: the table writer took one error shape and declined the other`);
+        if (plainSrc === null) { S.declined++; continue; }
+      }
+      if (refs.mutate) {
+        const out = refs.mutate(plainSrc, backend);
+        if (out === plainSrc) continue;
+        plainSrc = out; richSrc = refs.mutate(richSrc, backend);
+      }
+      const mp = await load(plainSrc); const mr = await load(richSrc);
+      for (const m of [mp, mr]) if (typeof m.setFormats === 'function') m.setFormats(opts.formats || {});
+      if (opts.formats && Object.keys(opts.formats).length && typeof mp.setFormats === 'function') S.withHoles++;
+      S.compiled++;
+      for (const doc of docs) {
+        S.docs++;
+        const text = JSON.stringify(doc);
+        if (text === undefined) continue;
+        const fresh = () => JSON.parse(text);
+        const runtimeAnswer = (V, R) => { const d1 = fresh(); const r = V.validate(d1); const d2 = fresh(); return { valid: V.isValidObject(d2), r: { valid: r.valid, errors: r.valid ? [] : r.errors.map(pick(PLAIN)) }, after: JSON.stringify(d1), rich: R ? (() => { const d3 = fresh(); const x = R.validate(d3); return x.valid ? [] : x.errors.map(pick(RICH)); })() : null }; };
+        const moduleAnswer = () => { const d1 = fresh(); const r = mp.validate(d1); const d2 = fresh(); const x = mr.validate(fresh()); return { valid: mp.isValid(d2), r: { valid: r.valid, errors: r.valid ? [] : r.errors.map(pick(PLAIN)) }, after: JSON.stringify(d1), rich: x.valid ? [] : x.errors.map(pick(RICH)) }; };
+        let a, b, c = null;
+        try { a = runtimeAnswer(rtPlain, rtRich); } catch { S.runtimeThrows++; continue; }
+        try { b = moduleAnswer(); } catch (e) { b = { threw: e.message }; }
+        if (v2Plain) { try { c = runtimeAnswer(v2Plain, null); } catch { c = null; } }
+        // The verdict and the document afterwards: no difference is allowed,
+        // from either runtime, unless the two runtimes give different verdicts
+        // themselves. The errors: none from the root Validator where the 2.0
+        // entry gives the same list; where the two runtimes list them
+        // differently (their order in a registered document) it is counted
+        // apart, as the runtimes' own disagreement.
+        const verdictSame = (x, y) => !x.threw && !y.threw && x.valid === y.valid && x.valid === x.r.valid && y.valid === y.r.valid && x.after === y.after;
+        const errorsSame = (x, y, rich) => show(x.r) === show(y.r) && (!rich || show(x.rich) === show(y.rich));
+        const note = (counter, keys) => {
+          S[counter]++; S[keys][key] = (S[keys][key] || 0) + 1;
+          if (process.env.DIFFS_OUT) fs.appendFileSync(process.env.DIFFS_OUT, JSON.stringify({ kind: counter, backend, key, doc: text, runtime: a, module: b, v2: c }) + '\n');
+          if (report.length < 40) report.push({ kind: counter, backend, key, doc: text.slice(0, 300), runtime: a, module: b, v2: c });
+        };
+        // The known runtime bug, and nothing wider: assertFormat is false,
+        // the runtime reports a format error, and the plan answers exactly
+        // as the runtime does with its format errors taken out (the verdict,
+        // every other error in order, plain and rich, and the document).
+        if (backend === 'table' && opts.assertFormat === false && !b.threw && !a.valid && a.r.errors.some((e) => e[0] === 'format')) {
+          const rest = a.r.errors.filter((e) => e[0] !== 'format'); const richRest = a.rich.filter((e) => e[1] !== 'format');
+          if (b.valid === (rest.length === 0) && b.r.valid === b.valid && show(b.r.errors) === show(rest) && show(b.rich) === show(richRest) && a.after === b.after) { note('runtimeFormatOff', 'runtimeFormatOffKeys'); continue; }
+        }
+        const runtimesSplitVerdict = c !== null && !verdictSame(a, c);
+        const runtimesSplitErrors = c !== null && (runtimesSplitVerdict || !errorsSame(a, c, false));
+        if (runtimesSplitVerdict || runtimesSplitErrors) { S.runtimesDisagree++; S.disagreeKeys[key] = (S.disagreeKeys[key] || 0) + 1; }
+        if (!verdictSame(a, b)) { if (runtimesSplitVerdict && verdictSame(c, b)) note('splitVerdict', 'splitKeys'); else note('diffs', 'diffKeys'); }
+        else if (c !== null && !verdictSame(c, b) && !runtimesSplitVerdict) note('v2Diffs', 'v2DiffKeys');
+        else if (!errorsSame(a, b, true)) { if (runtimesSplitErrors) note('splitErrors', 'splitKeys'); else note('diffs', 'diffKeys'); }
+      }
     }
   }
 }
@@ -247,10 +276,12 @@ async function schemastore(root, stats, report, refs, every, offset) {
 }
 
 async function run({ schemastoreDir = null, every = 1, offset = 0, mutate = null, suiteOn = true } = {}) {
-  const { specialize } = await import(pathToFileURL(path.join(ROOT, 'lib/ir/index.mjs')).href);
+  const { specialize, tableModule } = await import(pathToFileURL(path.join(ROOT, 'lib/ir/index.mjs')).href);
   const { Validator: V2 } = await import(pathToFileURL(path.join(ROOT, 'index.v2.browser.mjs')).href);
-  const refs = { specialize, V2, mutate };
-  const stats = { schemas: 0, compiled: 0, withHoles: 0, declined: 0, declines: {}, registryTooLarge: 0, docs: 0, diffs: 0, v2Diffs: 0, splitVerdict: 0, splitErrors: 0, runtimesDisagree: 0, diffKeys: {}, v2DiffKeys: {}, splitKeys: {}, disagreeKeys: {}, runtimeRefuses: 0, runtimeThrows: 0 };
+  const refs = { specialize, tableModule, V2, mutate };
+  // Counted per writer; what belongs to the schema or the runtime, once.
+  const per = () => ({ compiled: 0, withHoles: 0, declined: 0, declines: {}, docs: 0, diffs: 0, v2Diffs: 0, splitVerdict: 0, splitErrors: 0, runtimesDisagree: 0, runtimeFormatOff: 0, runtimeFormatOffKeys: {}, diffKeys: {}, v2DiffKeys: {}, splitKeys: {}, disagreeKeys: {}, runtimeThrows: 0 });
+  const stats = { schemas: 0, registryTooLarge: 0, runtimeRefuses: 0, module: per(), table: per() };
   const report = [];
   tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ata-build-options-')));
   try {
@@ -270,6 +301,6 @@ if (require.main === module) {
   run({ schemastoreDir: arg('--schemastore'), every: Number(arg('--every')) || 1, offset: Number(arg('--offset')) || 0, suiteOn: !argv.includes('--no-suite') }).then(({ stats, report }) => {
     for (const r of report.slice(0, 15)) console.log(JSON.stringify(r).slice(0, 900));
     console.log(JSON.stringify(stats, null, 1));
-    process.exitCode = stats.diffs || stats.v2Diffs ? 1 : 0;
+    process.exitCode = stats.module.diffs || stats.module.v2Diffs || stats.table.diffs || stats.table.v2Diffs ? 1 : 0;
   }, (e) => { console.error(e); process.exitCode = 1; });
 }

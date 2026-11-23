@@ -49,6 +49,11 @@ export interface TableOptions {
   richErrors?: boolean;
   useDefaults?: boolean;
   assertFormat?: boolean;
+  /** `tableModule` with `holes: true`: a function here is its step's check, bound by the module's `setFormats(formats)`, before which every check throws. Null without `holes`, and from `tablePlan`. */
+  formats?: Record<string, unknown>;
+  holes?: boolean;
+  /** Null for a `$ref` that resolves to nothing. */
+  strictRefs?: boolean;
 }
 
 /** What `compileClosures` builds: the two methods a compiled module exports. */

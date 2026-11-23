@@ -376,6 +376,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // choice copied for the ir's removeAdditional pass, and the code generator's
 // choice in a file both read (lib/pattern-choice.js) (694152 bytes, 677.9 KB;
 // 686036 before).
-assert.ok(manifest.size < 678.5 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 679 KB: the table writer of ata-validator/ir takes formats as holes and
+// strictRefs, so a page whose validator has format functions can be a plan
+// (695090 bytes, 678.8 KB; 694152 before).
+assert.ok(manifest.size < 679 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
