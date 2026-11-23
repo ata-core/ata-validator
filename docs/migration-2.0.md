@@ -91,6 +91,12 @@ Validator.use(richErrors)
 `Validator.use()` registers a feature for every Validator of the bundle. Call
 it once, before the first validator is used.
 
+The Validator of the Node entries has no `use`: there `Validator.use` is
+`undefined`, and every feature is already in. A module that runs on both
+sides, in a server render and in the page, calls it as
+`Validator.use?.(richErrors)`. For the same reason a test run in Node does
+not see the refusals of this page. They show in the bundle.
+
 `validateJSON()` on text that is not JSON returns the `__parse__` error with
 the same five fields. The frame of the text that 1.x attached is not there.
 
@@ -143,11 +149,10 @@ entries still do.
 | any key 1.x did not know | ignored | refused: `ata2: option <name>` | Delete it. |
 
 None of the five is accepted and ignored. Two of them change the answer
-(`keywords`, `strictSchema: true`), and ignoring `engine: 'interpreter'`
-would hand a schema to the code generator on a page that registered
-`codegen`. For the other two the cost decided: each accepted name adds 5 to
-7 B gzip to every page that carries the Validator (measured on the plugin
-core, 14,592 B), and the entries were held to no growth.
+(`keywords`, `strictSchema: true`). For the others the cost decided: each
+accepted name adds 5 to 7 B gzip to every page that carries the Validator
+(measured on the plugin core, 14,592 B), and the entries were held to no
+growth.
 
 ## The build plugin
 
