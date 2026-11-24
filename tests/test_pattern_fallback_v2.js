@@ -88,18 +88,21 @@ async function entryChecks (kind) {
   // --- the option value ---
 
   check('unknown values are refused', () => {
-    for (const bad of ['Reject', 'off', '', 1, 0, true, false, null, {}, []]) {
+    for (const bad of ['Reject', 'off', 1, true, {}, []]) {
       assert.throws(() => new Validator({ type: 'string' }, { patternFallback: bad }), TypeError, JSON.stringify(bad))
     }
   })
-  check("'platform' and undefined change nothing", () => {
-    for (const opt of [{}, { patternFallback: 'platform' }, { patternFallback: undefined }]) {
+  check("'platform', undefined and a falsy value change nothing", () => {
+    // The option is asked for as the others a feature answers: where its
+    // value is not falsy. A falsy one is the option left out.
+    for (const opt of [{}, { patternFallback: 'platform' }, { patternFallback: undefined }, { patternFallback: null }, { patternFallback: false }, { patternFallback: '' }, { patternFallback: 0 }]) {
       const v = new Validator(S_PATTERN, opt)
       assert.strictEqual(v.validate({ a: 'aa' }).valid, true)
       assert.strictEqual(v.validate({ a: 'ab' }).valid, false)
       assert.strictEqual(v.isValidObject({ a: 'aa' }), true)
       assert.strictEqual(v._pf, undefined)
       assert.ok(!Object.hasOwn(v, 'addSchema') && !Object.hasOwn(v, 'core') && !Object.hasOwn(v, '_tierUp'))
+      if (kind === 'edge') assert.strictEqual(v._engine.constructor.name, 'Engine')
     }
   })
 
@@ -186,7 +189,9 @@ async function entryChecks (kind) {
     const plain = new Validator(linear, {})
     const strict = new Validator(linear, { patternFallback: 'reject' })
     assert.strictEqual(strict._pf.matchers.size, 0)
-    assert.ok(!Object.hasOwn(strict, 'core') && !Object.hasOwn(strict, '_tierUp') && !Object.hasOwn(strict, '_count'))
+    assert.ok(!Object.hasOwn(strict, '_tierUp') && !Object.hasOwn(strict, '_count'))
+    // On the edge entry both answer on the verdict core.
+    if (kind === 'edge') assert.strictEqual(strict._build().constructor.name, 'Engine')
     const docs = [
       { a: 'ab', b: '123-4567', c: 'xabcde', d: 'aaa', e: 'a.b@c-d.io', 'x-y': 'z' },
       { a: 'A' }, { b: '1234567' }, { c: 'abe' }, { c: 'ae' }, { d: 'aab' }, { e: 'a@b' }, { 'x-y': 1 }, { B: 1 },
@@ -379,12 +384,13 @@ async function entryChecks (kind) {
     assert.strictEqual(a.validate('aa').valid, false)
     assert.strictEqual(a.isValidObject('aa'), false)
     const b = new Validator({ $ref: 'https://example.com/p.json' }, { patternFallback: magic(log) })
-    assert.ok(!Object.hasOwn(b, 'core'))
+    assert.ok(!Object.hasOwn(b, '_tierUp'))
     b.addSchema(ext)
-    assert.strictEqual(b.core, null, 'a validator that comes to hold a matcher through addSchema() leaves the verdict core')
+    assert.ok(Object.hasOwn(b, '_tierUp'), 'a validator that comes to hold a matcher through addSchema() is routed again')
     assert.strictEqual(b.isValidObject('magic'), true)
     assert.strictEqual(b.isValidObject('aa'), false)
     assert.strictEqual(b.validate('aa').valid, false)
+    assert.notStrictEqual(b._engine.constructor.name, 'Engine', 'and leaves the verdict core')
     assert.strictEqual(log.length, 2)
   })
   check('the matcher contract: an object with test, a boolean answer, errors propagate', () => {
@@ -413,7 +419,6 @@ async function entryChecks (kind) {
   check('a validator that holds a matcher answers on the small engine alone', () => {
     const v = new Validator(S_PATTERN, { patternFallback: magic() })
     assert.strictEqual(v._pf.matchers.size, 1)
-    assert.ok(Object.hasOwn(v, 'core') && v.core === null)
     v.isValidObject({ a: 'magic' })
     assert.strictEqual(typeof v._engine.isValid, 'function')
     // On the edge entry the engine would otherwise be the verdict core's.
@@ -423,7 +428,7 @@ async function entryChecks (kind) {
   check('a function that matches nothing outside the engine leaves the engines in place', () => {
     const log = []
     const v = new Validator({ type: 'string', pattern: '^[a-z]+$' }, { patternFallback: magic(log) })
-    assert.ok(!Object.hasOwn(v, 'core') && !Object.hasOwn(v, '_tierUp') && !Object.hasOwn(v, '_count'))
+    assert.ok(!Object.hasOwn(v, '_tierUp') && !Object.hasOwn(v, '_count'))
     assert.strictEqual(v.isValidObject('ab'), true)
     assert.strictEqual(v.isValidObject('A'), false)
     if (kind === 'edge') assert.strictEqual(v._engine.constructor.name, 'Engine')
@@ -529,7 +534,9 @@ async function entryChecks (kind) {
   check('featuresFor() names the feature for the option, and not without it', () => {
     assert.ok(F.featuresFor(S_PATTERN, { patternFallback: 'reject' }).includes('patternFallback'))
     assert.ok(F.featuresFor({ type: 'string' }, { patternFallback: magic() }).includes('patternFallback'))
-    for (const o of [undefined, {}, { patternFallback: 'platform' }, { patternFallback: undefined }]) assert.ok(!F.featuresFor(S_PATTERN, o).includes('patternFallback'), JSON.stringify(o))
+    // Asked for where the value is not falsy, so 'platform' written out names it too.
+    assert.ok(F.featuresFor(S_PATTERN, { patternFallback: 'platform' }).includes('patternFallback'))
+    for (const o of [undefined, {}, { patternFallback: undefined }, { patternFallback: null }, { patternFallback: false }]) assert.ok(!F.featuresFor(S_PATTERN, o).includes('patternFallback'), JSON.stringify(o))
   })
 
   done(kind)
@@ -545,8 +552,8 @@ async function refusalChecks (kind) {
     const G = (await load('lib/features/groups.js')).default
     Validator.use(...G.all)
   }
-  check("'reject' and a function are refused in the constructor, naming the feature", () => {
-    for (const mode of ['reject', magic(), 'nope', '', null, 0, false, 1, {}]) {
+  check("'reject', a function and any value that is not falsy are refused in the constructor, naming the feature", () => {
+    for (const mode of ['reject', magic(), 'platform', 'nope', 1, true, {}]) {
       for (const s of [S_PATTERN, { type: 'string' }, { type: 'string', pattern: '^[a-z]+$' }, true]) {
         assert.throws(() => new Validator(s, { patternFallback: mode }), (e) => e instanceof Error && e.message === NAMED, String(mode))
       }
@@ -559,8 +566,8 @@ async function refusalChecks (kind) {
       assert.throws(() => new Validator(S_PATTERN, o), (e) => e.message === NAMED)
     }
   })
-  check("'platform' and undefined build and answer on the platform RegExp", () => {
-    for (const opt of [{ patternFallback: 'platform' }, { patternFallback: undefined }, {}]) {
+  check('the option left out, undefined or falsy builds and answers on the platform RegExp', () => {
+    for (const opt of [{ patternFallback: undefined }, { patternFallback: null }, { patternFallback: false }, { patternFallback: '' }, { patternFallback: 0 }, {}]) {
       const v = new Validator(S_PATTERN, opt)
       assert.strictEqual(v.validate({ a: 'aa' }).valid, true)
       assert.strictEqual(v.isValidObject({ a: 'magic' }), false)
@@ -573,6 +580,9 @@ async function refusalChecks (kind) {
     assert.strictEqual(v.validate({ a: 'magic' }).valid, true)
     assert.strictEqual(v.isValidObject({ a: 'aa' }), false)
     assert.throws(() => new Validator(S_PATTERN, { patternFallback: 'reject' }), (e) => e.message.includes(OUTSIDE))
+    const p = new Validator(S_PATTERN, { patternFallback: 'platform' })
+    assert.strictEqual(p.validate({ a: 'aa' }).valid, true)
+    assert.strictEqual(p.isValidObject({ a: 'magic' }), false)
   })
   done(kind + ', not registered')
   console.log(`ok (${kind}, feature not registered): ${passed} checks`)
@@ -679,6 +689,7 @@ async function irChecks () {
         const inputs = Object.keys(r.metafile.inputs)
         assert.strictEqual(text.includes(OUTSIDE), add, entry + (add ? ' with' : ' without') + ' the feature')
         assert.strictEqual(inputs.some((f) => f.endsWith('lib/pattern-fallback.js')), add, entry + ': lib/pattern-fallback.js')
+        assert.strictEqual(inputs.some((f) => f.endsWith('lib/defaults-match.js')), add, entry + ': lib/defaults-match.js')
         if (entry !== ENTRY.edge) assert.strictEqual(inputs.some((f) => f.endsWith('lib/regex-linear.js')), add, entry + ': lib/regex-linear.js')
         // The refusal that names the feature is in every bundle.
         assert.ok(text.includes('patternFallback'), entry + ' names the option')
