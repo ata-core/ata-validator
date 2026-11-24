@@ -380,7 +380,7 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // writers settle before they write (lib/pattern-fallback.js, the scan the
 // 2.0 Validator's patternFallback feature shares, lib/ir/pattern-fallback.mjs
 // and the option in lib/ir/index.d.ts), and the feature's declarations
-// (697253 bytes, 680.9 KB; 694152 before).
+// (697199 bytes, 680.9 KB; 694152 before).
 assert.ok(manifest.size < 681.5 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
