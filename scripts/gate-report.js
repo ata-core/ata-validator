@@ -67,6 +67,7 @@ const CLASSES = [
   { id: 'native-repeated-names', title: 'The native walkers read JSON text that names a member twice, or holds a surrogate escape outside a pair, differently from JSON.parse.', effect: 'both', fixes: ['56c03df', 'dbc0434', '55e89a0', 'b11c120'], tests: ['tests/test_native_duplicate_names.js'] },
   { id: 'cache-key-unfaithful', title: 'A schema holding a value JSON cannot carry (NaN, Infinity, a hole) shared compiled code with the schema its JSON text spells.', effect: 'accepts', fixes: ['65332c5', 'a587dbf'], tests: ['tests/test_compile_cache_unfaithful.js'] },
   { id: 'from-standalone-defaults', title: '`Validator.fromStandalone()` built its defaults pass from the root schema alone and ran it only in `validate()`.', effect: 'both', fixes: ['96e6647'], tests: ['tests/test_from_standalone_defaults.js'] },
+  { id: 'keyword-named-names', title: 'A name that is also a keyword, under `properties` or another map of names, was read as the keyword: generated code dropped the schema of a property named `$id`, which the draft-07 and draft-06 meta-schemas constrain; a name spelled `$dynamicRef` threw; the native routing missed a reference behind a property named `const`.', effect: 'both', fixes: ['2791680'], tests: ['tests/test_keyword_named_names.js'] },
 ];
 
 // ---------------------------------------------------------------------------
