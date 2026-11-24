@@ -6,7 +6,7 @@
 // (a backreference, a lookaround, \B, \k, a repeat past the instruction
 // budget, a property escape the platform RegExp is not shown to run in linear
 // time) runs on the platform RegExp by default. With 'reject' the validator
-// refuses the schema where it is constructed; with a function, the function's
+// refuses the schema at its first use; with a function, the function's
 // matcher answers for such a pattern on every path that runs one, and nothing
 // hands it to the RegExp. Each path is held to that here, since a path that
 // ignored the option would accept quietly and nothing else would notice.
@@ -16,7 +16,8 @@
 // own: the plugin's core (index.v2.core.mjs) with its features registered,
 // the browser entry and the edge entry, whose verdict core keeps compiled
 // patterns in a table the whole process shares. A fourth process per entry
-// sets the option without registering the feature. ata-validator/ir is
+// sets the option without registering the feature, where the constructor
+// refuses it as any unknown option. ata-validator/ir is
 // checked in this one. The children run with this process's flags, so under
 // tests/test_no_eval.js every entry is checked with code generation blocked.
 
@@ -57,7 +58,7 @@ const BUDGET = '^((a|b){1000}){100}$'
 const PROPERTY = '^(\\p{L}+)+$'
 const FALLBACKS = [BACKREF, LOOKAHEAD, NEG_LOOKAHEAD, NON_BOUNDARY, NAMED_BACKREF, BUDGET, PROPERTY]
 const OUTSIDE = 'outside the linear-time engine'
-const NAMED = 'ata2: patternFallback, Validator.use(patternFallback)'
+const UNKNOWN = 'ata2: option patternFallback'
 
 // It accepts exactly the string "magic", so an answer that follows the
 // RegExp instead is visible.
@@ -87,21 +88,20 @@ async function entryChecks (kind) {
 
   // --- the option value ---
 
-  check('unknown values are refused', () => {
-    for (const bad of ['Reject', 'off', 1, true, {}, []]) {
-      assert.throws(() => new Validator({ type: 'string' }, { patternFallback: bad }), TypeError, JSON.stringify(bad))
+  check('unknown values are refused at the first use', () => {
+    for (const bad of ['Reject', 'off', '', 1, 0, true, false, null, {}, []]) {
+      const v = new Validator({ type: 'string' }, { patternFallback: bad })
+      for (const call of [() => v.validate('x'), () => v.isValidObject('x'), () => v.addSchema({ $id: 'https://example.com/x' })]) assert.throws(call, TypeError, JSON.stringify(bad))
     }
   })
-  check("'platform', undefined and a falsy value change nothing", () => {
-    // The option is asked for as the others a feature answers: where its
-    // value is not falsy. A falsy one is the option left out.
-    for (const opt of [{}, { patternFallback: 'platform' }, { patternFallback: undefined }, { patternFallback: null }, { patternFallback: false }, { patternFallback: '' }, { patternFallback: 0 }]) {
+  check("'platform' and undefined change nothing", () => {
+    for (const opt of [{}, { patternFallback: 'platform' }, { patternFallback: undefined }]) {
       const v = new Validator(S_PATTERN, opt)
       assert.strictEqual(v.validate({ a: 'aa' }).valid, true)
       assert.strictEqual(v.validate({ a: 'ab' }).valid, false)
       assert.strictEqual(v.isValidObject({ a: 'aa' }), true)
       assert.strictEqual(v._pf, undefined)
-      assert.ok(!Object.hasOwn(v, 'addSchema') && !Object.hasOwn(v, 'core') && !Object.hasOwn(v, '_tierUp'))
+      assert.ok(!Object.hasOwn(v, 'core') && !Object.hasOwn(v, '_count'))
       if (kind === 'edge') assert.strictEqual(v._engine.constructor.name, 'Engine')
     }
   })
@@ -109,15 +109,22 @@ async function entryChecks (kind) {
   // --- 'reject' ---
 
   function rejects (schema, source, where, opts) {
+    // The constructor reads nothing of the schema; the first use refuses it,
+    // each time it is tried.
+    const v = new Validator(schema, { ...opts, patternFallback: 'reject' })
     let err = null
-    try { new Validator(schema, { ...opts, patternFallback: 'reject' }) } catch (e) { err = e }
+    for (const call of [() => v.isValidObject(null), () => v.validate(null), () => v.validateJSON('null')]) {
+      err = null
+      try { call() } catch (e) { err = e }
+      assert.ok(err, 'expected a refusal for ' + JSON.stringify(source))
+    }
     assert.ok(err, 'expected a refusal for ' + JSON.stringify(source))
     assert.ok(err.message.includes(JSON.stringify(source)), err.message)
     assert.ok(err.message.includes(OUTSIDE), err.message)
     if (where) assert.ok(err.message.includes(' at ' + where + ' '), err.message + ' should name ' + where)
   }
 
-  check("'reject' refuses each kind of pattern outside the engine, in the constructor", () => {
+  check("'reject' refuses each kind of pattern outside the engine, at the first use", () => {
     for (const p of FALLBACKS) rejects({ type: 'string', pattern: p }, p, '#/pattern')
   })
   check("'reject' refuses pattern, patternProperties and propertyNames, naming the location", () => {
@@ -164,7 +171,7 @@ async function entryChecks (kind) {
     const hidden = {}
     Object.defineProperty(hidden, 'patternFallback', { value: 'reject', enumerable: false })
     for (const o of [Object.create({ patternFallback: 'reject' }), hidden]) {
-      assert.throws(() => new Validator(S_PATTERN, o), (e) => e.message.includes(OUTSIDE))
+      assert.throws(() => new Validator(S_PATTERN, o).validate({}), (e) => e.message.includes(OUTSIDE))
     }
     const v = new Validator(S_PATTERN, Object.create({ patternFallback: magic() }))
     assert.strictEqual(v.validate({ a: 'magic' }).valid, true)
@@ -188,10 +195,11 @@ async function entryChecks (kind) {
     }
     const plain = new Validator(linear, {})
     const strict = new Validator(linear, { patternFallback: 'reject' })
-    assert.strictEqual(strict._pf.matchers.size, 0)
-    assert.ok(!Object.hasOwn(strict, '_tierUp') && !Object.hasOwn(strict, '_count'))
     // On the edge entry both answer on the verdict core.
     if (kind === 'edge') assert.strictEqual(strict._build().constructor.name, 'Engine')
+    else strict._build()
+    assert.strictEqual(strict._pf.matchers.size, 0)
+    assert.ok(!Object.hasOwn(strict, '_count'))
     const docs = [
       { a: 'ab', b: '123-4567', c: 'xabcde', d: 'aaa', e: 'a.b@c-d.io', 'x-y': 'z' },
       { a: 'A' }, { b: '1234567' }, { c: 'abe' }, { c: 'ae' }, { d: 'aab' }, { e: 'a@b' }, { 'x-y': 1 }, { B: 1 },
@@ -210,27 +218,30 @@ async function entryChecks (kind) {
   })
   check('a pattern the scan did not see is refused where the small engine compiles it, in either mode', () => {
     // The schema is read-only once a validator is built from it; a change
-    // made after the scan stands in for anything a scan could miss.
+    // made after the scan stands in for anything a scan could miss. The
+    // scan is made when the validator is first given a document.
     const log = []
     for (const mode of ['reject', magic(log)]) {
       for (const call of [(v) => v.validate({ a: 'aa' }), (v) => v.validateJSON('{"a":"aa"}')]) {
         const s = { type: 'object', properties: { a: { type: 'string' } } }
         const v = new Validator(s, { patternFallback: mode })
+        v.addSchema({ $id: 'https://example.com/none.json' })
         s.properties.a.pattern = BACKREF
         for (let i = 0; i < 2; i++) assert.throws(() => call(v), (e) => e.message.includes(JSON.stringify(BACKREF)) && e.message.includes('was not in the schema when it was scanned'))
       }
     }
     assert.strictEqual(log.length, 0)
-    // The passes ask the same hook.
-    const s = { type: 'object', patternProperties: { '^a': {} }, additionalProperties: false }
-    const v = new Validator(s, { removeAdditional: true, patternFallback: 'reject' })
+    // The passes of a validator that holds a matcher ask the same hook.
+    const s = { type: 'object', properties: { p: { pattern: BACKREF } }, patternProperties: { '^a': {} }, additionalProperties: false }
+    const v = new Validator(s, { removeAdditional: true, patternFallback: magic() })
+    v.addSchema({ $id: 'https://example.com/none.json' })
     s.patternProperties = { [LOOKAHEAD]: {} }
     assert.throws(() => v.validate({ xy: 1 }), (e) => e.message.includes('was not in the schema when it was scanned'))
   })
 
   // --- a function ---
 
-  check('the function is called once per pattern, in the constructor, with source and flags', () => {
+  check('the function is called once per pattern, at the first use, with source and flags', () => {
     const log = []
     const schema = {
       type: 'object',
@@ -239,6 +250,8 @@ async function entryChecks (kind) {
       propertyNames: { pattern: NEG_LOOKAHEAD },
     }
     const v = new Validator(schema, { patternFallback: magic(log) })
+    assert.strictEqual(log.length, 0)
+    v.isValidObject({})
     // No linear pattern reaches it; a pattern twice is asked about once; the
     // flags are those the platform RegExp would have used (`[\w-.]` is valid
     // only without the u flag).
@@ -270,6 +283,7 @@ async function entryChecks (kind) {
       }
       assert.strictEqual(log.length, 0, p)
       assert.strictEqual(fn._pf.matchers.size, 0, p)
+      assert.strictEqual(strict._pf.matchers.size, 0, p)
     }
   })
   check('a linear pattern is not handed to the function', () => {
@@ -370,6 +384,16 @@ async function entryChecks (kind) {
     const plain = { magic: {}, xy: {} }
     new Validator(schema).validate(plain)
     assert.deepStrictEqual(plain, { magic: {}, xy: { d: 7 } })
+    // useDefaults: false fills nothing, with a matcher as without.
+    const off = { magic: {}, xy: {} }
+    assert.strictEqual(new Validator(schema, { useDefaults: false, patternFallback: magic() }).validate(off).valid, true)
+    assert.deepStrictEqual(off, { magic: {}, xy: {} })
+    // The passes run in the Validator's order with a matcher held: removal,
+    // coercion, then defaults.
+    const all = { type: 'object', properties: { n: { type: 'number' }, d: { type: 'string', default: 'x' } }, patternProperties: { [LOOKAHEAD]: { type: 'object', properties: { d: { default: 7 } } } }, additionalProperties: false }
+    const three = { n: '5', magic: {}, xy: {} }
+    assert.strictEqual(new Validator(all, { removeAdditional: true, coerceTypes: true, patternFallback: magic() }).validate(three).valid, true)
+    assert.deepStrictEqual(three, { n: 5, magic: { d: 7 }, d: 'x' })
   })
   check('coerceTypes with a pattern the function answers', () => {
     const v = new Validator({ type: 'object', properties: { a: { type: 'string', pattern: BACKREF } } }, { coerceTypes: true, patternFallback: magic() })
@@ -384,9 +408,8 @@ async function entryChecks (kind) {
     assert.strictEqual(a.validate('aa').valid, false)
     assert.strictEqual(a.isValidObject('aa'), false)
     const b = new Validator({ $ref: 'https://example.com/p.json' }, { patternFallback: magic(log) })
-    assert.ok(!Object.hasOwn(b, '_tierUp'))
     b.addSchema(ext)
-    assert.ok(Object.hasOwn(b, '_tierUp'), 'a validator that comes to hold a matcher through addSchema() is routed again')
+    assert.strictEqual(b._pf.matchers.size, 1, 'a validator comes to hold a matcher through addSchema()')
     assert.strictEqual(b.isValidObject('magic'), true)
     assert.strictEqual(b.isValidObject('aa'), false)
     assert.strictEqual(b.validate('aa').valid, false)
@@ -395,14 +418,14 @@ async function entryChecks (kind) {
   })
   check('the matcher contract: an object with test, a boolean answer, errors propagate', () => {
     for (const bad of [undefined, null, 1, 'x', {}, { test: 1 }]) {
-      assert.throws(() => new Validator(S_PATTERN, { patternFallback: () => bad }), TypeError, String(bad))
+      assert.throws(() => new Validator(S_PATTERN, { patternFallback: () => bad }).validate({}), TypeError, String(bad))
     }
     // A RegExp is an object with a test function, so it is accepted as one.
     const re = new Validator(S_PATTERN, { patternFallback: (s, f) => new RegExp(s, f) })
     assert.strictEqual(re.validate({ a: 'aa' }).valid, true)
     assert.strictEqual(re.validate({ a: 'ab' }).valid, false)
     const boom = new Error('boom')
-    assert.throws(() => new Validator(S_PATTERN, { patternFallback: () => { throw boom } }), (e) => e === boom)
+    assert.throws(() => new Validator(S_PATTERN, { patternFallback: () => { throw boom } }).validate({}), (e) => e === boom)
     const thrower = new Validator(S_PATTERN, { patternFallback: () => ({ test () { throw boom } }) })
     assert.throws(() => thrower.validate({ a: 'x' }), (e) => e === boom)
     assert.throws(() => thrower.isValidObject({ a: 'x' }), (e) => e === boom)
@@ -418,8 +441,9 @@ async function entryChecks (kind) {
 
   check('a validator that holds a matcher answers on the small engine alone', () => {
     const v = new Validator(S_PATTERN, { patternFallback: magic() })
-    assert.strictEqual(v._pf.matchers.size, 1)
     v.isValidObject({ a: 'magic' })
+    assert.strictEqual(v._pf.matchers.size, 1)
+    assert.ok(Object.hasOwn(v, '_count'))
     assert.strictEqual(typeof v._engine.isValid, 'function')
     // On the edge entry the engine would otherwise be the verdict core's.
     if (kind === 'edge') assert.strictEqual(new Validator(S_PATTERN)._build().constructor.name, 'Engine')
@@ -428,21 +452,27 @@ async function entryChecks (kind) {
   check('a function that matches nothing outside the engine leaves the engines in place', () => {
     const log = []
     const v = new Validator({ type: 'string', pattern: '^[a-z]+$' }, { patternFallback: magic(log) })
-    assert.ok(!Object.hasOwn(v, '_tierUp') && !Object.hasOwn(v, '_count'))
     assert.strictEqual(v.isValidObject('ab'), true)
+    assert.ok(!Object.hasOwn(v, '_count'))
     assert.strictEqual(v.isValidObject('A'), false)
     if (kind === 'edge') assert.strictEqual(v._engine.constructor.name, 'Engine')
     assert.strictEqual(log.length, 0)
   })
   await checkAsync('a validator that holds a matcher never moves to generated code', async () => {
+    // Asked before its first use, and after it.
+    const fresh = new Validator(S_PATTERN, { patternFallback: magic() })
+    assert.strictEqual(await fresh._tierUp(), false)
+    assert.strictEqual(fresh._full, null)
+    assert.strictEqual(fresh.validate({ a: 'aa' }).valid, false)
     const v = new Validator(S_PATTERN, { patternFallback: magic() })
+    v.isValidObject({})
     assert.strictEqual(await v._tierUp(), false)
     assert.strictEqual(v._full, null)
     // A hot validator: far past the count that would tier it up.
     for (let i = 0; i < 2500; i++) { v.isValidObject({ a: 'aa' }); v.validate({ a: 'magic' }) }
     await new Promise((resolve) => setTimeout(resolve, 20))
     assert.strictEqual(v._full, null)
-    assert.strictEqual(v._calls, 0)
+    assert.ok(v._calls <= 1, 'calls are not counted once the validator is built')
     assert.strictEqual(v.validate({ a: 'magic' }).valid, true)
     assert.strictEqual(v.isValidObject({ a: 'aa' }), false)
     // One that holds none tiers up as any other, and answers the same after.
@@ -473,7 +503,7 @@ async function entryChecks (kind) {
       assert.deepStrictEqual(each(m, (v, d) => v.isValidObject(d)), expectMagic, 'round ' + round)
       assert.deepStrictEqual(each(m, (v, d) => v.validate(d).valid), expectMagic, 'round ' + round)
       assert.deepStrictEqual(each(m, (v, d) => v.isValidJSON(JSON.stringify(d))), expectMagic, 'round ' + round)
-      assert.throws(() => new Validator(schema, { patternFallback: 'reject' }))
+      assert.throws(() => new Validator(schema, { patternFallback: 'reject' }).validate({}), (e) => e.message.includes(OUTSIDE))
       // The validator built before, and one built now, without the option.
       assert.deepStrictEqual(each(plain, (v, d) => v.isValidObject(d)), expectPlatform, 'round ' + round)
       assert.deepStrictEqual(each(plain, (v, d) => v.validate(d).valid), expectPlatform, 'round ' + round)
@@ -519,10 +549,12 @@ async function entryChecks (kind) {
     assert.strictEqual(new Validator(s, { patternFallback: only('x') }).validate('x').valid, true)
     assert.strictEqual(new Validator(s, {}).validate('x').valid, false)
   })
-  check('the function a validator was built with is the one it keeps', () => {
+  check('the function a validator first used is the one it keeps', () => {
+    // The option is read at the first use, as every option of a 2.0 validator.
     const schema = { type: 'string', pattern: BACKREF }
     const opts = { patternFallback: () => ({ test: (s) => s === 'first' }) }
     const v = new Validator(schema, opts)
+    assert.strictEqual(v.isValidObject('first'), true)
     opts.patternFallback = () => ({ test: () => true })
     assert.strictEqual(v.validate('first').valid, true)
     assert.strictEqual(v.validate('other').valid, false)
@@ -534,9 +566,11 @@ async function entryChecks (kind) {
   check('featuresFor() names the feature for the option, and not without it', () => {
     assert.ok(F.featuresFor(S_PATTERN, { patternFallback: 'reject' }).includes('patternFallback'))
     assert.ok(F.featuresFor({ type: 'string' }, { patternFallback: magic() }).includes('patternFallback'))
-    // Asked for where the value is not falsy, so 'platform' written out names it too.
-    assert.ok(F.featuresFor(S_PATTERN, { patternFallback: 'platform' }).includes('patternFallback'))
-    for (const o of [undefined, {}, { patternFallback: undefined }, { patternFallback: null }, { patternFallback: false }]) assert.ok(!F.featuresFor(S_PATTERN, o).includes('patternFallback'), JSON.stringify(o))
+    assert.ok(F.featuresFor(S_PATTERN, { patternFallback: null }).includes('patternFallback'))
+    for (const o of [undefined, {}, { patternFallback: 'platform' }, { patternFallback: undefined }]) assert.ok(!F.featuresFor(S_PATTERN, o).includes('patternFallback'), JSON.stringify(o))
+    // The other features the schema needs are named as without the option.
+    assert.deepStrictEqual(F.featuresFor(S_PATTERN, { patternFallback: 'reject' }).filter((n) => n !== 'patternFallback'), F.featuresFor(S_PATTERN))
+    assert.throws(() => F.featuresFor(S_PATTERN, { patternFallback: 'reject', nope: 1 }), { message: 'ata2: option nope' })
   })
 
   done(kind)
@@ -552,22 +586,15 @@ async function refusalChecks (kind) {
     const G = (await load('lib/features/groups.js')).default
     Validator.use(...G.all)
   }
-  check("'reject', a function and any value that is not falsy are refused in the constructor, naming the feature", () => {
-    for (const mode of ['reject', magic(), 'platform', 'nope', 1, true, {}]) {
+  check('the constructor refuses the option as any unknown one, whatever its value', () => {
+    for (const mode of ['reject', magic(), 'platform', 'nope', '', null, 0, false, 1, true, {}]) {
       for (const s of [S_PATTERN, { type: 'string' }, { type: 'string', pattern: '^[a-z]+$' }, true]) {
-        assert.throws(() => new Validator(s, { patternFallback: mode }), (e) => e instanceof Error && e.message === NAMED, String(mode))
+        assert.throws(() => new Validator(s, { patternFallback: mode }), (e) => e instanceof Error && e.message === UNKNOWN, String(mode))
       }
     }
   })
-  check('an option that is inherited or not enumerable is refused as well', () => {
-    const hidden = {}
-    Object.defineProperty(hidden, 'patternFallback', { value: 'reject', enumerable: false })
-    for (const o of [Object.create({ patternFallback: 'reject' }), Object.create({ patternFallback: magic() }), hidden]) {
-      assert.throws(() => new Validator(S_PATTERN, o), (e) => e.message === NAMED)
-    }
-  })
-  check('the option left out, undefined or falsy builds and answers on the platform RegExp', () => {
-    for (const opt of [{ patternFallback: undefined }, { patternFallback: null }, { patternFallback: false }, { patternFallback: '' }, { patternFallback: 0 }, {}]) {
+  check('the option left out or undefined builds and answers on the platform RegExp', () => {
+    for (const opt of [{ patternFallback: undefined }, {}]) {
       const v = new Validator(S_PATTERN, opt)
       assert.strictEqual(v.validate({ a: 'aa' }).valid, true)
       assert.strictEqual(v.isValidObject({ a: 'magic' }), false)
@@ -579,10 +606,25 @@ async function refusalChecks (kind) {
     const v = new Validator(S_PATTERN, { patternFallback: magic() })
     assert.strictEqual(v.validate({ a: 'magic' }).valid, true)
     assert.strictEqual(v.isValidObject({ a: 'aa' }), false)
-    assert.throws(() => new Validator(S_PATTERN, { patternFallback: 'reject' }), (e) => e.message.includes(OUTSIDE))
+    assert.throws(() => new Validator(S_PATTERN, { patternFallback: 'reject' }).validate({}), (e) => e.message.includes(OUTSIDE))
+    // Registered again, it is installed once.
+    const built = Validator.prototype._build
+    Validator.use(patternFallback)
+    assert.strictEqual(Validator.prototype._build, built)
+    const log = []
+    new Validator(S_PATTERN, { patternFallback: magic(log) }).validate({})
+    assert.strictEqual(log.length, 1)
     const p = new Validator(S_PATTERN, { patternFallback: 'platform' })
     assert.strictEqual(p.validate({ a: 'aa' }).valid, true)
     assert.strictEqual(p.isValidObject({ a: 'magic' }), false)
+  })
+  check('removeAdditional beside a matcher is refused by name without its feature', () => {
+    const v = new Validator(S_PATTERN_PROPS, { removeAdditional: true, patternFallback: magic() })
+    assert.throws(() => v.validate({}), { message: 'ata2: removeAdditional, Validator.use(removeAdditional)' })
+    // Not asked for, nothing is refused and nothing removed.
+    const doc = { xy: 1, magic: 2 }
+    assert.strictEqual(new Validator(S_PATTERN_PROPS, { patternFallback: magic() }).validate(doc).valid, true)
+    assert.deepStrictEqual(doc, { xy: 1, magic: 2 })
   })
   done(kind + ', not registered')
   console.log(`ok (${kind}, feature not registered): ${passed} checks`)
@@ -691,8 +733,9 @@ async function irChecks () {
         assert.strictEqual(inputs.some((f) => f.endsWith('lib/pattern-fallback.js')), add, entry + ': lib/pattern-fallback.js')
         assert.strictEqual(inputs.some((f) => f.endsWith('lib/defaults-match.js')), add, entry + ': lib/defaults-match.js')
         if (entry !== ENTRY.edge) assert.strictEqual(inputs.some((f) => f.endsWith('lib/regex-linear.js')), add, entry + ': lib/regex-linear.js')
-        // The refusal that names the feature is in every bundle.
-        assert.ok(text.includes('patternFallback'), entry + ' names the option')
+        // Without the feature a bundle holds the name once, as the slot
+        // Validator.use() registers it in.
+        if (!add) assert.strictEqual(text.split('patternFallback').length - 1, 1, entry + ' and the name of the option')
       }
     }
   })

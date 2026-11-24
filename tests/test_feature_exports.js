@@ -81,6 +81,15 @@ const CASES = {
       assert.strictEqual(v['~standard'], v['~standard'], 'standardSchema: one object per validator')
       continue
     }
+    if (name === 'patternFallback') {
+      // An option the Validator does not know until the feature is
+      // registered: refused as any unknown option, and named by featuresFor().
+      assert.ok(index.featuresFor(schema, opts).includes(name), name + ': named by featuresFor')
+      assert.throws(() => new V(schema, opts), { message: 'ata2: option patternFallback' }, name + ': the option is unknown without it')
+      V.use(...(await Promise.all(index.featuresFor(schema).map(async (n) => (await import('ata-validator/features/' + n))[n]))), m[name])
+      assert.strictEqual(new V(schema, opts).validate(doc).valid, true, name + ': answered once registered')
+      continue
+    }
     if (name === 'codegen') {
       V.use(m.codegen)
       assert.strictEqual(await new V({ type: 'string' })._tierUp(), true, 'codegen: registered, a validator tiers up')

@@ -19,7 +19,6 @@ const ALL = {
   draft7: d7.draft7, metaschemas: ms.metaschemas,
   defaults: { buildDefaultsApplier: NONE }, coerceTypes: { build: NONE }, removeAdditional: { build: NONE },
   errorMessage: {}, verbose: {}, richErrors: {}, codegen: {}, formats: {}, uri: {}, uniqueItems: {}, branchCollapse: {}, patterns: {},
-  patternFallback: { attach: NONE },
 };
 
 // The features a Validator built from `schema` with `options`, and given
@@ -33,6 +32,16 @@ const ALL = {
 // code) registers standardSchema itself.
 export function featuresFor (schema, options, schemas) {
   const got = new Set();
+  // patternFallback is an option the Validator does not know until its
+  // feature is registered (lib/features/patternFallback.js), so it is named
+  // here and left out of what the Validator is asked: any value but
+  // 'platform' needs the feature. What the feature would refuse the schema
+  // for ('reject' and a pattern outside the linear engine) is not asked.
+  if (options && options.patternFallback !== undefined) {
+    if (options.patternFallback !== 'platform') got.add('patternFallback');
+    options = { ...options };
+    delete options.patternFallback;
+  }
   small._probe({ all: ALL, got });
   try {
     const v = new small.Validator(schema, options);
