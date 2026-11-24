@@ -338,6 +338,7 @@ const FILES = [
   "tests/test_uneval_root_ref.js",
   "tests/test_aot_error_shape.js",
   "tests/test_defaults_own_keys.js",
+  "tests/test_defaults_undefined.js",
   "tests/test_plan_compiler.js",
   "tests/test_plan_required_tiers.js",
   "tests/test_nullable.js",
