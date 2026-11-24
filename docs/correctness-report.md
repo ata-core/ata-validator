@@ -4,12 +4,12 @@ This file is written by `node scripts/gate-report.js`. Do not edit it by hand: e
 
 ## Summary
 
-- Tree: ata-validator 1.65.0 at commit `636be3c`. Node v25.2.1 on darwin-arm64.
+- Tree: ata-validator 1.66.0 at commit `cbadeeb`. Node v25.2.1 on darwin-arm64.
 - Gate: 17 paths, each held to the Validator on the same documents. Official suite: 1767 schemas. SchemaStore: 492 schemas. Documents that differ or threw: 0.
 - Official JSON Schema Test Suite at `245a45a`: draft2020-12 1300 of 1300, draft2019-09 1259 of 1259, draft7 927 of 927, draft6 839 of 839, draft4 616 of 616, v1 1147 of 1147.
 - With `eval` and `new Function` blocked: draft2020-12 1300 of 1300, draft2019-09 1259 of 1259, draft7 927 of 927, draft6 839 of 839, draft4 616 of 616, v1 1147 of 1147.
-- Native engine: loaded from local build, version 1.65.0.
-- Sweep classes: 18. Closed in this tree, with their tests passing: 18. Open in this tree: 0.
+- Native engine: loaded from local build, version 1.66.0.
+- Sweep classes: 19. Closed in this tree, with their tests passing: 19. Open in this tree: 0.
 
 ## What the gate compares
 
@@ -152,6 +152,7 @@ The classes found by the sweep of 1.x for answers that differ between paths, one
 | The native walkers read JSON text that names a member twice, or holds a surrogate escape outside a pair, differently from JSON.parse. | accepted documents it should reject and rejected documents it should accept | `56c03df`, `dbc0434`, `55e89a0`, `b11c120` | yes | `tests/test_native_duplicate_names.js` | closed |
 | A schema holding a value JSON cannot carry (NaN, Infinity, a hole) shared compiled code with the schema its JSON text spells. | accepted documents it should reject | `65332c5`, `a587dbf` | yes | `tests/test_compile_cache_unfaithful.js` | closed |
 | `Validator.fromStandalone()` built its defaults pass from the root schema alone and ran it only in `validate()`. | accepted documents it should reject and rejected documents it should accept | `96e6647` | yes | `tests/test_from_standalone_defaults.js` | closed |
+| A name that is also a keyword, under `properties` or another map of names, was read as the keyword: generated code dropped the schema of a property named `$id`, which the draft-07 and draft-06 meta-schemas constrain; a name spelled `$dynamicRef` threw; the native routing missed a reference behind a property named `const`. | accepted documents it should reject and rejected documents it should accept | `2791680` | yes | `tests/test_keyword_named_names.js` | closed |
 
 ## Not covered
 
@@ -170,7 +171,7 @@ The classes found by the sweep of 1.x for answers that differ between paths, one
 
 ## Reproduce
 
-From a clean clone at the commit that adds this file, whose code is that of `636be3c`, with Node and git:
+From a clean clone at the commit that adds this file, whose code is that of `cbadeeb`, with Node and git:
 
 ```sh
 git clone https://github.com/ata-core/ata-validator.git && cd ata-validator
@@ -189,8 +190,8 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
 {
  "format": "ata-correctness-report/1",
  "tree": {
-  "commit": "636be3c6f3a869043125218cd00aa6edeaa48fc1",
-  "version": "1.65.0",
+  "commit": "cbadeeb93e076f14467ac7526185b6451513430d",
+  "version": "1.66.0",
   "uncommitted": []
  },
  "corpora": {
@@ -212,7 +213,7 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
  "gate": {
   "suite": {
    "format": "ata-gate/1",
-   "ata": "1.65.0",
+   "ata": "1.66.0",
    "node": "v25.2.1",
    "platform": "darwin",
    "arch": "arm64",
@@ -227,7 +228,7 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      },
      {
       "source": "local build",
-      "version": "1.65.0"
+      "version": "1.66.0"
      }
     ]
    },
@@ -572,7 +573,7 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
   },
   "schemastore": {
    "format": "ata-gate/1",
-   "ata": "1.65.0",
+   "ata": "1.66.0",
    "node": "v25.2.1",
    "platform": "darwin",
    "arch": "arm64",
@@ -587,7 +588,7 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      },
      {
       "source": "local build",
-      "version": "1.65.0"
+      "version": "1.66.0"
      }
     ]
    },
@@ -1377,6 +1378,25 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
    "tests": [
     {
      "file": "tests/test_from_standalone_defaults.js",
+     "present": true,
+     "listed": true,
+     "result": "passed"
+    }
+   ],
+   "closed": true
+  },
+  {
+   "id": "keyword-named-names",
+   "inTree": true,
+   "fixes": [
+    {
+     "commit": "2791680",
+     "inTree": true
+    }
+   ],
+   "tests": [
+    {
+     "file": "tests/test_keyword_named_names.js",
      "present": true,
      "listed": true,
      "result": "passed"
