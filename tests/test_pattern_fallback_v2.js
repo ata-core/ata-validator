@@ -157,6 +157,16 @@ async function entryChecks (kind) {
     assert.strictEqual(v.validate('aa').valid, true)
     assert.strictEqual(v.validate('b').valid, false)
   })
+  check('the option is read by name: inherited or not enumerable, it is honoured', () => {
+    const hidden = {}
+    Object.defineProperty(hidden, 'patternFallback', { value: 'reject', enumerable: false })
+    for (const o of [Object.create({ patternFallback: 'reject' }), hidden]) {
+      assert.throws(() => new Validator(S_PATTERN, o), (e) => e.message.includes(OUTSIDE))
+    }
+    const v = new Validator(S_PATTERN, Object.create({ patternFallback: magic() }))
+    assert.strictEqual(v.validate({ a: 'magic' }).valid, true)
+    assert.strictEqual(v.isValidObject({ a: 'aa' }), false)
+  })
   check("'reject' refuses a schema given as text", () => {
     rejects(JSON.stringify(S_PATTERN), BACKREF, '#/properties/a/pattern')
   })
@@ -540,6 +550,13 @@ async function refusalChecks (kind) {
       for (const s of [S_PATTERN, { type: 'string' }, { type: 'string', pattern: '^[a-z]+$' }, true]) {
         assert.throws(() => new Validator(s, { patternFallback: mode }), (e) => e instanceof Error && e.message === NAMED, String(mode))
       }
+    }
+  })
+  check('an option that is inherited or not enumerable is refused as well', () => {
+    const hidden = {}
+    Object.defineProperty(hidden, 'patternFallback', { value: 'reject', enumerable: false })
+    for (const o of [Object.create({ patternFallback: 'reject' }), Object.create({ patternFallback: magic() }), hidden]) {
+      assert.throws(() => new Validator(S_PATTERN, o), (e) => e.message === NAMED)
     }
   })
   check("'platform' and undefined build and answer on the platform RegExp", () => {
