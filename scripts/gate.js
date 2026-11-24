@@ -328,7 +328,10 @@ function record({ stats, report }, opts) {
   };
 }
 
-module.exports = { run, summary, PATHS };
+// `loadIr` and `cleanup` are for a test that builds PATHS on schemas of its
+// own: the first loads what the ir paths need, the second removes the
+// temporary directory the module paths write to, as run() does.
+module.exports = { run, summary, PATHS, loadIr, cleanup: () => fs.rmSync(tmp, { recursive: true, force: true }) };
 
 if (require.main === module) {
   const argv = process.argv.slice(2);
