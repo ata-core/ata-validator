@@ -42,6 +42,20 @@ const cases = [
   [{ type: 'object', additionalProperties: { type: 'number' } }, { a: undefined }, false],
   [{ type: 'object', patternProperties: { '^a': { type: 'number' } } }, { a: undefined }, false],
   [{ type: 'array', items: { type: 'number' } }, [undefined], false],
+  // dependentRequired and dependentSchemas read a name as required does: a
+  // key holding undefined neither triggers them nor satisfies them.
+  [{ type: 'object', dependentRequired: { a: ['b'] } }, { a: undefined }, true],
+  [{ dependentRequired: { a: ['b'] } }, { a: undefined }, true],
+  [{ type: 'object', dependentRequired: { a: ['b'] } }, { a: 1, b: undefined }, false],
+  [{ type: 'object', properties: { a: {}, b: {} }, dependentRequired: { a: ['b'] } }, { a: 1, b: undefined }, false],
+  [{ type: 'object', properties: { a: {}, b: {} }, dependentRequired: { a: ['b'] } }, { a: undefined }, true],
+  [{ $schema: 'http://json-schema.org/draft-07/schema#', dependencies: { a: ['b'] } }, { a: undefined }, true],
+  [{ type: 'object', dependentSchemas: { a: false } }, { a: undefined }, true],
+  [{ dependentSchemas: { a: false } }, { a: undefined }, true],
+  [{ type: 'object', dependentSchemas: { a: { required: ['b'] } } }, { a: 1, b: undefined }, false],
+  [{ $schema: 'http://json-schema.org/draft-07/schema#', dependencies: { a: false } }, { a: undefined }, true],
+  [{ type: 'object', properties: { a: {} }, dependentSchemas: { a: { properties: { b: {} } } }, unevaluatedProperties: false }, { a: undefined, b: 1 }, false],
+  [{ type: 'object', properties: { a: {} }, dependentSchemas: { a: { properties: { b: {} } } }, unevaluatedProperties: false }, { a: 1, b: 1 }, true],
 ];
 
 for (const [schema, doc, expected] of cases) {
