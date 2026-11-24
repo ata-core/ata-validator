@@ -122,7 +122,14 @@ add('edge entry', methods(require(path.join(ROOT, 'index.edge.js')).Validator))
 {
   const Small = require(path.join(ROOT, 'lib/validator-small.js')).Validator
   const f = require(path.join(ROOT, 'lib/features/groups.js')).all
-  Small.use(...f, require(path.join(ROOT, 'lib/features/metaschemas.js')).metaschemas, require(path.join(ROOT, 'lib/features/richErrors.js')).richErrors)
+  // On the plugin's core the option is the formatsOff feature: without it a
+  // validator that sets the option is refused by name, schema with a format
+  // or without, and featuresFor() names it whenever the option is false.
+  for (const schema of [{ type: 'string', format: 'uri' }, { type: 'string' }]) {
+    assert.throws(() => new Small(schema, { assertFormat: false }).isValidObject('a b'), /ata2: .*formatsOff, Validator\.use\(formatsOff\)/, 'the core refuses assertFormat: false without the feature')
+    assert.strictEqual(new Small({ type: 'string' }).isValidObject('a b'), true, 'and takes a validator that does not set it')
+  }
+  Small.use(...f, require(path.join(ROOT, 'lib/features/metaschemas.js')).metaschemas, require(path.join(ROOT, 'lib/features/richErrors.js')).richErrors, require(path.join(ROOT, 'lib/features/formatsOff.js')).formatsOff)
   add('2.0 core, every feature', declines(methods(Small)))
   add('2.0 core, every feature, plain errors', declines(methods(Small, { richErrors: false })))
   add('2.0 core, every feature, abortEarly', declines({ validate: methods(Small, { abortEarly: true }).validate }))
@@ -187,6 +194,13 @@ async function main () {
   {
     const url = (f) => require('node:url').pathToFileURL(path.join(ROOT, f)).href
     const features = await import(url('index.v2.features.mjs'))
+    for (const schema of [{ type: 'string', format: 'uri' }, { type: 'string' }, { $ref: 'http://x/y.json' }]) {
+      const schemas = [{ $id: 'http://x/y.json', type: 'string', format: 'uri' }]
+      assert.ok(features.featuresFor(schema, { assertFormat: false, schemas }).includes('formatsOff'), 'featuresFor names formatsOff when the option is false')
+      assert.ok(!features.featuresFor(schema, { schemas }).includes('formatsOff'), 'and not otherwise')
+    }
+    // With the option the formats are gone before the other questions are asked: no format feature is named.
+    assert.deepStrictEqual(features.featuresFor({ type: 'string', format: 'uri' }, { assertFormat: false }), ['formatsOff'])
     for (const [label, file] of [['2.0 browser entry', 'index.v2.browser.mjs'], ['2.0 edge entry', 'index.v2.edge.mjs']]) {
       const V = (await import(url(file))).Validator
       V.use(features.metaschemas)
@@ -287,7 +301,7 @@ async function main () {
     checks += 4
   }
 
-  // Two limits of the removal, held as they are so neither changes unseen.
+  // A limit of the removal, held as it is so it does not change unseen.
   // A schema that is the direct child named `default`, `enum`, `const` or
   // `examples` of an object that is not a map of names is taken for that
   // keyword's data and keeps its format.
@@ -295,15 +309,37 @@ async function main () {
     const held = { stuff: { default: F }, properties: { u: { $ref: '#/stuff/default' } } }
     assert.strictEqual(new Validator(held, { assertFormat: false }).isValidObject({ u: 'a b' }), false, 'a schema held under a data keyword\'s name keeps its format')
     assert.strictEqual(new Validator(held, { assertFormat: false }).isValidObject({ u: 'http://a.b/' }), true)
-    // An unknown keyword's value is read as a place schemas may be, which a
-    // custom keyword's parameters are too: a string `format` among them goes.
-    let seen
-    const v = new Validator({ type: 'object', properties: { u: { type: 'string', cur: { format: 'iso', min: 1 } } } }, { assertFormat: false, keywords: { cur: { validate: (p) => { seen = p; return true } } } })
-    v.validate({ u: 'x' })
-    assert.deepStrictEqual(seen, { min: 1 }, 'a custom keyword\'s parameters lose a string `format` under the option')
-    const w = new Validator({ type: 'object', properties: { u: { type: 'string', cur: { format: 'iso', min: 1 } } } }, { keywords: { cur: { validate: (p) => { seen = p; return true } } } })
-    w.validate({ u: 'x' })
-    assert.deepStrictEqual(seen, { format: 'iso', min: 1 }, 'and keep it without the option')
+    // A custom keyword's value is its parameters, the caller's data: a string
+    // `format` among them stays, with the option and without, in the root and
+    // in a registered document, while the formats beside it go. A key of the
+    // same name that no validator registered is an unknown keyword like any
+    // other, and a schema under it loses its format.
+    const seen = []
+    const kw = { cur: { validate: (p) => { seen.push(p); return true } } }
+    const root = () => ({ type: 'object', held: { url: F }, properties: { u: { type: 'string', cur: { format: 'iso', min: 1 } }, w: { $ref: '#/held/url' }, r: { $ref: 'http://x/k.json' } } })
+    const doc = () => [{ $id: 'http://x/k.json', type: 'string', format: 'uri', cur: { format: 'iso', min: 2 } }]
+    const before = new Validator({ zap: { url: F }, properties: { u: { $ref: '#/zap/url' } } }, { assertFormat: false })
+    assert.strictEqual(before.isValidObject({ u: 'a b' }), true, 'an unregistered key holds schemas')
+    for (const engine of [undefined, 'interpreter']) {
+      for (const off of [true, false]) {
+        seen.length = 0
+        const v = new Validator(root(), { ...(off ? { assertFormat: false } : {}), ...(engine ? { engine } : {}), keywords: kw, schemas: doc() })
+        assert.strictEqual(v.validate({ u: 'x', w: 'a b', r: 'a b' }).valid, off, `formats beside a custom keyword, assertFormat ${!off}`)
+        assert.ok(seen.some((p) => p.format === 'iso' && p.min === 1), `the root's parameters reach the keyword whole (${JSON.stringify(seen)})`)
+        assert.ok(seen.some((p) => p.format === 'iso' && p.min === 2), `and a registered document's (${JSON.stringify(seen)})`)
+        checks += 3
+      }
+    }
+    // The same schema object, first read by a validator that does not know
+    // the keyword: the copy it made is not the one the keyword's validator reads.
+    {
+      const shared = { type: 'object', properties: { u: { type: 'string', late: { format: 'iso', min: 3 } }, v: F } }
+      assert.strictEqual(new Validator(shared, { assertFormat: false }).validate({ u: 'x', v: 'a b' }).valid, true)
+      seen.length = 0
+      const v = new Validator(shared, { assertFormat: false, keywords: { late: kw.cur } })
+      assert.strictEqual(v.validate({ u: 'x', v: 'a b' }).valid, true)
+      assert.ok(seen.some((p) => p.format === 'iso' && p.min === 3), `a copy made before the keyword was registered is not reused (${JSON.stringify(seen)})`)
+    }
     checks += 4
   }
 

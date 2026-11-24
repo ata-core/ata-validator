@@ -77,7 +77,8 @@ const SUBS = [
   ['  kept.set(s, [k, copy]);', '  kept.set(s, [inherit, copy]);'],
   ['  if (code === 1 && !shown && scan(s) === DEFINITIONS) return s;\n', ''],
   ["  const d = need('draft7');", "  const d = require('./draft7');"],
-  ["need('draft7').formatsOff", "require('./format-off').formatsOff"],
+  // assertFormat: false needs no registration on a full entry.
+  ["need('formatsOff').build", "require('./format-off').formatsOff"],
   ["need('defaults').buildDefaultsApplier(pre, G.safe)", "require('./defaults').buildDefaultsApplier(pre)"],
 ];
 

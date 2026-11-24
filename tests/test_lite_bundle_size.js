@@ -297,7 +297,10 @@ const esbuild = require('esbuild')
 // 63250 (63241 measured): a lone high surrogate counts as its own code
 // point, length bounds stop scanning for pairs once decided, and a
 // well-formed string is read only at the high half of each pair; 78 bytes.
-const BUDGET = 63250
+// 63270 (63252 measured): `assertFormat: false` leaves a custom keyword's
+// parameters whole and removes formats as the schema is copied
+// (lib/validator-core.js, lib/keywords.js); 11 bytes.
+const BUDGET = 63270
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
