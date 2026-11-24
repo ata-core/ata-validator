@@ -28,6 +28,8 @@ const { spawnSync } = require('node:child_process')
 const ROOT = path.join(__dirname, '..')
 const NO_EVAL = process.argv.includes('--no-eval-child')
 const { Validator } = require(ROOT)
+// lib/validator-core.js counts on the table's twelve keys (8 * KIND.size - 88).
+assert.strictEqual(require(path.join(ROOT, 'lib/keywords.js')).KIND.size, 12, 'the key table as lib/validator-core.js reads it')
 
 const F = { type: 'string', format: 'uri' }
 const D2020 = 'https://json-schema.org/draft/2020-12/schema'
