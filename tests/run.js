@@ -399,6 +399,7 @@ const FILES = [
   "tests/test_keywords_codegen.js",
   "tests/test_ref_cross.js",
   "tests/test_unresolved_ref_fail_closed.js",
+  "tests/test_keyword_named_names.js",
   "tests/test_gate_report.js",
   "tests/test_shape_classifier.js",
   "tests/test_tier0.js",
