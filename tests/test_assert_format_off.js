@@ -204,6 +204,9 @@ async function main () {
   }
 
   let checks = 0; let taken = 0; let declined = 0
+  // Buffer cells where the buffer API accepts the well-formed document, so
+  // the cell says something about formats, and those where it refuses it.
+  let bufferTold = 0; let bufferRefused = 0
   const perPath = {}
   for (const [pname, build] of Object.entries(PATHS)) {
     perPath[pname] = 0
@@ -222,6 +225,7 @@ async function main () {
       if (isBuffer) {
         const base = buffers.call(null, { assertFormat: undefined })[pname.slice('buffer: '.length)](shape)
         good = base.valid(clone(docs.good)); type = base.valid(clone(docs.type))
+        if (good) bufferTold++; else bufferRefused++
       }
       assert.strictEqual(p.valid(clone(docs.good)), good, `${where}: the well-formed document`)
       assert.strictEqual(p.valid(clone(docs.bad)), good, `${where}: a document only the format refuses is answered as the well-formed one`)
@@ -283,6 +287,26 @@ async function main () {
     checks += 4
   }
 
+  // Two limits of the removal, held as they are so neither changes unseen.
+  // A schema that is the direct child named `default`, `enum`, `const` or
+  // `examples` of an object that is not a map of names is taken for that
+  // keyword's data and keeps its format.
+  {
+    const held = { stuff: { default: F }, properties: { u: { $ref: '#/stuff/default' } } }
+    assert.strictEqual(new Validator(held, { assertFormat: false }).isValidObject({ u: 'a b' }), false, 'a schema held under a data keyword\'s name keeps its format')
+    assert.strictEqual(new Validator(held, { assertFormat: false }).isValidObject({ u: 'http://a.b/' }), true)
+    // An unknown keyword's value is read as a place schemas may be, which a
+    // custom keyword's parameters are too: a string `format` among them goes.
+    let seen
+    const v = new Validator({ type: 'object', properties: { u: { type: 'string', cur: { format: 'iso', min: 1 } } } }, { assertFormat: false, keywords: { cur: { validate: (p) => { seen = p; return true } } } })
+    v.validate({ u: 'x' })
+    assert.deepStrictEqual(seen, { min: 1 }, 'a custom keyword\'s parameters lose a string `format` under the option')
+    const w = new Validator({ type: 'object', properties: { u: { type: 'string', cur: { format: 'iso', min: 1 } } } }, { keywords: { cur: { validate: (p) => { seen = p; return true } } } })
+    w.validate({ u: 'x' })
+    assert.deepStrictEqual(seen, { format: 'iso', min: 1 }, 'and keep it without the option')
+    checks += 4
+  }
+
   if (NO_EVAL) {
     console.log(`ok (code generation refused): assertFormat: false on ${Object.keys(PATHS).length} paths and ${Object.keys(SHAPES).length} shapes, ${taken} taken, ${declined} declined, ${checks} checks`)
     return
@@ -310,7 +334,7 @@ async function main () {
   const child = spawnSync(process.execPath, ['--disallow-code-generation-from-strings', __filename, '--no-eval-child'], { encoding: 'utf8' })
   assert.strictEqual(child.status, 0, 'with code generation refused:\n' + child.stdout + child.stderr)
 
-  console.log(`ok: assertFormat: false on ${Object.keys(PATHS).length} paths and ${Object.keys(SHAPES).length} shapes, ${taken} taken, ${declined} declined, ${checks} checks; the gate with the option: ${r.stats.schemas} schemas, ${paths.length - 1 - DECLINE_ALL.length} paths taking it, ${paths.reduce((n, [, s]) => n + s.docs, 0)} documents, 0 differences, ${oracle.flipped} documents accepted that only a format refused`)
+  console.log(`ok: assertFormat: false on ${Object.keys(PATHS).length} paths and ${Object.keys(SHAPES).length} shapes, ${taken} taken, ${declined} declined, ${checks} checks, the buffer APIs accepting the well-formed document in ${bufferTold} cells and refusing it in ${bufferRefused}; the gate with the option: ${r.stats.schemas} schemas, ${paths.length - 1 - DECLINE_ALL.length} paths taking it, ${paths.reduce((n, [, s]) => n + s.docs, 0)} documents, 0 differences, ${oracle.flipped} documents accepted that only a format refused`)
   process.stdout.write(child.stdout)
 }
 
