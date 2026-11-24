@@ -1,8 +1,9 @@
 'use strict'
 
-// The generated defaults pass decides "is this key an own property" by
-// reading it first and asking Object.hasOwn only when the read gives
-// undefined (plain objects, keys Object.prototype does not have). On a
+// The generated defaults pass decides "is this key absent" (not an own
+// property, or one holding undefined) by reading it first and asking
+// Object.hasOwn only when the object is not plain (plain objects, keys
+// Object.prototype does not have). On a
 // configuration schema of 82 defaults the hasOwn-for-every-key form cost
 // 820 ns a call for a document that already carried every key; the read-first
 // form costs 52. The shortcut must not change what gets written: this pins
@@ -68,12 +69,12 @@ assert.deepStrictEqual(Object.keys(Object.prototype), [], 'Object.prototype gain
 assert.strictEqual(({}).x, undefined)
 assert.strictEqual(({}).y, undefined)
 
-// The pass is the read-first form, and keys Object.prototype carries keep
-// the hasOwn test alone.
+// The pass is the read-first form, and keys Object.prototype carries ask
+// hasOwn first.
 const src = generated._applyDefaults.toString()
-assert.ok(/\(d\["a"\]===undefined\|\|!_pk\d+\)&&!Object\.hasOwn\(d,"a"\)/.test(src), 'plain key is tested by a read before hasOwn')
-assert.ok(/if\(!Object\.hasOwn\(d,"constructor"\)\)/.test(src), 'a key Object.prototype has keeps the hasOwn test')
-assert.ok(/if\(!Object\.hasOwn\(d,"__proto__"\)\)Object\.defineProperty/.test(src), '__proto__ keeps hasOwn and defineProperty')
+assert.ok(/\(d\["a"\]===undefined\|\|!_pk\d+&&!Object\.hasOwn\(d,"a"\)\)/.test(src), 'plain key is tested by a read before hasOwn')
+assert.ok(/if\(\(!Object\.hasOwn\(d,"constructor"\)\|\|d\["constructor"\]===undefined\)\)/.test(src), 'a key Object.prototype has asks hasOwn first')
+assert.ok(/if\(\(!Object\.hasOwn\(d,"__proto__"\)\|\|d\["__proto__"\]===undefined\)\)Object\.defineProperty/.test(src), '__proto__ asks hasOwn first and keeps defineProperty')
 assert.ok(!/if\(Object\.hasOwn\(d,"nested"\)\)\{/.test(src), 'the descent into a nested object reads first too')
 
 console.log(`defaults fast path: ${A.length} documents agree between the generated and the closure pass; the pass reads before it asks hasOwn`)

@@ -2,6 +2,13 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- `dependentRequired` and `dependentSchemas` read a key holding `undefined` as present, where `required` has read it as absent since 1.54.0. With `dependentRequired: { a: ['b'] }`, `{ a: undefined }` was rejected for a missing `b`, and `{ a: 1, b: undefined }` was accepted by the default validator while ata-validator/ir and the table and closure kernels rejected it, since they already read the required name as `required` does and only the trigger as an own key. `dependentSchemas: { a: false }` rejected `{ a: undefined }`, and a `dependentSchemas` branch credited its properties to `unevaluatedProperties` for a trigger holding `undefined`. Both keywords, and the defaults pass where it applies a `dependentSchemas` branch, now read the trigger and each required name as `required` does, on every engine: an own key holding a value other than `undefined`. Once serialized such a key is not in the document at all, and `validateJSON()` already answered this way. Draft-07 `dependencies` is read through the same keywords. `tests/test_undefined_property.js` covers twelve more shapes on both engines.
+- `useDefaults` left a key holding `undefined` as it was. `required` reads such a key as missing, so `{ a: undefined }` against `{ required: ['a'], properties: { a: { default: 1 } } }` was rejected where `{}` was filled and accepted, and a nested object built with its optional fields set to `undefined` received none of its defaults. ajv's `useDefaults`, whose behaviour lib/defaults.js follows, fills a property that is missing or `undefined`. Every defaults pass now writes the default over a key holding `undefined`: the generated pass and the closure pass, the `applyDefaults` an `ata build` module exports, ata-validator/ir's module writer and closures, and `parse()`. A key holding `null` or any other value is left alone, as before. The generated pass keeps its read-first form, and on a plain object the read alone settles the test now. `tests/test_defaults_undefined.js`.
+
 ## 1.65.0 - 2026-11-19
 
 ### Fixed
