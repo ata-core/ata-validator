@@ -222,7 +222,9 @@ const HAND = ['^(/|\\./|[A-Za-z]:\\\\)?[^/]+$', '^[^\\u0000]*$', '^(?:a|bc)?x*$'
   // lib/mutators.js and lib/remove-additional.js, which the full entries and
   // 1.x share, and lib/defaults.js requires the engine: a page with either
   // carries it as before.
-  const SHARED = ['patterns', 'removeAdditional', 'coerceTypes', 'codegen']
+  // patternFallback carries the proof that the RegExp runs a pattern in
+  // linear time (lib/regex-linear.js), which reads the engine's parser.
+  const SHARED = ['patterns', 'removeAdditional', 'coerceTypes', 'codegen', 'patternFallback']
   const others = Object.keys(F).filter((n) => isObj(F[n]) && !SHARED.includes(n))
   assert.strictEqual(await carries([]), false, 'the core alone leaves out lib/safe-regex.js')
   for (const n of others) assert.strictEqual(await carries([n]), false, 'the core with ' + n + ' leaves out lib/safe-regex.js')

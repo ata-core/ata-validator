@@ -70,4 +70,6 @@ import _formatIriReference from './lib/features/formatIriReference.js';
 export const formatIriReference = _formatIriReference.formatIriReference;
 import _standardSchema from './lib/features/standardSchema.js';
 export const standardSchema = _standardSchema.standardSchema;
+import _patternFallback from './lib/features/patternFallback.js';
+export const patternFallback = _patternFallback.patternFallback;
 export { featuresFor } from './features/index.mjs';

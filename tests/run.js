@@ -44,6 +44,7 @@ const FILES = [
   "tests/test_v2_core_features.js",
   "tests/test_feature_exports.js",
   "tests/test_patterns_feature.js",
+  "tests/test_pattern_fallback_v2.js",
   "tests/test_format_sizes.js",
   "tests/test_join_features.js",
   "tests/test_code_point_pairs.js",

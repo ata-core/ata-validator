@@ -34,6 +34,7 @@ const CASES = {
   uniqueItems: ['uniqueItems.js', { uniqueItems: true }, {}, [1, 1]],
   branchCollapse: ['branchCollapse.js', { anyOf: [{ type: 'string' }] }, {}, 1],
   patterns: ['patterns.js', { pattern: '(a+)+b' }, {}, 'aab'],
+  patternFallback: ['patternFallback.js', { pattern: '^(a)\\1$' }, { patternFallback: () => ({ test: (s) => s === 'magic' }) }, 'magic'],
   richErrors: ['richErrors.js', { type: 'string' }, { richErrors: true }, 1],
   verbose: ['verbose.js', { type: 'string' }, { verbose: true }, 1],
   metaschemas: ['metaschemas.js', { $ref: 'https://json-schema.org/draft/2020-12/schema' }, {}, { type: 1 }],
@@ -78,6 +79,15 @@ const CASES = {
       V.use(m.standardSchema)
       assert.deepStrictEqual(v['~standard'].validate(1), { issues: [{ message: 'must be string', path: [] }] }, 'standardSchema: answered once registered')
       assert.strictEqual(v['~standard'], v['~standard'], 'standardSchema: one object per validator')
+      continue
+    }
+    if (name === 'patternFallback') {
+      // An option the Validator does not know until the feature is
+      // registered: refused as any unknown option, and named by featuresFor().
+      assert.ok(index.featuresFor(schema, opts).includes(name), name + ': named by featuresFor')
+      assert.throws(() => new V(schema, opts), { message: 'ata2: option patternFallback' }, name + ': the option is unknown without it')
+      V.use(...(await Promise.all(index.featuresFor(schema).map(async (n) => (await import('ata-validator/features/' + n))[n]))), m[name])
+      assert.strictEqual(new V(schema, opts).validate(doc).valid, true, name + ': answered once registered')
       continue
     }
     if (name === 'codegen') {
