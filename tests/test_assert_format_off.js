@@ -203,9 +203,33 @@ async function main () {
     }
     // With the option the formats are gone before the other questions are asked: no format feature is named.
     assert.deepStrictEqual(features.featuresFor({ type: 'string', format: 'uri' }, { assertFormat: false }), ['formatsOff'])
+    // The full entries take the option as the core does: refused by name
+    // until the feature is registered, a schema with a format or without.
+    // Each in a process of its own: here the two share one registry.
+    for (const file of ['index.v2.browser.mjs', 'index.v2.edge.mjs']) {
+      const probe = `
+        import assert from 'node:assert'
+        const { Validator } = await import(${JSON.stringify(url(file))})
+        const { formatsOff } = await import(${JSON.stringify(url('index.v2.features.mjs'))})
+        const F = { type: 'string', format: 'uri' }
+        const refused = /ata2: .*formatsOff, Validator\\.use\\(formatsOff\\)/
+        for (const schema of [F, { type: 'string' }, { $ref: '#/held/a', held: { a: F } }]) {
+          assert.throws(() => new Validator(schema, { assertFormat: false }).isValidObject('a b'), refused)
+          assert.throws(() => new Validator(schema, { assertFormat: false }).validate('a b'), refused)
+        }
+        assert.strictEqual(new Validator(F).isValidObject('a b'), false)
+        Validator.use(formatsOff)
+        assert.strictEqual(new Validator(F, { assertFormat: false }).isValidObject('a b'), true)
+        assert.strictEqual(new Validator({ $ref: '#/held/a', held: { a: F } }, { assertFormat: false }).validate('a b').valid, true)
+        assert.strictEqual(new Validator(F).isValidObject('a b'), false)
+        console.log('refused, then answered')
+      `
+      const r = spawnSync(process.execPath, ['--input-type=module', '-e', probe], { encoding: 'utf8' })
+      assert.ok(r.status === 0 && /refused, then answered/.test(r.stdout), `${file} refuses assertFormat: false until formatsOff is registered:\n${r.stdout}${r.stderr}`)
+    }
     for (const [label, file] of [['2.0 browser entry', 'index.v2.browser.mjs'], ['2.0 edge entry', 'index.v2.edge.mjs']]) {
       const V = (await import(url(file))).Validator
-      V.use(features.metaschemas)
+      V.use(features.metaschemas, features.formatsOff)
       add(label, declines(methods(V)))
       add(label + ', plain errors', declines(methods(V, { richErrors: false })))
     }

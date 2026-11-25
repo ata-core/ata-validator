@@ -18,6 +18,8 @@ const require = createRequire(import.meta.url)
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const { Validator } = require('../index.js')
 const { Validator: V2 } = await import('../index.v2.browser.mjs')
+// On every 2.0 entry `assertFormat: false` is the formatsOff feature.
+V2.use((await import('../index.v2.features.mjs')).formatsOff)
 const { run } = require('../scripts/build-options-differential.js')
 
 const KERNELS = pathToFileURL(path.join(ROOT, 'lib/kernels/index.mjs')).href

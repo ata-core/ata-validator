@@ -39,6 +39,7 @@ const CASES = {
   metaschemas: ['metaschemas.js', { $ref: 'https://json-schema.org/draft/2020-12/schema' }, {}, { type: 1 }],
   errorMessages: ['errorMessages.js', { type: 'string', errorMessage: 'a string' }, {}, 1],
   coerceTypes: ['coerceTypes.js', { type: 'number' }, { coerceTypes: true }, '1'],
+  formatsOff: ['formatsOff.js', { type: 'string' }, { assertFormat: false }, 'x'],
   removeAdditional: ['removeAdditional.js', { type: 'object', additionalProperties: false }, { removeAdditional: true }, { a: 1 }],
   codegen: ['codegen.js', null, null, null],
   standardSchema: ['standardSchema.js', null, null, null],
@@ -115,9 +116,9 @@ const CASES = {
   assert.deepStrictEqual(parts(await carried('ata-validator/features/formatTime')), [])
   assert.ok(!(await carried('ata-validator/features/formatUriReference')).includes('lib/fmt/URI_FAST.js'), 'formatUriReference leaves out URI_FAST')
   const files = await carried('ata-validator/features')
-  for (const [other, f] of Object.entries(own)) assert.strictEqual(files.includes(f), other === 'draft7' || other === 'metaschemas', `ata-validator/features and ${f}`)
+  for (const [other, f] of Object.entries(own)) assert.strictEqual(files.includes(f), other === 'draft7' || other === 'metaschemas' || other === 'formatsOff', `ata-validator/features and ${f}`)
   for (const f of ['lib/enrich-error.js', 'lib/fmt/ipv6.js', 'lib/unique-dup.js', 'lib/branch-collapse.js', 'lib/defaults.js', 'lib/mutators.js', 'lib/safe-regex.js']) assert.ok(!files.includes(f), 'ata-validator/features leaves out ' + f)
   // The declarations.
   execFileSync(process.execPath, [TSC_JS, '--noEmit', '--strict', '--module', 'nodenext', '--moduleResolution', 'nodenext', path.join(__dirname, 'feature_exports_types.ts')], { cwd: ROOT, stdio: 'inherit' })
-  console.log(`ok: ${Object.keys(CASES).length} feature exports resolve and register; featuresFor() carries draft7 and the meta-schemas only; the declarations type-check`)
+  console.log(`ok: ${Object.keys(CASES).length} feature exports resolve and register; featuresFor() carries draft7, the meta-schemas and formatsOff only; the declarations type-check`)
 })().catch((e) => { console.error(e); process.exit(1) })

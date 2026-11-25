@@ -249,6 +249,8 @@ async function schemastore(root, stats, report, refs, every, offset) {
 async function run({ schemastoreDir = null, every = 1, offset = 0, mutate = null, suiteOn = true } = {}) {
   const { specialize } = await import(pathToFileURL(path.join(ROOT, 'lib/ir/index.mjs')).href);
   const { Validator: V2 } = await import(pathToFileURL(path.join(ROOT, 'index.v2.browser.mjs')).href);
+  // On every 2.0 entry `assertFormat: false` is the formatsOff feature.
+  V2.use((await import(pathToFileURL(path.join(ROOT, 'index.v2.features.mjs')).href)).formatsOff);
   const refs = { specialize, V2, mutate };
   const stats = { schemas: 0, compiled: 0, withHoles: 0, declined: 0, declines: {}, registryTooLarge: 0, docs: 0, diffs: 0, v2Diffs: 0, splitVerdict: 0, splitErrors: 0, runtimesDisagree: 0, diffKeys: {}, v2DiffKeys: {}, splitKeys: {}, disagreeKeys: {}, runtimeRefuses: 0, runtimeThrows: 0 };
   const report = [];
