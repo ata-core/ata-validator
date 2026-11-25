@@ -4,12 +4,12 @@ This file is written by `node scripts/gate-report.js`. Do not edit it by hand: e
 
 ## Summary
 
-- Tree: ata-validator 1.66.0 at commit `01be37e`. Node v25.2.1 on darwin-arm64.
+- Tree: ata-validator 1.66.0 at commit `a96a095`. Node v25.2.1 on darwin-arm64.
 - Gate: 23 paths, each held to the Validator on the same documents. Official suite: 1767 schemas. SchemaStore: 492 schemas. Documents that differ or threw: 250.
 - Official JSON Schema Test Suite at `245a45a`: draft2020-12 1300 of 1300, draft2019-09 1259 of 1259, draft7 927 of 927, draft6 839 of 839, draft4 616 of 616, v1 1147 of 1147.
 - With `eval` and `new Function` blocked: draft2020-12 1300 of 1300, draft2019-09 1259 of 1259, draft7 927 of 927, draft6 839 of 839, draft4 616 of 616, v1 1147 of 1147.
 - Native engine: loaded from @ata-validator/native-darwin-arm64, version 1.66.0.
-- Sweep classes: 19. Closed in this tree, with their tests passing: 0. Open in this tree: 19.
+- Sweep classes: 19. Closed in this tree, with their tests passing: 19. Open in this tree: 0.
 
 ## What the gate compares
 
@@ -170,25 +170,25 @@ The classes found by the sweep of 1.x for answers that differ between paths, one
 
 | class | effect before the fix | fix commits | in this tree | tests | result |
 |---|---|---|---|---|---|
-| A `$ref` that does not resolve, inside a document given through `schemas` and reached through another reference: generated code and the modules wrote no check for it. | accepted documents it should reject | `3429ae8`, `45052bb` | no | `tests/test_registered_ref_resolution.js`, `tests/test_codegen_entrypoint_agreement.js` | open: fix not in this tree |
-| The defaults, `removeAdditional` and `coerceTypes` passes followed a relative `$ref` into another document by path suffix. | filled, removed or coerced by one document while validation read another | `bb8a738`, `73d307f` | no | `tests/test_registered_ref_resolution.js` | open: fix not in this tree |
-| A cycle of references across registered documents reached the verdict generator as written, and it wrote no check for the reference back. | accepted documents it should reject | `8f41bb7` | no | `tests/test_registered_ref_resolution.js` | open: fix not in this tree |
-| A local definition reached again through an anchor, or an anchor that refers to itself, on a cycle the generator does not detect. | accepted documents it should reject | `3953dcd` | no | `tests/test_registered_ref_resolution.js` | open: fix not in this tree |
-| `minLength` and `maxLength` in the interpreted engine counted a lone high surrogate and the unit after it as one code point. | accepted documents it should reject | `dc9bf05` | no | `tests/test_code_point_pairs.js` | open: fix not in this tree |
-| `enum`, `const` and `uniqueItems` compared two objects by the keys of one side only, for objects with a non-enumerable own property. | the answer depended on the order of the two values compared | `333707e`, `95f3e90` | no | `tests/test_deep_equal_enumerable.js` | open: fix not in this tree |
-| A module from `ata-validator/ir` for a schema with `propertyDependencies` or draft-07 `dependencies` did not declare the object flag it reads. | threw instead of answering | `57a1e22` | no | `tests/test_ir_object_flag.mjs` | open: fix not in this tree |
-| `propertyNames` with `minLength` or `maxLength` counted UTF-16 units in the three code generators, where the interpreted engine counts code points. | accepted documents it should reject and rejected documents it should accept | `05ab41e` | no | `tests/test_code_point_pairs.js` | open: fix not in this tree |
-| The closure compiler compared `enum`, `const` and `uniqueItems` values by a canonical string that wrote a string inside an array without quotes. | accepted documents it should reject and rejected documents it should accept | `96849ae` | no | `tests/test_closure_equality.js` | open: fix not in this tree |
-| A schema reached by a JSON pointer through a name no keyword reads had its own references resolved against the root. | accepted documents it should reject | `b42396e`, `7ab4de4` | no | `tests/test_registered_ref_resolution.js`, `tests/test_ir_registered_docs.mjs` | open: fix not in this tree |
-| `ata-validator/ir` registered a draft-07 document whose root is a `$ref` under no name. | rejected documents it should accept | `6cc0b8d` | no | `tests/test_ir_registered_docs.mjs` | open: fix not in this tree |
-| A module from `ata-validator/ir` called the shared defaults pass for defaults that pass cannot reach. | threw instead of answering | `86f4a91` | no | `tests/test_ir_registered_docs.mjs` | open: fix not in this tree |
-| The native engine skipped a length, item or property count bound that is not a whole number from zero. | accepted documents it should reject | `d76b4a9` | no | `tests/test_buffer_gate.js`, `tests/test_code_point_pairs.js` | open: fix not in this tree |
-| The small engine that answers a simple schema's first calls read `maxLength: -1` as no bound. | accepted documents it should reject | `8f77b65` | no | `tests/test_code_point_pairs.js` | open: fix not in this tree |
-| The buffer APIs answered from the native walker for a validator with defaults, `coerceTypes` or `removeAdditional`, judging the bytes before those passes. | accepted documents it should reject and rejected documents it should accept | `641f9e2`, `e114137` | no | `tests/test_buffer_gate.js`, `tests/test_buffer_defaults_static.js` | open: fix not in this tree |
-| The native walkers read JSON text that names a member twice, or holds a surrogate escape outside a pair, differently from JSON.parse. | accepted documents it should reject and rejected documents it should accept | `56c03df`, `dbc0434`, `55e89a0`, `b11c120` | no | `tests/test_native_duplicate_names.js` | open: fix not in this tree |
-| A schema holding a value JSON cannot carry (NaN, Infinity, a hole) shared compiled code with the schema its JSON text spells. | accepted documents it should reject | `65332c5`, `a587dbf` | no | `tests/test_compile_cache_unfaithful.js` | open: fix not in this tree |
-| `Validator.fromStandalone()` built its defaults pass from the root schema alone and ran it only in `validate()`. | accepted documents it should reject and rejected documents it should accept | `96e6647` | no | `tests/test_from_standalone_defaults.js` | open: fix not in this tree |
-| A name that is also a keyword, under `properties` or another map of names, was read as the keyword: generated code dropped the schema of a property named `$id`, which the draft-07 and draft-06 meta-schemas constrain; a name spelled `$dynamicRef` threw; the native routing missed a reference behind a property named `const`. | accepted documents it should reject and rejected documents it should accept | `2791680` | no | `tests/test_keyword_named_names.js` | open: fix not in this tree |
+| A `$ref` that does not resolve, inside a document given through `schemas` and reached through another reference: generated code and the modules wrote no check for it. | accepted documents it should reject | `3429ae8`, `45052bb` | yes | `tests/test_registered_ref_resolution.js`, `tests/test_codegen_entrypoint_agreement.js` | closed |
+| The defaults, `removeAdditional` and `coerceTypes` passes followed a relative `$ref` into another document by path suffix. | filled, removed or coerced by one document while validation read another | `bb8a738`, `73d307f` | yes | `tests/test_registered_ref_resolution.js` | closed |
+| A cycle of references across registered documents reached the verdict generator as written, and it wrote no check for the reference back. | accepted documents it should reject | `8f41bb7` | yes | `tests/test_registered_ref_resolution.js` | closed |
+| A local definition reached again through an anchor, or an anchor that refers to itself, on a cycle the generator does not detect. | accepted documents it should reject | `3953dcd` | yes | `tests/test_registered_ref_resolution.js` | closed |
+| `minLength` and `maxLength` in the interpreted engine counted a lone high surrogate and the unit after it as one code point. | accepted documents it should reject | `dc9bf05` | yes | `tests/test_code_point_pairs.js` | closed |
+| `enum`, `const` and `uniqueItems` compared two objects by the keys of one side only, for objects with a non-enumerable own property. | the answer depended on the order of the two values compared | `333707e`, `95f3e90` | yes | `tests/test_deep_equal_enumerable.js` | closed |
+| A module from `ata-validator/ir` for a schema with `propertyDependencies` or draft-07 `dependencies` did not declare the object flag it reads. | threw instead of answering | `57a1e22` | yes | `tests/test_ir_object_flag.mjs` | closed |
+| `propertyNames` with `minLength` or `maxLength` counted UTF-16 units in the three code generators, where the interpreted engine counts code points. | accepted documents it should reject and rejected documents it should accept | `05ab41e` | yes | `tests/test_code_point_pairs.js` | closed |
+| The closure compiler compared `enum`, `const` and `uniqueItems` values by a canonical string that wrote a string inside an array without quotes. | accepted documents it should reject and rejected documents it should accept | `96849ae` | yes | `tests/test_closure_equality.js` | closed |
+| A schema reached by a JSON pointer through a name no keyword reads had its own references resolved against the root. | accepted documents it should reject | `b42396e`, `7ab4de4` | yes | `tests/test_registered_ref_resolution.js`, `tests/test_ir_registered_docs.mjs` | closed |
+| `ata-validator/ir` registered a draft-07 document whose root is a `$ref` under no name. | rejected documents it should accept | `6cc0b8d` | yes | `tests/test_ir_registered_docs.mjs` | closed |
+| A module from `ata-validator/ir` called the shared defaults pass for defaults that pass cannot reach. | threw instead of answering | `86f4a91` | yes | `tests/test_ir_registered_docs.mjs` | closed |
+| The native engine skipped a length, item or property count bound that is not a whole number from zero. | accepted documents it should reject | `d76b4a9` | yes | `tests/test_buffer_gate.js`, `tests/test_code_point_pairs.js` | closed |
+| The small engine that answers a simple schema's first calls read `maxLength: -1` as no bound. | accepted documents it should reject | `8f77b65` | yes | `tests/test_code_point_pairs.js` | closed |
+| The buffer APIs answered from the native walker for a validator with defaults, `coerceTypes` or `removeAdditional`, judging the bytes before those passes. | accepted documents it should reject and rejected documents it should accept | `641f9e2`, `e114137` | yes | `tests/test_buffer_gate.js`, `tests/test_buffer_defaults_static.js` | closed |
+| The native walkers read JSON text that names a member twice, or holds a surrogate escape outside a pair, differently from JSON.parse. | accepted documents it should reject and rejected documents it should accept | `56c03df`, `dbc0434`, `55e89a0`, `b11c120` | yes | `tests/test_native_duplicate_names.js` | closed |
+| A schema holding a value JSON cannot carry (NaN, Infinity, a hole) shared compiled code with the schema its JSON text spells. | accepted documents it should reject | `65332c5`, `a587dbf` | yes | `tests/test_compile_cache_unfaithful.js` | closed |
+| `Validator.fromStandalone()` built its defaults pass from the root schema alone and ran it only in `validate()`. | accepted documents it should reject and rejected documents it should accept | `96e6647` | yes | `tests/test_from_standalone_defaults.js` | closed |
+| A name that is also a keyword, under `properties` or another map of names, was read as the keyword: generated code dropped the schema of a property named `$id`, which the draft-07 and draft-06 meta-schemas constrain; a name spelled `$dynamicRef` threw; the native routing missed a reference behind a property named `const`. | accepted documents it should reject and rejected documents it should accept | `2791680` | yes | `tests/test_keyword_named_names.js` | closed |
 
 ## Not covered
 
@@ -203,31 +203,12 @@ The classes found by the sweep of 1.x for answers that differ between paths, one
 
 ## Known open items
 
-- Sweep class open in this tree: A `$ref` that does not resolve, inside a document given through `schemas` and reached through another reference: generated code and the modules wrote no check for it.
-- Sweep class open in this tree: The defaults, `removeAdditional` and `coerceTypes` passes followed a relative `$ref` into another document by path suffix.
-- Sweep class open in this tree: A cycle of references across registered documents reached the verdict generator as written, and it wrote no check for the reference back.
-- Sweep class open in this tree: A local definition reached again through an anchor, or an anchor that refers to itself, on a cycle the generator does not detect.
-- Sweep class open in this tree: `minLength` and `maxLength` in the interpreted engine counted a lone high surrogate and the unit after it as one code point.
-- Sweep class open in this tree: `enum`, `const` and `uniqueItems` compared two objects by the keys of one side only, for objects with a non-enumerable own property.
-- Sweep class open in this tree: A module from `ata-validator/ir` for a schema with `propertyDependencies` or draft-07 `dependencies` did not declare the object flag it reads.
-- Sweep class open in this tree: `propertyNames` with `minLength` or `maxLength` counted UTF-16 units in the three code generators, where the interpreted engine counts code points.
-- Sweep class open in this tree: The closure compiler compared `enum`, `const` and `uniqueItems` values by a canonical string that wrote a string inside an array without quotes.
-- Sweep class open in this tree: A schema reached by a JSON pointer through a name no keyword reads had its own references resolved against the root.
-- Sweep class open in this tree: `ata-validator/ir` registered a draft-07 document whose root is a `$ref` under no name.
-- Sweep class open in this tree: A module from `ata-validator/ir` called the shared defaults pass for defaults that pass cannot reach.
-- Sweep class open in this tree: The native engine skipped a length, item or property count bound that is not a whole number from zero.
-- Sweep class open in this tree: The small engine that answers a simple schema's first calls read `maxLength: -1` as no bound.
-- Sweep class open in this tree: The buffer APIs answered from the native walker for a validator with defaults, `coerceTypes` or `removeAdditional`, judging the bytes before those passes.
-- Sweep class open in this tree: The native walkers read JSON text that names a member twice, or holds a surrogate escape outside a pair, differently from JSON.parse.
-- Sweep class open in this tree: A schema holding a value JSON cannot carry (NaN, Infinity, a hole) shared compiled code with the schema its JSON text spells.
-- Sweep class open in this tree: `Validator.fromStandalone()` built its defaults pass from the root schema alone and ran it only in `validate()`.
-- Sweep class open in this tree: A name that is also a keyword, under `properties` or another map of names, was read as the keyword: generated code dropped the schema of a property named `$id`, which the draft-07 and draft-06 meta-schemas constrain; a name spelled `$dynamicRef` threw; the native routing missed a reference behind a property named `const`.
 - The error order exception "unevaluatedItems with $dynamicRef" in `scripts/gate.js`.
 - 250 documents differ in the gate.
 
 ## Reproduce
 
-From a clean clone at the commit that adds this file, whose code is that of `01be37e`, with Node and git:
+From a clean clone at the commit that adds this file, whose code is that of `a96a095`, with Node and git:
 
 ```sh
 git clone https://github.com/ata-core/ata-validator.git && cd ata-validator
@@ -246,7 +227,7 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
 {
  "format": "ata-correctness-report/1",
  "tree": {
-  "commit": "01be37e80530eadfb7637ecdb7e8b156047b3655",
+  "commit": "a96a095724b5bbe48bd84f5eb5b75e7f9c06a080",
   "version": "1.66.0",
   "uncommitted": []
  },
@@ -1306,15 +1287,15 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
  "sweep": [
   {
    "id": "ref-unresolved-registered",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "3429ae8",
-     "inTree": false
+     "inTree": true
     },
     {
      "commit": "45052bb",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1322,28 +1303,28 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_registered_ref_resolution.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     },
     {
      "file": "tests/test_codegen_entrypoint_agreement.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "ref-preprocess-suffix",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "bb8a738",
-     "inTree": false
+     "inTree": true
     },
     {
      "commit": "73d307f",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1351,18 +1332,18 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_registered_ref_resolution.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "ref-cycle-documents",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "8f41bb7",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1370,18 +1351,18 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_registered_ref_resolution.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "ref-cycle-local",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "3953dcd",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1389,18 +1370,18 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_registered_ref_resolution.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "length-lone-high-surrogate",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "dc9bf05",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1408,22 +1389,22 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_code_point_pairs.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "equality-enumerable",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "333707e",
-     "inTree": false
+     "inTree": true
     },
     {
      "commit": "95f3e90",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1431,18 +1412,18 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_deep_equal_enumerable.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "ir-object-flag",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "57a1e22",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1450,18 +1431,18 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_ir_object_flag.mjs",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "property-names-length",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "05ab41e",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1469,18 +1450,18 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_code_point_pairs.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "closure-equality",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "96849ae",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1488,22 +1469,22 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_closure_equality.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "ref-pointer-base",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "b42396e",
-     "inTree": false
+     "inTree": true
     },
     {
      "commit": "7ab4de4",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1511,24 +1492,24 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_registered_ref_resolution.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     },
     {
      "file": "tests/test_ir_registered_docs.mjs",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "ir-draft7-root-ref",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "6cc0b8d",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1536,18 +1517,18 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_ir_registered_docs.mjs",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "ir-unreachable-defaults",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "86f4a91",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1555,18 +1536,18 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_ir_registered_docs.mjs",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "native-count-bounds",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "d76b4a9",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1574,24 +1555,24 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_buffer_gate.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     },
     {
      "file": "tests/test_code_point_pairs.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "small-engine-negative-max",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "8f77b65",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1599,22 +1580,22 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_code_point_pairs.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "buffer-preprocess",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "641f9e2",
-     "inTree": false
+     "inTree": true
     },
     {
      "commit": "e114137",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1622,36 +1603,36 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_buffer_gate.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     },
     {
      "file": "tests/test_buffer_defaults_static.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "native-repeated-names",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "56c03df",
-     "inTree": false
+     "inTree": true
     },
     {
      "commit": "dbc0434",
-     "inTree": false
+     "inTree": true
     },
     {
      "commit": "55e89a0",
-     "inTree": false
+     "inTree": true
     },
     {
      "commit": "b11c120",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1659,22 +1640,22 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_native_duplicate_names.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "cache-key-unfaithful",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "65332c5",
-     "inTree": false
+     "inTree": true
     },
     {
      "commit": "a587dbf",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1682,18 +1663,18 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_compile_cache_unfaithful.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "from-standalone-defaults",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "96e6647",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1701,18 +1682,18 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_from_standalone_defaults.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   },
   {
    "id": "keyword-named-names",
-   "inTree": false,
+   "inTree": true,
    "fixes": [
     {
      "commit": "2791680",
-     "inTree": false
+     "inTree": true
     }
    ],
    "tests": [
@@ -1720,10 +1701,10 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "file": "tests/test_keyword_named_names.js",
      "present": true,
      "listed": true,
-     "result": "not run"
+     "result": "passed"
     }
    ],
-   "closed": false
+   "closed": true
   }
  ]
 }
