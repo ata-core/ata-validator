@@ -224,6 +224,15 @@ export function compiledModuleFor(schema: unknown, opts?: { format?: 'esm' | 'cj
 export const compiledOptions: readonly string[];
 
 /**
+ * The Validator options a build reproduces in the module that
+ * `ata-validator/ir`'s `specialize()` writes, rather than in the wrapper:
+ * `assertFormat`, `formats` given as functions (each a call in the module,
+ * bound with the module's `setFormats()`), and `schemas` resolved at build
+ * time. `fromCompiled()` still refuses them. Absent before this release.
+ */
+export const compiledBuildOptions: readonly string[];
+
+/**
  * The Bun target, for a build plugin: the schema as a TypeScript type and the
  * `.bun.ts` module `ata build --target bun` writes beside a compiled module.
  * With `tags: true` the type carries Bun's `Schema` tags and `residual` holds

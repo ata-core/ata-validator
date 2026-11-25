@@ -16,4 +16,5 @@ export const defaultsSource = mod.defaultsSource;
 export const bunTarget = mod.bunTarget;
 export const verify = mod.verify;
 export const compiledOptions = mod.compiledOptions;
+export const compiledBuildOptions = mod.compiledBuildOptions;
 export default mod;

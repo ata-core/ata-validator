@@ -6,6 +6,22 @@
 const { Validator } = require('ata-validator');
 ```
 
+This page describes the Validator of the Node entries. From 2.0 a browser bundle
+(the `browser` export condition) and a Workers or Vercel Edge bundle (`workerd`,
+`edge-light`) resolve `ata-validator` to the 2.0 entries, which export
+`Validator` alone with `validate`, `isValidObject`, `validateJSON`,
+`isValidJSON`, `addSchema`, `~standard` and `Validator.use()`. What they take
+and what they refuse is in [migration-2.0.md](migration-2.0.md). Everything on this
+page is also `ata-validator/v1`, under every condition.
+
+### Validator.use(...features)
+
+On the 2.0 entries, registers features (`ata-validator/features/<name>`) for
+every Validator of the bundle: `richErrors`, `verbose`, `coerceTypes`,
+`removeAdditional`, `errorMessages`, `metaschemas`. On the Node entries the
+Validator carries all of them, and the call does nothing and returns the class,
+so code that runs on both sides can call it unconditionally.
+
 ### new Validator(schema, options?)
 
 Creates a validator instance. Does not compile anything until first use (lazy compilation).
@@ -262,8 +278,9 @@ serve it from your own server.
 ### tablePlan(schema, options?), ata-validator/ir
 
 Returns a `Plan` object, or `null` where the table backend does not cover the schema. Options:
-`richErrors` (default `true`), `useDefaults` (default `true`), `assertFormat` (default `true`);
-any other option makes it return `null`. On 1.63.1 a plan takes types, properties, required,
+`richErrors` (default `true`), `useDefaults` (default `true`), `assertFormat` (default `true`),
+and `strictRefs`, which returns `null` for a `$ref` that resolves to nothing; any other option
+makes it return `null`, and so does a format given as a function. On 1.63.1 a plan takes types, properties, required,
 additionalProperties, enum, const, the string, number and array bounds, format, pattern, nested
 objects and arrays, allOf, `$ref` within the document, not, if, dependentRequired and defaults;
 a `$ref` to another document, the unevaluated keywords, dynamic references, `anyOf`, `oneOf`,
@@ -302,7 +319,13 @@ v.validate(data)
 
 The same plan as JavaScript module source (a string), or `null` where `tablePlan` would return
 `null`, for a build that writes the module to disk; it imports the interpreter and the handlers
-it names from `ata-validator/kernels`. Takes the same options as `tablePlan`.
+it names from `ata-validator/kernels`. Takes the same options as `tablePlan`, and `formats`
+with `holes: true`, which takes a format given as a function, as `specialize` does: the module exports
+`formatHoles` (the names) and `setFormats(formats)`, which takes each function by name from the
+object's own properties, throws for a name with no function, and builds the plan. Until
+`setFormats()` has run, `isValid` and `validate` throw on every document. Without `holes` a
+function format returns `null`, and `tablePlan` returns `null` for one in every case, since a
+plan sent as data cannot carry a function. The table backend does not take `schemas`.
 
 ### closureModule(schema, options), ata-validator/ir
 
@@ -918,11 +941,17 @@ Without it a browser bundle checks a `hostname` for letters, digits and
 hyphens only and treats `idn-hostname` as an annotation, as releases before
 1.64.0 did everywhere.
 
-The `patternFallback` option works the same way. Node has it with no setup; a
-bundle for a page or a Worker leaves it out, and refuses the option, until the
-application imports it once (3393 bytes gzipped in a browser bundle, 3442 in a
-Workers bundle, most of it the linearity proof):
+The `patternFallback` option is left out of browser and Workers bundles too. Node
+has it with no setup. The 2.0 entry that such a bundle gets refuses the option
+with `ata2: option patternFallback` until the application registers it once
+(4,009 B gzipped in a browser bundle, 3,064 in a Workers bundle, most of it the
+linearity proof):
 
 ```javascript
-import 'ata-validator/pattern-fallback';
+import { Validator } from 'ata-validator';
+import { patternFallback } from 'ata-validator/features/patternFallback';
+Validator.use(patternFallback);
 ```
+
+`ata-validator/v1` in such a bundle takes the option after
+`import 'ata-validator/pattern-fallback'`.

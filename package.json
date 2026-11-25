@@ -1,6 +1,6 @@
 {
   "name": "ata-validator",
-  "version": "1.66.0",
+  "version": "2.0.0-rc.0",
   "description": "JSON Schema validator that compiles to plain JavaScript, still runs where code generation is blocked, and can be compiled away at build time. Passes the full official test suite.",
   "type": "commonjs",
   "main": "index.js",
@@ -13,6 +13,30 @@
         "import": "./index.aot.mjs",
         "require": "./index.aot.js"
       },
+      "workerd": {
+        "types": "./index.v2.d.ts",
+        "import": "./index.v2.edge.mjs",
+        "require": "./index.v2.edge.js"
+      },
+      "edge-light": {
+        "types": "./index.v2.d.ts",
+        "import": "./index.v2.edge.mjs",
+        "require": "./index.v2.edge.js"
+      },
+      "browser": {
+        "types": "./index.v2.d.ts",
+        "import": "./index.v2.browser.mjs",
+        "require": "./index.v2.browser.js"
+      },
+      "types": "./index.d.ts",
+      "import": {
+        "module": "./index.bundle.mjs",
+        "module-sync": "./index.node.mjs",
+        "default": "./index.mjs"
+      },
+      "require": "./index.js"
+    },
+    "./v1": {
       "workerd": {
         "types": "./index.d.ts",
         "import": "./index.edge.mjs",
@@ -88,6 +112,17 @@
       "types": "./compiled-standard.d.ts",
       "import": "./compiled-standard.mjs",
       "default": "./lib/compiled-standard.js"
+    },
+    "./features": {
+      "types": "./features/index.d.ts",
+      "import": "./features/index.mjs"
+    },
+    "./features/*": {
+      "types": "./features/*.d.ts",
+      "default": "./lib/features/*.js"
+    },
+    "./v2/plugin-core": {
+      "import": "./index.v2.core.mjs"
     },
     "./stream": {
       "types": "./stream.d.ts",
@@ -239,12 +274,20 @@
     "index.browser.mjs",
     "index.edge.js",
     "index.edge.mjs",
+    "index.v2.browser.mjs",
+    "index.v2.browser.js",
+    "index.v2.edge.mjs",
+    "index.v2.edge.js",
+    "index.v2.core.mjs",
+    "index.v2.d.ts",
+    "features/",
     "index.d.ts",
     "aot.js",
     "aot.mjs",
     "aot.d.ts",
     "lib/",
     "!lib/plan-source.js",
+    "!lib/core/engine.js",
     "compat.js",
     "compat.mjs",
     "compat.d.ts",
@@ -298,13 +341,13 @@
     "pattern-fallback.d.ts"
   ],
   "optionalDependencies": {
-    "@ata-validator/native-darwin-arm64": "1.66.0",
-    "@ata-validator/native-darwin-x64": "1.66.0",
-    "@ata-validator/native-linux-arm64-gnu": "1.66.0",
-    "@ata-validator/native-linux-arm64-musl": "1.66.0",
-    "@ata-validator/native-linux-x64-gnu": "1.66.0",
-    "@ata-validator/native-linux-x64-musl": "1.66.0",
-    "@ata-validator/native-win32-x64": "1.66.0"
+    "@ata-validator/native-darwin-arm64": "2.0.0-rc.0",
+    "@ata-validator/native-darwin-x64": "2.0.0-rc.0",
+    "@ata-validator/native-linux-arm64-gnu": "2.0.0-rc.0",
+    "@ata-validator/native-linux-arm64-musl": "2.0.0-rc.0",
+    "@ata-validator/native-linux-x64-gnu": "2.0.0-rc.0",
+    "@ata-validator/native-linux-x64-musl": "2.0.0-rc.0",
+    "@ata-validator/native-win32-x64": "2.0.0-rc.0"
   },
   "peerDependencies": {
     "yaml": "^2.0.0"

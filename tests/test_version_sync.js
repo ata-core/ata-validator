@@ -37,9 +37,11 @@ const triple = ['MAJOR', 'MINOR', 'REVISION'].map((part) => {
   assert.ok(m, `include/ata.h: VERSION_${part} constant not found`);
   return m[1];
 }).join('.');
+// The triple has no room for a prerelease suffix (2.0.0-rc.0): it carries
+// the release the prerelease leads to, and the define carries the whole name.
 assert.strictEqual(
   triple,
-  pkg.version,
+  pkg.version.replace(/-.*$/, ''),
   `include/ata.h VERSION_* constants (${triple}) are out of sync with package.json (${pkg.version}).`,
 );
 

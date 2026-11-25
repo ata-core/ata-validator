@@ -103,25 +103,28 @@ npm install ata-validator --omit=optional
 
 or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; shapes the compiler cannot represent (some `$dynamicRef`, cyclic `$ref`, unusual keyword interactions) fall back to an interpreted engine, so every schema validates in every environment. The pure-JS setup scores the same on the official suite as the native one, 1300 of 1300 Draft 2020-12 cases. The buffer and parallel APIs (`isValid` on raw buffers, `isValidPrepadded`, `isValidNDJSON`, `isValidParallel`, `countValid`, `batchIsValid`, `validateAndParse`) work without the addon too, answering through the same checks as `isValidJSON()`, slower than the addon: 177 ns against 92 for a small document on Node 25. In a browser, which has no `Buffer`, they throw and name the methods to use instead.
 
-In Cloudflare Workers and Vercel Edge, where generated code cannot run, `ata-validator`
-resolves to an entry without the code generator through the `workerd` and `edge-light` export
-conditions: the same names and answers, and a Worker bundled by wrangler goes from 179.1 to
-70.4 KiB gzipped.
+From 2.0, a browser bundle and a Workers or Vercel Edge bundle get a smaller Validator than Node
+does. The `browser` export condition resolves to the 2.0 browser entry and `workerd` and
+`edge-light` to the 2.0 edge entry. Both export `Validator` alone and generate no code. For a page whose only import is `import { Validator } from 'ata-validator'`
+(esbuild, minified, gzip level 9) the first load is 26,560 B where 1.66.0 was 58,843 B, and a
+Workers bundle is 51,115 B where it was 68,579 B.
+
+On those entries an error has five fields (`keyword`, `instancePath`, `schemaPath`, `params`,
+`message`) until the page registers the rich ones, and a few options are features to register
+the same way:
+
+```js
+import { Validator } from 'ata-validator'
+import { richErrors } from 'ata-validator/features/richErrors'
+Validator.use(richErrors)   // 5,209 B more; a no-op on the Node entry
+```
+
+Something a validator needs that is not registered is refused by name, with an error that
+starts with `ata2:`, never answered without it. The 1.x Validator, with `validate()`,
+`compile()`, custom keywords and every other name, is `ata-validator/v1` under every condition.
+What changes for code written for 1.x is in [docs/migration-2.0.md](docs/migration-2.0.md).
 
 In a browser, compile with the bundler plugin: see [In the browser](#in-the-browser).
-
-Without the plugin, the code generator is still not part of the page. Every schema starts on the
-interpreted engine, which gives the same answers, and a validator called a thousand times within
-a second loads the generator in the background, through a dynamic import that Vite, webpack and
-Rollup put in a chunk of their own, and is rebuilt on generated code when the page is idle. A
-form, checked as the user types, never loads it. On a react-jsonschema-form page this takes the validator's
-share of the first load from 134.7 KB to about 55 KB gzipped; the generator chunk is about 78 KB
-more when it does load, and the plan compiler, which speeds up a schema the interpreted engine checks
-often, comes in a 6 KB chunk once the page is idle. Where `unsafe-eval` is blocked, on a page with a strict
-Content-Security-Policy or in a Manifest V3 extension, it is never fetched and every schema
-stays on the interpreted engine. To have generated code from the first call, import
-`ata-validator/codegen` once; it also makes `parse()` available in the browser, which otherwise
-waits for the generator.
 
 On Deno the same package is `npm:ata-validator` or `jsr:@ata/validator`; the JSR package
 re-exports the npm one at the same version, and CI runs the official suite under Deno. The
@@ -682,7 +685,7 @@ const RE2 = require('re2');
 const v = new Validator(toolSchema, { patternFallback: (source, flags) => new RE2(source, flags) });
 ```
 
-Patterns the linear engine runs are not affected, and with no such pattern in the schema a validator compiles as it would without the option. The schema is scanned when the validator is built, every object in it, `default`, `const` and `enum` values included, since a `$ref` can point anywhere. The Node entry carries the option; a bundle for a page or a Worker adds it with `import 'ata-validator/pattern-fallback'` once (3442 bytes gzipped in a Workers bundle, 3393 in a browser bundle, most of it the linearity proof) and refuses it without that import. `ata build --pattern-fallback reject` and `build({ patternFallback: 'reject' })` fail an input with such a pattern. A function cannot be written into a compiled module, so `ata build`, the bundle methods and `Validator.fromStandalone()` throw for one.
+Patterns the linear engine runs are not affected, and with no such pattern in the schema a validator compiles as it would without the option. The schema is scanned when the validator is built, every object in it, `default`, `const` and `enum` values included, since a `$ref` can point anywhere. The Node entry carries the option. A browser or Workers bundle, which gets the 2.0 entry, refuses it with `ata2: option patternFallback` until the application registers it once with `Validator.use(patternFallback)`, imported from `ata-validator/features/patternFallback` (4,009 B gzipped in a browser bundle, 3,064 in a Workers bundle, most of it the linearity proof). `ata-validator/v1` in such a bundle takes the option after `import 'ata-validator/pattern-fallback'`. `ata build --pattern-fallback reject` and `build({ patternFallback: 'reject' })` fail an input with such a pattern. A function cannot be written into a compiled module, so `ata build`, the bundle methods and `Validator.fromStandalone()` throw for one.
 
 ### Build-time compile (`ata compile`)
 

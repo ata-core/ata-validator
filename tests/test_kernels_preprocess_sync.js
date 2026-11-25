@@ -4,5 +4,5 @@
 const assert = require('assert');
 const fs = require('fs');
 const { render, file } = require('../scripts/gen-kernels-preprocess.js');
-assert.strictEqual(fs.readFileSync(file, 'utf8'), render(), 'lib/kernels/preprocess.mjs differs from lib/validator-core.js; run node scripts/gen-kernels-preprocess.js');
-console.log('ok: lib/kernels/preprocess.mjs matches lib/validator-core.js');
+assert.strictEqual(fs.readFileSync(file, 'utf8'), render(), 'lib/kernels/preprocess.mjs differs from its sources; run node scripts/gen-kernels-preprocess.js');
+console.log('ok: lib/kernels/preprocess.mjs matches its sources');

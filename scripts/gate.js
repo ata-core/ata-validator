@@ -23,6 +23,8 @@
 //   node scripts/gate.js --schemastore <dir> SchemaStore's samples as well
 //   node scripts/gate.js --paths a,b         only these paths
 //   node scripts/gate.js --json <file>       the counts as JSON as well
+//   node scripts/gate.js --assert-format-off every path built with
+//                                            assertFormat: false (see OFF below)
 //
 // scripts/gate-report.js writes docs/correctness-report.md from --json.
 // tests/test_gate_suite.js runs the first form in `npm test`.
@@ -47,6 +49,8 @@ const ATA_VERSION = require(path.join(ROOT, 'lib/version'));
 const RICH = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'message', 'expected', 'received', 'detail', 'suggestion', 'related', 'rank', 'docUrl'];
 const MODULE = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'message', 'docUrl'];
 const PLAIN = ['keyword', 'instancePath', 'schemaPath', 'params', 'message'];
+const VERBOSE = RICH.concat(['parentSchema', 'schema', 'data']);
+const PLAIN_VERBOSE = PLAIN.concat(['parentSchema', 'schema', 'data']);
 const pick = (fields) => function f(e) { return fields.map((k) => e[k]).concat([Array.isArray(e.branchErrors) ? e.branchErrors.map(f) : null]); };
 
 // The real path: require.cache is keyed by it, and on macOS the temporary
@@ -78,10 +82,114 @@ async function loadIr() {
   K = await import(at('lib/kernels/index.mjs'));
   plans = await import(at('lib/kernels/plan-rich.mjs'));
   ({ functionBody } = await import(at('lib/ir/emit.mjs')));
+  // The 2.0 features, for the v2 paths: loaded here so that a caller that
+  // takes PATHS without run() (tests/test_keyword_named_names.js) has them.
+  v2f = await import(at('index.v2.features.mjs'));
 }
 const irModule = (src) => new Function('K', functionBody(src))(K);
 const irData = (src) => { const m = /^import \{([^}]*)\} from "[^"\n]*"\n/.exec(src); return new Function('K', `const {${m[1]}}=K\n` + src.slice(m[0].length).replace(/^export const\{isValid,validate\}=/m, 'const{isValid,validate}=') + 'return{isValid,validate}')(K); };
 const irRefused = (e) => e && typeof e.message === 'string' && e.message.startsWith('ir:');
+
+// The 2.0 Validator's paths, from a bundle of one of its entries. `rich`: the
+// bundle registers the richErrors feature, so the errors carry the rich
+// fields; without it they are held to the fields and the key set of the
+// Validator's `richErrors: false` errors.
+function v2Paths(bundle, label, rich) {
+  const F = rich ? RICH : PLAIN;
+  const VF = rich ? VERBOSE : PLAIN_VERBOSE;
+  const R = (o) => (rich ? o : { ...o, richErrors: false });
+  const keys = !rich;
+  const v2 = (opts) => async (s, o) => {
+    const B = await import(require('node:url').pathToFileURL(bundle).href);
+    const out = (e) => { if (e && /^ata2:/.test(String(e.message))) { const k = String(e.message).slice(6, 60); (globalThis.__ata2 || (globalThis.__ata2 = {}))[k] = (globalThis.__ata2[k] || 0) + 1; return true; } return false; };
+    try { const v = new B.Validator(s, o ? { ...o, ...opts } : opts); v.isValidObject(null); v.validate(null); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } catch (e) { if (out(e)) return null; throw e; }
+  };
+  return {
+    [label]: { fields: F, keys, ref: R(undefined), fills: true, async: true, build: v2(undefined) },
+    [label + ', plain errors']: { fields: PLAIN, ref: { richErrors: false }, fills: true, async: true, build: v2({ richErrors: false }) },
+    // Without the rich fields, the messages are still the Validator's default ones.
+    ...(rich ? {} : { [label + ', messages']: { fields: PLAIN.slice(), fills: true, async: true, build: v2(undefined) } }),
+    [label + ', no defaults']: { fields: F, keys, ref: R({ useDefaults: false }), fills: true, async: true, build: v2({ useDefaults: false }) },
+    [label + ', formats off']: { fields: F, keys, ref: R({ assertFormat: false }), fills: true, async: true, build: v2({ assertFormat: false }) },
+    [label + ', verbose']: { fields: VF, keys, ref: R({ verbose: true }), fills: true, async: true, build: v2({ verbose: true }) },
+    [label + ', abortEarly']: { fields: MODULE, ref: { abortEarly: true, engine: 'interpreter' }, fills: true, async: true, build: v2({ abortEarly: true }) },
+    [label + ', coerce']: { fields: F, keys, ref: R({ coerceTypes: true }), fills: true, async: true, build: v2({ coerceTypes: true }) },
+    [label + ', coerce array']: { fields: F, keys, ref: R({ coerceTypes: 'array' }), fills: true, async: true, build: v2({ coerceTypes: 'array' }) },
+    [label + ', remove']: { fields: F, keys, ref: R({ removeAdditional: true }), fills: true, async: true, build: v2({ removeAdditional: true }) },
+    [label + ', tiered up']: { fields: F, keys, ref: R(undefined), fills: true, async: true, build: async (s, o) => { const b = await v2(undefined)(s, o); if (b === null) return null; const B = await import(require('node:url').pathToFileURL(bundle).href); const v = new B.Validator(s, o); if (!(await v._tierUp())) throw new Error('tier-up refused'); const tag = (f) => (d) => { try { return f(d); } catch (e) { e.message += ' | schema ' + JSON.stringify(s).slice(0, 400) + ' | doc ' + JSON.stringify(d).slice(0, 200); throw e; } }; return { validate: tag((d) => { const r = v.validate(d); if (!r.valid) r.errors.length; return r; }), isValid: tag((d) => v.isValidObject(d)) }; } },
+    [label + ', JSON text']: { fields: F, keys, ref: R(undefined), json: true, fills: false, async: true, build: async (s, o) => { const b = await v2(undefined)(s, o); if (b === null) return null; const B = await import(require('node:url').pathToFileURL(bundle).href); const v = new B.Validator(s, o); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
+    // The first call is validate here, after which an entry may compile its
+    // verdicts at a later call.
+    [label + ', validate first']: { fields: F, keys, ref: R(undefined), fills: true, async: true, build: async (s, o) => {
+      const B = await import(require('node:url').pathToFileURL(bundle).href);
+      try { const v = new B.Validator(s, o); v.validate(null); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } catch (e) { if (e && /^ata2:/.test(String(e.message))) return null; throw e; }
+    } },
+  };
+}
+
+// The small engine, with every schema-decided group registered (lib/groups.js)
+// as the full 2.0 entries have them. Held here: the core paths below load
+// copies of their own.
+const { createSmall } = require(path.join(ROOT, 'lib/engine-small.js'));
+require(path.join(ROOT, 'lib/validator-small.js')).Validator.use(...require(path.join(ROOT, 'lib/features/groups.js')).all);
+
+// The plugin's core (index.v2.core.mjs) with exactly the features
+// featuresFor() names registered. The registry is the module's, and the
+// pieces the engine reads are lib/groups.js's, so each set of features gets
+// its own copy of the two and of the engine that reads them: a schema built
+// with fewer features than it needs is refused, never answered by what an
+// earlier schema registered. tests/test_v2_core_features.js holds the same
+// copies to refusing when one feature is withheld.
+let v2f = null;
+const cores = new Map();
+const FRESH = ['validator-small.js', 'groups.js', 'engine-small.js'].map((f) => path.join(ROOT, 'lib', f));
+function coreWith(names) {
+  const key = [...names].sort().join(',');
+  let V = cores.get(key);
+  if (V === undefined) {
+    for (const f of FRESH) delete require.cache[f];
+    const small = require(FRESH[0]); V = small.Validator;
+    if (names.length) V.use(...names.map((n) => v2f[n]));
+    for (const f of FRESH) delete require.cache[f];
+    cores.set(key, V);
+  }
+  return V;
+}
+// The core paths: each schema with options, and optionally registered
+// through `schemas` behind a $ref (`wrap`), on the core with exactly the
+// features featuresFor() names, against the Validator built the same way.
+const asDoc = (s) => { const id = typeof s.$id === 'string' && s.$id !== '' && s.$id[0] !== '#' ? s.$id : 'https://example.com/gate-root.json'; return [id, id === s.$id ? s : { ...s, $id: id }]; };
+const wrapped = (s, opts) => { const [id, doc] = asDoc(s); return [typeof s.$schema === 'string' ? { $schema: s.$schema, $ref: id } : { $ref: id }, { ...opts, schemas: [doc] }]; };
+// A boolean schema cannot be a registered document with an $id, so it is given directly.
+const isDoc = (s) => s !== null && typeof s === 'object' && !Array.isArray(s);
+function corePath(opts, wrap) {
+  // `--assert-format-off` (OFF, below) joins the options of every core path.
+  const make = (s) => { const O = OFF ? { ...OFF, ...opts } : opts; return wrap && isDoc(s) ? wrapped(s, O) : [s, O]; };
+  return {
+    fields: PLAIN, ref: { ...opts, richErrors: false }, fills: true,
+    // Registered behind a $ref, the reference is the 2.0 Validator with every
+    // feature but the error-shape ones registered, built the same way: the 1.x
+    // Validator reads a relative reference inside a registered document
+    // differently (SchemaStore's foundryvtt and cinnamon schemas), which is
+    // not a question of features.
+    refMake: wrap ? (s) => { const [r, o] = make(s); try { const v = new (coreWith(FULL))(r, o); v.isValidObject(null); return v; } catch (e) { if (/^ata2:/.test(String(e && e.message))) return null; throw e; } } : null,
+    build: (s) => {
+      const [r, o] = make(s);
+      const V = coreWith(v2f.featuresFor(r, o));
+      const v = new V(r, o); v.isValidObject(null); v.validate(null);
+      return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) };
+    },
+  };
+}
+const FULL = ['errorMessages', 'metaschemas', 'coerceTypes', 'removeAdditional', 'formatsOff', 'formats', 'uri', 'draft7', 'defaults', 'uniqueItems', 'branchCollapse', 'patterns'];
+const FMT = { date: (x) => /^\d{4}-\d\d-\d\d$/.test(x), uri: (x) => x.includes(':'), email: (x) => x.includes('@') };
+const CORE_PATHS = {
+  'v2 core + featuresFor': corePath({}),
+  'v2 core + featuresFor, no defaults': corePath({ useDefaults: false }),
+  'v2 core + featuresFor, formats off': corePath({ assertFormat: false }),
+  'v2 core + featuresFor, formats given': corePath({ formats: FMT }),
+  'v2 core + featuresFor, schemas map': corePath({}, true),
+};
 
 // A path: build(schema) returns { validate, isValid } or null when it declines
 // the schema. `fields` are the error fields it promises; `ref` the Validator
@@ -90,15 +198,36 @@ const irRefused = (e) => e && typeof e.message === 'string' && e.message.startsW
 // `json` where it answers JSON text. `fills`: it fills defaults itself; a
 // module does not (its caller asks it to), so its reference does not either.
 const PATHS = {
-  'interpreted engine': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s, { engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
-  'generated code, warm': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s); for (let i = 0; i < 80; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
-  'closure tree': { fields: RICH, fills: true, build: (s) => { const v = new Validator(s, { engine: 'interpreter' }); for (let i = 0; i < 1100; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
-  'JSON text': { fields: RICH, json: true, fills: false, build: (s) => { const v = new Validator(s); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
-  'plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => { const v = new Validator(s, { richErrors: false, engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
-  'module': { fields: MODULE, abort: true, ref: { useDefaults: false }, build: (s) => { const src = aot.toStandaloneModule(new Validator(s), { format: 'cjs', order: true, onWarning() {} }); return src ? loadCjs(src) : null; } },
-  'module, one pass': { fields: MODULE, abort: true, ref: { useDefaults: false }, ordered: false, build: (s) => { const src = aot.toStandaloneModule(new Validator(s), { format: 'cjs', onePass: true, onWarning() {} }); return src ? loadCjs(src) : null; } },
-  'module, plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => {
-    if (!build.compiledEligible(s)) return null;
+  'interpreted engine': { fields: RICH, fills: true, build: (s, o) => { const v = new Validator(s, { ...o, engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
+  'generated code, warm': { fields: RICH, fills: true, build: (s, o) => { const v = new Validator(s, o); for (let i = 0; i < 80; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
+  // The small engine (lib/engine-small.js) in the walk's place under the
+  // Validator: not wired into the package yet, so it is put there for the
+  // build of this one instance. Declined where it takes no part (createSmall
+  // returns null and the walk answers).
+  'small engine': { fields: RICH, fills: true, build: (s, o) => {
+    const im = require(path.join(ROOT, 'lib/interpreter.js'));
+    const real = im.createInterpreter; let used = false;
+    im.createInterpreter = (schema, args) => { const e = createSmall(schema, args); if (e === null) return real(schema, args); used = true; return e; };
+    try { const v = new Validator(s, { ...o, engine: 'interpreter' }); v.isValidObject(null); return used ? { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) } : null; } finally { im.createInterpreter = real; }
+  } },
+  // Bundles of candidate 2.0 entries, ESM files that export Validator: the
+  // browser entry (ATA_V2_BUNDLE) and the server and edge entry, the core
+  // its engine (ATA_V2_EDGE_BUNDLE); each also with the richErrors feature
+  // registered (ATA_V2_RICH_BUNDLE, ATA_V2_EDGE_RICH_BUNDLE). A feature the
+  // entry leaves out throws "ata2: ..." and the schema counts as declined.
+  ...(process.env.ATA_V2_BUNDLE ? v2Paths(process.env.ATA_V2_BUNDLE, 'v2 entry', false) : {}),
+  ...(process.env.ATA_V2_RICH_BUNDLE ? v2Paths(process.env.ATA_V2_RICH_BUNDLE, 'v2 entry, rich errors', true) : {}),
+  ...(process.env.ATA_V2_EDGE_BUNDLE ? v2Paths(process.env.ATA_V2_EDGE_BUNDLE, 'v2 edge entry', false) : {}),
+  ...(process.env.ATA_V2_EDGE_RICH_BUNDLE ? v2Paths(process.env.ATA_V2_EDGE_RICH_BUNDLE, 'v2 edge entry, rich errors', true) : {}),
+  ...CORE_PATHS,
+  'closure tree': { fields: RICH, fills: true, build: (s, o) => { const v = new Validator(s, { ...o, engine: 'interpreter' }); for (let i = 0; i < 1100; i++) v.isValidObject(i % 2 ? {} : []); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
+  'JSON text': { fields: RICH, json: true, fills: false, build: (s, o) => { const v = new Validator(s, o); return { validate: (d) => v.validateJSON(JSON.stringify(d)), isValid: (d) => v.isValidJSON(JSON.stringify(d)) }; } },
+  'plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s, o) => { const v = new Validator(s, { ...o, richErrors: false, engine: 'interpreter' }); return { validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) }; } },
+  'module': { fields: MODULE, abort: true, ref: { useDefaults: false }, build: (s, o) => { const src = aot.toStandaloneModule(new Validator(s, o), { format: 'cjs', order: true, onWarning() {} }); return src ? loadCjs(src) : null; } },
+  'module, one pass': { fields: MODULE, abort: true, ref: { useDefaults: false }, ordered: false, build: (s, o) => { const src = aot.toStandaloneModule(new Validator(s, o), { format: 'cjs', onePass: true, onWarning() {} }); return src ? loadCjs(src) : null; } },
+  'module, plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s, o) => {
+    // The module that stands for `new Validator(schema)`: it takes no options.
+    if (o !== undefined || !build.compiledEligible(s)) return null;
     const src = build.compiledModuleFor(s, { format: 'cjs', plainErrors: true, order: true });
     if (!src) return null;
     const v = fromCompiledPlain(loadCjs(src), build.compiledSchemaFor(s), { richErrors: false });
@@ -107,21 +236,21 @@ const PATHS = {
     const unordered = false;
     return { ordered: !unordered, validate: (d) => v.validate(d), isValid: (d) => v.isValidObject(d) };
   } },
-  'compact module': { fields: MODULE, abort: true, ref: { useDefaults: false }, build: (s) => {
-    const v = new Validator(s); const src = aot.toCompactModule(v, { format: 'cjs', errorRuntime: './ata-errors.cjs' });
+  'compact module': { fields: MODULE, abort: true, ref: { useDefaults: false }, build: (s, o) => {
+    const v = new Validator(s, o); const src = aot.toCompactModule(v, { format: 'cjs', errorRuntime: './ata-errors.cjs' });
     return src ? loadWithRuntime(src, 'ata-errors.cjs', errorRuntimeSource('cjs', ATA_VERSION, runtimeFeatures([stripAnnotationsKeepingDefaults(v._schemaObj)]), false)) : null;
   } },
-  'schema module': { fields: MODULE, abort: true, ref: { useDefaults: false }, build: (s) => {
-    const v = new Validator(s); const src = aot.toSchemaModule(v, { format: 'cjs', runtime: './ata-errors.cjs' });
+  'schema module': { fields: MODULE, abort: true, ref: { useDefaults: false }, build: (s, o) => {
+    const v = new Validator(s, o); const src = aot.toSchemaModule(v, { format: 'cjs', runtime: './ata-errors.cjs' });
     return src ? loadWithRuntime(src, 'ata-errors.cjs', errorRuntimeSource('cjs', ATA_VERSION, runtimeFeatures([stripAnnotationsKeepingDefaults(v._schemaObj)]), true)) : null;
   } },
-  'ir module': { fields: RICH, fills: true, build: (s) => { try { return irModule(ir.specialize(s, { verdict: true })); } catch (e) { if (irRefused(e)) return null; throw e; } } },
-  'ir module, plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => { try { return irModule(ir.specialize(s, { verdict: true, richErrors: false })); } catch (e) { if (irRefused(e)) return null; throw e; } } },
-  'ir closures': { fields: RICH, fills: true, build: (s) => { try { return ir.compileClosures(s, {}); } catch (e) { if (irRefused(e)) return null; throw e; } } },
-  'ir table': { fields: RICH, fills: true, build: (s) => { const t = ir.tableModule(s, {}); return t === null ? null : irData(t); } },
-  'ir table, plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s) => { const t = ir.tableModule(s, { richErrors: false }); return t === null ? null : irData(t); } },
-  'ir plan as JSON': { fields: RICH, fills: true, async: true, build: async (s) => { const p = ir.tablePlan(s, {}); return p === null ? null : plans.fromPlan(JSON.parse(JSON.stringify(p))); } },
-  'ir closure module': { fields: PLAIN, ref: { richErrors: false }, build: (s) => { const t = ir.closureModule(s, { richErrors: false }); return t === null ? null : irData(t); } },
+  'ir module': { fields: RICH, fills: true, build: (s, o) => { try { return irModule(ir.specialize(s, { ...o, verdict: true })); } catch (e) { if (irRefused(e)) return null; throw e; } } },
+  'ir module, plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s, o) => { try { return irModule(ir.specialize(s, { ...o, verdict: true, richErrors: false })); } catch (e) { if (irRefused(e)) return null; throw e; } } },
+  'ir closures': { fields: RICH, fills: true, build: (s, o) => { try { return ir.compileClosures(s, { ...o }); } catch (e) { if (irRefused(e)) return null; throw e; } } },
+  'ir table': { fields: RICH, fills: true, build: (s, o) => { const t = ir.tableModule(s, { ...o }); return t === null ? null : irData(t); } },
+  'ir table, plain errors': { fields: PLAIN, ref: { richErrors: false }, fills: true, build: (s, o) => { const t = ir.tableModule(s, { ...o, richErrors: false }); return t === null ? null : irData(t); } },
+  'ir plan as JSON': { fields: RICH, fills: true, async: true, build: async (s, o) => { const p = ir.tablePlan(s, { ...o }); return p === null ? null : plans.fromPlan(JSON.parse(JSON.stringify(p))); } },
+  'ir closure module': { fields: PLAIN, ref: { richErrors: false }, build: (s, o) => { const t = ir.closureModule(s, { ...o, richErrors: false }); return t === null ? null : irData(t); } },
 };
 
 // Differences that are known and written down where they are made, by the
@@ -129,6 +258,7 @@ const PATHS = {
 // gate; removing an entry here is how one of them gets fixed. None now: an
 // array with an own named key was one (generated code read it as an object).
 const KNOWN = {};
+const ORACLE = 'Validator, formats accepting';
 
 // Schemas whose errors come in a different order from generated code than
 // from the interpreted walk (same errors, same verdict). Open, not decided.
@@ -137,6 +267,22 @@ const KNOWN_ORDER = [
   // paths in two resources, and neither engine has a rank for them.
   'unevaluatedItems with $dynamicRef',
 ];
+
+// `--assert-format-off`: every path is built with `assertFormat: false` and
+// held to the Validator built the same way, and that Validator is held to one
+// that does not go through the option at all: the default one, given a
+// function that accepts for every format the schema names. The first has the
+// formats taken out of the schema it reads; the second checks every format
+// and hears yes. They must agree on every document: a format left asserted
+// anywhere a reference can reach shows as a document the first rejects.
+let OFF;
+const FORMAT_NAMES = Object.keys(require(path.join(ROOT, 'lib/js-compiler'))._internal.FORMAT_CODEGEN);
+function everyFormatAccepts(schema) {
+  const formats = {};
+  for (const n of FORMAT_NAMES) formats[n] = () => true;
+  for (const m of (JSON.stringify(schema) || '').matchAll(/"format":"((?:[^"\\]|\\.)*)"/g)) { try { formats[JSON.parse('"' + m[1] + '"')] = () => true; } catch {} }
+  return formats;
+}
 
 const clone = (d) => (d === undefined ? d : structuredClone(d));
 const jsonable = (d) => { try { return JSON.stringify(d) !== undefined && JSON.stringify(JSON.parse(JSON.stringify(d))) === JSON.stringify(d); } catch { return false; } };
@@ -164,18 +310,43 @@ async function check(label, schema, docs, stats, report, only) {
   // timer, and timers that never fire hold every module the run loaded.
   await new Promise((r) => setImmediate(r));
   const refs = new Map();
-  const refFor = (opts) => { const k = JSON.stringify(opts || {}); if (!refs.has(k)) { try { refs.set(k, new Validator(schema, opts)); } catch { refs.set(k, null); } } return refs.get(k); };
+  const refFor = (opts) => { const k = JSON.stringify(opts || {}); if (!refs.has(k)) { try { refs.set(k, new Validator(schema, OFF ? { ...OFF, ...opts } : opts)); } catch { refs.set(k, null); } } return refs.get(k); };
   if (refFor() === null) return;
   try { refFor().isValidObject(null); } catch { return; }
   stats.schemas++;
   const all = docs.map((d) => [d, 'sample']).concat(extraDocs(schema));
+  if (OFF && (!only || only.has(ORACLE))) {
+    const st = stats.paths[ORACLE] || (stats.paths[ORACLE] = { taken: 0, declined: 0, docs: 0, diffs: 0, threw: 0, abort: 0, flipped: 0 });
+    let oracle = null; let asserting = null;
+    try { oracle = new Validator(schema, { formats: everyFormatAccepts(schema) }); oracle.isValidObject(null); asserting = new Validator(schema, {}); } catch { oracle = null; }
+    if (oracle === null) st.declined++;
+    else {
+      st.taken++;
+      for (const [d, tag] of all) {
+        let want; let got; let was;
+        try { want = oracle.validate(clone(d)).valid; was = asserting.validate(clone(d)).valid; } catch { continue; }
+        st.docs++;
+        try { got = refFor().validate(clone(d)).valid; } catch (e) { st.threw++; st.diffs++; continue; }
+        // A document only a format refused: accepted now, and counted.
+        if (!was && got) st.flipped++;
+        if (got !== want) { st.diffs++; const k = `${ORACLE} | verdict | ${tag}`; stats.kinds[k] = (stats.kinds[k] || 0) + 1; if (!stats.first[k]) stats.first[k] = `${label} | assertFormat: false ${got}, every format accepting ${want} | ${show(d)}`; }
+      }
+    }
+  }
   for (const [name, P] of Object.entries(PATHS)) {
     if (only && !only.has(name)) continue;
     const st = stats.paths[name] || (stats.paths[name] = { taken: 0, declined: 0, docs: 0, diffs: 0, threw: 0, abort: 0 });
     let p;
-    try { p = P.async ? await P.build(schema) : P.build(schema); } catch (e) { st.threw++; if (report.length < 40) report.push(`${name} | ${label} | building threw: ${String(e && e.message).slice(0, 160)}`); continue; }
+    // A 2.0 path refuses, when it builds, a schema with a reference that
+    // resolves to nothing where failing it could accept (lib/engine-small.js
+    // inverted()): declined, and listed, never a difference.
+    try { p = P.async ? await P.build(schema, OFF) : P.build(schema, OFF); } catch (e) {
+      const m = String(e && e.message);
+      if (/^ata2: cannot resolve /.test(m)) { st.declined++; (stats.refused || (stats.refused = new Map())).set(label, m); continue; }
+      st.threw++; if (report.length < 40) report.push(`${name} | ${label} | building threw: ${m.slice(0, 160)}`); continue;
+    }
     if (p === null) { st.declined++; continue; }
-    const ref = refFor(P.ref);
+    const ref = P.refMake ? P.refMake(schema) : refFor(P.ref);
     if (ref === null) { st.declined++; continue; }
     st.taken++;
     const shape = pick(P.fields);
@@ -193,7 +364,7 @@ async function check(label, schema, docs, stats, report, only) {
         if (P.abort && got.errors.length === 1 && got.errors[0].code === 'ATA9000') st.abort++;
         else {
           // A plain error has the plain fields and no others: its keys are compared too.
-          const keysOf = (e) => (P.fields === PLAIN ? ' keys ' + Object.keys(e).filter((k) => e[k] !== undefined).sort().join(',') + (Array.isArray(e.branchErrors) ? ' [' + e.branchErrors.map(keysOf).join(';') + ']' : '') : '');
+          const keysOf = (e) => (P.fields === PLAIN || P.keys ? ' keys ' + Object.keys(e).filter((k) => e[k] !== undefined).sort().join(',') + (Array.isArray(e.branchErrors) ? ' [' + e.branchErrors.map(keysOf).join(';') + ']' : '') : '');
           let x = want.errors.map((e) => JSON.stringify(shape(e)) + keysOf(e)); let y = got.errors.map((e) => JSON.stringify(shape(e)) + keysOf(e));
           if (P.ordered === false || p.ordered === false) {
             if (x.join('\n') !== y.join('\n')) st.unordered = (st.unordered || 0) + 1;
@@ -271,6 +442,7 @@ async function run(opts) {
   const stats = { schemas: 0, paths: {}, kinds: {}, first: {}, knownSeen: [] }; const report = [];
   const only = opts.paths ? new Set(opts.paths) : null;
   EVERY = opts.every > 1 ? opts.every : 1; SEEN = 0;
+  OFF = opts.assertFormat === false ? { assertFormat: false } : undefined;
   if (opts.suite !== false) await suite(stats, report, only);
   if (opts.schemastore) await schemastore(opts.schemastore, stats, report, only);
   fs.rmSync(tmp, { recursive: true, force: true });
@@ -279,7 +451,9 @@ async function run(opts) {
 
 function summary({ stats, report }) {
   const lines = [`${stats.schemas} schemas, ${Object.keys(stats.paths).length} paths against the Validator`];
-  for (const [name, s] of Object.entries(stats.paths)) lines.push(`  ${name.padEnd(26)} ${String(s.taken).padStart(5)} schemas (${s.declined} declined) ${String(s.docs).padStart(7)} documents  ${s.diffs} differ${s.threw ? `, ${s.threw} threw` : ''}${s.abort ? `, ${s.abort} as ATA9000` : ''}${s.known ? `, ${s.known} known` : ''}${s.unordered ? `, ${s.unordered} in another order where none is promised` : ''}`);
+  if (globalThis.__ata2) lines.push('  left out: ' + JSON.stringify(globalThis.__ata2));
+  if (stats.refused) for (const [label, m] of stats.refused) lines.push(`  refused at build: ${label}: ${m}`);
+  for (const [name, s] of Object.entries(stats.paths)) lines.push(`  ${name.padEnd(26)} ${String(s.taken).padStart(5)} schemas (${s.declined} declined) ${String(s.docs).padStart(7)} documents  ${s.diffs} differ${s.threw ? `, ${s.threw} threw` : ''}${s.abort ? `, ${s.abort} as ATA9000` : ''}${s.flipped ? `, ${s.flipped} refused by a format alone and accepted now` : ''}${s.known ? `, ${s.known} known` : ''}${s.unordered ? `, ${s.unordered} in another order where none is promised` : ''}`);
   for (const r of report) lines.push('  ' + r);
   // What differs, by path, kind and the kind of document, with the first of each.
   for (const [k, n] of Object.entries(stats.kinds).sort((a, b) => b[1] - a[1])) lines.push(`  ${String(n).padStart(5)}  ${k}\n         ${stats.first[k].slice(0, 700)}`);
@@ -314,11 +488,12 @@ function record({ stats, report }, opts) {
     platform: process.platform,
     arch: process.arch,
     native: nativeState(),
-    given: { suite: opts.suite !== false, schemastore: opts.schemastore || null, paths: opts.paths || null, every: opts.every > 1 ? opts.every : 1 },
+    given: { suite: opts.suite !== false, schemastore: opts.schemastore || null, paths: opts.paths || null, every: opts.every > 1 ? opts.every : 1, ...(opts.assertFormat === false ? { assertFormat: false } : {}) },
     schemas: stats.schemas,
     paths: Object.entries(stats.paths).map(([name, s]) => {
-      const P = PATHS[name];
-      return { name, fields: fieldsName(P.fields), ordered: P.ordered !== false, abortAllowed: !!P.abort, json: !!P.json, fills: !!P.fills, taken: s.taken, declined: s.declined, docs: s.docs, diffs: s.diffs, threw: s.threw, abort: s.abort, known: s.known || 0, unordered: s.unordered || 0 };
+      // The oracle of `--assert-format-off` is not one of PATHS.
+      const P = PATHS[name] || {};
+      return { name, fields: fieldsName(P.fields), ordered: P.ordered !== false, abortAllowed: !!P.abort, json: !!P.json, fills: !!P.fills, taken: s.taken, declined: s.declined, docs: s.docs, diffs: s.diffs, threw: s.threw, abort: s.abort, known: s.known || 0, unordered: s.unordered || 0, ...(s.flipped !== undefined ? { flipped: s.flipped } : {}) };
     }),
     kinds: Object.entries(stats.kinds).sort((a, b) => b[1] - a[1]).map(([kind, n]) => ({ kind, n, first: stats.first[kind] })),
     report,
@@ -336,7 +511,7 @@ module.exports = { run, summary, PATHS, loadIr, cleanup: () => fs.rmSync(tmp, { 
 if (require.main === module) {
   const argv = process.argv.slice(2);
   const arg = (n) => { const i = argv.indexOf(n); return i === -1 ? undefined : argv[i + 1]; };
-  const opts = { schemastore: arg('--schemastore'), paths: arg('--paths') ? arg('--paths').split(';') : undefined, suite: !argv.includes('--no-suite'), every: Number(arg('--every')) || 1 };
+  const opts = { schemastore: arg('--schemastore'), paths: arg('--paths') ? arg('--paths').split(';') : undefined, suite: !argv.includes('--no-suite'), assertFormat: argv.includes('--assert-format-off') ? false : undefined, every: Number(arg('--every')) || 1 };
   run(opts).then((r) => {
     console.log(summary(r));
     if (arg('--json')) fs.writeFileSync(arg('--json'), JSON.stringify(record(r, opts), null, 2) + '\n');

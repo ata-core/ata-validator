@@ -352,6 +352,37 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // members and the values under patternProperties, additionalProperties and
 // dependentSchemas (#116), lib/remove-additional.js and its notes.
 // Measured 664.7 KB.
+// On the 2.0 branch, also lib/mutators.js, which the 1.x Validator and the
+// 2.0 entry share. Measured 665.4 KB.
+// 667 KB on the 2.0 branch after merging 1.65.0 (addSchema id checks, the
+// removal pass loaded only for closed objects, its notes). Master measures
+// 681769 bytes, this branch 682289. Measured 666.3 KB.
+// 668 KB: plainLinear scans characters in one loop instead of a sticky
+// RegExp whose first call cost 100 to 160 microseconds (682678 bytes), and
+// a second scanner takes one level of group, kept apart so a process whose
+// patterns have none never compiles it, and `\uXXXX` with it (683551
+// bytes, 667.5 KB).
+// 669 KB: a lone high surrogate counts as its own code point, length bounds
+// stop scanning for pairs once decided, and a well-formed string is read only
+// at the high half of each pair (684179 bytes, 668.1 KB; 683873 before).
+// 670 KB: modules of ata-validator/ir take formats as calls to the caller's
+// functions, schemas resolved at build time and assertFormat read as the
+// runtime reads it (compiledBuildOptions), and verify takes a module's
+// options (686031 bytes, 670.0 KB; 684179 before).
+// 678.5 KB: ata-validator/ir and ata-validator/kernels give a pattern the
+// engine the Validator gives it, with the linear engine as an ES module for
+// the modules the ir writes (lib/kernels/safe-re.mjs, a copy of
+// lib/safe-regex.js's engine without its comments), the interpreted engine's
+// choice copied for the ir's removeAdditional pass, and the code generator's
+// choice in a file both read (lib/pattern-choice.js) (694152 bytes, 677.9 KB;
+// 686036 before).
+// 681.5 KB: the patternFallback option of ata-validator/ir, which the module
+// writers settle before they write (the scan the 2.0 Validator's
+// patternFallback feature shares, lib/pattern-fallback-scan.js since the
+// 1.66.0 merge, lib/ir/pattern-fallback.mjs
+// and the option in lib/ir/index.d.ts), and the feature's declarations
+// (697197 bytes, 680.9 KB; 694152 before).
+// On the 1.x line from 1.65.0 to 1.66.0:
 // 668 KB for a silent accept fix, +1,476 B: references inside registered
 // documents resolved at their own base before code generation trusts them,
 // and the verdict and combined generators declining a reference they cannot
@@ -390,6 +421,23 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // (lib/ref-bindings.js, Validator.fromStandalone in lib/aot.browser.js, the
 // buffer API choice in lib/buffer-gate.js): one file more, and moved code
 // packs a little worse apart. Measured 689.7 KB.
-assert.ok(manifest.size < 690 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 698 KB: 1.66.0 merged into the 2.0 branch, with the 2.0 scan for
+// patternFallback in lib/pattern-fallback-scan.js beside the 1.x option in
+// lib/pattern-fallback.js (713711 bytes, 697.0 KB; 681.5 KB ceiling on the
+// 2.0 branch, 690 KB on 1.66.0).
+// 679 KB: the table writer of ata-validator/ir takes formats as holes and
+// strictRefs, so a page whose validator has format functions can be a plan
+// (695090 bytes, 678.8 KB; 694152 before).
+// 700 KB: the two above with the 2.0 branch's `assertFormat: false` fix
+// (lib/format-off.js, the formatsOff feature; 714660 bytes, 697.9 KB) in one
+// tree (715554 bytes, 698.8 KB; 698 KB ceiling before).
+// 775 KB at 2.0.0: the 2.0 entries ship. The browser and worker conditions of
+// the root export name them (index.v2.browser.mjs, index.v2.edge.mjs and
+// their require forms), with the small and full Validator, their engines,
+// lib/core/, lib/fmt/, lib/features/ and features/, 102 files that the 1.x
+// tarballs left out (793093 bytes, 774.5 KB, on the 2.0 branch with 1.66.0
+// merged; 764875 bytes on the branch before it). lib/core/engine.js
+// stays out: no entry imports it.
+assert.ok(manifest.size < 775 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

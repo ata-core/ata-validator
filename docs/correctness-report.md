@@ -4,11 +4,11 @@ This file is written by `node scripts/gate-report.js`. Do not edit it by hand: e
 
 ## Summary
 
-- Tree: ata-validator 1.66.0 at commit `cbadeeb`. Node v25.2.1 on darwin-arm64.
-- Gate: 17 paths, each held to the Validator on the same documents. Official suite: 1767 schemas. SchemaStore: 492 schemas. Documents that differ or threw: 0.
+- Tree: ata-validator 1.66.0 at commit `a96a095`. Node v25.2.1 on darwin-arm64.
+- Gate: 23 paths, each held to the Validator on the same documents. Official suite: 1767 schemas. SchemaStore: 492 schemas. Documents that differ or threw: 250.
 - Official JSON Schema Test Suite at `245a45a`: draft2020-12 1300 of 1300, draft2019-09 1259 of 1259, draft7 927 of 927, draft6 839 of 839, draft4 616 of 616, v1 1147 of 1147.
 - With `eval` and `new Function` blocked: draft2020-12 1300 of 1300, draft2019-09 1259 of 1259, draft7 927 of 927, draft6 839 of 839, draft4 616 of 616, v1 1147 of 1147.
-- Native engine: loaded from local build, version 1.66.0.
+- Native engine: loaded from @ata-validator/native-darwin-arm64, version 1.66.0.
 - Sweep classes: 19. Closed in this tree, with their tests passing: 19. Open in this tree: 0.
 
 ## What the gate compares
@@ -40,6 +40,12 @@ The suite checkout is at the commit this tree pins.
 |---|---|---|---|---|---|---|---|---|---|---|
 | interpreted engine | rich | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 1 |
 | generated code, warm | rich | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 0 |
+| small engine | rich | yes | 1609 | 158 | 22625 | 0 | 0 | 0 | 0 | 1 |
+| v2 core + featuresFor | plain | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 1 |
+| v2 core + featuresFor, no defaults | plain | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 1 |
+| v2 core + featuresFor, formats off | plain | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 1 |
+| v2 core + featuresFor, formats given | plain | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 1 |
+| v2 core + featuresFor, schemas map | plain | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 0 |
 | closure tree | rich | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 1 |
 | JSON text | rich | yes | 1767 | 0 | 23421 | 0 | 0 | 0 | 0 | 0 |
 | plain errors | plain | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 1 |
@@ -58,12 +64,18 @@ The suite checkout is at the commit this tree pins.
 
 ## Paths, SchemaStore
 
-492 schemas the Validator builds. Gate exit status 0.
+492 schemas the Validator builds. Gate exit status 1.
 
 | path | error fields compared | order compared | schemas taken | declined | documents | differ | threw | allowed as ATA9000 | other order, none promised | known |
 |---|---|---|---|---|---|---|---|---|---|---|
 | interpreted engine | rich | yes | 492 | 0 | 14756 | 0 | 0 | 0 | 0 | 0 |
 | generated code, warm | rich | yes | 492 | 0 | 14756 | 0 | 0 | 0 | 0 | 0 |
+| small engine | rich | yes | 489 | 3 | 14708 | 50 | 0 | 0 | 0 | 0 |
+| v2 core + featuresFor | plain | yes | 492 | 0 | 14756 | 50 | 0 | 0 | 0 | 0 |
+| v2 core + featuresFor, no defaults | plain | yes | 492 | 0 | 14756 | 50 | 0 | 0 | 0 | 0 |
+| v2 core + featuresFor, formats off | plain | yes | 492 | 0 | 14756 | 50 | 0 | 0 | 0 | 0 |
+| v2 core + featuresFor, formats given | plain | yes | 492 | 0 | 14756 | 50 | 0 | 0 | 0 | 0 |
+| v2 core + featuresFor, schemas map | plain | yes | 492 | 0 | 14756 | 0 | 0 | 0 | 0 | 0 |
 | closure tree | rich | yes | 492 | 0 | 14756 | 0 | 0 | 0 | 0 | 0 |
 | JSON text | rich | yes | 492 | 0 | 13028 | 0 | 0 | 0 | 0 | 0 |
 | plain errors | plain | yes | 492 | 0 | 14756 | 0 | 0 | 0 | 0 | 0 |
@@ -82,12 +94,36 @@ The suite checkout is at the commit this tree pins.
 
 ## Differences
 
-None. No path gave an answer that differs from the Validator's, and no path threw.
+- SchemaStore: 48 documents of `small engine \| errors \| sample`, the first: `schemastore/anywork-ac-1.0 \| errors
+      Validator ["ATA5001","$ref","","#",{"ref":"base.json#/definitions/path"},"cannot resolve $ref base.json#/definitions/path",null,"[object, 3 keys]",null,null,null,2,"https://ata-validator.com/e/ATA5001",null]
+      path      ["ATA4003","anyOf","/swagger-codeg`
+- SchemaStore: 48 documents of `v2 core + featuresFor \| errors \| sample`, the first: `schemastore/anywork-ac-1.0 \| errors
+      Validator ["$ref","","#",{"ref":"base.json#/definitions/path"},"cannot resolve $ref base.json#/definitions/path",null] keys instancePath,keyword,message,params,schemaPath
+      path      ["anyOf","/swagger-codegen/actions","#/allOf/0/then/properties/swagger-`
+- SchemaStore: 48 documents of `v2 core + featuresFor, no defaults \| errors \| sample`, the first: `schemastore/anywork-ac-1.0 \| errors
+      Validator ["$ref","","#",{"ref":"base.json#/definitions/path"},"cannot resolve $ref base.json#/definitions/path",null] keys instancePath,keyword,message,params,schemaPath
+      path      ["anyOf","/swagger-codegen/actions","#/allOf/0/then/properties/swagger-`
+- SchemaStore: 48 documents of `v2 core + featuresFor, formats off \| errors \| sample`, the first: `schemastore/anywork-ac-1.0 \| errors
+      Validator ["$ref","","#",{"ref":"base.json#/definitions/path"},"cannot resolve $ref base.json#/definitions/path",null] keys instancePath,keyword,message,params,schemaPath
+      path      ["anyOf","/swagger-codegen/actions","#/allOf/0/then/properties/swagger-`
+- SchemaStore: 48 documents of `v2 core + featuresFor, formats given \| errors \| sample`, the first: `schemastore/anywork-ac-1.0 \| errors
+      Validator ["$ref","","#",{"ref":"base.json#/definitions/path"},"cannot resolve $ref base.json#/definitions/path",null] keys instancePath,keyword,message,params,schemaPath
+      path      ["anyOf","/swagger-codegen/actions","#/allOf/0/then/properties/swagger-`
+- SchemaStore: 2 documents of `small engine \| verdict \| sample`, the first: `schemastore/minecraft-texture-mcmeta \| verdict: Validator false, validate true, isValid true \| {"animation":{"frames":[0,1,2,{"index":10,"time":20}],"frametime":8,"height":8,"interpolate":true,"w keys ["animation","fusion"]`
+- SchemaStore: 2 documents of `v2 core + featuresFor \| verdict \| sample`, the first: `schemastore/minecraft-texture-mcmeta \| verdict: Validator false, validate true, isValid true \| {"animation":{"frames":[0,1,2,{"index":10,"time":20}],"frametime":8,"height":8,"interpolate":true,"w keys ["animation","fusion"]`
+- SchemaStore: 2 documents of `v2 core + featuresFor, no defaults \| verdict \| sample`, the first: `schemastore/minecraft-texture-mcmeta \| verdict: Validator false, validate true, isValid true \| {"animation":{"frames":[0,1,2,{"index":10,"time":20}],"frametime":8,"height":8,"interpolate":true,"w keys ["animation","fusion"]`
+- SchemaStore: 2 documents of `v2 core + featuresFor, formats off \| verdict \| sample`, the first: `schemastore/minecraft-texture-mcmeta \| verdict: Validator false, validate true, isValid true \| {"animation":{"frames":[0,1,2,{"index":10,"time":20}],"frametime":8,"height":8,"interpolate":true,"w keys ["animation","fusion"]`
+- SchemaStore: 2 documents of `v2 core + featuresFor, formats given \| verdict \| sample`, the first: `schemastore/minecraft-texture-mcmeta \| verdict: Validator false, validate true, isValid true \| {"animation":{"frames":[0,1,2,{"index":10,"time":20}],"frametime":8,"height":8,"interpolate":true,"w keys ["animation","fusion"]`
 
 ## Known exceptions
 
 - Error order, for a suite group whose description ends in "unevaluatedItems with $dynamicRef". A `$ref` to an embedded resource that holds a `$dynamicRef`: the errors name paths in two resources and neither engine ranks them, so generated code and the interpreted walk list the same errors in a different order. The verdict and the set of errors agree. Open, not decided.
   - interpreted engine, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
+  - small engine, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
+  - v2 core + featuresFor, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
+  - v2 core + featuresFor, no defaults, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
+  - v2 core + featuresFor, formats off, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
+  - v2 core + featuresFor, formats given, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
   - closure tree, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
   - plain errors, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
   - compact module, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
@@ -126,7 +162,7 @@ Code generation attempts blocked: 1. Standard Schema check with code generation 
 
 ## Native engine
 
-The gate loaded the native engine from local build. With it loaded, the JSON text path hands long text to it. The gate has no path of its own for the buffer APIs (`isValid(buffer)`, `countValid`, `isValidParallel`, `isValidNDJSON`, `batchIsValid`).
+The gate loaded the native engine from @ata-validator/native-darwin-arm64. With it loaded, the JSON text path hands long text to it. The gate has no path of its own for the buffer APIs (`isValid(buffer)`, `countValid`, `isValidParallel`, `isValidNDJSON`, `batchIsValid`).
 
 ## Sweep classes
 
@@ -168,10 +204,11 @@ The classes found by the sweep of 1.x for answers that differ between paths, one
 ## Known open items
 
 - The error order exception "unevaluatedItems with $dynamicRef" in `scripts/gate.js`.
+- 250 documents differ in the gate.
 
 ## Reproduce
 
-From a clean clone at the commit that adds this file, whose code is that of `cbadeeb`, with Node and git:
+From a clean clone at the commit that adds this file, whose code is that of `a96a095`, with Node and git:
 
 ```sh
 git clone https://github.com/ata-core/ata-validator.git && cd ata-validator
@@ -190,7 +227,7 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
 {
  "format": "ata-correctness-report/1",
  "tree": {
-  "commit": "cbadeeb93e076f14467ac7526185b6451513430d",
+  "commit": "a96a095724b5bbe48bd84f5eb5b75e7f9c06a080",
   "version": "1.66.0",
   "uncommitted": []
  },
@@ -220,14 +257,10 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
    "native": {
     "loaded": true,
     "noNative": false,
-    "source": "local build",
+    "source": "@ata-validator/native-darwin-arm64",
     "found": [
      {
       "source": "@ata-validator/native-darwin-arm64",
-      "version": "1.64.0"
-     },
-     {
-      "source": "local build",
       "version": "1.66.0"
      }
     ]
@@ -259,6 +292,102 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
     {
      "name": "generated code, warm",
      "fields": "rich",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 1767,
+     "declined": 0,
+     "docs": 24545,
+     "diffs": 0,
+     "threw": 0,
+     "abort": 0,
+     "known": 0,
+     "unordered": 0
+    },
+    {
+     "name": "small engine",
+     "fields": "rich",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 1609,
+     "declined": 158,
+     "docs": 22625,
+     "diffs": 0,
+     "threw": 0,
+     "abort": 0,
+     "known": 1,
+     "unordered": 0
+    },
+    {
+     "name": "v2 core + featuresFor",
+     "fields": "plain",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 1767,
+     "declined": 0,
+     "docs": 24545,
+     "diffs": 0,
+     "threw": 0,
+     "abort": 0,
+     "known": 1,
+     "unordered": 0
+    },
+    {
+     "name": "v2 core + featuresFor, no defaults",
+     "fields": "plain",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 1767,
+     "declined": 0,
+     "docs": 24545,
+     "diffs": 0,
+     "threw": 0,
+     "abort": 0,
+     "known": 1,
+     "unordered": 0
+    },
+    {
+     "name": "v2 core + featuresFor, formats off",
+     "fields": "plain",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 1767,
+     "declined": 0,
+     "docs": 24545,
+     "diffs": 0,
+     "threw": 0,
+     "abort": 0,
+     "known": 1,
+     "unordered": 0
+    },
+    {
+     "name": "v2 core + featuresFor, formats given",
+     "fields": "plain",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 1767,
+     "declined": 0,
+     "docs": 24545,
+     "diffs": 0,
+     "threw": 0,
+     "abort": 0,
+     "known": 1,
+     "unordered": 0
+    },
+    {
+     "name": "v2 core + featuresFor, schemas map",
+     "fields": "plain",
      "ordered": true,
      "abortAllowed": false,
      "json": false,
@@ -527,6 +656,36 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "what": "errors"
     },
     {
+     "path": "small engine",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "tag": "array",
+     "what": "errors"
+    },
+    {
+     "path": "v2 core + featuresFor",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "tag": "array",
+     "what": "errors"
+    },
+    {
+     "path": "v2 core + featuresFor, no defaults",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "tag": "array",
+     "what": "errors"
+    },
+    {
+     "path": "v2 core + featuresFor, formats off",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "tag": "array",
+     "what": "errors"
+    },
+    {
+     "path": "v2 core + featuresFor, formats given",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "tag": "array",
+     "what": "errors"
+    },
+    {
      "path": "closure tree",
      "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
      "tag": "array",
@@ -580,14 +739,10 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
    "native": {
     "loaded": true,
     "noNative": false,
-    "source": "local build",
+    "source": "@ata-validator/native-darwin-arm64",
     "found": [
      {
       "source": "@ata-validator/native-darwin-arm64",
-      "version": "1.64.0"
-     },
-     {
-      "source": "local build",
       "version": "1.66.0"
      }
     ]
@@ -619,6 +774,102 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
     {
      "name": "generated code, warm",
      "fields": "rich",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 492,
+     "declined": 0,
+     "docs": 14756,
+     "diffs": 0,
+     "threw": 0,
+     "abort": 0,
+     "known": 0,
+     "unordered": 0
+    },
+    {
+     "name": "small engine",
+     "fields": "rich",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 489,
+     "declined": 3,
+     "docs": 14708,
+     "diffs": 50,
+     "threw": 0,
+     "abort": 0,
+     "known": 0,
+     "unordered": 0
+    },
+    {
+     "name": "v2 core + featuresFor",
+     "fields": "plain",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 492,
+     "declined": 0,
+     "docs": 14756,
+     "diffs": 50,
+     "threw": 0,
+     "abort": 0,
+     "known": 0,
+     "unordered": 0
+    },
+    {
+     "name": "v2 core + featuresFor, no defaults",
+     "fields": "plain",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 492,
+     "declined": 0,
+     "docs": 14756,
+     "diffs": 50,
+     "threw": 0,
+     "abort": 0,
+     "known": 0,
+     "unordered": 0
+    },
+    {
+     "name": "v2 core + featuresFor, formats off",
+     "fields": "plain",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 492,
+     "declined": 0,
+     "docs": 14756,
+     "diffs": 50,
+     "threw": 0,
+     "abort": 0,
+     "known": 0,
+     "unordered": 0
+    },
+    {
+     "name": "v2 core + featuresFor, formats given",
+     "fields": "plain",
+     "ordered": true,
+     "abortAllowed": false,
+     "json": false,
+     "fills": true,
+     "taken": 492,
+     "declined": 0,
+     "docs": 14756,
+     "diffs": 50,
+     "threw": 0,
+     "abort": 0,
+     "known": 0,
+     "unordered": 0
+    },
+    {
+     "name": "v2 core + featuresFor, schemas map",
+     "fields": "plain",
      "ordered": true,
      "abortAllowed": false,
      "json": false,
@@ -873,14 +1124,65 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "unordered": 0
     }
    ],
-   "kinds": [],
+   "kinds": [
+    {
+     "kind": "small engine | errors | sample",
+     "n": 48,
+     "first": "schemastore/anywork-ac-1.0 | errors\n      Validator [\"ATA5001\",\"$ref\",\"\",\"#\",{\"ref\":\"base.json#/definitions/path\"},\"cannot resolve $ref base.json#/definitions/path\",null,\"[object, 3 keys]\",null,null,null,2,\"https://ata-validator.com/e/ATA5001\",null]\n      path      [\"ATA4003\",\"anyOf\",\"/swagger-codegen/actions\",\"#/allOf/0/then/properties/swagger-codegen/properties/actions/anyOf\",{\"variants\":2,\"closest\":1,\"closestName\":\"variant 2\"},\"value matched 0 of 2 anyOf variants\",null,\"[array, 2 items]\",null,null,null,3,\"https://ata-validator.com/e/ATA4003\",[[\"ATA4001\",\"on | {\"ctype\":\"swagger-codegen\",\"cversion\":1,\"swagger-codegen\":{\"actions\":[\"all\",{\"schema\":\"authenticatio keys [\"ctype\",\"cversion\",\"swagger-codegen\"]"
+    },
+    {
+     "kind": "v2 core + featuresFor | errors | sample",
+     "n": 48,
+     "first": "schemastore/anywork-ac-1.0 | errors\n      Validator [\"$ref\",\"\",\"#\",{\"ref\":\"base.json#/definitions/path\"},\"cannot resolve $ref base.json#/definitions/path\",null] keys instancePath,keyword,message,params,schemaPath\n      path      [\"anyOf\",\"/swagger-codegen/actions\",\"#/allOf/0/then/properties/swagger-codegen/properties/actions/anyOf\",{\"variants\":2,\"closest\":1,\"closestName\":\"variant 2\"},\"value matched 0 of 2 anyOf variants\",[[\"oneOf\",\"/swagger-codegen/actions/1\",\"#/allOf/0/then/properties/swagger-codegen/properties/actions/any | {\"ctype\":\"swagger-codegen\",\"cversion\":1,\"swagger-codegen\":{\"actions\":[\"all\",{\"schema\":\"authenticatio keys [\"ctype\",\"cversion\",\"swagger-codegen\"]"
+    },
+    {
+     "kind": "v2 core + featuresFor, no defaults | errors | sample",
+     "n": 48,
+     "first": "schemastore/anywork-ac-1.0 | errors\n      Validator [\"$ref\",\"\",\"#\",{\"ref\":\"base.json#/definitions/path\"},\"cannot resolve $ref base.json#/definitions/path\",null] keys instancePath,keyword,message,params,schemaPath\n      path      [\"anyOf\",\"/swagger-codegen/actions\",\"#/allOf/0/then/properties/swagger-codegen/properties/actions/anyOf\",{\"variants\":2,\"closest\":1,\"closestName\":\"variant 2\"},\"value matched 0 of 2 anyOf variants\",[[\"oneOf\",\"/swagger-codegen/actions/1\",\"#/allOf/0/then/properties/swagger-codegen/properties/actions/any | {\"ctype\":\"swagger-codegen\",\"cversion\":1,\"swagger-codegen\":{\"actions\":[\"all\",{\"schema\":\"authenticatio keys [\"ctype\",\"cversion\",\"swagger-codegen\"]"
+    },
+    {
+     "kind": "v2 core + featuresFor, formats off | errors | sample",
+     "n": 48,
+     "first": "schemastore/anywork-ac-1.0 | errors\n      Validator [\"$ref\",\"\",\"#\",{\"ref\":\"base.json#/definitions/path\"},\"cannot resolve $ref base.json#/definitions/path\",null] keys instancePath,keyword,message,params,schemaPath\n      path      [\"anyOf\",\"/swagger-codegen/actions\",\"#/allOf/0/then/properties/swagger-codegen/properties/actions/anyOf\",{\"variants\":2,\"closest\":1,\"closestName\":\"variant 2\"},\"value matched 0 of 2 anyOf variants\",[[\"oneOf\",\"/swagger-codegen/actions/1\",\"#/allOf/0/then/properties/swagger-codegen/properties/actions/any | {\"ctype\":\"swagger-codegen\",\"cversion\":1,\"swagger-codegen\":{\"actions\":[\"all\",{\"schema\":\"authenticatio keys [\"ctype\",\"cversion\",\"swagger-codegen\"]"
+    },
+    {
+     "kind": "v2 core + featuresFor, formats given | errors | sample",
+     "n": 48,
+     "first": "schemastore/anywork-ac-1.0 | errors\n      Validator [\"$ref\",\"\",\"#\",{\"ref\":\"base.json#/definitions/path\"},\"cannot resolve $ref base.json#/definitions/path\",null] keys instancePath,keyword,message,params,schemaPath\n      path      [\"anyOf\",\"/swagger-codegen/actions\",\"#/allOf/0/then/properties/swagger-codegen/properties/actions/anyOf\",{\"variants\":2,\"closest\":1,\"closestName\":\"variant 2\"},\"value matched 0 of 2 anyOf variants\",[[\"oneOf\",\"/swagger-codegen/actions/1\",\"#/allOf/0/then/properties/swagger-codegen/properties/actions/any | {\"ctype\":\"swagger-codegen\",\"cversion\":1,\"swagger-codegen\":{\"actions\":[\"all\",{\"schema\":\"authenticatio keys [\"ctype\",\"cversion\",\"swagger-codegen\"]"
+    },
+    {
+     "kind": "small engine | verdict | sample",
+     "n": 2,
+     "first": "schemastore/minecraft-texture-mcmeta | verdict: Validator false, validate true, isValid true | {\"animation\":{\"frames\":[0,1,2,{\"index\":10,\"time\":20}],\"frametime\":8,\"height\":8,\"interpolate\":true,\"w keys [\"animation\",\"fusion\"]"
+    },
+    {
+     "kind": "v2 core + featuresFor | verdict | sample",
+     "n": 2,
+     "first": "schemastore/minecraft-texture-mcmeta | verdict: Validator false, validate true, isValid true | {\"animation\":{\"frames\":[0,1,2,{\"index\":10,\"time\":20}],\"frametime\":8,\"height\":8,\"interpolate\":true,\"w keys [\"animation\",\"fusion\"]"
+    },
+    {
+     "kind": "v2 core + featuresFor, no defaults | verdict | sample",
+     "n": 2,
+     "first": "schemastore/minecraft-texture-mcmeta | verdict: Validator false, validate true, isValid true | {\"animation\":{\"frames\":[0,1,2,{\"index\":10,\"time\":20}],\"frametime\":8,\"height\":8,\"interpolate\":true,\"w keys [\"animation\",\"fusion\"]"
+    },
+    {
+     "kind": "v2 core + featuresFor, formats off | verdict | sample",
+     "n": 2,
+     "first": "schemastore/minecraft-texture-mcmeta | verdict: Validator false, validate true, isValid true | {\"animation\":{\"frames\":[0,1,2,{\"index\":10,\"time\":20}],\"frametime\":8,\"height\":8,\"interpolate\":true,\"w keys [\"animation\",\"fusion\"]"
+    },
+    {
+     "kind": "v2 core + featuresFor, formats given | verdict | sample",
+     "n": 2,
+     "first": "schemastore/minecraft-texture-mcmeta | verdict: Validator false, validate true, isValid true | {\"animation\":{\"frames\":[0,1,2,{\"index\":10,\"time\":20}],\"frametime\":8,\"height\":8,\"interpolate\":true,\"w keys [\"animation\",\"fusion\"]"
+    }
+   ],
    "report": [],
    "known": [],
    "knownOrder": [
     "unevaluatedItems with $dynamicRef"
    ],
    "knownSeen": [],
-   "exit": 0
+   "exit": 1
   }
  },
  "dialects": [

@@ -217,6 +217,9 @@ jobs:
       - name: Publish native packages
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          # A prerelease (2.0.0-rc.0) goes out under `next`, so `latest` stays
+          # on the last release; npm refuses a prerelease without a tag.
+          case "$VERSION" in *-*) TAG=next ;; *) TAG=latest ;; esac
           for dir in native-packages/native-*; do
             # These directories come from the build jobs, which hold no
             # publish identity. Each must be named for a target, hold the
@@ -233,7 +236,7 @@ jobs:
             if npm view "$NAME@$VERSION" version > /dev/null 2>&1; then
               echo "$NAME@$VERSION already published, skipping"
             else
-              (cd "$dir" && npm publish --access public --ignore-scripts)
+              (cd "$dir" && npm publish --access public --ignore-scripts --tag "$TAG")
             fi
           done
           # The core must not publish before every native it pins is visible,
@@ -251,4 +254,7 @@ jobs:
           done
 
       - name: Publish core
-        run: npm publish
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          case "$VERSION" in *-*) TAG=next ;; *) TAG=latest ;; esac
+          npm publish --tag "$TAG"

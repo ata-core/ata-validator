@@ -82,7 +82,20 @@ const EXTRA = {
   'ata-validator/compat': { noRegistry: true, oracle: (s) => compatFn(s, true), build: (s) => { const f = compatFn(s, false); return { isValid: (d) => f(d), validate: (d) => f(d) } } },
 }
 const GATE = {}
-if (gate !== null) for (const [name, P] of Object.entries(gate.PATHS)) GATE[name] = { noRegistry: true, async: P.async, build: (s) => { const p = P.async ? P.build(s) : P.build(s); const wrap = (q) => (q === null ? null : { isValid: (d) => q.isValid(d), validate: (d) => q.validate(d).valid }); return P.async ? p.then(wrap) : wrap(p) } }
+// A gate path that runs with options of its own (`ref`: the 2.0 core paths
+// with useDefaults, assertFormat or formats set) is held to the interpreted
+// engine with the same options. One that registers the schema behind a
+// $ref (`refMake`, 'v2 core + featuresFor, schemas map') is held to the
+// reference the gate holds it to, the 2.0 Validator with every feature built
+// the same way: registered under its `$id`, a draft-04 schema's `$id` names
+// it, which the schema given directly does not.
+const viaInterpreter = (P) => (s) => { const v = new Validator(s, { ...P.ref, engine: 'interpreter' }); return (d) => v.validate(d).valid }
+const refOracle = (P) => {
+  const opts = P.ref && Object.keys(P.ref).some((k) => k !== 'richErrors') ? viaInterpreter(P) : null
+  if (!P.refMake) return opts || undefined
+  return (s) => { const v = P.refMake(s); return v === null ? (opts || viaInterpreter({ ref: {} }))(s) : (d) => v.validate(d).valid }
+}
+if (gate !== null) for (const [name, P] of Object.entries(gate.PATHS)) GATE[name] = { noRegistry: true, async: P.async, oracle: refOracle(P), build: (s) => { const p = P.async ? P.build(s) : P.build(s); const wrap = (q) => (q === null ? null : { isValid: (d) => q.isValid(d), validate: (d) => q.validate(d).valid }); return P.async ? p.then(wrap) : wrap(p) } }
 const PATHS = { ...GATE, ...EXTRA }
 
 const stats = {}

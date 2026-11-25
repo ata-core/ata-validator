@@ -6,6 +6,11 @@
 // lib/codegen-engine.js, so that the edge entry (index.edge.js) and
 // ata-validator/lite can load the core without it.
 const core = require('./lib/validator-core.js');
+// The 2.0 entries of a browser or worker bundle register features with
+// Validator.use(). This Validator carries every one, so code shared with a
+// page calls it here to no effect. Assigned in the Node entries only: on the
+// class it would be bytes in the 1.x edge and lite bundles.
+core.Validator.use = function use () { return this; };
 const { env } = require('./lib/env');
 
 // Validation as the body arrives: `v.stream(opts)` is a record stream over the

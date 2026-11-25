@@ -288,6 +288,16 @@ const esbuild = require('esbuild')
 // 63040 (63032 measured): the removal pass and the defaults module load only
 // for a schema with a closed object in its text, which kept 0.25 ms off a
 // server's first validated request; 56 bytes.
+// 63180 (63166 measured): plainLinear scans characters in one loop in place
+// of a sticky RegExp whose first call cost 100 to 160 microseconds (62823 on
+// the 2.0 branch, 62768 before), and a second scanner, compiled only when a
+// pattern has a group or `\uXXXX`, takes one level of group and that escape,
+// so such a pattern gets the platform RegExp instead of the linear engine's
+// first compile; 343 bytes.
+// 63250 (63241 measured): a lone high surrogate counts as its own code
+// point, length bounds stop scanning for pairs once decided, and a
+// well-formed string is read only at the high half of each pair; 78 bytes.
+// On the 1.x line from 1.65.0 to 1.66.0:
 // 63064 (63059 measured): deep equality (enum, const, uniqueItems) reads the
 // enumerable own keys of both sides, so an object with a non-enumerable key no
 // longer compares differently by argument order; 27 bytes.
@@ -324,7 +334,16 @@ const esbuild = require('esbuild')
 // refuses the method, and the choice between the native walker and validate()
 // for the buffer APIs lives in lib/buffer-gate.js, whose browser twin only
 // throws; 537 bytes less.
-const BUDGET = 63500
+// 63690 (63677 measured): 1.66.0 merged into the 2.0 branch, the character
+// scan with its group scanner and the code point counters above with 1.66.0's
+// fixes in one tree (63250 on the 2.0 branch, 63500 on 1.66.0).
+// 63270 (63252 measured): `assertFormat: false` leaves a custom keyword's
+// parameters whole and removes formats as the schema is copied
+// (lib/validator-core.js, lib/keywords.js); 11 bytes.
+// 63680 (63669 measured): 1.66.0's tree above and the `assertFormat: false`
+// fix together (63677 on the 2.0 branch with 1.66.0, 63252 on the fix's base);
+// the copy without formats replaces stripFormatAssertions, 8 bytes less.
+const BUDGET = 63680
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
