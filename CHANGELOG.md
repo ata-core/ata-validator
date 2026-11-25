@@ -24,7 +24,7 @@ How to move a browser or worker bundle is in [docs/migration-2.0.md](docs/migrat
 
 ### Notes
 
-- The tarball is 792,999 B packed, from 706,541 B at 1.66.0: 112 more files, the 2.0 entries and what they import.
+- The tarball is 793,071 B packed, from 706,541 B at 1.66.0: 112 more files, the 2.0 entries and what they import.
 - `@rjsf/validator-ata` 6.11.1 depends on `ata-validator ^1.56.0` and keeps a 1.x copy. Forced onto 2.0.0 by an override it reads the `ata2: verbose` refusal as an invalid document, for every document.
 
 ## 1.66.0 - 2026-11-25
