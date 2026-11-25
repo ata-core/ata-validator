@@ -17,6 +17,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { spawnSync } = require('child_process')
+const { pathToFileURL } = require('url')
 
 const ROOT = path.join(__dirname, '..')
 const CHILD = process.env.ATA_PF_CHILD === '1'
@@ -542,7 +543,8 @@ const PROBE = `
 const REFUSED = "TypeError: patternFallback needs import 'ata-validator/pattern-fallback'|true|true|false|rejected"
 const HONOURED = 'built|true|true|false|rejected'
 const cjs = (entry, add) => inChild(`(async () => { const V = require(${JSON.stringify(path.join(ROOT, entry))}).Validator; const ADD = ${add ? `async () => require(${JSON.stringify(path.join(ROOT, 'pattern-fallback.js'))})` : 'null'}; ${PROBE} })()`)
-const esm = (entry, add) => inChild(`const { Validator: V } = await import(${JSON.stringify(path.join(ROOT, entry))}); const ADD = ${add ? `async () => import(${JSON.stringify(path.join(ROOT, 'pattern-fallback.mjs'))})` : 'null'}; ${PROBE}`, 'module')
+// import() takes a URL: a Windows path such as d:\a\... is read as a scheme.
+const esm = (entry, add) => inChild(`const { Validator: V } = await import(${JSON.stringify(pathToFileURL(path.join(ROOT, entry)).href)}); const ADD = ${add ? `async () => import(${JSON.stringify(pathToFileURL(path.join(ROOT, 'pattern-fallback.mjs')).href)})` : 'null'}; ${PROBE}`, 'module')
 
 check('the Node entries have the option by themselves', () => {
   assert.strictEqual(cjs('index.js', false), HONOURED)
