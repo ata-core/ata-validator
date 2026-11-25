@@ -27,7 +27,7 @@ function safeKeyMatcher(src) {
 }
 
 module.exports = {
-  buildDefaultsApplier: (schema) => buildDefaultsApplier(schema, safeKeyMatcher),
+  buildDefaultsApplier: (schema, keyPattern) => buildDefaultsApplier(schema, keyPattern || safeKeyMatcher),
   setOwn, localRef, resourceRoots, refTarget, reachGraph, reachesDefault, safeKeyMatcher, MAX_DEPTH, EMBED,
 };
 `;
@@ -62,7 +62,8 @@ function render () {
 // lib/defaults-match.js: the same pass with the key matcher handed in and
 // nothing else, for the patternFallback feature on the full 2.0 entries
 // (lib/features/patternFallback.js). Their defaults pass is lib/defaults.js,
-// which 1.x shares and which takes no matcher; a validator that holds a
+// which 1.x shares and whose optional matcher is the 1.x patternFallback
+// option's (lib/pattern-fallback.js); a validator that holds a
 // patternFallback matcher builds its pass from this copy instead, so
 // lib/defaults.js, and the 1.x bundles that carry it, stay as they are.
 function renderMatch () {

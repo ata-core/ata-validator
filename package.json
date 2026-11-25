@@ -1,6 +1,6 @@
 {
   "name": "ata-validator",
-  "version": "1.65.0",
+  "version": "1.66.0",
   "description": "JSON Schema validator that compiles to plain JavaScript, still runs where code generation is blocked, and can be compiled away at build time. Passes the full official test suite.",
   "type": "commonjs",
   "main": "index.js",
@@ -131,6 +131,11 @@
       "import": "./codegen.mjs",
       "require": "./codegen.js"
     },
+    "./pattern-fallback": {
+      "types": "./pattern-fallback.d.ts",
+      "import": "./pattern-fallback.mjs",
+      "require": "./pattern-fallback.js"
+    },
     "./kernels": {
       "import": "./lib/kernels/index.mjs"
     },
@@ -154,6 +159,8 @@
   "sideEffects": [
     "./codegen.js",
     "./codegen.mjs",
+    "./pattern-fallback.js",
+    "./pattern-fallback.mjs",
     "./lib/aot-mark.js",
     "./index.aot.js",
     "./index.aot.mjs",
@@ -176,7 +183,8 @@
     "./lib/native-codes.js": "./lib/native.browser.js",
     "./lib/email-literal.js": false,
     "./lib/native-positions.js": "./lib/native.browser.js",
-    "./lib/idna.js": "./lib/idna.browser.js"
+    "./lib/idna.js": "./lib/idna.browser.js",
+    "./lib/defaults-safety.js": false
   },
   "scripts": {
     "prepublishOnly": "node tests/test_pack_purity.js && ATA_ALLOW_DOC_PLACEHOLDERS=1 node scripts/check-doc-coverage.js && node tests/test_error_codes_lock.js && node tests/test_safe_regex_embed.js && node tests/test_version_sync.js",
@@ -312,16 +320,19 @@
     "LICENSE",
     "codegen.js",
     "codegen.mjs",
-    "codegen.d.ts"
+    "codegen.d.ts",
+    "pattern-fallback.js",
+    "pattern-fallback.mjs",
+    "pattern-fallback.d.ts"
   ],
   "optionalDependencies": {
-    "@ata-validator/native-darwin-arm64": "1.65.0",
-    "@ata-validator/native-darwin-x64": "1.65.0",
-    "@ata-validator/native-linux-arm64-gnu": "1.65.0",
-    "@ata-validator/native-linux-arm64-musl": "1.65.0",
-    "@ata-validator/native-linux-x64-gnu": "1.65.0",
-    "@ata-validator/native-linux-x64-musl": "1.65.0",
-    "@ata-validator/native-win32-x64": "1.65.0"
+    "@ata-validator/native-darwin-arm64": "1.66.0",
+    "@ata-validator/native-darwin-x64": "1.66.0",
+    "@ata-validator/native-linux-arm64-gnu": "1.66.0",
+    "@ata-validator/native-linux-arm64-musl": "1.66.0",
+    "@ata-validator/native-linux-x64-gnu": "1.66.0",
+    "@ata-validator/native-linux-x64-musl": "1.66.0",
+    "@ata-validator/native-win32-x64": "1.66.0"
   },
   "peerDependencies": {
     "yaml": "^2.0.0"

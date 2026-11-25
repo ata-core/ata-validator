@@ -1,145 +1,205 @@
-'use strict'
+'use strict';
 
-// minLength and maxLength count code points. A high surrogate is half of a
-// pair only when a low surrogate follows it; otherwise it is a code point of
-// its own. "\ud800b" is two code points, so maxLength 1 rejects it and
-// minLength 2 accepts it. A counter that skipped the unit after any high
-// surrogate counted it as one and accepted the over-long string.
+// minLength and maxLength count code points, and a surrogate that is not part
+// of a pair counts as one. The interpreted engine's counter skipped the unit
+// after every high surrogate without asking whether it was a low one, so
+// '\ud800b' counted as one code point and passed maxLength: 1 (1.65.0 and
+// before). That engine answers with code generation blocked, for
+// engine: 'interpreter', and for a small schema's first verdicts once a process
+// has met sixteen schemas (the small twin), so validateJSON, and through the
+// twin isValidObject and validate(), accepted it with eval allowed too. The
+// oracle here is [...s].length, which is the spec's count.
 //
-// Every string here, alone and inside longer strings that cross the bounds,
-// is checked at count - 1.5 to count + 1.5 in half steps for minLength,
-// maxLength and both, at the root and under a property, on every engine and
-// entry, through every method. `[...s].length` is the oracle. The 1.x Validator and the 2.0
-// entries run again in a process with code generation from strings blocked,
-// and again with the small twin off (as tests/run.js runs the suite).
+// Every string is checked at count - 1, count and count + 1 on both bounds (a
+// short one at every bound), through validate, isValidObject, validateJSON and
+// isValidJSON, on four validator configurations, ata-validator/lite,
+// index.edge.js and standalone modules. Each child process runs one setting:
+// code generation blocked, the small twin answering, and the twin turned off
+// (ATA_NO_SMALL_TWIN=1) with and without the native engine.
 
-const assert = require('node:assert')
-const path = require('node:path')
-const { spawnSync } = require('node:child_process')
-const { pathToFileURL } = require('node:url')
+const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
-const ROOT = path.join(__dirname, '..')
-const CHILD = process.argv[2] === '--child'
-// The counters take a fast path where String.prototype.isWellFormed exists;
-// a child runs without it, as an engine that predates it would.
-if (CHILD && process.env.ATA_TEST_NO_WELL_FORMED === '1') delete String.prototype.isWellFormed
+const ROOT = path.join(__dirname, '..');
+const CHILD = process.argv[2] === '--child';
 
-const BASE = ['\ud800b', '\ud800', '\udc00\ud800', 'a\u{1F642}\ud83d', '\u{1F642}', '\u{10FFFF}', '\ud800\ud800']
-const STRINGS = [...BASE]
-// Long strings mixing them, so the length sits between the bound and twice
-// the bound and the counter has to run.
-for (let k = 0; k < BASE.length; k++) {
-  let s = ''
-  for (let i = 0; s.length < 70 + 9 * k; i++) s += BASE[(i * 3 + k) % BASE.length] + (i % 4 === 0 ? 'x' : '')
-  STRINGS.push(s)
-}
-STRINGS.push('\ud800b'.repeat(40), '\ud800'.repeat(65), 'b\ud800'.repeat(33) + '\udc00', '\u{1F642}'.repeat(50) + '\ud800')
+const strings = [
+  '\ud800b', '\ud800', '\udc00\ud800', 'a\u{1F642}\ud83d', '\u{1F642}', '\u{10FFFF}', '\ud800\ud800',
+  'b\ud800', '\udc00', '􏿿', '\udbff', '퟿\udc00',
+  // Long and mixed, past the bounds the counters decide on length alone.
+  ('a\u{1F642}\ud800').repeat(30),
+  ('\ud800b').repeat(40),
+  ('\u{1F642}').repeat(70),
+  'x'.repeat(50) + '\ud83d'.repeat(20) + '\u{1F642}'.repeat(20),
+  ('\udc00\ud800').repeat(33) + 'z',
+  ('\u{1F642}a🙂\udc00').repeat(15),
+];
 
-const SCHEMAS = []
-for (const s of STRINGS) {
-  const n = [...s].length
-  // Whole bounds and fractional ones, at half steps around the count.
-  for (const b of [n - 1.5, n - 1, n - 0.5, n, n + 0.5, n + 1, n + 1.5]) {
-    if (b < 0) continue
-    SCHEMAS.push([{ type: 'string', maxLength: b }, s, n <= b])
-    SCHEMAS.push([{ type: 'string', minLength: b }, s, n >= b])
+const cases = [];
+for (const s of strings) {
+  const c = [...s].length;
+  // A short string is checked at every bound up to past its length, which
+  // walks each place the counters stop early.
+  const ks = s.length <= 12 ? Array.from({ length: s.length + 3 }, (_, k) => k) : [c - 1, c, c + 1];
+  for (const k of ks) {
+    if (k < 0) continue;
+    cases.push({ s, schema: { type: 'string', minLength: k }, want: c >= k });
+    cases.push({ s, schema: { type: 'string', maxLength: k }, want: c <= k });
+    cases.push({ s, schema: { type: 'string', minLength: k, maxLength: k }, want: c === k });
+    cases.push({ s, schema: { type: 'object', properties: { p: { type: 'string', maxLength: k } } }, data: { p: s }, want: c <= k });
+    cases.push({ s, schema: { type: 'object', properties: { p: { type: 'string', minLength: k } } }, data: { p: s }, want: c >= k });
+    // A property name is counted the same way (propertyNames).
+    cases.push({ s, schema: { type: 'object', propertyNames: { maxLength: k } }, data: { [s]: 1 }, want: c <= k });
+    cases.push({ s, schema: { type: 'object', propertyNames: { minLength: k } }, data: { [s]: 1 }, want: c >= k });
+    cases.push({ s, schema: { type: 'object', propertyNames: { minLength: k, maxLength: k + 1 }, properties: { z: {} } }, data: { [s]: 1 }, want: c >= k && c <= k + 1 });
   }
-  SCHEMAS.push([{ type: 'string', minLength: n, maxLength: n }, s, true])
-  SCHEMAS.push([{ type: 'string', minLength: n + 1, maxLength: n + 1 }, s, false])
-  SCHEMAS.push([{ type: 'string', minLength: Math.max(0, n - 1), maxLength: n - 1 }, s, false])
-  SCHEMAS.push([{ type: 'string', minLength: Math.max(0, n - 0.5), maxLength: n + 0.5 }, s, true])
-  SCHEMAS.push([{ type: 'string', minLength: n + 0.5, maxLength: n + 1.5 }, s, false])
-}
-// The same checks under a required property.
-for (const [schema, s, want] of SCHEMAS.slice()) {
-  SCHEMAS.push([{ type: 'object', properties: { a: schema }, required: ['a'] }, { a: s }, want])
-}
-
-let paths = 0
-let checks = 0
-const failed = []
-function run (name, make) {
-  paths++
-  let bad = 0
-  for (const [schema, doc, want] of SCHEMAS) {
-    const where = `${name}: ${JSON.stringify(schema)} on ${JSON.stringify(doc)} (${[...(typeof doc === 'string' ? doc : doc.a)].length} code points)`
-    const check = make(schema)
-    // The first calls and the calls after warm-up can be answered by
-    // different code, so both are asked.
-    for (let i = 0; i < 12; i++) {
-      const got = check(doc)
-      checks++
-      if (got !== want) { if (bad++ === 0) failed.push(`${where}: call ${i + 1} answered ${got}, want ${want}`); break }
+  // A bound that is not a whole number is compared as written.
+  if (s.length <= 12) {
+    for (const k of [0.5, 1.5, 2.5]) {
+      cases.push({ s, schema: { type: 'string', minLength: k }, want: c >= k });
+      cases.push({ s, schema: { type: 'string', maxLength: k }, want: c <= k });
+      cases.push({ s, schema: { type: 'object', propertyNames: { minLength: k } }, data: { [s]: 1 }, want: c >= k });
     }
   }
-  if (bad) failed.push(`${name}: ${bad} schemas answered wrongly`)
+}
+// A negative bound is a bound: the small engine read -1 as none.
+cases.push({ s: 'a', schema: { type: 'string', maxLength: -1 }, want: false });
+cases.push({ s: '', schema: { type: 'string', maxLength: -0.5 }, want: false });
+cases.push({ s: 'a', schema: { type: 'object', properties: { p: { type: 'string', maxLength: -1 } } }, data: { p: 'a' }, want: false });
+
+// The JSON text as JSON.stringify writes it (lone surrogates escaped) and, where
+// the string needs no escape, with the units written raw.
+function texts(d) {
+  const out = [JSON.stringify(d)];
+  const raw = out[0].replace(/\\u(d[89a-f][0-9a-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+  if (raw !== out[0]) out.push(raw);
+  return out;
 }
 
-function v1 (V, opts) {
-  run(`1.x Validator${opts ? ' ' + JSON.stringify(opts) : ''} isValidObject`, (s) => { const v = new V(s, opts); return (d) => v.isValidObject(d) })
-  run(`1.x Validator${opts ? ' ' + JSON.stringify(opts) : ''} validate`, (s) => { const v = new V(s, opts); return (d) => v.validate(d).valid })
-  run(`1.x Validator${opts ? ' ' + JSON.stringify(opts) : ''} validateJSON`, (s) => { const v = new V(s, opts); return (d) => v.validateJSON(JSON.stringify(d)).valid })
-  // The text with the surrogates written raw rather than escaped.
-  run(`1.x Validator${opts ? ' ' + JSON.stringify(opts) : ''} validateJSON raw`, (s) => { const v = new V(s, opts); return (d) => v.validateJSON(raw(d)).valid })
-  run(`1.x Validator${opts ? ' ' + JSON.stringify(opts) : ''} isValidJSON`, (s) => { const v = new V(s, opts); return (d) => v.isValidJSON(JSON.stringify(d)) })
+let checked = 0;
+function check(label, got, c) {
+  assert.strictEqual(got, c.want, `${label}: ${JSON.stringify(c.schema)} on ${JSON.stringify(c.s)} (${[...c.s].length} code points)`);
+  checked++;
 }
 
-// JSON text with every string written out as is, lone surrogates included.
-const raw = (d) => typeof d === 'string' ? '"' + d + '"' : '{"a":"' + d.a + '"}'
-
-function v2 (name, V) {
-  run(`${name} isValidObject`, (s) => { const v = new V(s); return (d) => v.isValidObject(d) })
-  run(`${name} validate`, (s) => { const v = new V(s); return (d) => v.validate(d).valid })
-  run(`${name} validateJSON`, (s) => { const v = new V(s); return (d) => v.validateJSON(JSON.stringify(d)).valid })
-  run(`${name} validateJSON raw`, (s) => { const v = new V(s); return (d) => v.validateJSON(raw(d)).valid })
-}
-
-async function main () {
-  const { Validator } = require('..')
-  v1(Validator)
-  v1(Validator, { engine: 'interpreter' })
-
-  if (!CHILD || process.env.ATA_TEST_NO_WELL_FORMED === '1') {
-    // The engines on their own.
-    for (const f of ['engine-small.js', 'engine-full.js']) {
-      const { createSmall } = require(path.join(ROOT, 'lib', f))
-      run(`lib/${f} isValid`, (s) => { const e = createSmall(s, {}); return (d) => e.isValid(d) })
-      run(`lib/${f} validate`, (s) => { const e = createSmall(s, {}); return (d) => e.validate(d).valid })
+function runValidator(name, Validator, opts) {
+  for (const c of cases) {
+    const d = c.data !== undefined ? c.data : c.s;
+    // Twice each: the first calls and the compiled ones may be different engines.
+    for (let r = 0; r < 2; r++) {
+      const v = new Validator(c.schema, opts);
+      check(`${name} validate`, v.validate(d).valid, c);
+      check(`${name} isValidObject`, v.isValidObject(d), c);
+      for (const t of texts(d)) {
+        check(`${name} validateJSON`, v.validateJSON(t).valid, c);
+        check(`${name} isValidJSON`, v.isValidJSON(t), c);
+      }
+      check(`${name} validate again`, v.validate(d).valid, c);
     }
-    const { createEngine } = require(path.join(ROOT, 'lib/core/engine.js'))
-    run('lib/core/engine.js isValid', (s) => { const e = createEngine(s, {}); return (d) => e.isValid(d) })
-    run('lib/core/engine.js validate', (s) => { const e = createEngine(s, {}); return (d) => e.validate(d).valid })
-    const { createVerdict } = require(path.join(ROOT, 'lib/core/verdict.js'))
-    run('lib/core/verdict.js', (s) => { const f = createVerdict(s, {}); assert.ok(typeof f === 'function', 'the verdict core takes ' + JSON.stringify(s)); return f })
-    const ic = require(path.join(ROOT, 'lib/interpreter.js'))
-    run('lib/interpreter.js', (s) => { const w = ic.createInterpreter(s, { tier: Infinity }); return (d) => w.validate(d).valid })
   }
+}
 
-  const imp = (f) => import(pathToFileURL(path.join(ROOT, f)).href)
-  v2('index.v2.browser.mjs', (await imp('index.v2.browser.mjs')).Validator)
-  v2('index.v2.core.mjs', (await imp('index.v2.core.mjs')).Validator)
-  v2('index.v2.edge.mjs', (await imp('index.v2.edge.mjs')).Validator)
+function runAll() {
+  const configs = [['default', undefined], ['interpreter', { engine: 'interpreter' }], ['richErrors:false', { richErrors: false }], ['abortEarly', { abortEarly: true }]];
+  const entries = [['index.js', require(path.join(ROOT, 'index.js'))], ['lite.js', require(path.join(ROOT, 'lite.js'))], ['index.edge.js', require(path.join(ROOT, 'index.edge.js'))]];
+  for (const [entry, mod] of entries) for (const [cfg, opts] of configs) runValidator(`${entry} ${cfg}`, mod.Validator, opts);
+}
 
-  if (failed.length) { console.error(failed.join('\n')); process.exit(1) }
-  if (!CHILD) {
-    const modes = [
-      [['--disallow-code-generation-from-strings'], {}],
-      [[], { ATA_NO_SMALL_TWIN: '1' }],
-      [['--disallow-code-generation-from-strings'], { ATA_NO_SMALL_TWIN: '1' }],
-      [[], { ATA_TEST_NO_WELL_FORMED: '1' }],
-      [['--disallow-code-generation-from-strings'], { ATA_TEST_NO_WELL_FORMED: '1', ATA_NO_SMALL_TWIN: '1' }]
-    ]
-    for (const [flags, env] of modes) {
-      const r = spawnSync(process.execPath, [...flags, __filename, '--child'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, ...env } })
-      if (r.status !== 0) assert.fail(`child ${flags.join(' ')} ${JSON.stringify(env)}: exit ${r.status}\n${r.stdout}${r.stderr}`)
-      const m = /^paths (\d+) checks (\d+)$/m.exec(r.stdout)
-      assert.ok(m, 'the child reports its counts')
-      paths += +m[1]; checks += +m[2]
+// The three code generators, called directly as the runtime calls them.
+function runEntryPoints() {
+  const jc = require(path.join(ROOT, 'lib/js-compiler.js'));
+  const VALID = { valid: true, errors: [] };
+  for (const c of cases) {
+    const d = c.data !== undefined ? c.data : c.s;
+    const cg = jc.compileToJSCodegen(c.schema, null);
+    const er = jc.compileToJSCodegenWithErrors(c.schema, null);
+    const co = jc.compileToJSCombined(c.schema, VALID, null);
+    assert.ok(cg && er && co, `the generators compile ${JSON.stringify(c.schema)}`);
+    check('compileToJSCodegen', !!cg(d), c);
+    check('compileToJSCodegenWithErrors', er(d, true).valid, c);
+    check('compileToJSCombined', co(d).valid, c);
+  }
+}
+
+function runModules() {
+  const { toStandaloneModule } = require(path.join(ROOT, 'build.js'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-cp-'));
+  try {
+    let i = 0;
+    const seen = new Map();
+    for (const c of cases) {
+      const key = JSON.stringify(c.schema);
+      let m = seen.get(key);
+      if (m === undefined) {
+        const src = toStandaloneModule(c.schema, { format: 'cjs' });
+        assert.ok(typeof src === 'string', `a module is emitted for ${key}`);
+        const file = path.join(dir, `m${i++}.cjs`);
+        fs.writeFileSync(file, src);
+        m = require(file);
+        seen.set(key, m);
+      }
+      const d = c.data !== undefined ? c.data : c.s;
+      check('module validate', m.validate(d).valid, c);
+      check('module isValid', m.isValid(d), c);
     }
-    console.log(`code point pairs: ${paths} paths, ${SCHEMAS.length} schemas, ${checks} checks, all agree with [...s].length`)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// The small twin: once a process has met sixteen schemas, a new small schema's
+// first verdicts come from the interpreted engine before it compiles. Each
+// schema here is made unique so none is in the compile cache, which the twin
+// declines.
+function runTwin() {
+  const { Validator } = require(path.join(ROOT, 'index.js'));
+  for (let i = 0; i < 32; i++) new Validator({ type: 'integer', minimum: i }).isValidObject(i);
+  let twins = 0;
+  let u = 0;
+  for (const c of cases) {
+    const d = c.data !== undefined ? c.data : c.s;
+    const a = new Validator(Object.assign({ $comment: 'twin ' + u++ }, c.schema));
+    check('twin isValidObject', a.isValidObject(d), c);
+    if (a._twin) twins++;
+    const b = new Validator(Object.assign({ $comment: 'twin ' + u++ }, c.schema));
+    check('twin validate', b.validate(d).valid, c);
+  }
+  assert.ok(twins > cases.length / 2, `the twin answered (${twins} of ${cases.length})`);
+}
+
+const MODE = process.argv[3];
+if (CHILD) {
+  if (MODE === 'blocked') {
+    // Code generation is blocked by the flag; prove it before trusting the run.
+    assert.throws(() => new Function('return 1'), EvalError);
+    runAll();
+  } else if (MODE === 'twin') {
+    runTwin();
   } else {
-    console.log(`paths ${paths} checks ${checks}`)
+    runAll();
   }
+  console.log(`ok child ${MODE}: ${checked} answers`);
+} else {
+  runEntryPoints();
+  runModules();
+  const children = [
+    ['blocked', ['--disallow-code-generation-from-strings'], { ATA_NO_NATIVE: '1' }],
+    ['twin', [], {}],
+    ['notwin', [], { ATA_NO_SMALL_TWIN: '1' }],
+    ['notwin-js', [], { ATA_NO_SMALL_TWIN: '1', ATA_NO_NATIVE: '1' }],
+  ];
+  for (const [mode, flags, env] of children) {
+    // tests/run.js sets ATA_NO_SMALL_TWIN=1 for every file; each child gets the
+    // setting its mode names.
+    const childEnv = Object.assign({}, process.env, env);
+    if (env.ATA_NO_SMALL_TWIN === undefined) delete childEnv.ATA_NO_SMALL_TWIN;
+    const r = spawnSync(process.execPath, [...flags, __filename, '--child', mode], { encoding: 'utf8', env: childEnv });
+    process.stdout.write(r.stdout);
+    process.stderr.write(r.stderr);
+    assert.strictEqual(r.status, 0, `the ${mode} child agrees with the oracle`);
+  }
+  console.log(`ok: code point counts match [...s].length (${cases.length} cases, modules ${checked} answers, four children)`);
 }
-
-main().catch((e) => { console.error(e); process.exit(1) })

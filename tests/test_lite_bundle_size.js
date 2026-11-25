@@ -297,7 +297,47 @@ const esbuild = require('esbuild')
 // 63250 (63241 measured): a lone high surrogate counts as its own code
 // point, length bounds stop scanning for pairs once decided, and a
 // well-formed string is read only at the high half of each pair; 78 bytes.
-const BUDGET = 63250
+// On the 1.x line from 1.65.0 to 1.66.0:
+// 63064 (63059 measured): deep equality (enum, const, uniqueItems) reads the
+// enumerable own keys of both sides, so an object with a non-enumerable key no
+// longer compares differently by argument order; 27 bytes.
+// 63090 (63083 measured): a lone high surrogate counts as its own code
+// point, and length bounds stop scanning once decided; 51 bytes.
+// 63110 (63103 measured): the defaults, removal and coercion passes resolve a
+// relative $ref at its document's base, not by path suffix, so they no longer
+// act on a different registered document; 71 bytes.
+// 63180 (63171 measured): the three fixes above together in one tree.
+// 63210 (63202 measured): a validator with a preprocess pass answers its
+// buffer APIs through validate() unless the Node entry says its defaults
+// cannot change a verdict; 31 bytes, the check itself left out of lite.
+// 63350 (63345 measured): a schema holding a value JSON cannot carry gets a
+// compile cache key of its own, read from the normalization walk; 174 bytes.
+// 63230 (63226 measured): Validator.fromStandalone fills defaults from the
+// documents given through `schemas` and before every verdict, as a Validator
+// does; 55 bytes.
+// 63440 (63434 measured): the sweep's fixes together in one tree.
+// 63590 (63579 measured): a $ref that resolves to nothing, reached under not,
+// an if condition, a oneOf branch, a contains with maxContains or unevaluated*,
+// ends the whole validation instead of failing in place, which there could
+// accept; 408 bytes.
+// 63870 (63853 measured): the sweep's fixes and the unresolved $ref
+// fix together in one tree.
+// 63180 (63173 measured): the patternFallback option (issue #131): one
+// optional hook argument through the interpreted engine's pattern compile, a
+// key matcher for the defaults and removal passes, and the refusal that names
+// the import; the option itself is in lib/pattern-fallback.js, which lite
+// carries only when ata-validator/pattern-fallback is imported; 141 bytes.
+// 64030 (64016 measured): the sweep's fixes, the unresolved $ref fix
+// and the patternFallback option together in one tree.
+// 63500 (63479 measured): Validator.fromStandalone lives with the loader of
+// built modules (lib/aot.browser.js), which lite does not carry since it
+// refuses the method, and the choice between the native walker and validate()
+// for the buffer APIs lives in lib/buffer-gate.js, whose browser twin only
+// throws; 537 bytes less.
+// 63690 (63677 measured): 1.66.0 merged into the 2.0 branch, the character
+// scan with its group scanner and the code point counters above with 1.66.0's
+// fixes in one tree (63250 on the 2.0 branch, 63500 on 1.66.0).
+const BUDGET = 63690
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

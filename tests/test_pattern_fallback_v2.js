@@ -2,7 +2,7 @@
 
 // The patternFallback feature of the 2.0 Validator
 // (ata-validator/features/patternFallback, lib/features/patternFallback.js,
-// lib/pattern-fallback.js). A pattern the linear-time engine cannot represent
+// lib/pattern-fallback-scan.js). A pattern the linear-time engine cannot represent
 // (a backreference, a lookaround, \B, \k, a repeat past the instruction
 // budget, a property escape the platform RegExp is not shown to run in linear
 // time) runs on the platform RegExp by default. With 'reject' the validator
@@ -678,7 +678,7 @@ async function irChecks () {
     }
   })
   check("what 'reject' lets through runs on the linear engine or a RegExp shown linear, in every engine (official suite patterns)", () => {
-    const { make } = require(path.join(ROOT, 'lib', 'pattern-fallback.js'))
+    const { make } = require(path.join(ROOT, 'lib', 'pattern-fallback-scan.js'))
     const { nativeIsLinear } = require(path.join(ROOT, 'lib', 'regex-linear'))
     const shared = require(path.join(ROOT, 'lib', 'engine-shared.js'))
     const sharedCore = require(path.join(ROOT, 'lib', 'engine-shared-core.js'))
@@ -730,7 +730,7 @@ async function irChecks () {
         const text = r.outputFiles.map((f) => f.text).join('\n')
         const inputs = Object.keys(r.metafile.inputs)
         assert.strictEqual(text.includes(OUTSIDE), add, entry + (add ? ' with' : ' without') + ' the feature')
-        assert.strictEqual(inputs.some((f) => f.endsWith('lib/pattern-fallback.js')), add, entry + ': lib/pattern-fallback.js')
+        assert.strictEqual(inputs.some((f) => f.endsWith('lib/pattern-fallback-scan.js')), add, entry + ': lib/pattern-fallback-scan.js')
         assert.strictEqual(inputs.some((f) => f.endsWith('lib/defaults-match.js')), add, entry + ': lib/defaults-match.js')
         if (entry !== ENTRY.edge) assert.strictEqual(inputs.some((f) => f.endsWith('lib/regex-linear.js')), add, entry + ': lib/regex-linear.js')
         // Without the feature a bundle holds the name once, as the slot

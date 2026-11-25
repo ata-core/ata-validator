@@ -22,7 +22,9 @@
 //   node scripts/gate.js                     the official suite, every dialect
 //   node scripts/gate.js --schemastore <dir> SchemaStore's samples as well
 //   node scripts/gate.js --paths a,b         only these paths
+//   node scripts/gate.js --json <file>       the counts as JSON as well
 //
+// scripts/gate-report.js writes docs/correctness-report.md from --json.
 // tests/test_gate_suite.js runs the first form in `npm test`.
 
 const fs = require('node:fs');
@@ -78,6 +80,9 @@ async function loadIr() {
   K = await import(at('lib/kernels/index.mjs'));
   plans = await import(at('lib/kernels/plan-rich.mjs'));
   ({ functionBody } = await import(at('lib/ir/emit.mjs')));
+  // The 2.0 features, for the v2 paths: loaded here so that a caller that
+  // takes PATHS without run() (tests/test_keyword_named_names.js) has them.
+  v2f = await import(at('index.v2.features.mjs'));
 }
 const irModule = (src) => new Function('K', functionBody(src))(K);
 const irData = (src) => { const m = /^import \{([^}]*)\} from "[^"\n]*"\n/.exec(src); return new Function('K', `const {${m[1]}}=K\n` + src.slice(m[0].length).replace(/^export const\{isValid,validate\}=/m, 'const{isValid,validate}=') + 'return{isValid,validate}')(K); };
@@ -307,7 +312,7 @@ async function check(label, schema, docs, stats, report, only) {
       let want; let got; let ok;
       try { want = ref.validate(a); } catch { continue; }
       try { got = p.validate(b); ok = p.isValid(clone(d)); } catch (e) { st.threw++; st.diffs++; if (report.length < 40) report.push(`${name} | ${label} | threw on ${show(d)}: ${String(e && e.message).slice(0, 160)}`); continue; }
-      const fail = (what) => { if (KNOWN[tag] !== undefined || (what.startsWith('errors') && KNOWN_ORDER.some((x) => label.endsWith(x)))) { st.known = (st.known || 0) + 1; return; } st.diffs++; const k = `${name} | ${what.split(/[:\n]/)[0]} | ${tag}`; stats.kinds[k] = (stats.kinds[k] || 0) + 1; if (!stats.first[k]) stats.first[k] = `${label} | ${what} | ${show(d)}`; };
+      const fail = (what) => { if (KNOWN[tag] !== undefined || (what.startsWith('errors') && KNOWN_ORDER.some((x) => label.endsWith(x)))) { st.known = (st.known || 0) + 1; stats.knownSeen.push({ path: name, label, tag, what: what.split(/[:\n]/)[0] }); return; } st.diffs++; const k = `${name} | ${what.split(/[:\n]/)[0]} | ${tag}`; stats.kinds[k] = (stats.kinds[k] || 0) + 1; if (!stats.first[k]) stats.first[k] = `${label} | ${what} | ${show(d)}`; };
       if (got.valid !== want.valid || ok !== want.valid) { fail(`verdict: Validator ${want.valid}, validate ${got.valid}, isValid ${ok}`); continue; }
       if (!want.valid) {
         if (P.abort && got.errors.length === 1 && got.errors[0].code === 'ATA9000') st.abort++;
@@ -388,8 +393,7 @@ async function schemastore(root, stats, report, only) {
 
 async function run(opts) {
   await loadIr();
-  v2f = await import(at('index.v2.features.mjs'));
-  const stats = { schemas: 0, paths: {}, kinds: {}, first: {} }; const report = [];
+  const stats = { schemas: 0, paths: {}, kinds: {}, first: {}, knownSeen: [] }; const report = [];
   const only = opts.paths ? new Set(opts.paths) : null;
   EVERY = opts.every > 1 ? opts.every : 1; SEEN = 0;
   if (opts.suite !== false) await suite(stats, report, only);
@@ -408,13 +412,60 @@ function summary({ stats, report }) {
   return lines.join('\n');
 }
 
-module.exports = { run, summary, PATHS };
+// Which native engine this process can load, and what it found and refused.
+// The gate has no path of its own for the buffer APIs; with an engine loaded,
+// the JSON text path hands long text to it.
+function nativeState() {
+  const { env } = require(path.join(ROOT, 'lib/env'));
+  if (env('ATA_NO_NATIVE')) return { loaded: false, noNative: true, found: [] };
+  const loadNative = require(path.join(ROOT, 'lib/native-load'));
+  const names = [...new Set([false, true].map((musl) => loadNative.nativePackageName(process.platform, process.arch, musl)).filter(Boolean))];
+  const found = [];
+  const probe = (source, load) => { try { const b = load(); found.push({ source, version: typeof b.version === 'function' ? b.version() : null }); } catch {} };
+  for (const n of names) probe(n, () => require(n));
+  probe('local build', () => require(path.join(ROOT, 'build', 'Release', 'ata.node')));
+  const loaded = loadNative() !== null;
+  const used = loaded ? found.find((f) => f.version === ATA_VERSION) : undefined;
+  return { loaded, noNative: false, source: used ? used.source : null, found };
+}
+
+// What `--json <file>` writes: every count the summary prints, by path, and
+// what the run was given, for scripts/gate-report.js.
+function record({ stats, report }, opts) {
+  const fieldsName = (f) => (f === RICH ? 'rich' : f === MODULE ? 'module' : 'plain');
+  return {
+    format: 'ata-gate/1',
+    ata: ATA_VERSION,
+    node: process.version,
+    platform: process.platform,
+    arch: process.arch,
+    native: nativeState(),
+    given: { suite: opts.suite !== false, schemastore: opts.schemastore || null, paths: opts.paths || null, every: opts.every > 1 ? opts.every : 1 },
+    schemas: stats.schemas,
+    paths: Object.entries(stats.paths).map(([name, s]) => {
+      const P = PATHS[name];
+      return { name, fields: fieldsName(P.fields), ordered: P.ordered !== false, abortAllowed: !!P.abort, json: !!P.json, fills: !!P.fills, taken: s.taken, declined: s.declined, docs: s.docs, diffs: s.diffs, threw: s.threw, abort: s.abort, known: s.known || 0, unordered: s.unordered || 0 };
+    }),
+    kinds: Object.entries(stats.kinds).sort((a, b) => b[1] - a[1]).map(([kind, n]) => ({ kind, n, first: stats.first[kind] })),
+    report,
+    known: Object.keys(KNOWN),
+    knownOrder: KNOWN_ORDER.slice(),
+    knownSeen: stats.knownSeen,
+  };
+}
+
+// `loadIr` and `cleanup` are for a test that builds PATHS on schemas of its
+// own: the first loads what the ir paths need, the second removes the
+// temporary directory the module paths write to, as run() does.
+module.exports = { run, summary, PATHS, loadIr, cleanup: () => fs.rmSync(tmp, { recursive: true, force: true }) };
 
 if (require.main === module) {
   const argv = process.argv.slice(2);
   const arg = (n) => { const i = argv.indexOf(n); return i === -1 ? undefined : argv[i + 1]; };
-  run({ schemastore: arg('--schemastore'), paths: arg('--paths') ? arg('--paths').split(';') : undefined, suite: !argv.includes('--no-suite'), every: Number(arg('--every')) || 1 }).then((r) => {
+  const opts = { schemastore: arg('--schemastore'), paths: arg('--paths') ? arg('--paths').split(';') : undefined, suite: !argv.includes('--no-suite'), every: Number(arg('--every')) || 1 };
+  run(opts).then((r) => {
     console.log(summary(r));
+    if (arg('--json')) fs.writeFileSync(arg('--json'), JSON.stringify(record(r, opts), null, 2) + '\n');
     const bad = Object.values(r.stats.paths).reduce((n, s) => n + s.diffs + s.threw, 0);
     process.exit(bad === 0 ? 0 : 1);
   }, (e) => { console.error(e); process.exit(2); });

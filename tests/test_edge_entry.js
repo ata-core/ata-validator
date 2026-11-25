@@ -160,7 +160,42 @@ const root = path.resolve(__dirname, '..');
     // 67640 bytes (67623 measured): a lone high surrogate counts as its own
     // code point, length bounds stop scanning for pairs once decided, and a
     // well-formed string is read only at the high half of each pair; 77 bytes.
-    assert.ok(size < 67640, `the Workers bundle is ${size} bytes gzipped, over 67640`);
+    // On the 1.x line from 1.65.0 to 1.66.0:
+    // 67360 bytes (67355 measured): deep equality reads the enumerable own keys
+    // of both sides; 23 bytes.
+    // 67380 bytes (67374 measured): a lone high surrogate counts as its own
+    // code point, and length bounds stop scanning once decided; 42 bytes.
+    // 67420 bytes (67416 measured): the defaults, removal and coercion passes
+    // resolve a relative $ref at its document's base, not by path suffix, so
+    // they no longer act on a different registered document; 84 bytes.
+    // 67480 bytes (67474 measured): the three fixes above together in one tree.
+    // 67520 bytes (67509 measured): a count bound that is not a whole number
+    // from zero keeps the buffer APIs off the native walker, which skipped it;
+    // 35 bytes, in a bundle that never loads the addon.
+    // 67520 bytes (67510 measured): a validator with a preprocess pass answers
+    // its buffer APIs through validate() unless the Node entry says its
+    // defaults cannot change a verdict; 36 bytes, the check left out here.
+    // 67650 bytes (67645 measured): a schema holding a value JSON cannot carry
+    // gets a compile cache key of its own; 171 bytes.
+    // 67520 bytes (67516 measured): Validator.fromStandalone fills defaults
+    // from the documents given through `schemas` and before every verdict, as
+    // a Validator does; 42 bytes.
+    // 67960 bytes (67947 measured): the sweep's fixes together in one tree.
+    // 67950 bytes (67938 measured): a $ref that resolves to nothing, reached
+    // where failing it could be inverted, ends the whole validation; 464 bytes.
+    // 68420 bytes (68402 measured): the sweep's fixes and the unresolved
+    // $ref fix together in one tree.
+    // 67510 bytes (67498 measured): the patternFallback option's hook and
+    // refusal (issue #131); the option itself comes with
+    // ata-validator/pattern-fallback, which a Worker imports to use it; 166
+    // bytes.
+    // 68580 bytes (68566 measured): the sweep's fixes, the unresolved
+    // $ref fix and the patternFallback option together in one tree.
+    // 68810 bytes (68795 measured): 1.66.0 merged into the 2.0 branch, the
+    // character scan with its group scanner and the code point counters above
+    // with 1.66.0's fixes in one tree (67640 on the 2.0 branch, 68580 on
+    // 1.66.0).
+    assert.ok(size < 68810, `the Workers bundle is ${size} bytes gzipped, over 68810`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

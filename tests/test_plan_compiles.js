@@ -11,6 +11,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { createInterpreter } = require('../lib/interpreter.js');
+const { hasNegativeRef } = require('../lib/negative-refs.js');
 
 const schemas = [];
 for (const dialect of ['draft2020-12', 'draft7', 'draft2019-09', 'draft6', 'draft4']) {
@@ -34,12 +35,17 @@ for (const width of [0, 1, 8, 9, 32, 33]) {
 }
 
 let compiled = 0;
+let skipped = 0;
 const failed = [];
 for (const [name, schema] of schemas) {
   let it;
   try { it = createInterpreter(schema); } catch { continue; }
   let fast;
   try { fast = it._fastRoot(); } catch (e) { failed.push(`${name}: threw ${e.message}`); continue; }
+  // A reference that resolves to nothing here (nothing is registered) where
+  // failing it could be inverted: no tree, by design, and the walk ends the
+  // validation when it reaches one (lib/negative-refs.js).
+  if (fast === null && hasNegativeRef(schema, null)) { skipped++; continue; }
   if (fast === null) { failed.push(`${name}: no tree`); continue; }
   compiled++;
 }
@@ -47,4 +53,4 @@ assert.strictEqual(failed.length, 0, `${failed.length} schemas fell back to the 
 // 1409 on the 2026-09-18 suite pin; schemas whose remote references the
 // interpreter cannot resolve here are skipped above.
 assert.ok(compiled > 1200, `too few schemas compiled: ${compiled}`);
-console.log(`ok: the closure-tree compiler covers ${compiled} suite schemas, none fall back to the plain walk`);
+console.log(`ok: the closure-tree compiler covers ${compiled} suite schemas, none fall back to the plain walk (${skipped} hold a reference that resolves to nothing here, where failing it could be inverted)`);

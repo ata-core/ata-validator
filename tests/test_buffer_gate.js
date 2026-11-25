@@ -48,13 +48,52 @@ check('shapes the walker gets wrong are routed', () => {
     { prefixItems: [{ type: 'integer' }] },
     { items: [{ type: 'integer' }] },
     { allOf: [{ items: false }] },
+    // A count bound that is not a whole number from zero: the walker skips it.
+    { minLength: 1.5 }, { maxLength: -1 }, { properties: { a: { minItems: 0.5 } } }, { maxItems: -1 },
+    { minProperties: 2.5 }, { maxProperties: -1 }, { items: { maxLength: '2' } },
   ]
   for (const s of routed) assert.strictEqual(bufferNeedsSlowPath(s, new Map()), true, JSON.stringify(s))
+  for (const s of [{ minLength: 1 }, { maxLength: 2.0 }, { minItems: 0 }, { maxProperties: 3 }]) assert.strictEqual(bufferNeedsSlowPath(s, new Map()), false, JSON.stringify(s))
+})
+
+check('a count bound the walker skips gives the validate() verdict on every buffer API', () => {
+  const cases = [
+    [{ type: 'string', minLength: 1.5 }, '"a"'], [{ type: 'string', maxLength: -1 }, '""'],
+    [{ type: 'array', minItems: 1.5 }, '[1]'], [{ type: 'array', maxItems: -1 }, '[]'],
+    [{ type: 'object', minProperties: 0.5 }, '{}'], [{ type: 'object', maxProperties: -1 }, '{}'],
+  ]
+  for (const [s, text] of cases) {
+    const v = new Validator(s, {})
+    const want = v.validate(JSON.parse(text)).valid
+    assert.strictEqual(want, false, JSON.stringify(s))
+    assert.strictEqual(v.isValid(Buffer.from(text)), want, `isValid ${JSON.stringify(s)}`)
+    assert.strictEqual(v.countValid(Buffer.from(text + '\n' + text)), 0, `countValid ${JSON.stringify(s)}`)
+    assert.strictEqual(v.isValidJSON(text + ' '.repeat(9000)), want, `isValidJSON past the native threshold ${JSON.stringify(s)}`)
+  }
 })
 
 check('an external schema with a routed shape routes the validator', () => {
   const map = new Map([['http://example.com/x', { contains: { type: 'string' } }]])
   assert.strictEqual(bufferNeedsSlowPath({ type: 'object' }, map), true)
+})
+
+check('a validator with defaults, coerceTypes or removeAdditional answers the buffer APIs as validate()', () => {
+  // The native walker reads the bytes as they came; these passes change the
+  // document before it is judged.
+  const cases = [
+    [{ type: 'object', required: ['a'], properties: { a: { default: 1 } } }, '{}', {}],
+    [{ type: 'object', properties: { a: { type: 'boolean', default: 'false' } } }, '{}', {}],
+    [{ type: 'object', properties: { n: { type: 'integer' } } }, '{"n":"1"}', { coerceTypes: true }],
+    [{ type: 'object', properties: { a: {} }, additionalProperties: false }, '{"a":1,"b":2}', { removeAdditional: true }],
+  ]
+  for (const [s, text, opts] of cases) {
+    const v = new Validator(s, opts)
+    const want = v.validate(JSON.parse(text)).valid
+    assert.strictEqual(v.isValid(Buffer.from(text)), want, `isValid ${JSON.stringify(s)}`)
+    assert.strictEqual(v.countValid(Buffer.from(text + '\n' + text)), want ? 2 : 0, `countValid ${JSON.stringify(s)}`)
+    assert.strictEqual(v.batchIsValid([Buffer.from(text)]), want ? 1 : 0, `batchIsValid ${JSON.stringify(s)}`)
+    assert.deepStrictEqual(v.isValidParallel(Buffer.from(text + '\n' + text)), [want, want], `isValidParallel ${JSON.stringify(s)}`)
+  }
 })
 
 check('routed APIs give the validate() verdict', () => {

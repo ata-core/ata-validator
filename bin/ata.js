@@ -57,6 +57,9 @@ Compile options:
                           and for a schema with $ref its key skeleton
   --source                Embed schema source map (default in development)
   --no-source             Omit source map (default in production, NODE_ENV=production)
+  --pattern-fallback <m>  platform (default) | reject. reject fails the compile on a
+                          pattern outside the linear-time engine, which would run on
+                          the platform RegExp and can backtrack
 
 Migrate options:
   --write                 Apply the mechanical changes (import specifiers, addFormats calls).
@@ -94,6 +97,8 @@ Build options:
                           keywords (with a spelling suggestion), keywords the
                           node's type makes inert, unresolvable local $refs,
                           and required names nothing can satisfy
+  --pattern-fallback <m>  platform (default) | reject. reject fails an input whose
+                          schema has a pattern outside the linear-time engine
   --watch                 Re-emit on schema change (Ctrl-C to exit)
   --no-types              Skip .d.mts/.d.cts emission alongside compiled modules
   --source                Embed schema source map (default in development)
@@ -142,6 +147,7 @@ function parseArgs(argv) {
     if (a === '--check') { out.opts.check = true; continue; }
     if (a === '--strict') { out.opts.strict = true; continue; }
     if (a === '--strict-schema') { out.opts.strictSchema = true; continue; }
+    if (a === '--pattern-fallback') { out.opts.patternFallback = argv[++i]; continue; }
     if (a === '--target') { out.opts.target = argv[++i]; continue; }
     if (a === '--generate') { out.opts.generate = Number(argv[++i]); continue; }
     if (a === '--samples') { (out.opts.samples = out.opts.samples || []).push(argv[++i]); continue; }
@@ -280,7 +286,9 @@ function cmdCompile(args) {
   }
   let v;
   try {
-    v = new Validator(schema);
+    const pf = args.opts.patternFallback;
+    if (pf !== undefined && pf !== 'platform' && pf !== 'reject') throw new Error(`--pattern-fallback must be platform or reject (got "${pf}")`);
+    v = new Validator(schema, pf === 'reject' ? { patternFallback: 'reject' } : undefined);
   } catch (e) {
     reportCompileError(input, e.message);
     process.exit(1);
@@ -388,6 +396,7 @@ function cmdBuild(args) {
     target: args.opts.target,
     types: args.opts.types,
     cacheFile: args.opts.cacheFile,
+    patternFallback: args.opts.patternFallback,
     // Forward the explicit user choice (true / false / undefined). The
     // aot-build module applies the NODE_ENV-aware default when undefined.
     source: args.opts.source,

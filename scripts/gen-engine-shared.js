@@ -31,12 +31,27 @@ const CALL = '    try {\n      re = compileSafe(src);\n';
 // which the core never loads: there a missing engine is the refusal above.
 const STUB = "      if (e && typeof e.message === 'string' && e.message.includes('built without the pattern engine')) throw e;\n";
 
+// The 1.x Validator's patternFallback hook (lib/pattern-fallback.js) is a
+// parameter of the interpreter's compilePattern. The 2.0 engines take the
+// option as a feature that wraps their compile instead
+// (lib/features/patternFallback.js), so their copies are written without it.
+const HOOKED = [
+  ['function compilePattern(src, hook) {\n', 'function compilePattern(src) {\n'],
+  ['    try {\n      return compileSafe(src);\n', '    try {\n      re = compileSafe(src);\n'],
+  ['  return hook ? hook(src, re) : re;\n', '  return re;\n'],
+];
+
 function block () {
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'interpreter-core.js'), 'utf8');
   const a = src.indexOf(BEGIN);
   const b = src.indexOf(END);
   if (a < 0 || b < a) throw new Error('lib/interpreter-core.js has no engine-shared markers');
-  return src.slice(a + BEGIN.length, b);
+  let s = src.slice(a + BEGIN.length, b);
+  for (const [from, to] of HOOKED) {
+    if (s.split(from).length !== 2) throw new Error('gen-engine-shared: lib/interpreter-core.js no longer holds, once, ' + JSON.stringify(from));
+    s = s.replace(from, () => to);
+  }
+  return s;
 }
 
 // Whole-line comments stay in lib/interpreter-core.js, where the code is read.

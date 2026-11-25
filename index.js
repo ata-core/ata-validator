@@ -28,6 +28,10 @@ const loadCodegen = () => {
   return engine;
 };
 core._setCodegenLoader(loadCodegen);
+// The patternFallback option, read when a validator asks for it.
+core._internals.pf = () => require('./lib/pattern-fallback.js');
+// Whether a preprocess pass can be left out of a buffer verdict.
+core._internals.kv = (v) => require('./lib/defaults-safety.js').keepsVerdict(v, core.Validator);
 const warm = setTimeout(loadCodegen, 0);
 if (typeof warm === 'object' && typeof warm.unref === 'function') warm.unref();
 

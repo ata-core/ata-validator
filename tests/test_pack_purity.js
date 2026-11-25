@@ -377,10 +377,54 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // choice in a file both read (lib/pattern-choice.js) (694152 bytes, 677.9 KB;
 // 686036 before).
 // 681.5 KB: the patternFallback option of ata-validator/ir, which the module
-// writers settle before they write (lib/pattern-fallback.js, the scan the
-// 2.0 Validator's patternFallback feature shares, lib/ir/pattern-fallback.mjs
+// writers settle before they write (the scan the 2.0 Validator's
+// patternFallback feature shares, lib/pattern-fallback-scan.js since the
+// 1.66.0 merge, lib/ir/pattern-fallback.mjs
 // and the option in lib/ir/index.d.ts), and the feature's declarations
 // (697197 bytes, 680.9 KB; 694152 before).
-assert.ok(manifest.size < 681.5 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// On the 1.x line from 1.65.0 to 1.66.0:
+// 668 KB for a silent accept fix, +1,476 B: references inside registered
+// documents resolved at their own base before code generation trusts them,
+// and the verdict and combined generators declining a reference they cannot
+// resolve. Measured 667.2 KB; 667.7 KB with the preprocess passes resolving
+// a relative $ref at its document's base and the cross-document cycle
+// declined (+508 B); 667.9 KB with a local definition re-entered on an
+// undetected cycle declined (+197 B).
+// 670 KB with the deep equality and code point fixes in the same release.
+// Measured 668.3 KB.
+// 672 KB with lib/defaults-safety.js, the static check that keeps a
+// validator's buffer APIs on the native walker when its defaults cannot
+// change a verdict. Measured 671.9 KB.
+// 675 KB with the sweep's fixes together in one tree. Measured 674.0 KB.
+// 671 KB for a silent accept fix, +2,363 B over that tree: a $ref that
+// resolves to nothing, reached where failing it in place could be inverted,
+// ends the whole validation (lib/negative-refs.js for the paths that cannot
+// end it). Measured 670.6 KB.
+// 677 KB with the sweep's fixes and the unresolved $ref fix together in
+// one tree. Measured 676.4 KB.
+// 671 KB with the patternFallback option (#131): lib/pattern-fallback.js,
+// the ata-validator/pattern-fallback entry, its types and its notes in the
+// README and the CHANGELOG. Measured 670.5 KB.
+// 682 KB with the sweep's fixes, the unresolved $ref fix and the
+// patternFallback option together in one tree. Measured 681.3 KB.
+// 674 KB with ata-validator/ir and ata-validator/kernels giving a pattern
+// the engine the Validator gives it: the linear engine as an ES module for
+// the modules the ir writes (lib/kernels/safe-re.mjs, a copy of
+// lib/safe-regex.js's engine without its comments, since the kernels reach
+// no CommonJS file), the interpreted engine's choice as one for the ir's
+// removeAdditional pass, and the code generator's choice in a file of its own
+// that both read (lib/pattern-choice.js). Measured 673.0 KB.
+// 689 KB with the sweep's fixes, the unresolved $ref fix, the
+// patternFallback option and the ir and kernels pattern engine together in
+// one tree. Measured 688.5 KB.
+// 690 KB with the code only some schemas or calls need read on first need
+// (lib/ref-bindings.js, Validator.fromStandalone in lib/aot.browser.js, the
+// buffer API choice in lib/buffer-gate.js): one file more, and moved code
+// packs a little worse apart. Measured 689.7 KB.
+// 698 KB: 1.66.0 merged into the 2.0 branch, with the 2.0 scan for
+// patternFallback in lib/pattern-fallback-scan.js beside the 1.x option in
+// lib/pattern-fallback.js (713711 bytes, 697.0 KB; 681.5 KB ceiling on the
+// 2.0 branch, 690 KB on 1.66.0).
+assert.ok(manifest.size < 698 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

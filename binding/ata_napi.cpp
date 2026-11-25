@@ -1176,6 +1176,16 @@ Napi::Value FastRegister(const Napi::CallbackInfo& info) {
   return Napi::Number::New(env, slot);
 }
 
+// Set by the walkers in src/ata.cpp for a document they cannot answer as
+// validate() does (a name twice in an object they read, or a string simdjson
+// refuses and JSON.parse reads); read, and cleared, right after each verdict
+// on the thread that gave it. The raw functions below answer such a document
+// with null, and lib/native-attach.js has the JS path answer it.
+namespace ata { bool take_needs_js(); extern std::atomic<uint64_t> g_needs_js_marks; }
+static inline uint64_t needs_js_marks() { return ata::g_needs_js_marks.load(std::memory_order_relaxed); }
+// Whether the verdict given since `marks` was read is one to leave to JS.
+static inline bool needs_js_since(uint64_t marks) { return needs_js_marks() != marks && ata::take_needs_js(); }
+
 // Fast validation: slot + raw buffer → bool
 // Routes through is_valid_buf → is_valid_prepadded → On-Demand od_plan fast path
 static bool FastValidateImpl(uint32_t slot, const uint8_t* data, size_t length) {
@@ -1237,6 +1247,7 @@ static napi_value RawFastValidate(napi_env env, napi_callback_info info) {
 
   uint32_t slot;
   napi_get_value_uint32(env, args[0], &slot);
+  const uint64_t marks = needs_js_marks();
 
   // Check if pre-padded mode (3rd arg = json length, buffer has padding)
   bool prepadded = (argc >= 3);
@@ -1303,7 +1314,8 @@ static napi_value RawFastValidate(napi_env env, napi_callback_info info) {
   }
 
   napi_value result;
-  napi_get_boolean(env, valid, &result);
+  if (needs_js_since(marks)) napi_get_null(env, &result);
+  else napi_get_boolean(env, valid, &result);
   return result;
 }
 
@@ -1450,8 +1462,9 @@ static napi_value RawParallelValidate(napi_env env, napi_callback_info info) {
   if (schema_json.empty() || n < num_threads * 2) {
     // Fallback: single-threaded for small batches
     for (size_t i = 0; i < n; i++) {
+      const uint64_t marks = needs_js_marks();
       auto r = ata::validate(g_fast_schemas[slot], std::string_view(lines[i].ptr, lines[i].len));
-      results[i] = r.valid;
+      results[i] = needs_js_since(marks) ? 2 : r.valid;
     }
   } else {
     auto& tp = pool();
@@ -1471,7 +1484,9 @@ static napi_value RawParallelValidate(napi_env env, napi_callback_info info) {
         }
         auto& s = it->second;
         for (size_t i = from; i < to; i++) {
-          results[i] = line_is_valid(s, lines[i].ptr, lines[i].len, end);
+          const uint64_t marks = needs_js_marks();
+          const bool ok = line_is_valid(s, lines[i].ptr, lines[i].len, end);
+          results[i] = needs_js_since(marks) ? 2 : ok;
         }
       });
     }
@@ -1482,7 +1497,8 @@ static napi_value RawParallelValidate(napi_env env, napi_callback_info info) {
   napi_create_array_with_length(env, n, &result_arr);
   for (size_t i = 0; i < n; i++) {
     napi_value bval;
-    napi_get_boolean(env, results[i], &bval);
+    if (results[i] == 2) napi_get_null(env, &bval);
+    else napi_get_boolean(env, results[i], &bval);
     napi_set_element(env, result_arr, (uint32_t)i, bval);
   }
   return result_arr;
@@ -1623,9 +1639,11 @@ static napi_value RawNDJSONValidate(napi_env env, napi_callback_info info) {
     const char* nl = static_cast<const char*>(memchr(start, '\n', end - start));
     size_t line_len = nl ? (size_t)(nl - start) : (size_t)(end - start);
     if (line_len > 0) {
+      const uint64_t marks = needs_js_marks();
       auto r = ata::validate(g_fast_schemas[slot], std::string_view(start, line_len));
       napi_value bval;
-      napi_get_boolean(env, r.valid, &bval);
+      if (needs_js_since(marks)) napi_get_null(env, &bval);
+      else napi_get_boolean(env, r.valid, &bval);
       napi_set_element(env, result_arr, idx++, bval);
     }
     start += line_len + 1;
