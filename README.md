@@ -106,8 +106,8 @@ or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; 
 From 2.0, a browser bundle and a Workers or Vercel Edge bundle get a smaller Validator than Node
 does. The `browser` export condition resolves to the 2.0 browser entry and `workerd` and
 `edge-light` to the 2.0 edge entry. Both export `Validator` alone and generate no code. For a page whose only import is `import { Validator } from 'ata-validator'`
-(esbuild, minified, gzip level 9) the first load is 26,154 B where 1.65.0 was 58,144 B, and a
-Workers bundle is 50,713 B where it was 67,332 B.
+(esbuild, minified, gzip level 9) the first load is 26,583 B where 1.66.0 was 58,843 B, and a
+Workers bundle is 51,148 B where it was 68,579 B.
 
 On those entries an error has five fields (`keyword`, `instancePath`, `schemaPath`, `params`,
 `message`) until the page registers the rich ones, and a few options are features to register

@@ -8,7 +8,7 @@ How to move a browser or worker bundle is in [docs/migration-2.0.md](docs/migrat
 
 ### Changed
 
-- In a browser bundle (the `browser` export condition) `ata-validator` is now the 2.0 browser entry, `index.v2.browser.mjs`, and under `workerd` and `edge-light` the 2.0 edge entry, `index.v2.edge.mjs`. For a page whose only import is `import { Validator } from 'ata-validator'`, bundled with esbuild, minified, gzip -9, the first load goes from 58,144 B on 1.65.0 to 26,154 B, and a Workers bundle from 67,332 B to 50,713 B.
+- In a browser bundle (the `browser` export condition) `ata-validator` is now the 2.0 browser entry, `index.v2.browser.mjs`, and under `workerd` and `edge-light` the 2.0 edge entry, `index.v2.edge.mjs`. For a page whose only import is `import { Validator } from 'ata-validator'`, bundled with esbuild, minified, gzip -9, the first load goes from 58,843 B on 1.66.0 to 26,583 B, and a Workers bundle from 68,579 B to 51,148 B.
 - Those two entries export `Validator` and nothing else. `compile`, `validate`, the tools (`toTypeScript`, `renderPretty` and the others), `version` and the default export are on the Node entries only. The class keeps `validate`, `isValidObject`, `validateJSON`, `isValidJSON`, `addSchema` and `~standard`; the buffer methods and the bundle statics are not on it.
 - On those entries an error has five fields by default: `keyword`, `instancePath`, `schemaPath`, `params`, `message`. The rich fields come with `Validator.use(richErrors)`, imported from `ata-validator/features/richErrors` (5,210 B). `verbose`, `coerceTypes`, `removeAdditional`, the `errorMessage` keyword and references to the json-schema.org meta-schemas are features registered the same way. A validator that needs one that is not registered throws an error starting with `ata2:` that names it, on its first call.
 - On those entries an option the Validator does not know is refused by the constructor with `ata2: option <name>`, where 1.x ignored it. That includes `engine`, `keywords`, `strictSchema`, `logger` and `source`, which the Node entries still take. None is accepted and ignored: `keywords` and `strictSchema: true` change the answer, and each accepted name measured 5 to 7 B gzip on every page that carries the Validator.
@@ -24,7 +24,7 @@ How to move a browser or worker bundle is in [docs/migration-2.0.md](docs/migrat
 
 ### Notes
 
-- The tarball is 765,857 B packed, from 681,769 B at 1.65.0: 107 more files, the 2.0 entries and what they import.
+- The tarball is 792,999 B packed, from 706,541 B at 1.66.0: 112 more files, the 2.0 entries and what they import.
 - `@rjsf/validator-ata` 6.11.1 depends on `ata-validator ^1.56.0` and keeps a 1.x copy. Forced onto 2.0.0 by an override it reads the `ata2: verbose` refusal as an invalid document, for every document.
 
 ## 1.66.0 - 2026-11-25

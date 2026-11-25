@@ -32,8 +32,8 @@ one line:
 import { Validator, validate } from 'ata-validator/v1'
 ```
 
-Measured as the table in the next section: 58,436 B first load in a browser
-bundle and 67,622 B in a Workers bundle. A page that does not import it
+Measured as the table in the next section: 59,090 B first load in a browser
+bundle and 68,811 B in a Workers bundle. A page that does not import it
 carries none of it. A bundle that imports both holds both
 Validators.
 
@@ -43,12 +43,12 @@ The 2.0 entries carry a smaller Validator. Measured on the packed 2.0.0
 tarball with esbuild 0.28.2, minified, gzip -9, for a page whose only import
 is `import { Validator } from 'ata-validator'`:
 
-| Bundle | 1.65.0 | 2.0.0 |
+| Bundle | 1.66.0 | 2.0.0 |
 |---|---:|---:|
-| browser, first load | 58,144 B | 26,154 B |
-| Workers (`workerd`) | 67,332 B | 50,713 B |
+| browser, first load | 58,843 B | 26,583 B |
+| Workers (`workerd`) | 68,579 B | 51,148 B |
 
-The 1.65.0 browser entry also loads the code generator later, in chunks of
+The 1.66.0 browser entry also loads the code generator later, in chunks of
 its own, once a validator is used often; the 2.0 browser entry does not load
 it unless the page registers the `codegen` feature.
 
