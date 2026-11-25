@@ -51,7 +51,7 @@ const ENGINE = [
   ["      const duplicatePair = G.dup || refuse('uniqueItems')\n", ''],
   ["      const collapse = G.collapse || refuse('branchCollapse')\n", ''],
   // The verdict core (lib/core/verdict.js) takes its length checks from here.
-  ['module.exports = { createSmall }\n', 'module.exports = { createSmall, cpAtLeast, cpAtMost }\n'],
+  ['module.exports = { createSmall, inverted }\n', 'module.exports = { createSmall, inverted, cpAtLeast, cpAtMost }\n'],
 ];
 function renderEngine () {
   let src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'engine-small.js'), 'utf8');
