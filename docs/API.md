@@ -941,11 +941,17 @@ Without it a browser bundle checks a `hostname` for letters, digits and
 hyphens only and treats `idn-hostname` as an annotation, as releases before
 1.64.0 did everywhere.
 
-The `patternFallback` option works the same way. Node has it with no setup; a
-bundle for a page or a Worker leaves it out, and refuses the option, until the
-application imports it once (3393 bytes gzipped in a browser bundle, 3442 in a
-Workers bundle, most of it the linearity proof):
+The `patternFallback` option is left out of browser and Workers bundles too. Node
+has it with no setup. The 2.0 entry that such a bundle gets refuses the option
+with `ata2: option patternFallback` until the application registers it once
+(3,994 B gzipped in a browser bundle, 3,064 in a Workers bundle, most of it the
+linearity proof):
 
 ```javascript
-import 'ata-validator/pattern-fallback';
+import { Validator } from 'ata-validator';
+import { patternFallback } from 'ata-validator/features/patternFallback';
+Validator.use(patternFallback);
 ```
+
+`ata-validator/v1` in such a bundle takes the option after
+`import 'ata-validator/pattern-fallback'`.

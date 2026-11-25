@@ -116,7 +116,7 @@ the same way:
 ```js
 import { Validator } from 'ata-validator'
 import { richErrors } from 'ata-validator/features/richErrors'
-Validator.use(richErrors)   // 5,210 B more; a no-op on the Node entry
+Validator.use(richErrors)   // 5,196 B more; a no-op on the Node entry
 ```
 
 Something a validator needs that is not registered is refused by name, with an error that
@@ -685,7 +685,7 @@ const RE2 = require('re2');
 const v = new Validator(toolSchema, { patternFallback: (source, flags) => new RE2(source, flags) });
 ```
 
-Patterns the linear engine runs are not affected, and with no such pattern in the schema a validator compiles as it would without the option. The schema is scanned when the validator is built, every object in it, `default`, `const` and `enum` values included, since a `$ref` can point anywhere. The Node entry carries the option; a bundle for a page or a Worker adds it with `import 'ata-validator/pattern-fallback'` once (3442 bytes gzipped in a Workers bundle, 3393 in a browser bundle, most of it the linearity proof) and refuses it without that import. `ata build --pattern-fallback reject` and `build({ patternFallback: 'reject' })` fail an input with such a pattern. A function cannot be written into a compiled module, so `ata build`, the bundle methods and `Validator.fromStandalone()` throw for one.
+Patterns the linear engine runs are not affected, and with no such pattern in the schema a validator compiles as it would without the option. The schema is scanned when the validator is built, every object in it, `default`, `const` and `enum` values included, since a `$ref` can point anywhere. The Node entry carries the option. A browser or Workers bundle, which gets the 2.0 entry, refuses it with `ata2: option patternFallback` until the application registers it once with `Validator.use(patternFallback)`, imported from `ata-validator/features/patternFallback` (3,994 B gzipped in a browser bundle, 3,064 in a Workers bundle, most of it the linearity proof). `ata-validator/v1` in such a bundle takes the option after `import 'ata-validator/pattern-fallback'`. `ata build --pattern-fallback reject` and `build({ patternFallback: 'reject' })` fail an input with such a pattern. A function cannot be written into a compiled module, so `ata build`, the bundle methods and `Validator.fromStandalone()` throw for one.
 
 ### Build-time compile (`ata compile`)
 

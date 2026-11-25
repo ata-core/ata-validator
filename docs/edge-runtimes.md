@@ -90,13 +90,14 @@ An invalid payload comes back with the same errors you get anywhere else:
 A Worker that validates against schemas it receives at runtime, such as an MCP
 host checking tool arguments against a remote server's schemas, can keep
 patterns the linear-time regex engine cannot run off the platform RegExp with
-the `patternFallback` option (see docs/API.md). The edge entry leaves the
-option out of the bundle, and refuses it, until the Worker imports it once;
-the import adds 3442 bytes gzipped:
+the `patternFallback` option (see docs/API.md). The 2.0 edge entry leaves the
+option out of the bundle, and refuses it with `ata2: option patternFallback`,
+until the Worker registers it once; that adds 3,064 B gzipped:
 
 ```js
-import 'ata-validator/pattern-fallback'
 import { Validator } from 'ata-validator'
+import { patternFallback } from 'ata-validator/features/patternFallback'
+Validator.use(patternFallback)
 
 const v = new Validator(remoteSchema, { patternFallback: 'reject' })
 ```
@@ -158,7 +159,7 @@ condition, minified, gzip level 9) is 51,148 B on 2.0.0 and was 68,579 B on
 1.66.0.
 
 The entry exports `Validator` alone. Its errors have five fields until the
-Worker registers `richErrors` (604 B more in that bundle), and `verbose`,
+Worker registers `richErrors` (616 B more in that bundle), and `verbose`,
 `coerceTypes`, `removeAdditional`, the `errorMessage` keyword and
 meta-schema references are features registered the same way; anything
 missing is refused by name. The list, and what to change in code written for
