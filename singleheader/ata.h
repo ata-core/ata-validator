@@ -10,7 +10,7 @@
 #include <variant>
 #include <vector>
 
-#define ATA_VERSION "2.0.0"
+#define ATA_VERSION "2.0.0-rc.0"
 
 namespace ata {
 

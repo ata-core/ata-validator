@@ -12,19 +12,24 @@ How to move a browser or worker bundle is in [docs/migration-2.0.md](docs/migrat
 - Those two entries export `Validator` and nothing else. `compile`, `validate`, the tools (`toTypeScript`, `renderPretty` and the others), `version` and the default export are on the Node entries only. The class keeps `validate`, `isValidObject`, `validateJSON`, `isValidJSON`, `addSchema` and `~standard`; the buffer methods and the bundle statics are not on it.
 - On those entries an error has five fields by default: `keyword`, `instancePath`, `schemaPath`, `params`, `message`. The rich fields come with `Validator.use(richErrors)`, imported from `ata-validator/features/richErrors` (5,209 B). `verbose`, `coerceTypes`, `removeAdditional`, the `errorMessage` keyword and references to the json-schema.org meta-schemas are features registered the same way. A validator that needs one that is not registered throws an error starting with `ata2:` that names it, on its first call.
 - On those entries an option the Validator does not know is refused by the constructor with `ata2: option <name>`, where 1.x ignored it. That includes `engine`, `keywords`, `strictSchema`, `logger` and `source`, which the Node entries still take. None is accepted and ignored: `keywords` and `strictSchema: true` change the answer, and each accepted name measured 5 to 7 B gzip on every page that carries the Validator.
+- On those entries a schema whose `$ref` resolves to nothing, reached where failing it in place could turn into an acceptance (under `not`, an `if` condition, a `oneOf` branch or `unevaluated*`), is refused on the validator's first call with `ata2: cannot resolve $ref <ref>`, where 1.66.0 ends the validation as invalid. `{ not: { $ref: "missing.json" } }` throws on `isValidObject(1)`. Where failing in place is sound, as under `allOf`, the reference fails with the error `cannot resolve $ref missing.json` as in 1.x.
+- On those entries `assertFormat: false` is refused with `ata2: formatsOff, Validator.use(formatsOff)` until `ata-validator/features/formatsOff` is registered, and `patternFallback` with `ata2: option patternFallback` until `ata-validator/features/patternFallback` is. Sizes are in docs/migration-2.0.md.
 
 ### Added
 
 - `require('ata-validator')` under the browser and worker conditions gives the same 2.0 Validator as `import` (`index.v2.browser.js`, `index.v2.edge.js`). Under `browser` it gave `index.js`, which put the code generator in the first load of a page that reached the package that way.
 - `ata-validator/features` (`featuresFor()`, `joinFeatures()`), `ata-validator/features/<name>` and `ata-validator/v2/plugin-core` are new exports. The build plugin reads them to keep a validator it cannot compile on a Validator with only the features its schema needs.
-
 - `ata-validator/v1`: the Validator of 1.x under every condition, with `validate()`, `compile()`, custom keywords, the buffer methods and the bundle statics, for a browser or worker bundle that needs what the 2.0 entries do not carry. A page that does not import it carries none of it.
 - `Validator.use()` on the Node entries, where the Validator carries every feature: it does nothing and returns the class, so code shared between a server and a page registers features the same way on both.
 - `index.v2.d.ts` types the root import under the `browser`, `workerd` and `edge-light` conditions, so a project that sets them (`customConditions`) gets a type error for a removed export or a refused option.
 
+### Fixed
+
+- A `$ref` whose fragment holds a lone surrogate or a tab, such as a pointer through a property named `"a\uD800b"`, was read after the URL parser had rewritten it, so it named nothing and a valid document was refused. Through a reference into another document this happens on 1.66.0 too. The fragment is now read as written on every engine.
+
 ### Notes
 
-- The tarball is 793,086 B packed, from 706,541 B at 1.66.0: 112 more files, the 2.0 entries and what they import.
+- The tarball is 793,093 B packed, from 706,541 B at 1.66.0: 112 more files, the 2.0 entries and what they import.
 - `@rjsf/validator-ata` 6.11.1 depends on `ata-validator ^1.56.0` and keeps a 1.x copy. Forced onto 2.0.0 by an override it reads the `ata2: verbose` refusal as an invalid document, for every document.
 
 ## 1.66.0 - 2026-11-25
