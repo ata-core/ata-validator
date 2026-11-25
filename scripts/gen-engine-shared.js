@@ -21,7 +21,7 @@ const path = require('path');
 
 const BEGIN = '// ---- engine-shared: begin ----\n';
 const END = '// ---- engine-shared: end ----\n';
-const EXPORTS = ['indexSchemas', 'resolveRef', 'splitFragment', 'resolveUri', 'FALLBACK_BASE', 'plainLinear', 'compilePattern'];
+const EXPORTS = ['indexSchemas', 'resolveRef', 'splitFragment', 'resolveUri', 'FALLBACK_BASE', 'plainLinear', 'compilePattern', 'walkPointer'];
 
 const ENGINE = "let _safeRe = null;\nconst compileSafe = (src) => (_safeRe || (_safeRe = require('./safe-regex'))).compileSafe(src);\n";
 const HEAD = 'function compilePattern(src) {\n  let re;\n';
