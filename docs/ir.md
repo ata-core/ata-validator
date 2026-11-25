@@ -91,6 +91,11 @@ server agree on every document only on the same version. The format checks and t
 them. On 1298 suite groups and 3140 SchemaStore runs a plan over JSON
 answers as the module writer does (`tests/test_ir_table.mjs`).
 
+A module (not a plan sent as data) also takes `strictRefs` and, with
+`holes: true`, `formats` given as functions: each is the check of its step,
+the module exports `setFormats(formats)`, which builds the plan from the
+caller's functions, and no check answers before it has run.
+
 It takes `richErrors`, `useDefaults` and `assertFormat`, and the keywords
 forms use: types, properties, required, additionalProperties, the leaf
 checks and formats, patternProperties, propertyNames, items, prefixItems,

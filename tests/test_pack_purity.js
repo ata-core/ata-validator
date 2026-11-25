@@ -425,6 +425,12 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // patternFallback in lib/pattern-fallback-scan.js beside the 1.x option in
 // lib/pattern-fallback.js (713711 bytes, 697.0 KB; 681.5 KB ceiling on the
 // 2.0 branch, 690 KB on 1.66.0).
-assert.ok(manifest.size < 698 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 679 KB: the table writer of ata-validator/ir takes formats as holes and
+// strictRefs, so a page whose validator has format functions can be a plan
+// (695090 bytes, 678.8 KB; 694152 before).
+// 700 KB: the two above with the 2.0 branch's `assertFormat: false` fix
+// (lib/format-off.js, the formatsOff feature; 714660 bytes, 697.9 KB) in one
+// tree (715554 bytes, 698.8 KB; 698 KB ceiling before).
+assert.ok(manifest.size < 700 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);

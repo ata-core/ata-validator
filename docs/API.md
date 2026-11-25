@@ -262,8 +262,9 @@ serve it from your own server.
 ### tablePlan(schema, options?), ata-validator/ir
 
 Returns a `Plan` object, or `null` where the table backend does not cover the schema. Options:
-`richErrors` (default `true`), `useDefaults` (default `true`), `assertFormat` (default `true`);
-any other option makes it return `null`. On 1.63.1 a plan takes types, properties, required,
+`richErrors` (default `true`), `useDefaults` (default `true`), `assertFormat` (default `true`),
+and `strictRefs`, which returns `null` for a `$ref` that resolves to nothing; any other option
+makes it return `null`, and so does a format given as a function. On 1.63.1 a plan takes types, properties, required,
 additionalProperties, enum, const, the string, number and array bounds, format, pattern, nested
 objects and arrays, allOf, `$ref` within the document, not, if, dependentRequired and defaults;
 a `$ref` to another document, the unevaluated keywords, dynamic references, `anyOf`, `oneOf`,
@@ -302,7 +303,13 @@ v.validate(data)
 
 The same plan as JavaScript module source (a string), or `null` where `tablePlan` would return
 `null`, for a build that writes the module to disk; it imports the interpreter and the handlers
-it names from `ata-validator/kernels`. Takes the same options as `tablePlan`.
+it names from `ata-validator/kernels`. Takes the same options as `tablePlan`, and `formats`
+with `holes: true`, which takes a format given as a function, as `specialize` does: the module exports
+`formatHoles` (the names) and `setFormats(formats)`, which takes each function by name from the
+object's own properties, throws for a name with no function, and builds the plan. Until
+`setFormats()` has run, `isValid` and `validate` throw on every document. Without `holes` a
+function format returns `null`, and `tablePlan` returns `null` for one in every case, since a
+plan sent as data cannot carry a function. The table backend does not take `schemas`.
 
 ### closureModule(schema, options), ata-validator/ir
 

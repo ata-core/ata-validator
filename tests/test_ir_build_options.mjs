@@ -6,13 +6,17 @@
 // a reference that resolves to nothing refuses the schema under strictRefs,
 // and every module answers as the runtime given the same options does
 // (scripts/build-options-differential.js, the whole suite here).
+//
+// The table writer (lib/ir/table.mjs) takes `formats` as holes, assertFormat
+// and strictRefs too, and is held to the same: the differential runs both
+// writers, and each block below has the table's cases beside the module's.
 import assert from 'node:assert'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { specialize } from '../lib/ir/index.mjs'
+import { specialize, tableModule, tablePlan } from '../lib/ir/index.mjs'
 
 const require = createRequire(import.meta.url)
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -32,19 +36,36 @@ try {
   // stand-in functions, assertFormat: false, both, and `schemas`.
   {
     const { stats, report } = await run()
-    assert.strictEqual(stats.diffs, 0, 'module against the root Validator: ' + JSON.stringify(report.slice(0, 2)).slice(0, 1500))
-    assert.strictEqual(stats.v2Diffs, 0, 'module against the 2.0 browser entry: ' + JSON.stringify(report.slice(0, 2)).slice(0, 1500))
-    assert.ok(stats.compiled > 2000, `compiled ${stats.compiled} option sets`)
-    assert.ok(stats.withHoles > 150, `${stats.withHoles} of them with format holes`)
+    for (const backend of ['module', 'table']) {
+      const of = report.filter((r) => r.backend === backend)
+      assert.strictEqual(stats[backend].diffs, 0, `${backend} against the root Validator: ` + JSON.stringify(of.slice(0, 2)).slice(0, 1500))
+      assert.strictEqual(stats[backend].v2Diffs, 0, `${backend} against the 2.0 browser entry: ` + JSON.stringify(of.slice(0, 2)).slice(0, 1500))
+    }
+    assert.ok(stats.module.compiled > 2000, `compiled ${stats.module.compiled} option sets`)
+    assert.ok(stats.module.withHoles > 150, `${stats.module.withHoles} of them with format holes`)
+    // The table declines more (it returns null for `schemas`), and a table
+    // that declined everything would pass the lines above.
+    assert.ok(stats.table.compiled > 1800, `the table compiled ${stats.table.compiled} option sets`)
+    assert.ok(stats.table.withHoles > 150, `${stats.table.withHoles} of them with format holes`)
+    // The one known difference (the runtime asserting a format under
+    // assertFormat: false) has no case in the suite; SchemaStore has one.
+    assert.strictEqual(stats.table.runtimeFormatOff, 0)
+    assert.strictEqual(stats.module.runtimeFormatOff, 0)
   }
 
   // The same differential with every hole call taken out of the modules:
   // it has to fail, or it proves nothing about the holes.
+  // In a plan the hole is the step's check (`,UF0,` in the step), called by
+  // the interpreter: there it is replaced with a function that answers true.
   {
-    let replaced = 0
-    const { stats } = await run({ mutate: (src) => src.replace(/\bUF\d+\(([^()]*)\)/g, () => { replaced++; return 'true' }) })
-    assert.ok(replaced > 100, `the mutation replaced ${replaced} hole calls`)
-    assert.ok(stats.diffs > 100, `a module without its hole calls was caught (${stats.diffs} differences)`)
+    const replaced = { module: 0, table: 0 }
+    const { stats } = await run({ mutate: (src, backend) => backend === 'module'
+      ? src.replace(/\bUF\d+\(([^()]*)\)/g, () => { replaced.module++; return 'true' })
+      : src.replace(/,UF\d+,/g, () => { replaced.table++; return ',()=>true,' }) })
+    assert.ok(replaced.module > 100, `the mutation replaced ${replaced.module} hole calls`)
+    assert.ok(stats.module.diffs > 100, `a module without its hole calls was caught (${stats.module.diffs} differences)`)
+    assert.ok(replaced.table > 100, `the mutation replaced ${replaced.table} hole steps`)
+    assert.ok(stats.table.diffs > 100, `a plan without its hole checks was caught (${stats.table.diffs} differences)`)
   }
 
   // Documents that fail only the custom format: the runtime with a format
@@ -81,6 +102,59 @@ try {
         assert.ok(r.errors.some((e) => e.keyword === 'format'), 'with a format error')
       }
       for (const d of good) assert.strictEqual(m.isValid(d), true, `module accepts ${JSON.stringify(d)}`)
+      // The table writer: a plan with the same holes, or none at all where
+      // the schema reaches a registered document.
+      for (const richErrors of [false, true]) {
+        const tab = tableModule(schema, { ...opts, formats, holes: true, strictRefs: true, richErrors })
+        if (schemas) { assert.strictEqual(tab, null, 'the table declines `schemas`'); continue }
+        assert.ok(/^export function setFormats\(/m.test(tab), 'the plan has holes')
+        const t = await load(tab)
+        assert.deepStrictEqual([...t.formatHoles].sort(), [...m.formatHoles].sort())
+        t.setFormats(formats)
+        for (const d of bad) {
+          assert.strictEqual(t.isValid(d), false, `plan rejects ${JSON.stringify(d)}`)
+          const r = t.validate(d)
+          assert.strictEqual(r.valid, false)
+          assert.ok(r.errors.some((e) => e.keyword === 'format'), 'with a format error')
+          // Every field of every error, as the runtime with the same functions gives them.
+          if (richErrors) assert.deepStrictEqual(JSON.parse(JSON.stringify(r.errors)), JSON.parse(JSON.stringify(new Validator(schema, { formats }).validate(d).errors)), `plan errors on ${JSON.stringify(d)}`)
+        }
+        for (const d of good) assert.strictEqual(t.isValid(d), true, `plan accepts ${JSON.stringify(d)}`)
+      }
+    }
+  }
+
+  // A function under a built-in name with a hint (email): the errors of the
+  // plan, the module and the runtime are the same in every field, the
+  // suggestion among them.
+  {
+    const schema = { type: 'object', properties: { mail: { type: 'string', format: 'email' }, when: { type: 'string', format: 'date' } } }
+    const formats = { email: (s) => s.endsWith('.test') }
+    const doc = { mail: 'nope', when: '2026-13-45' }
+    const want = JSON.parse(JSON.stringify(new Validator(schema, { formats }).validate(doc).errors))
+    assert.strictEqual(want.length, 2)
+    assert.ok(want[0].suggestion, 'the runtime gives the hint of the name')
+    for (const src of [specialize(schema, { formats, holes: true, strictRefs: true }), tableModule(schema, { formats, holes: true, strictRefs: true })]) {
+      const m = await load(src)
+      m.setFormats(formats)
+      assert.deepStrictEqual(JSON.parse(JSON.stringify(m.validate(doc).errors)), want)
+      assert.strictEqual(m.isValid({ mail: 'x.test', when: '2026-11-23' }), true)
+    }
+  }
+
+  // Each hole takes the function of its own name: two formats whose
+  // functions answer opposite ways on the same strings.
+  {
+    const schema = { type: 'object', properties: { tint: { type: 'string', format: 'color' }, file: { type: 'string', format: 'data-url' } } }
+    const formats = { color: (s) => s === 'c', 'data-url': (s) => s === 'd' }
+    for (const [name, src] of [['module', specialize(schema, { formats, holes: true, richErrors: false })], ['plan', tableModule(schema, { formats, holes: true, richErrors: false })]]) {
+      const m = await load(src)
+      // Given in the other order, and with a key that is no format's.
+      m.setFormats({ other: () => true, 'data-url': formats['data-url'], color: formats.color })
+      assert.strictEqual(m.isValid({ tint: 'c', file: 'd' }), true, name)
+      assert.deepStrictEqual(m.validate({ tint: 'd', file: 'c' }).errors.map((e) => e.instancePath + ' ' + e.params.format), ['/tint color', '/file data-url'], name)
+      assert.deepStrictEqual(m.validate({ tint: 'c', file: 'c' }).errors.map((e) => e.instancePath), ['/file'], name)
+      assert.deepStrictEqual(m.validate({ tint: 'd', file: 'd' }).errors.map((e) => e.instancePath), ['/tint'], name)
     }
   }
 
@@ -107,6 +181,62 @@ try {
     assert.ok(!/setFormats/.test(specialize(schema, { formats: { color: () => true }, holes: true, assertFormat: false })))
   }
 
+  // The same of a plan, which is stricter before setFormats(): there is no
+  // plan until the functions are taken, so every check throws, one that
+  // would not reach the format too. A setFormats() that throws leaves it so.
+  {
+    const schema = { type: 'string', format: 'color' }
+    for (const richErrors of [false, true]) {
+      const m = await load(tableModule(schema, { formats: { color: () => true }, holes: true, richErrors }))
+      assert.deepStrictEqual([...m.formatHoles], ['color'])
+      for (const d of ['x', 5]) {
+        assert.throws(() => m.isValid(d), TypeError)
+        assert.throws(() => m.validate(d), TypeError)
+      }
+      assert.throws(() => m.setFormats({}), /setFormats\(\) has no function for format "color"/)
+      assert.throws(() => m.setFormats({ color: /x/ }), TypeError)
+      assert.throws(() => m.setFormats(Object.create({ color: () => true })), TypeError, 'own properties only')
+      assert.throws(() => m.setFormats(null), TypeError)
+      assert.throws(() => m.setFormats(), TypeError)
+      assert.throws(() => m.isValid('x'), TypeError, 'still no plan')
+      m.setFormats({ color: (s) => s === 'ok' })
+      assert.strictEqual(m.isValid('ok'), true)
+      assert.strictEqual(m.isValid('no'), false)
+      assert.strictEqual(m.validate('no').errors[0].keyword, 'format')
+      // A later setFormats() that throws keeps the plan it had, whole.
+      assert.throws(() => m.setFormats({}), TypeError)
+      assert.strictEqual(m.isValid('no'), false)
+    }
+    // Two holes, one function missing: no plan, not half of one.
+    const two = await load(tableModule({ properties: { a: { format: 'color' }, b: { format: 'shade' } } }, { formats: { color: () => true, shade: () => true }, holes: true }))
+    assert.throws(() => two.setFormats({ color: () => false }), /no function for format "shade"/)
+    assert.throws(() => two.isValid({ a: 'x' }), TypeError)
+    const bare = await load(tableModule({ format: 'color' }, { formats: { color: () => true }, holes: true }))
+    bare.setFormats({ color: () => false })
+    assert.strictEqual(bare.isValid(5), true, 'a format reads strings only')
+    assert.strictEqual(bare.isValid('x'), false)
+    // Without `holes` a function format is declined, and a plan sent as data
+    // never carries one.
+    assert.strictEqual(tableModule(schema, { formats: { color: () => true } }), null)
+    assert.strictEqual(tablePlan(schema, { formats: { color: () => true }, holes: true }), null)
+    assert.strictEqual(tablePlan(schema, { formats: { color: () => true } }), null)
+    // A value that is not a function is no format, as the runtime reads it.
+    const none = tableModule(schema, { formats: { color: /x/ }, holes: true })
+    assert.ok(none !== null && !/setFormats/.test(none))
+    assert.strictEqual((await load(none)).isValid('anything'), new Validator(schema, { formats: { color: /x/ } }).isValidObject('anything'))
+    // assertFormat: false takes the format away, the hole with it.
+    assert.ok(!/setFormats/.test(tableModule(schema, { formats: { color: () => true }, holes: true, assertFormat: false })))
+    // A function under a name every object inherits is declined: the
+    // runtime throws for some of them and words the error its own way for
+    // the others.
+    for (const name of ['toString', 'constructor', 'hasOwnProperty', '__proto__']) {
+      const formats = Object.defineProperty({}, name, { value: () => true, enumerable: true })
+      assert.strictEqual(tableModule({ type: 'string', format: name }, { formats, holes: true }), null, name)
+    }
+    // A reference that resolves to nothing declines.
+    assert.strictEqual(tableModule({ $ref: '#/$defs/missing' }, { strictRefs: true }), null)
+  }
+
   // A hole runs as often as the check reaches it: the repeat of a check in a
   // row of statements is not skipped when it holds one.
   {
@@ -119,6 +249,11 @@ try {
     new V2(schema, { formats: { color: () => { rt++; return true } } }).isValidObject('x')
     assert.strictEqual(calls, 2)
     assert.strictEqual(rt, 2)
+    let plan = 0
+    const t = await load(tableModule(schema, { formats: { color: () => true }, holes: true }))
+    t.setFormats({ color: () => { plan++; return true } })
+    t.isValid('x')
+    assert.strictEqual(plan, 2)
   }
 
   // References into registered documents: the cases of the master fix for
@@ -190,6 +325,27 @@ try {
     }
     assert.strictEqual(m.isValid({ u: 'a b' }), true)
     assert.strictEqual(m.isValid({ v: 'a b' }), true)
+    // The table writer asserts no format under assertFormat: false, the one
+    // behind the reference too: { u: 'a b' } is valid. The runtime and the
+    // module above reject it, which is the runtime's bug (the differential
+    // counts it apart as runtimeFormatOff until the runtime is fixed). With
+    // a function for the format the plan has no hole and never calls it.
+    const uri = (s) => s === 'ok'
+    for (const [o, src] of [[{ assertFormat: false }, tableModule(schema, { assertFormat: false })], [{ assertFormat: false }, tableModule(schema, { assertFormat: false, richErrors: false })], [{ assertFormat: false, formats: { uri } }, tableModule(schema, { assertFormat: false, formats: { uri }, holes: true })]]) {
+      const t = await load(src)
+      if (t.setFormats) t.setFormats(o.formats)
+      assert.ok(!/setFormats/.test(src), 'no hole')
+      for (const d of [{ u: 'a b' }, { v: 'a b' }, { u: 'https://e.com' }, { u: 'ok' }]) {
+        assert.strictEqual(t.isValid(d), true, 'plan ' + JSON.stringify(d))
+        assert.deepStrictEqual(t.validate(d).errors, [], 'plan ' + JSON.stringify(d))
+      }
+      assert.strictEqual(t.isValid({ u: 5 }), false, 'the type beside the format is still checked')
+    }
+    // The same plan as data.
+    const { fromPlan } = await import('../lib/kernels/plan-rich.mjs')
+    const plan = await fromPlan(JSON.parse(JSON.stringify(tablePlan(schema, { assertFormat: false }))))
+    assert.strictEqual(plan.isValid({ u: 'a b' }), true, 'the plan as data asserts no format either')
+    assert.strictEqual(plan.isValid({ v: 'a b' }), true)
   }
 
   // The wrapper still refuses what it cannot reproduce; the build lists the
