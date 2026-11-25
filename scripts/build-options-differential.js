@@ -14,15 +14,6 @@
 // shows as a difference. A schema the build declines (an `ir:` error, a
 // reference that resolves to nothing) is counted, never guessed.
 //
-// One difference is known and counted apart (runtimeFormatOff), on the table
-// writer only: under assertFormat: false the runtime still asserts a format
-// that a reference reaches under a name that is not a keyword (SchemaStore's
-// travis, `#/definitions/notificationObject/webhooks`), which is the
-// runtime's bug: no format is asserted with that option. The table writer
-// asserts none. Such a difference is excused only where the plan answers as
-// the runtime does with every format given a function that accepts. Remove
-// the exclusion when the runtime is fixed.
-//
 // Two writers are held, each with its own counts: the module writer
 // (specialize) and the table writer (tableModule), which takes formats as
 // holes too, declines `schemas`, and returns null for what it does not cover.
@@ -125,7 +116,6 @@ async function check(name, schema, docs, optionSets, stats, report, refs) {
       for (const m of [mp, mr]) if (typeof m.setFormats === 'function') m.setFormats(opts.formats || {});
       if (opts.formats && Object.keys(opts.formats).length && typeof mp.setFormats === 'function') S.withHoles++;
       S.compiled++;
-      let noFormat;
       for (const doc of docs) {
         S.docs++;
         const text = JSON.stringify(doc);
@@ -150,21 +140,6 @@ async function check(name, schema, docs, optionSets, stats, report, refs) {
           if (process.env.DIFFS_OUT) fs.appendFileSync(process.env.DIFFS_OUT, JSON.stringify({ kind: counter, backend, key, doc: text, runtime: a, module: b, v2: c }) + '\n');
           if (report.length < 40) report.push({ kind: counter, backend, key, doc: text.slice(0, 300), runtime: a, module: b, v2: c });
         };
-        // The known runtime bug, and nothing wider: assertFormat is false,
-        // the plan differs from the runtime, and it answers exactly (the
-        // verdict, the errors in order, plain and rich, and the document) as
-        // the runtime does when every format the schema names is given a
-        // function that accepts, which asserts no format by construction.
-        if (backend === 'table' && opts.assertFormat === false && !b.threw && !(verdictSame(a, b) && errorsSame(a, b, true))) {
-          if (noFormat === undefined) {
-            const accept = Object.fromEntries([...formatNames(schema)].filter((n) => n !== '__proto__').map((n) => [n, () => true]));
-            const { assertFormat, formats, ...rest } = opts;
-            try { noFormat = [new Validator(own(), { ...rest, formats: accept, richErrors: false }), new Validator(own(), { ...rest, formats: accept })]; } catch { noFormat = null; }
-          }
-          let want = null;
-          if (noFormat) { try { want = runtimeAnswer(noFormat[0], noFormat[1]); } catch { want = null; } }
-          if (want !== null && verdictSame(want, b) && errorsSame(want, b, true)) { note('runtimeFormatOff', 'runtimeFormatOffKeys'); continue; }
-        }
         const runtimesSplitVerdict = c !== null && !verdictSame(a, c);
         const runtimesSplitErrors = c !== null && (runtimesSplitVerdict || !errorsSame(a, c, false));
         if (runtimesSplitVerdict || runtimesSplitErrors) { S.runtimesDisagree++; S.disagreeKeys[key] = (S.disagreeKeys[key] || 0) + 1; }
@@ -292,7 +267,7 @@ async function run({ schemastoreDir = null, every = 1, offset = 0, mutate = null
   V2.use((await import(pathToFileURL(path.join(ROOT, 'index.v2.features.mjs')).href)).formatsOff);
   const refs = { specialize, tableModule, V2, mutate };
   // Counted per writer; what belongs to the schema or the runtime, once.
-  const per = () => ({ compiled: 0, withHoles: 0, declined: 0, declines: {}, docs: 0, diffs: 0, v2Diffs: 0, splitVerdict: 0, splitErrors: 0, runtimesDisagree: 0, runtimeFormatOff: 0, runtimeFormatOffKeys: {}, diffKeys: {}, v2DiffKeys: {}, splitKeys: {}, disagreeKeys: {}, runtimeThrows: 0 });
+  const per = () => ({ compiled: 0, withHoles: 0, declined: 0, declines: {}, docs: 0, diffs: 0, v2Diffs: 0, splitVerdict: 0, splitErrors: 0, runtimesDisagree: 0, diffKeys: {}, v2DiffKeys: {}, splitKeys: {}, disagreeKeys: {}, runtimeThrows: 0 });
   const stats = { schemas: 0, registryTooLarge: 0, runtimeRefuses: 0, module: per(), table: per() };
   const report = [];
   tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ata-build-options-')));

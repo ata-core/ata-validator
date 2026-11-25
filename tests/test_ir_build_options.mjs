@@ -47,10 +47,6 @@ try {
     // that declined everything would pass the lines above.
     assert.ok(stats.table.compiled > 1800, `the table compiled ${stats.table.compiled} option sets`)
     assert.ok(stats.table.withHoles > 150, `${stats.table.withHoles} of them with format holes`)
-    // The one known difference (the runtime asserting a format under
-    // assertFormat: false) has no case in the suite; SchemaStore has one.
-    assert.strictEqual(stats.table.runtimeFormatOff, 0)
-    assert.strictEqual(stats.module.runtimeFormatOff, 0)
   }
 
   // The same differential with every hole call taken out of the modules:
@@ -326,10 +322,9 @@ try {
     assert.strictEqual(m.isValid({ u: 'a b' }), true)
     assert.strictEqual(m.isValid({ v: 'a b' }), true)
     // The table writer asserts no format under assertFormat: false, the one
-    // behind the reference too: { u: 'a b' } is valid. The runtime and the
-    // module above reject it, which is the runtime's bug (the differential
-    // counts it apart as runtimeFormatOff until the runtime is fixed). With
-    // a function for the format the plan has no hole and never calls it.
+    // behind the reference too: { u: 'a b' } is valid, as it is to the module
+    // above and both runtimes. With a function for the format the plan has
+    // no hole and never calls it.
     const uri = (s) => s === 'ok'
     for (const [o, src] of [[{ assertFormat: false }, tableModule(schema, { assertFormat: false })], [{ assertFormat: false }, tableModule(schema, { assertFormat: false, richErrors: false })], [{ assertFormat: false, formats: { uri } }, tableModule(schema, { assertFormat: false, formats: { uri }, holes: true })]]) {
       const t = await load(src)
