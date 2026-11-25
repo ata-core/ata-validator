@@ -32,8 +32,8 @@ one line:
 import { Validator, validate } from 'ata-validator/v1'
 ```
 
-Measured as the table in the next section: 59,090 B first load in a browser
-bundle and 68,811 B in a Workers bundle. A page that does not import it
+Measured as the table in the next section: 59,078 B first load in a browser
+bundle and 68,765 B in a Workers bundle. A page that does not import it
 carries none of it. A bundle that imports both holds both
 Validators.
 
@@ -45,8 +45,8 @@ is `import { Validator } from 'ata-validator'`:
 
 | Bundle | 1.66.0 | 2.0.0 |
 |---|---:|---:|
-| browser, first load | 58,843 B | 26,583 B |
-| Workers (`workerd`) | 68,579 B | 51,148 B |
+| browser, first load | 58,843 B | 26,560 B |
+| Workers (`workerd`) | 68,579 B | 51,115 B |
 
 The 1.66.0 browser entry also loads the code generator later, in chunks of
 its own, once a validator is used often; the 2.0 browser entry does not load
@@ -122,17 +122,17 @@ call of that validator, not by the constructor.
 
 | Needed by | Refusal | Import | Bytes added to the browser bundle |
 |---|---|---|---:|
-| the rich error fields; `richErrors: true` | `ata2: richErrors, Validator.use(richErrors)` | `ata-validator/features/richErrors` | 5,196 |
-| `verbose: true` | `ata2: verbose, Validator.use(verbose)` | `ata-validator/features/verbose` | 229 |
-| `coerceTypes` | `ata2: coerceTypes, Validator.use(coerceTypes)` | `ata-validator/features/coerceTypes` | 1,219 |
-| `removeAdditional` | `ata2: removeAdditional, Validator.use(removeAdditional)` | `ata-validator/features/removeAdditional` | 1,240 |
-| the `errorMessage` keyword in a schema | `ata2: errorMessage, Validator.use(errorMessages)` | `ata-validator/features/errorMessages` | 380 |
-| a `$ref` to a json-schema.org meta-schema | `ata2: metaschemas, Validator.use(metaschemas)` | `ata-validator/features/metaschemas` | 2,312 |
-| `assertFormat: false` | `ata2: formatsOff, Validator.use(formatsOff)` | `ata-validator/features/formatsOff` | 234 |
-| the `patternFallback` option | `ata2: option patternFallback` | `ata-validator/features/patternFallback` | 3,994 |
+| the rich error fields; `richErrors: true` | `ata2: richErrors, Validator.use(richErrors)` | `ata-validator/features/richErrors` | 5,209 |
+| `verbose: true` | `ata2: verbose, Validator.use(verbose)` | `ata-validator/features/verbose` | 242 |
+| `coerceTypes` | `ata2: coerceTypes, Validator.use(coerceTypes)` | `ata-validator/features/coerceTypes` | 1,230 |
+| `removeAdditional` | `ata2: removeAdditional, Validator.use(removeAdditional)` | `ata-validator/features/removeAdditional` | 1,250 |
+| the `errorMessage` keyword in a schema | `ata2: errorMessage, Validator.use(errorMessages)` | `ata-validator/features/errorMessages` | 386 |
+| a `$ref` to a json-schema.org meta-schema | `ata2: metaschemas, Validator.use(metaschemas)` | `ata-validator/features/metaschemas` | 2,318 |
+| `assertFormat: false` | `ata2: formatsOff, Validator.use(formatsOff)` | `ata-validator/features/formatsOff` | 241 |
+| the `patternFallback` option | `ata2: option patternFallback` | `ata-validator/features/patternFallback` | 4,009 |
 
 Each figure is that feature alone, same method as the table above. The first
-six together add 9,497 B. Unlike the others, `patternFallback` is refused by
+six together add 9,513 B. Unlike the others, `patternFallback` is refused by
 the constructor, as an option the entry does not know, until it is registered.
 
 A page that does not pass `richErrors` gets the plain fields and no refusal.
@@ -171,7 +171,7 @@ the validator is constructed.
 None of the five is accepted and ignored. Two of them change the answer
 (`keywords`, `strictSchema: true`). For the others the cost decided: each
 accepted name adds 5 to 7 B gzip to every page that carries the Validator
-(measured on the plugin core when it was 14,592 B; it is 15,180 B at 2.0.0), and the entries were held to no
+(measured on the plugin core when it was 14,592 B; it is 15,161 B at 2.0.0), and the entries were held to no
 growth.
 
 ## The build plugin

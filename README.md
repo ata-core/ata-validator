@@ -106,8 +106,8 @@ or set `ATA_NO_NATIVE=1` at runtime. Typical schemas compile to specialized JS; 
 From 2.0, a browser bundle and a Workers or Vercel Edge bundle get a smaller Validator than Node
 does. The `browser` export condition resolves to the 2.0 browser entry and `workerd` and
 `edge-light` to the 2.0 edge entry. Both export `Validator` alone and generate no code. For a page whose only import is `import { Validator } from 'ata-validator'`
-(esbuild, minified, gzip level 9) the first load is 26,583 B where 1.66.0 was 58,843 B, and a
-Workers bundle is 51,148 B where it was 68,579 B.
+(esbuild, minified, gzip level 9) the first load is 26,560 B where 1.66.0 was 58,843 B, and a
+Workers bundle is 51,115 B where it was 68,579 B.
 
 On those entries an error has five fields (`keyword`, `instancePath`, `schemaPath`, `params`,
 `message`) until the page registers the rich ones, and a few options are features to register
@@ -116,7 +116,7 @@ the same way:
 ```js
 import { Validator } from 'ata-validator'
 import { richErrors } from 'ata-validator/features/richErrors'
-Validator.use(richErrors)   // 5,196 B more; a no-op on the Node entry
+Validator.use(richErrors)   // 5,209 B more; a no-op on the Node entry
 ```
 
 Something a validator needs that is not registered is refused by name, with an error that
@@ -685,7 +685,7 @@ const RE2 = require('re2');
 const v = new Validator(toolSchema, { patternFallback: (source, flags) => new RE2(source, flags) });
 ```
 
-Patterns the linear engine runs are not affected, and with no such pattern in the schema a validator compiles as it would without the option. The schema is scanned when the validator is built, every object in it, `default`, `const` and `enum` values included, since a `$ref` can point anywhere. The Node entry carries the option. A browser or Workers bundle, which gets the 2.0 entry, refuses it with `ata2: option patternFallback` until the application registers it once with `Validator.use(patternFallback)`, imported from `ata-validator/features/patternFallback` (3,994 B gzipped in a browser bundle, 3,064 in a Workers bundle, most of it the linearity proof). `ata-validator/v1` in such a bundle takes the option after `import 'ata-validator/pattern-fallback'`. `ata build --pattern-fallback reject` and `build({ patternFallback: 'reject' })` fail an input with such a pattern. A function cannot be written into a compiled module, so `ata build`, the bundle methods and `Validator.fromStandalone()` throw for one.
+Patterns the linear engine runs are not affected, and with no such pattern in the schema a validator compiles as it would without the option. The schema is scanned when the validator is built, every object in it, `default`, `const` and `enum` values included, since a `$ref` can point anywhere. The Node entry carries the option. A browser or Workers bundle, which gets the 2.0 entry, refuses it with `ata2: option patternFallback` until the application registers it once with `Validator.use(patternFallback)`, imported from `ata-validator/features/patternFallback` (4,009 B gzipped in a browser bundle, 3,064 in a Workers bundle, most of it the linearity proof). `ata-validator/v1` in such a bundle takes the option after `import 'ata-validator/pattern-fallback'`. `ata build --pattern-fallback reject` and `build({ patternFallback: 'reject' })` fail an input with such a pattern. A function cannot be written into a compiled module, so `ata build`, the bundle methods and `Validator.fromStandalone()` throw for one.
 
 ### Build-time compile (`ata compile`)
 

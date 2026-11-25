@@ -104,10 +104,10 @@ const root = path.resolve(__dirname, '..');
       // verdict core and the small engine, every schema-decided group wired
       // in, and IDNA2008, which a Workers build keeps because it does not
       // apply the package's `browser` map.
-      // 51160 bytes (51148 measured): the RC on the 2.0 branch with 1.66.0
+      // 51160 bytes (51115 measured): the RC on the 2.0 branch with 1.66.0
       // merged, a $ref that resolves to nothing refused at build, the
       // metaschema gate, patternFallback's refusal and formatsOff's. The 1.x
-      // edge entry below is 68812.
+      // edge entry below is 68765.
       assert.ok(size2 < 51160, `the 2.0 ${c} bundle is ${size2} bytes gzipped, over 51160`);
       if (c === 'workerd') console.log(`ok: the worker conditions resolve to the 2.0 edge entry, ${size2} bytes gzipped, no code generator`);
     }

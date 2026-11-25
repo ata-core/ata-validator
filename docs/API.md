@@ -944,7 +944,7 @@ hyphens only and treats `idn-hostname` as an annotation, as releases before
 The `patternFallback` option is left out of browser and Workers bundles too. Node
 has it with no setup. The 2.0 entry that such a bundle gets refuses the option
 with `ata2: option patternFallback` until the application registers it once
-(3,994 B gzipped in a browser bundle, 3,064 in a Workers bundle, most of it the
+(4,009 B gzipped in a browser bundle, 3,064 in a Workers bundle, most of it the
 linearity proof):
 
 ```javascript

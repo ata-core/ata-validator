@@ -155,7 +155,7 @@ builds for one of them it says so through an export condition (`workerd`,
 entry: a Validator that generates no code, described in
 [v2-edge.md](v2-edge.md). A Workers bundle whose only import is
 `import { Validator } from 'ata-validator'` (esbuild with the `workerd`
-condition, minified, gzip level 9) is 51,148 B on 2.0.0 and was 68,579 B on
+condition, minified, gzip level 9) is 51,115 B on 2.0.0 and was 68,579 B on
 1.66.0.
 
 The entry exports `Validator` alone. Its errors have five fields until the

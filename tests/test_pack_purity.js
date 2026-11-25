@@ -435,7 +435,7 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // the root export name them (index.v2.browser.mjs, index.v2.edge.mjs and
 // their require forms), with the small and full Validator, their engines,
 // lib/core/, lib/fmt/, lib/features/ and features/, 102 files that the 1.x
-// tarballs left out (793071 bytes, 774.5 KB, on the 2.0 branch with 1.66.0
+// tarballs left out (793086 bytes, 774.5 KB, on the 2.0 branch with 1.66.0
 // merged; 764875 bytes on the branch before it). lib/core/engine.js
 // stays out: no entry imports it.
 assert.ok(manifest.size < 775 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
