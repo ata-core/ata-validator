@@ -133,6 +133,28 @@ try {
     for (const [name, [schema, schemas]] of Object.entries(refused)) {
       assert.throws(() => specialize(schema, { schemas, strictRefs: true }), /^Error: ir: /, name)
     }
+    // A reference that names nothing under not, in an if condition or in a
+    // oneOf branch, where failing it in place could accept: refused with
+    // strictRefs or without, as the 2.0 entries refuse it when they build
+    // (tests/test_v2_unresolved_ref.mjs), and the same reference where
+    // failing it can only reject is still compiled without strictRefs.
+    const inverted = {
+      'under not': [{ not: { $ref: 'missing.json' } }, 1],
+      'in an if condition': [{ if: { $ref: '#/$defs/nope' }, then: { type: 'string' } }, 1],
+      'in a oneOf branch': [{ oneOf: [{ type: 'string' }, { $ref: 'missing.json' }] }, 'x'],
+      'in a registered document, under not': [{ $ref: 'https://example.com/a.json' }, 1, [{ $id: 'https://example.com/a.json', not: { $ref: 'missing.json' } }]],
+    }
+    for (const [name, [schema, d, schemas]] of Object.entries(inverted)) {
+      const ref = JSON.stringify(schema).includes('nope') ? '#/$defs/nope' : 'missing.json'
+      assert.throws(() => specialize(schema, { schemas, strictRefs: true }), /^Error: ir: /, name)
+      assert.throws(() => specialize(schema, { schemas, verdict: true }), { message: `ir: cannot resolve $ref ${ref}` }, name + ' without strictRefs')
+      assert.throws(() => new V2(structuredClone(schema), { schemas }).isValidObject(d), { message: `ata2: cannot resolve $ref ${ref}` }, name + ': the 2.0 entry refuses')
+    }
+    {
+      const schema = { properties: { a: { $ref: 'missing.json' } } }
+      const m = await load(specialize(schema, { verdict: true }))
+      for (const d of [{}, { a: 1 }]) assert.strictEqual(m.isValid(d), new V2(schema).isValidObject(d), 'a reference that can only reject, ' + JSON.stringify(d))
+    }
     const agree = {
       'pointer in the second document': [{ $ref: 'https://example.com/a.json' }, [{ $id: 'https://example.com/a.json', properties: { p: { $ref: 'b.json' } }, definitions: { x: { type: 'number' } } }, { $id: 'https://example.com/b.json', properties: { q: { $ref: '#/definitions/x' } }, definitions: { x: { type: 'string' } } }], [{ p: { q: 1 } }, { p: { q: 'x' } }]],
       'a cycle across documents': [{ $ref: 'https://example.com/a.json' }, [{ $id: 'https://example.com/a.json', type: 'object', properties: { b: { $ref: 'b.json' }, n: { type: 'integer' } } }, { $id: 'https://example.com/b.json', type: 'object', properties: { a: { $ref: 'a.json' }, s: { type: 'string' } } }], [{ b: { a: { n: 1, b: { s: 'x' } } } }, { b: { a: { n: 'x' } } }, { b: { s: 3 } }]],
