@@ -293,7 +293,14 @@ async function check(label, schema, docs, stats, report, only) {
     if (only && !only.has(name)) continue;
     const st = stats.paths[name] || (stats.paths[name] = { taken: 0, declined: 0, docs: 0, diffs: 0, threw: 0, abort: 0 });
     let p;
-    try { p = P.async ? await P.build(schema) : P.build(schema); } catch (e) { st.threw++; if (report.length < 40) report.push(`${name} | ${label} | building threw: ${String(e && e.message).slice(0, 160)}`); continue; }
+    // A 2.0 path refuses, when it builds, a schema with a reference that
+    // resolves to nothing where failing it could accept (lib/engine-small.js
+    // inverted()): declined, and listed, never a difference.
+    try { p = P.async ? await P.build(schema) : P.build(schema); } catch (e) {
+      const m = String(e && e.message);
+      if (/^ata2: cannot resolve /.test(m)) { st.declined++; (stats.refused || (stats.refused = new Map())).set(label, m); continue; }
+      st.threw++; if (report.length < 40) report.push(`${name} | ${label} | building threw: ${m.slice(0, 160)}`); continue;
+    }
     if (p === null) { st.declined++; continue; }
     const ref = P.refMake ? P.refMake(schema) : refFor(P.ref);
     if (ref === null) { st.declined++; continue; }
@@ -401,6 +408,7 @@ async function run(opts) {
 function summary({ stats, report }) {
   const lines = [`${stats.schemas} schemas, ${Object.keys(stats.paths).length} paths against the Validator`];
   if (globalThis.__ata2) lines.push('  left out: ' + JSON.stringify(globalThis.__ata2));
+  if (stats.refused) for (const [label, m] of stats.refused) lines.push(`  refused at build: ${label}: ${m}`);
   for (const [name, s] of Object.entries(stats.paths)) lines.push(`  ${name.padEnd(26)} ${String(s.taken).padStart(5)} schemas (${s.declined} declined) ${String(s.docs).padStart(7)} documents  ${s.diffs} differ${s.threw ? `, ${s.threw} threw` : ''}${s.abort ? `, ${s.abort} as ATA9000` : ''}${s.known ? `, ${s.known} known` : ''}${s.unordered ? `, ${s.unordered} in another order where none is promised` : ''}`);
   for (const r of report) lines.push('  ' + r);
   // What differs, by path, kind and the kind of document, with the first of each.
