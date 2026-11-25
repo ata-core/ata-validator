@@ -17,7 +17,7 @@ const FULL = {
     "const need = (name, as) => features[name] || missing(name + ', Validator.use(' + (as || name) + ')');",
   ],
   features: [
-    "const features = { errorMessage: null, metaschemas: null, coerceTypes: null, removeAdditional: null, codegen: null, richErrors: null, verbose: null, patternFallback: null };",
+    "const features = { errorMessage: null, metaschemas: null, coerceTypes: null, removeAdditional: null, codegen: null, richErrors: null, verbose: null, patternFallback: null, formatsOff: null };",
   ],
   regroup: [],
   gates: ["    if (map !== null) require('./schema-order').registerDocuments(schemaObj, map);"],
@@ -77,7 +77,6 @@ const SUBS = [
   ['  kept.set(s, [k, copy]);', '  kept.set(s, [inherit, copy]);'],
   ['  if (code === 1 && !shown && scan(s) === DEFINITIONS) return s;\n', ''],
   ["  const d = need('draft7');", "  const d = require('./draft7');"],
-  ["need('draft7').stripFormatAssertions", "require('./draft7').stripFormatAssertions"],
   ["need('defaults').buildDefaultsApplier(pre, G.safe)", "require('./defaults').buildDefaultsApplier(pre)"],
 ];
 

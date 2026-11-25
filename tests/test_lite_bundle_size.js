@@ -337,7 +337,13 @@ const esbuild = require('esbuild')
 // 63690 (63677 measured): 1.66.0 merged into the 2.0 branch, the character
 // scan with its group scanner and the code point counters above with 1.66.0's
 // fixes in one tree (63250 on the 2.0 branch, 63500 on 1.66.0).
-const BUDGET = 63690
+// 63270 (63252 measured): `assertFormat: false` leaves a custom keyword's
+// parameters whole and removes formats as the schema is copied
+// (lib/validator-core.js, lib/keywords.js); 11 bytes.
+// 63680 (63669 measured): 1.66.0's tree above and the `assertFormat: false`
+// fix together (63677 on the 2.0 branch with 1.66.0, 63252 on the fix's base);
+// the copy without formats replaces stripFormatAssertions, 8 bytes less.
+const BUDGET = 63680
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

@@ -24,6 +24,8 @@ import _metaschemas from './lib/features/metaschemas.js';
 export const metaschemas = _metaschemas.metaschemas;
 import _errorMessages from './lib/features/errorMessages.js';
 export const errorMessages = _errorMessages.errorMessages;
+import _formatsOff from './lib/features/formatsOff.js';
+export const formatsOff = _formatsOff.formatsOff;
 import _coerceTypes from './lib/features/coerceTypes.js';
 export const coerceTypes = _coerceTypes.coerceTypes;
 import _removeAdditional from './lib/features/removeAdditional.js';

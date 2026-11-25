@@ -18,6 +18,8 @@ const require = createRequire(import.meta.url)
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const { Validator } = require('../index.js')
 const { Validator: V2 } = await import('../index.v2.browser.mjs')
+// On every 2.0 entry `assertFormat: false` is the formatsOff feature.
+V2.use((await import('../index.v2.features.mjs')).formatsOff)
 const { run } = require('../scripts/build-options-differential.js')
 
 const KERNELS = pathToFileURL(path.join(ROOT, 'lib/kernels/index.mjs')).href
@@ -175,11 +177,10 @@ try {
     }
   }
 
-  // assertFormat: false as the runtime reads it: `format` removed by the
-  // runtime's own walk of the root schema, which follows keywords only, so a
-  // format reached through a reference to a place that is not a keyword is
-  // still checked (SchemaStore's travis). Skipping every format accepted what
-  // the runtime rejects.
+  // assertFormat: false asserts no format, wherever the schema that holds it
+  // sits: one reached through a reference to a place that is not a keyword
+  // (SchemaStore's travis) is skipped like any other, by the module and by
+  // both runtimes (tests/test_assert_format_off.js).
   {
     const schema = { definitions: { holder: { url: { type: 'string', format: 'uri' } } }, properties: { u: { $ref: '#/definitions/holder/url' }, v: { type: 'string', format: 'uri' } } }
     const m = await load(specialize(schema, { assertFormat: false }))
@@ -187,7 +188,7 @@ try {
       assert.strictEqual(m.isValid(d), new Validator(schema, { assertFormat: false }).isValidObject(d), JSON.stringify(d))
       assert.strictEqual(m.isValid(d), new V2(schema, { assertFormat: false }).isValidObject(d), JSON.stringify(d) + ' (2.0 entry)')
     }
-    assert.strictEqual(m.isValid({ u: 'a b' }), false)
+    assert.strictEqual(m.isValid({ u: 'a b' }), true)
     assert.strictEqual(m.isValid({ v: 'a b' }), true)
   }
 

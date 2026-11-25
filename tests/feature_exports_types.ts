@@ -12,6 +12,7 @@ import { verbose } from 'ata-validator/features/verbose'
 import { metaschemas } from 'ata-validator/features/metaschemas'
 import { errorMessages } from 'ata-validator/features/errorMessages'
 import { coerceTypes } from 'ata-validator/features/coerceTypes'
+import { formatsOff } from 'ata-validator/features/formatsOff'
 import { removeAdditional } from 'ata-validator/features/removeAdditional'
 import { codegen } from 'ata-validator/features/codegen'
 import { formatDateTime } from 'ata-validator/features/formatDateTime'
@@ -20,7 +21,7 @@ import { standardSchema } from 'ata-validator/features/standardSchema'
 import { patterns } from 'ata-validator/features/patterns'
 import { patternFallback, type PatternFallback, type PatternMatcher } from 'ata-validator/features/patternFallback'
 const names: FeatureName[] = featuresFor({ format: 'date' }, { verbose: true }, [{ $id: 'x' }])
-const all: Feature[] = [formats, uri, draft7, defaults, uniqueItems, branchCollapse, richErrors, verbose, metaschemas, errorMessages, coerceTypes, removeAdditional, codegen, formatDateTime, formatUri, standardSchema, patterns, patternFallback]
+const all: Feature[] = [formats, uri, draft7, defaults, uniqueItems, branchCollapse, richErrors, verbose, metaschemas, errorMessages, coerceTypes, formatsOff, removeAdditional, codegen, formatDateTime, formatUri, standardSchema, patterns, patternFallback]
 const pf: Feature<'patternFallback'> = patternFallback
 const matcher: PatternMatcher = { test: (s) => s === 'x' }
 const modes: PatternFallback[] = ['platform', 'reject', () => matcher, (source, flags) => new RegExp(source, flags)]

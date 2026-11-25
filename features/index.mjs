@@ -1,12 +1,13 @@
 // ata-validator/features: featuresFor(), the features a schema needs on the
 // 2.0 Validator, by the names ata-validator/features/<name> exports them
-// under. It carries the two features its answer depends on (draft7, which
-// rewrites a schema before the other questions are asked of it, and the
-// meta-schemas a schema can reference) and none of the others. Work in
+// under. It carries the three features its answer depends on (draft7 and
+// formatsOff, which rewrite a schema before the other questions are asked of
+// it, and the meta-schemas a schema can reference) and no other. Work in
 // progress; not in the published package until 2.0.
 import small from '../lib/validator-small.js';
 import d7 from '../lib/features/draft7.js';
 import ms from '../lib/features/metaschemas.js';
+import fo from '../lib/features/formatsOff.js';
 import groups from '../lib/groups.js';
 import { OWN, PART, PARTS, GROUP, SHARE } from './format-sizes.mjs';
 
@@ -16,7 +17,7 @@ import { OWN, PART, PARTS, GROUP, SHARE } from './format-sizes.mjs';
 // not called.
 const NONE = () => null;
 const ALL = {
-  draft7: d7.draft7, metaschemas: ms.metaschemas,
+  draft7: d7.draft7, metaschemas: ms.metaschemas, formatsOff: fo.formatsOff,
   defaults: { buildDefaultsApplier: NONE }, coerceTypes: { build: NONE }, removeAdditional: { build: NONE },
   errorMessage: {}, verbose: {}, richErrors: {}, codegen: {}, formats: {}, uri: {}, uniqueItems: {}, branchCollapse: {}, patterns: {},
 };

@@ -195,7 +195,11 @@ const root = path.resolve(__dirname, '..');
     // character scan with its group scanner and the code point counters above
     // with 1.66.0's fixes in one tree (67640 on the 2.0 branch, 68580 on
     // 1.66.0).
-    assert.ok(size < 68810, `the Workers bundle is ${size} bytes gzipped, over 68810`);
+    // 68830 bytes (68812 measured): the above and `assertFormat: false`
+    // asserting no format a reference reaches, with a custom keyword's
+    // parameters left whole (lib/keywords.js KIND); 17 bytes (15 on its own
+    // base, 67623 to 67638).
+    assert.ok(size < 68830, `the Workers bundle is ${size} bytes gzipped, over 68830`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
