@@ -403,6 +403,7 @@ const FILES = [
   "tests/test_gate_report.js",
   "tests/test_shape_classifier.js",
   "tests/test_tier0.js",
+  "tests/test_multiple_of_exact.js",
   "benchmark/bench_aot_size.mjs",
 ]
 

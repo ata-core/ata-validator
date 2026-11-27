@@ -2,6 +2,12 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- `multipleOf` tested divisibility on the doubles with a quotient within `1e-9` of a whole number, which accepted `1e20` for `{ multipleOf: 3 }` and `0.30000000000000004` for `{ multipleOf: 0.1 }`, and rejected `1e308` for `{ multipleOf: 0.5 }` because the quotient overflowed to infinity. Every engine now asks the question JSON Schema asks, exactly: two safe integers use the integer remainder, and any other finite pair is read as its shortest round-trip decimals (`String(Math.abs(v))`) and tested for exact divisibility over a common power of ten. The engines changed are the interpreted engine and its plans (`lib/interpreter-core.js`), the small engine that answers a fresh validator's first calls (`lib/tier0.js`), the code generators and the closure compiler (`lib/js-compiler.js`, `lib/js-compiler-errors.js`), generated standalone modules (the helper is written into the module, which still imports nothing), the error runtime (`lib/error-runtime.js`), `ata-validator/kernels`, and the closure and written modules of `ata-validator/ir`, whose closure backend had its own copy of the old test. The native engine's `multiple_of_ok` (`src/ata.cpp`, `singleheader/ata.cpp`) is rewritten to the same rule, so the buffer APIs agree once the addon is rebuilt. This changes `validate()` answers for those example values: `1e20` against `3` and `0.30000000000000004` against `0.1` are now rejected, and `1e308` against `0.5` is now accepted. The addon's `validateDirect` path in `binding/ata_napi.cpp` has its own `fmod` check with a `1e-8` tolerance and is not changed here; nothing in the package calls it.
+
 ## 1.66.0 - 2026-11-25
 
 ### Added

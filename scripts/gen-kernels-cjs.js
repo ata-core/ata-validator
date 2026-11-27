@@ -1,6 +1,7 @@
 'use strict';
-// Writes lib/kernels/unique.mjs and lib/kernels/collapse.mjs: lib/unique-items.js
-// and lib/branch-collapse.js as ES modules, from their text. Both files import
+// Writes lib/kernels/unique.mjs, lib/kernels/multiple-of.mjs and
+// lib/kernels/collapse.mjs: lib/unique-items.js, lib/multiple-of.js and
+// lib/branch-collapse.js as ES modules, from their text. Both files import
 // nothing. A module written by ata-validator/ir imports its helpers from
 // ata-validator/kernels; a CommonJS file reachable from there stays in a
 // bundle whether or not a helper of it is used (Next.js with webpack kept
@@ -12,6 +13,7 @@ const path = require('path');
 
 const COPIES = [
   { file: 'unique.mjs', from: 'unique-items.js', exports: ['_deq', 'duplicatePair'] },
+  { file: 'multiple-of.mjs', from: 'multiple-of.js', exports: ['multipleOfOk'] },
   { file: 'collapse.mjs', from: 'branch-collapse.js', exports: ['__ataCollapse'] },
 ];
 

@@ -324,7 +324,9 @@ const esbuild = require('esbuild')
 // refuses the method, and the choice between the native walker and validate()
 // for the buffer APIs lives in lib/buffer-gate.js, whose browser twin only
 // throws; 537 bytes less.
-const BUDGET = 63500
+// 63650 (63636 measured): exact decimal multipleOf (lib/multiple-of.js, and
+// the helper the code generator writes into a program); 157 bytes.
+const BUDGET = 63650
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
