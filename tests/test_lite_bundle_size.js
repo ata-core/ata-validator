@@ -326,7 +326,10 @@ const esbuild = require('esbuild')
 // throws; 537 bytes less.
 // 63650 (63636 measured): exact decimal multipleOf (lib/multiple-of.js, and
 // the helper the code generator writes into a program); 157 bytes.
-const BUDGET = 63650
+// 64180 (64165 measured): uniqueItems under hash collisions sorts a bucket's
+// indices by a total order over values (the comparator, the run scan and the
+// larger bucket loop of lib/unique-items.js); 529 bytes.
+const BUDGET = 64180
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

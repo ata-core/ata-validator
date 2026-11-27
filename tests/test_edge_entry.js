@@ -184,7 +184,10 @@ const root = path.resolve(__dirname, '..');
     // $ref fix and the patternFallback option together in one tree.
     // 68770 bytes (68756 measured): exact decimal multipleOf
     // (lib/multiple-of.js); 190 bytes.
-    assert.ok(size < 68770, `the Workers bundle is ${size} bytes gzipped, over 68770`);
+    // 69350 bytes (69332 measured): uniqueItems under hash collisions sorts a
+    // bucket's indices by a total order over values (lib/unique-items.js); 576
+    // bytes.
+    assert.ok(size < 69350, `the Workers bundle is ${size} bytes gzipped, over 69350`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

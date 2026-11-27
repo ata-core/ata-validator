@@ -392,6 +392,9 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // packs a little worse apart. Measured 689.7 KB.
 // 692 KB with exact decimal multipleOf (lib/multiple-of.js and its kernels
 // copy lib/kernels/multiple-of.mjs). Measured 691.3 KB.
-assert.ok(manifest.size < 692 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 696 KB with the uniqueItems collision settling in lib/unique-items.js, its
+// generated copies (lib/unique-items-source.js, lib/kernels/unique.mjs) and
+// the changelog entry. Measured 694.7 KB.
+assert.ok(manifest.size < 696 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
