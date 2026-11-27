@@ -27,10 +27,7 @@ const DIALECTS = {
   '2020-12': ['https://json-schema.org/draft/2020-12/schema', 2020],
 }
 
-if (!fs.existsSync(SUITE)) {
-  console.log('output annotations: suite not checked out, skipped')
-  process.exit(0)
-}
+const HAVE_SUITE = fs.existsSync(SUITE)
 
 // "7" means 7 and later, "=2020" only 2020, "<=2019" up to 2019, and a
 // comma joins conditions. Absent means every dialect.
@@ -77,6 +74,7 @@ function keywordOf (unit) {
 function run (only) {
   const counts = {}
   const failures = []
+  if (!HAVE_SUITE) return { counts, failures }
   for (const [name, [uri, release]] of Object.entries(DIALECTS)) {
     if (only && only !== name) continue
     let total = 0
@@ -146,6 +144,43 @@ function extras () {
   check('format under assertFormat: false, schema given as text',
     JSON.stringify({ format: 'email', title: 'T' }), 'not an email', { assertFormat: false },
     [['/format', 'email'], ['/title', 'T']])
+  check('anyOf branch probed with format stripped under assertFormat: false',
+    { anyOf: [{ format: 'email', title: 'T' }] }, 'not an email', { assertFormat: false },
+    [['/anyOf/0/format', 'email'], ['/anyOf/0/title', 'T']])
+  check('registry entry found by its relative key',
+    { $ref: 'shared' }, 1, { schemas: { shared: { title: 'T' } } }, [['/$ref/title', 'T']])
+  check('registry entry found by its key when it declares another $id',
+    { $ref: 'https://example.com/key' }, 1, { schemas: { 'https://example.com/key': { $id: 'https://example.com/own', title: 'T' } } },
+    [['/$ref/title', 'T']])
+  {
+    const v = new Validator({ $ref: 'https://example.com/added' })
+    v.addSchema({ $id: 'https://example.com/added', title: 'A' })
+    const got = (toOutput(v, 1).annotations || []).map((u) => [u.keywordLocation, u.annotation])
+    try { assert.deepStrictEqual(got, [['/$ref/title', 'A']]) } catch {
+      failures.push(`schema registered through addSchema()\n    got ${JSON.stringify(got)}`)
+    }
+  }
+  check('a draft-07 document reached from 2020-12 ignores siblings of its $ref',
+    { $ref: 'https://example.com/d7' }, 1,
+    { schemas: [{ $id: 'https://example.com/d7', $schema: 'http://json-schema.org/draft-07/schema#', definitions: { n: { title: 'N' } }, title: 'ignored', $ref: '#/definitions/n' }] },
+    [['/$ref/$ref/title', 'N']])
+  check('an $id inside an annotation value is not a resource',
+    { $defs: { a: { $id: 'https://example.com/a', title: 'real' } }, 'x-note': { $id: 'https://example.com/a', title: 'note' }, $ref: 'https://example.com/a' }, 1, undefined,
+    [['/x-note', { $id: 'https://example.com/a', title: 'note' }], ['/$ref/title', 'real']])
+  {
+    const out = toOutput(new Validator({ properties: { 'a%b': { title: 'T' } } }, { baseURI: 'https://example.com/root' }), { 'a%b': 1 })
+    const abs = out.annotations[0].absoluteKeywordLocation
+    try { assert.strictEqual(abs, 'https://example.com/root#/properties/a%25b/title') } catch {
+      failures.push(`absoluteKeywordLocation percent-encodes its fragment\n    got ${abs}`)
+    }
+  }
+  {
+    const out = toOutput(new Validator({ type: 'string' }, { baseURI: 'https://example.com/root' }), 1)
+    const abs = out.errors[0].absoluteKeywordLocation
+    try { assert.strictEqual(abs, 'https://example.com/root#/type') } catch {
+      failures.push(`an error under baseURI carries its absolute location\n    got ${abs}`)
+    }
+  }
   return failures
 }
 
@@ -154,7 +189,9 @@ if (require.main === module) {
   const counts = result.counts
   const failures = result.failures.concat(process.argv[2] ? [] : extras())
   for (const f of failures) console.error('  ' + f + '\n')
-  const line = Object.entries(counts).map(([n, [p, t]]) => `${n} ${p} of ${t}`).join(', ')
+  const line = HAVE_SUITE
+    ? Object.entries(counts).map(([n, [p, t]]) => `${n} ${p} of ${t}`).join(', ')
+    : 'suite not checked out, standalone checks only'
   if (failures.length && !process.env.ANNOTATIONS_REPORT) {
     console.error(`FAIL output annotations: ${line}`)
     process.exit(1)
