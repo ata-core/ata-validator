@@ -390,6 +390,10 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // (lib/ref-bindings.js, Validator.fromStandalone in lib/aot.browser.js, the
 // buffer API choice in lib/buffer-gate.js): one file more, and moved code
 // packs a little worse apart. Measured 689.7 KB.
-assert.ok(manifest.size < 690 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 695 KB with toOutput collecting annotations the way the suite's annotation
+// tests and Bowtie ask (pattern and additional properties, contains,
+// dependentSchemas, $ref and $dynamicRef, unevaluated*, unknown keywords),
+// in lib/output-format.js, which only a toOutput call loads. Measured 694.0 KB.
+assert.ok(manifest.size < 695 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
