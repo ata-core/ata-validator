@@ -55,6 +55,7 @@ const FILES = [
   "tests/test_error_shape_differential.js",
   "tests/test_error_list_differential.js",
   "tests/test_output_format.js",
+  "tests/test_output_annotations.js",
   "tests/test_standard_json_schema.js",
   "tests/test_retry_message.js",
   "tests/test_describe_schema.js",
