@@ -280,7 +280,7 @@ function render(r) {
   p('');
 
   p('## With code generation blocked', '');
-  p('`node tests/test_no_eval.js` replaces `eval` and `Function` before the package loads, so that building a function from source throws, turns the native engine off, and runs the same cases as `tests/run_suite.js` through `validate()`.', '');
+  p('`node tests/test_no_eval.js` replaces `eval` and `Function` before the package loads, so that building a function from source throws, turns the native engine off, and runs the same cases as `tests/run_suite.js` through `validate()`, the format-assertion cases aside.', '');
   p('| dialect | passed | cases | failed | errored |', '|---|---|---|---|---|');
   for (const d of r.noEval.dialects) p(`| ${d.dialect} | ${d.passed} | ${d.total} | ${d.failed} | ${d.errored} |`);
   p('');

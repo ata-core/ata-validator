@@ -44,7 +44,7 @@ for (const { file, cases: list } of suite.files(dialect)) {
       declined.set(key, (declined.get(key) || 0) + 1)
       continue
     }
-    cases.push({ id: cases.length, mapped, tests: g.tests, group: g.description, file, schema, residual: mapped.residual })
+    cases.push({ id: cases.length, mapped, tests: g.tests, group: g.description, file, schema, residual: mapped.residual, schemas: suite.registry(g) })
   }
 }
 
@@ -90,8 +90,8 @@ for (const [id, i, typeOk] of answers) {
   const t = c.tests[i]
   tests++
   if (!modules.has(id)) {
-    try { modules.set(id, new Validator(c.schema, suiteOptions)) } catch { modules.set(id, null) }
-    try { residuals.set(id, c.residual === null ? null : new Validator(c.residual, suiteOptions)) } catch (e) { residuals.set(id, undefined); console.log('RESIDUAL DOES NOT COMPILE', c.file, '/', c.group, e.message) }
+    try { modules.set(id, new Validator(c.schema, { ...suiteOptions, schemas: c.schemas })) } catch { modules.set(id, null) }
+    try { residuals.set(id, c.residual === null ? null : new Validator(c.residual, { ...suiteOptions, schemas: c.schemas })) } catch (e) { residuals.set(id, undefined); console.log('RESIDUAL DOES NOT COMPILE', c.file, '/', c.group, e.message) }
   }
   const m = modules.get(id)
   const mv = m ? m.isValidObject(t.data) : null
