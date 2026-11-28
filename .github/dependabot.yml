@@ -24,3 +24,10 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore"
+    # CodeQL refuses to run when its init and analyze steps are on different
+    # versions, so a bump of one alone fails CI. One pull request for all of
+    # github/codeql-action.
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
