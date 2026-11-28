@@ -4,7 +4,7 @@ This file is written by `node scripts/gate-report.js`. Do not edit it by hand: e
 
 ## Summary
 
-- Tree: ata-validator 1.66.0 at commit `e3dc733`. Node v25.2.1 on darwin-arm64.
+- Tree: ata-validator 1.66.0 at commit `fa7c7bc`. Node v25.2.1 on darwin-arm64.
 - Gate: 17 paths, each held to the Validator on the same documents. Official suite: 1945 schemas. SchemaStore: 492 schemas. Documents that differ or threw: 0.
 - Official JSON Schema Test Suite at `e2a68a1`: draft2020-12 1319 of 1319, draft2019-09 1292 of 1292, draft7 972 of 972, draft6 878 of 878, draft4 672 of 672, v1 1290 of 1290.
 - With `eval` and `new Function` blocked: draft2020-12 1319 of 1319, draft2019-09 1292 of 1292, draft7 972 of 972, draft6 878 of 878, draft4 672 of 672, v1 1290 of 1290.
@@ -115,7 +115,7 @@ None. No path gave an answer that differs from the Validator's, and no path thre
 
 ## With code generation blocked
 
-`node tests/test_no_eval.js` replaces `eval` and `Function` before the package loads, so that building a function from source throws, turns the native engine off, and runs the same cases as `tests/run_suite.js` through `validate()`.
+`node tests/test_no_eval.js` replaces `eval` and `Function` before the package loads, so that building a function from source throws, turns the native engine off, and runs the same cases as `tests/run_suite.js` through `validate()`, the format-assertion cases aside.
 
 | dialect | passed | cases | failed | errored |
 |---|---|---|---|---|
@@ -176,7 +176,7 @@ The classes found by the sweep of 1.x for answers that differ between paths, one
 
 ## Reproduce
 
-From a clean clone at the commit that adds this file, whose code is that of `e3dc733`, with Node and git:
+From a clean clone at the commit that adds this file, whose code is that of `fa7c7bc`, with Node and git:
 
 ```sh
 git clone https://github.com/ata-core/ata-validator.git && cd ata-validator
@@ -195,7 +195,7 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
 {
  "format": "ata-correctness-report/1",
  "tree": {
-  "commit": "e3dc73314c322f3070bc6a980c3b13ec271d8ed1",
+  "commit": "fa7c7bc68f737a006224cab7d5a3f461f5242b90",
   "version": "1.66.0",
   "uncommitted": []
  },
