@@ -182,7 +182,11 @@ const root = path.resolve(__dirname, '..');
     // bytes.
     // 68580 bytes (68566 measured): the sweep's fixes, the unresolved
     // $ref fix and the patternFallback option together in one tree.
-    assert.ok(size < 68580, `the Workers bundle is ${size} bytes gzipped, over 68580`);
+    // 68650 bytes (68638 measured): under v1 a `$dynamicRef` written as a bare
+    // anchor name is read as that fragment (lib/interpreter-core.js
+    // dynamicRefUri), and the buffer APIs route that spelling through
+    // validate(); 72 bytes.
+    assert.ok(size < 68650, `the Workers bundle is ${size} bytes gzipped, over 68650`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and
