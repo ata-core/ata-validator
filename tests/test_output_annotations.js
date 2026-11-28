@@ -29,19 +29,9 @@ const DIALECTS = {
 
 const HAVE_SUITE = fs.existsSync(SUITE)
 
-// "7" means 7 and later, "=2020" only 2020, "<=2019" up to 2019, and a
-// comma joins conditions. Absent means every dialect.
-function compatible (release, compat) {
-  if (compat === undefined) return true
-  return String(compat).split(',').every((c) => {
-    const m = /^(<=|=)?(\d+)$/.exec(c.trim())
-    if (!m) return false
-    const n = Number(m[2])
-    if (m[1] === '=') return release === n
-    if (m[1] === '<=') return release <= n
-    return release >= n
-  })
-}
+// The suite's `compatibility` field, read as tests/suite-loader.js reads the
+// validation suite: the annotation suite uses the same syntax.
+const { compatible } = require('./suite-loader')
 
 // Where each schema resource embedded in the root sits, by URI, as Bowtie's
 // `Annotation.relative_to` maps them. Any other URI is the root resource.
@@ -81,7 +71,7 @@ function run (only) {
     let passed = 0
     for (const file of fs.readdirSync(SUITE).filter((f) => f.endsWith('.json')).sort()) {
       for (const c of JSON.parse(fs.readFileSync(path.join(SUITE, file), 'utf8')).suite) {
-        if (!compatible(release, c.compatibility)) continue
+        if (!compatible(c.compatibility, release)) continue
         const schema = typeof c.schema === 'object' && c.schema !== null && !('$schema' in c.schema)
           ? { $schema: uri, ...c.schema }
           : c.schema

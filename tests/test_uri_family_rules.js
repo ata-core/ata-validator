@@ -7,9 +7,8 @@
 // the official suite's cases for the four formats.
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
 const { Validator } = require('..');
+const suite = require('./suite-loader');
 const aot = require('../lib/aot.js');
 
 const cases = [
@@ -31,9 +30,8 @@ const cases = [
   ['email', 'a@[ipv6:::1]', true], ['email', 'a@[IPv6:::1]', true], ['email', 'a@[ipv6:::zz]', false], ['email', 'a@[127.0.0.1]', true],
 ];
 // The official suite's four URI formats and the two others touched, both answers.
-const dir = path.join(__dirname, 'suite/tests/draft2020-12/optional/format');
 for (const f of ['uri', 'uri-reference', 'iri', 'iri-reference', 'uri-template', 'email']) {
-  for (const g of JSON.parse(fs.readFileSync(path.join(dir, f + '.json')))) for (const t of g.tests) if (typeof t.data === 'string') cases.push([f, t.data, t.valid]);
+  for (const g of suite.formatCases('draft2020-12', f)) for (const t of g.tests) if (typeof t.data === 'string') cases.push([f, t.data, t.valid]);
 }
 let n = 0;
 const byFormat = new Map();

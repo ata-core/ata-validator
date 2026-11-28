@@ -14,10 +14,8 @@
 // the interpreter reads own keys only and answers differently there.
 
 const assert = require('assert')
-const fs = require('fs')
-const path = require('path')
 const { Validator } = require('..')
-const root = path.join(__dirname, 'suite/tests')
+const suite = require('./suite-loader')
 const names = (s, out) => { if (s && typeof s === 'object') { for (const k of ['properties', 'patternProperties', 'dependentRequired', 'dependentSchemas', 'dependencies']) if (s[k] && typeof s[k] === 'object') for (const n of Object.keys(s[k])) if (!n.startsWith('^')) out.add(n); if (Array.isArray(s.required)) for (const n of s.required) out.add(n); for (const v of Object.values(s)) names(v, out) } return out }
 const variants = (d, keys) => {
   if (!d || typeof d !== 'object' || Array.isArray(d)) return []
@@ -31,9 +29,9 @@ const variants = (d, keys) => {
 }
 let n = 0; const bad = []
 for (const dia of ['draft2020-12', 'draft7']) {
-  for (const f of fs.readdirSync(path.join(root, dia)).filter((x) => x.endsWith('.json'))) {
-    for (const g of JSON.parse(fs.readFileSync(path.join(root, dia, f), 'utf8'))) {
-      const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: dia === 'draft7' ? 'http://json-schema.org/draft-07/schema#' : 'https://json-schema.org/draft/2020-12/schema' } : g.schema
+  for (const { file: f, cases } of suite.files(dia)) {
+    for (const g of cases) {
+      const schema = g.schema
       let code, interp
       try { code = new Validator(schema); interp = new Validator(schema, { engine: 'interpreter' }); code.isValidObject({}) } catch { continue }
       if (code.engine() !== 'codegen') continue

@@ -5,8 +5,7 @@
 // every character class the grammar tells apart, on strings built from the
 // URI grammar and mutated, and on the official suite's format tests.
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
+const suite = require('./suite-loader');
 const LEN = +(process.env.FORMATS_SMALL_LEN || 4);
 
 (async () => {
@@ -70,13 +69,12 @@ const LEN = +(process.env.FORMATS_SMALL_LEN || 4);
     same('a@[IPv6:' + t + ']'); same('http://[' + t + ']/'); same('//[' + t + '%25eth0]:80')
   }
 
-  // The suite's format tests.
-  const SUITE = path.join(__dirname, 'suite/tests');
-  for (const d of fs.readdirSync(SUITE)) {
-    for (const f of ['uri.json', 'uri-reference.json', 'email.json']) {
-      const p = path.join(SUITE, d, 'optional/format', f);
-      if (!fs.existsSync(p)) continue;
-      for (const g of JSON.parse(fs.readFileSync(p, 'utf8'))) for (const t of g.tests) if (typeof t.data === 'string') same(t.data);
+  // The suite's format assertion tests, in every dialect this package reads.
+  if (suite.HAVE_SUITE) {
+    for (const d of Object.keys(suite.DIALECTS)) {
+      for (const f of ['uri', 'uri-reference', 'email']) {
+        for (const g of suite.formatCases(d, f)) for (const t of g.tests) if (typeof t.data === 'string') same(t.data);
+      }
     }
   }
   console.log(`ok: formats-small agrees with the scanners on ${checked} checks (exhaustive to ${LEN} characters over ${A.length})`);

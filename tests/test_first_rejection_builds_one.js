@@ -8,8 +8,7 @@
 // still gets both, so the split cannot pass by quietly never building one.
 
 const assert = require('assert')
-const fs = require('fs')
-const path = require('path')
+const suite = require('./suite-loader')
 const compiler = require('../lib/js-compiler')
 
 const counts = { combined: 0, errors: 0, combinedDeclined: 0 }
@@ -49,10 +48,9 @@ assert.strictEqual(shape(warm.errors), shape(r.errors))
 // Every suite group: the first rejection builds one generator, or two only
 // when the combined one declined and the error generator had to stand in; and
 // its errors agree with the same rejection read once warm.
-const dir = path.join(__dirname, 'suite/tests/draft2020-12')
 let groups = 0, rejections = 0, bad2 = 0, generated = 0
-for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-  for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
+for (const { file: f, cases } of suite.files('draft2020-12')) {
+  for (const g of cases) {
     const t = g.tests.find((x) => !x.valid)
     if (!t) continue
     let val

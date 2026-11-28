@@ -13,15 +13,10 @@
 // interpreted engine does: verdict and errors.
 
 const assert = require('assert')
-const fs = require('fs')
-const path = require('path')
 const { Validator } = require('..')
+const suite = require('./suite-loader')
 
-const DIALECTS = {
-  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
-  draft7: 'http://json-schema.org/draft-07/schema#',
-  v1: 'https://json-schema.org/v1',
-}
+const DIALECTS = Object.fromEntries(['draft2020-12', 'draft7', 'v1'].map((d) => [d, suite.DIALECTS[d].uri]))
 const shape = (r) => JSON.stringify(r.valid ? true : r.errors.map((e) => [e.code, e.keyword, e.instancePath, e.message]))
 const WRAPS = [
   (s, uri) => ({ $schema: uri, type: 'object', properties: { x: s }, additionalProperties: true }),
@@ -32,9 +27,8 @@ const WRAPS = [
 let compared = 0
 const diffs = []
 for (const [dialect, uri] of Object.entries(DIALECTS)) {
-  const dir = path.join(__dirname, 'suite/tests', dialect)
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))) {
+  for (const { file, cases } of suite.files(dialect)) {
+    for (const group of cases) {
       // A schema with ids or anchors of its own means something else once it
       // is not the root; those cases stay with the root-level suite.
       const text = JSON.stringify(group.schema)

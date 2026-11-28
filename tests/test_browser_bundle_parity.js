@@ -11,8 +11,8 @@
 //
 // The one difference allowed is documented: without the idna import a
 // browser bundle holds `hostname` to the letters-digits-hyphens rule and does
-// not check `idn-hostname` (lib/idna.browser.js). Those groups are counted
-// and must be exactly the hostname format groups.
+// not check `idn-hostname` (lib/idna.browser.js). Those cases are counted
+// and must be exactly the ones in the hostname format files.
 
 const assert = require('assert')
 const path = require('path')
@@ -21,6 +21,7 @@ const os = require('os')
 const vm = require('vm')
 const esbuild = require('esbuild')
 const { Validator } = require('..')
+const suite = require('./suite-loader')
 
 const root = path.join(__dirname, '..')
 const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ata-bundle-parity-')))
@@ -39,17 +40,14 @@ const CONFIGS = [
   { name: 'workerd, import', src: ESM(''), idna: true, opts: WORKERD },
 ]
 
-const DIALECTS = { 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', draft7: 'http://json-schema.org/draft-07/schema#' }
+// The required cases and the format assertion cases. Cases that refer to an
+// external document are left out: no registry goes into the bundle.
 const groups = []
-for (const dialect of Object.keys(DIALECTS)) {
-  for (const sub of ['', 'optional/format']) {
-    const d = path.join(root, 'tests/suite/tests', dialect, sub)
-    for (const f of fs.readdirSync(d).filter((x) => x.endsWith('.json'))) {
-      for (const g of JSON.parse(fs.readFileSync(path.join(d, f), 'utf8'))) {
-        if (JSON.stringify(g.schema).includes('localhost:1234')) continue
-        const schema = g.schema !== null && typeof g.schema === 'object' && !Array.isArray(g.schema) && !('$schema' in g.schema) ? { $schema: DIALECTS[dialect], ...g.schema } : g.schema
-        groups.push({ label: `${dialect}/${sub ? sub + '/' : ''}${f}: ${g.description}`, file: f, schema, docs: g.tests.map((t) => t.data) })
-      }
+for (const dialect of ['draft2020-12', 'draft7']) {
+  for (const sel of [{ which: 'all' }, { dir: 'optional', which: 'assertion' }]) {
+    for (const g of suite.cases(dialect, sel)) {
+      if (g.externalSchemas || JSON.stringify(g.schema).includes('localhost:1234')) continue
+      groups.push({ label: `${dialect}/${g.file}: ${g.description}`, file: g.file, schema: g.schema, docs: g.tests.map((t) => t.data) })
     }
   }
 }
@@ -101,7 +99,7 @@ function inNode (schema, docs, F, opts) {
           // Excused only as a different answer: a bundle that failed to build
           // the validator or threw on a document is never a documented difference.
           const answered = got !== 'ctor' && JSON.parse(got).every((r) => r[0] !== 'threw')
-          if (answered && !c.idna && (/^(idn-)?hostname\.json$/.test(grp.file) || /: (idn-)?hostname format$/.test(grp.label))) { hostnameOnly.add(grp.label); continue }
+          if (answered && !c.idna && /^format-(idn-)?hostname\.json$/.test(grp.file)) { hostnameOnly.add(grp.label); continue }
           differ.push(grp.label)
         }
       }

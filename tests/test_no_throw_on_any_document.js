@@ -18,9 +18,8 @@
 // official suite a document of each JSON type through every method, as a
 // first call and as a later one, and none may throw.
 const assert = require('node:assert')
-const fs = require('node:fs')
-const path = require('node:path')
 const { Validator } = require('..')
+const suite = require('./suite-loader')
 
 const methods = ['validate', 'isValidObject', 'validateJSON', 'isValidJSON']
 const ask = (v, m, d) => { const r = v[m](m.endsWith('JSON') ? JSON.stringify(d) : structuredClone(d)); return typeof r === 'object' ? r.valid : r }
@@ -97,15 +96,14 @@ for (const f of FORMATS) {
   }
 }
 
-const SUITE = path.join(__dirname, 'suite', 'tests')
 const docs = [null, 0, 1.5, '', 'x', true, [], {}, [null], [[]], [{}], { a: null }, { a: [] }, [1, 'a', null, {}, []], { foo: null, bar: null }]
 let schemas = 0; let calls = 0
 for (const draft of ['draft2020-12', 'draft2019-09', 'draft7', 'draft6', 'draft4']) {
-  for (const sub of ['', 'optional']) {
-    const dir = path.join(SUITE, draft, sub)
-    if (!fs.existsSync(dir)) continue
-    for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-      for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
+  // The required cases and every case under optional/, as the old
+  // per-dialect top level and optional/*.json were read.
+  for (const [sub, which] of [['', 'required'], ['optional', 'all']]) {
+    for (const { file: f, cases } of suite.files(draft, { dir: sub, which })) {
+      for (const g of cases) {
         // A schema the Validator refuses to build (a reference to a document
         // nobody registered) has nothing to call.
         try { new Validator(structuredClone(g.schema)) } catch { continue }
@@ -113,7 +111,7 @@ for (const draft of ['draft2020-12', 'draft2019-09', 'draft7', 'draft6', 'draft4
         for (const m of methods) {
           const warm = new Validator(structuredClone(g.schema))
           for (const d of docs) {
-            const where = `${draft}/${sub ? sub + '/' : ''}${f}, "${g.description}": ${m}(${JSON.stringify(d)})`
+            const where = `${draft}/${f}, "${g.description}": ${m}(${JSON.stringify(d)})`
             assert.doesNotThrow(() => ask(new Validator(structuredClone(g.schema)), m, d), where + ' as a first call')
             assert.doesNotThrow(() => ask(warm, m, d), where)
             calls += 2

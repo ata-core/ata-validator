@@ -12,38 +12,19 @@
 // had stamped with a docUrl for enriched ones, so they came without `received`.
 
 const assert = require('assert')
-const fs = require('fs')
-const path = require('path')
 const { Validator } = require('..')
-
-const DIALECTS = {
-  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
-  draft7: 'http://json-schema.org/draft-07/schema#',
-  v1: 'https://json-schema.org/v1',
-}
-const registry = {}
-;(function collect (dir, prefix) {
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, e.name)
-    if (e.isDirectory()) collect(full, prefix + e.name + '/')
-    else if (e.name.endsWith('.json')) registry['http://localhost:1234/' + prefix + e.name] = JSON.parse(fs.readFileSync(full, 'utf8'))
-  }
-})(path.join(__dirname, 'suite/remotes'), '')
+const suite = require('./suite-loader')
 
 const PAD = ' '.repeat(9000)
 const shape = (r) => r.valid ? 'valid' : r.errors.map((e) => [e.code, e.keyword, e.instancePath, e.schemaPath, e.message, e.received])
 
 let compared = 0
 const diffs = []
-for (const [dialect, uri] of Object.entries(DIALECTS)) {
-  const dir = path.join(__dirname, 'suite/tests', dialect)
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))) {
-      const schema = typeof group.schema === 'object' && group.schema !== null && !('$schema' in group.schema)
-        ? { ...group.schema, $schema: uri }
-        : group.schema
+for (const dialect of ['draft2020-12', 'draft7', 'v1']) {
+  for (const { file, cases } of suite.files(dialect)) {
+    for (const group of cases) {
       let v
-      try { v = new Validator(schema, { schemas: registry }) } catch { continue }
+      try { v = new Validator(group.schema, { schemas: suite.registry(group) }) } catch { continue }
       for (const t of group.tests) {
         const text = JSON.stringify(t.data)
         const want = JSON.stringify(shape(v.validate(JSON.parse(text))))

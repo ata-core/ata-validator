@@ -135,7 +135,9 @@ const KNOWN = {};
 const KNOWN_ORDER = [
   // A $ref to an embedded resource that holds a $dynamicRef: the errors name
   // paths in two resources, and neither engine has a rank for them.
-  'unevaluatedItems with $dynamicRef',
+  'unevaluatedItems with $dynamicRef (2020-12)',
+  // Its v1 twin, written with the bare anchor name v1 uses.
+  'v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef',
 ];
 
 const clone = (d) => (d === undefined ? d : structuredClone(d));
@@ -210,25 +212,22 @@ async function check(label, schema, docs, stats, report, only) {
 }
 const show = (d) => { let t; try { t = JSON.stringify(d); } catch { t = undefined; } return (t === undefined ? String(d) : t).slice(0, 100) + (d && typeof d === 'object' ? ' keys ' + JSON.stringify(Object.keys(d)).slice(0, 40) : ''); };
 
-const DIALECTS = { 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', 'draft2019-09': 'https://json-schema.org/draft/2019-09/schema', draft7: 'http://json-schema.org/draft-07/schema#', draft6: 'http://json-schema.org/draft-06/schema#', draft4: 'http://json-schema.org/draft-04/schema#', v1: 'https://json-schema.org/v1' };
+// The official suite through tests/suite-loader.js, the one file that knows
+// its layout. The loader gives each schema its dialect's $schema, as
+// tests/run_suite.js does: a case's schema rarely declares its own.
+const SUITE = require(path.join(ROOT, 'tests/suite-loader'));
 async function suite(stats, report, only) {
-  const S = path.join(ROOT, 'tests/suite/tests');
-  // The dialects this package reads (draft3 and draft-next are in the suite and are not among them).
+  if (!SUITE.HAVE_SUITE) return;
+  // The dialects this package reads (draft3 is in the suite and is not among them).
   for (const dialect of ['draft2020-12', 'draft2019-09', 'draft7', 'draft6', 'draft4', 'v1']) {
-    if (!fs.existsSync(path.join(S, dialect))) continue;
-    // optional/non-bmp-regex.json: patterns read in unicode mode (issue #94).
-    for (const sub of ['', 'optional/format', 'optional/non-bmp-regex.json']) {
-      let dir = path.join(S, dialect, sub);
-      let names;
-      if (sub.endsWith('.json')) { if (!fs.existsSync(dir)) continue; names = [path.basename(dir)]; dir = path.dirname(dir); }
-      else { if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue; names = fs.readdirSync(dir).filter((x) => x.endsWith('.json')); }
-      for (const f of names) {
-        for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-          if (JSON.stringify(g.schema).includes('localhost:1234')) continue;
-          // The dialect is said, as tests/run_suite.js says it: a group's schema rarely declares its own.
-          const schema = g.schema !== null && typeof g.schema === 'object' && !Array.isArray(g.schema) && !('$schema' in g.schema) ? { $schema: DIALECTS[dialect], ...g.schema } : g.schema;
-          await check(`${dialect}/${sub && !sub.endsWith('.json') ? sub + '/' : sub ? 'optional/' : ''}${f}: ${g.description}`, schema, g.tests.map((t) => t.data), stats, report, only);
-        }
+    // Every case at the top level, format assertion cases included; the format
+    // assertion cases of optional/; and optional/non-bmp-regex.json, patterns
+    // read in unicode mode (issue #94).
+    for (const sel of [{ which: 'all' }, { dir: 'optional', which: 'assertion' }, { dir: 'optional', only: (f) => f === 'non-bmp-regex.json' }]) {
+      for (const g of SUITE.cases(dialect, sel)) {
+        // No registry goes in: a case that needs an external document is left out.
+        if (g.externalSchemas || JSON.stringify(g.schema).includes('localhost:1234')) continue;
+        await check(`${dialect}/${g.file}: ${g.description}`, g.schema, g.tests.map((t) => t.data), stats, report, only);
       }
     }
   }

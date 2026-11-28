@@ -12,13 +12,11 @@
 // by never reaching it.
 
 const assert = require('node:assert')
-const fs = require('node:fs')
-const path = require('node:path')
 const { Validator } = require('..')
+const suite = require('./suite-loader')
 const jc = require('../lib/js-compiler')
 const { enrich } = require('../lib/enrich-error')
 
-const DIALECTS = { 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', draft7: 'http://json-schema.org/draft-07/schema#' }
 const json = (x) => JSON.stringify(x)
 
 let direct = 0
@@ -59,11 +57,10 @@ function compareApi (schema, docs, where) {
 }
 
 // The suite.
-for (const [dialect, uri] of Object.entries(DIALECTS)) {
-  const dir = path.join(__dirname, 'suite', 'tests', dialect)
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-    for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-      const schema = g.schema && typeof g.schema === 'object' ? { ...g.schema, $schema: uri } : g.schema
+for (const dialect of ['draft2020-12', 'draft7']) {
+  for (const { file: f, cases } of suite.files(dialect)) {
+    for (const g of cases) {
+      const schema = g.schema
       const docs = g.tests.map((t) => t.data)
       compareDirect(schema, docs, `${dialect}/${f}`)
       compareApi(schema, docs, `${dialect}/${f}`)

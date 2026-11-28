@@ -15,6 +15,7 @@ const { Validator } = require('..');
 const aot = require('../lib/aot-impl');
 const { build } = require('../lib/aot-build');
 const { stripAnnotations } = require('../lib/schema-strip');
+const suite = require('./suite-loader');
 
 let passed = 0, failed = 0;
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
@@ -22,13 +23,8 @@ const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ata-compact-'));
 const J = (x) => JSON.stringify(x);
 const noCode = (x) => { const o = { ...x }; delete o.code; delete o.docUrl; if (o.branchErrors) o.branchErrors = o.branchErrors.map((b) => JSON.parse(noCode(b))); return J(o); };
 
-const DIALECTS = {
-  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
-  'draft2019-09': 'https://json-schema.org/draft/2019-09/schema',
-  draft7: 'http://json-schema.org/draft-07/schema#',
-  draft6: 'http://json-schema.org/draft-06/schema#',
-  v1: 'https://json-schema.org/v1',
-};
+// The loader gives each schema its dialect's $schema.
+const DIALECTS = ['draft2020-12', 'draft2019-09', 'draft7', 'draft6', 'v1'];
 
 let n = 0;
 function loadPair(dir, schema, opts) {
@@ -48,11 +44,10 @@ const tests = [
     fs.writeFileSync(path.join(dir, 'ata-errors.cjs'), aot.errorRuntimeSource('cjs'));
     let cases = 0, schemas = 0;
     const bad = [];
-    for (const [dia, uri] of Object.entries(DIALECTS)) {
-      const sdir = path.join(__dirname, 'suite/tests', dia);
-      for (const f of fs.readdirSync(sdir).filter((x) => x.endsWith('.json'))) {
-        for (const g of JSON.parse(fs.readFileSync(path.join(sdir, f), 'utf8'))) {
-          const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
+    for (const dia of DIALECTS) {
+      for (const { file: f, cases: fileCases } of suite.files(dia)) {
+        for (const g of fileCases) {
+          const schema = g.schema;
           let pair, rt;
           try { pair = loadPair(dir, schema); rt = new Validator(schema, { useDefaults: false, richErrors: false }); } catch { continue; }
           if (!pair) continue;
@@ -81,11 +76,10 @@ const tests = [
     const written = new Set();
     let schemas = 0, cases = 0, trimmed = 0;
     const bad = [];
-    for (const [dia, uri] of Object.entries(DIALECTS)) {
-      const sdir = path.join(__dirname, 'suite/tests', dia);
-      for (const f of fs.readdirSync(sdir).filter((x) => x.endsWith('.json'))) {
-        for (const g of JSON.parse(fs.readFileSync(path.join(sdir, f), 'utf8'))) {
-          const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
+    for (const dia of DIALECTS) {
+      for (const { file: f, cases: fileCases } of suite.files(dia)) {
+        for (const g of fileCases) {
+          const schema = g.schema;
           let v, src, rt;
           try { v = new Validator(schema); rt = new Validator(schema, { useDefaults: false, richErrors: false }); } catch { continue; }
           const feats = runtimeFeatures([stripAnnotations(v._schemaObj)]);
@@ -121,11 +115,10 @@ const tests = [
     const runtime = path.join(__dirname, '..', 'error-runtime.js');
     let modules = 0, cases = 0;
     const bad = [];
-    for (const [dia, uri] of Object.entries({ 'draft2020-12': DIALECTS['draft2020-12'], draft7: DIALECTS.draft7 })) {
-      const sdir = path.join(__dirname, 'suite/tests', dia);
-      for (const f of fs.readdirSync(sdir).filter((x) => x.endsWith('.json'))) {
-        for (const g of JSON.parse(fs.readFileSync(path.join(sdir, f), 'utf8'))) {
-          const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
+    for (const dia of ['draft2020-12', 'draft7']) {
+      for (const { file: f, cases: fileCases } of suite.files(dia)) {
+        for (const g of fileCases) {
+          const schema = g.schema;
           let src; try { src = b.compiledModuleFor(schema, { format: 'cjs', errorRuntime: runtime }); } catch { continue; }
           if (!src || !src.includes('createErrors')) continue;
           const file = path.join(dir, `w${n++}.cjs`);
@@ -150,11 +143,10 @@ const tests = [
     fs.writeFileSync(path.join(dir, 'ata-schema.cjs'), aot.errorRuntimeSource('cjs', null, true));
     let schemas = 0, cases = 0;
     const bad = [];
-    for (const [dia, uri] of Object.entries(DIALECTS)) {
-      const sdir = path.join(__dirname, 'suite/tests', dia);
-      for (const f of fs.readdirSync(sdir).filter((x) => x.endsWith('.json'))) {
-        for (const g of JSON.parse(fs.readFileSync(path.join(sdir, f), 'utf8'))) {
-          const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
+    for (const dia of DIALECTS) {
+      for (const { file: f, cases: fileCases } of suite.files(dia)) {
+        for (const g of fileCases) {
+          const schema = g.schema;
           let src, rt;
           try { src = aot.toSchemaModule(new Validator(schema), { format: 'cjs', runtime: './ata-schema.cjs' }); rt = new Validator(schema, { useDefaults: false, richErrors: false }); } catch { continue; }
           if (!src) continue;

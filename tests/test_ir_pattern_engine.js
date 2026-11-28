@@ -155,7 +155,8 @@ function timed (what, fn, expect) {
       else if (e.name.endsWith('.json')) { try { walk(JSON.parse(fs.readFileSync(f, 'utf8'))); } catch {} }
     }
   };
-  const suite = path.join(ROOT, 'tests', 'suite', 'tests');
+  // Every file of the suite, every dialect, read whole.
+  const suite = require('./suite-loader').ROOT;
   assert.ok(fs.existsSync(suite), 'the JSON Schema Test Suite is not checked out (tests/suite)');
   readTree(suite);
   const fromSuite = found.size;

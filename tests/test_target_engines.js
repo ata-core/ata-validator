@@ -14,11 +14,12 @@ const { Validator } = require('..')
 const { toStandaloneModule } = require('../lib/aot')
 const { setTargetEngine, targetEngine } = require('../lib/js-compiler')
 
-const DIALECTS = { 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', draft7: 'http://json-schema.org/draft-07/schema#' }
+const suite = require('./suite-loader')
+
+const DIALECTS = ['draft2020-12', 'draft7']
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-engines-'))
 let n = 0
 const load = (src) => { const f = path.join(dir, `m${n++}.cjs`); fs.writeFileSync(f, src); return require(f) }
-const withDialect = (s, uri) => (typeof s === 'object' && s !== null && !Array.isArray(s) && !('$schema' in s)) ? { ...s, $schema: uri } : s
 
 // Documents the suite does not have: the same shape through other prototypes
 // and other key orders.
@@ -47,10 +48,9 @@ const engines = ['v8', 'jsc', 'jsc-aot']
 let groups = 0, compared = 0, unbuilt = 0
 const diffs = []
 const prev = targetEngine()
-for (const [dialect, uri] of Object.entries(DIALECTS)) {
-  const sdir = path.join(__dirname, 'suite/tests', dialect)
-  for (const file of fs.readdirSync(sdir).filter((f) => f.endsWith('.json')).sort()) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(sdir, file), 'utf8'))) {
+for (const dialect of DIALECTS) {
+  for (const { file, cases } of suite.files(dialect)) {
+    for (const group of cases) {
       groups++
       const mods = {}
       let ok = true
@@ -59,7 +59,7 @@ for (const [dialect, uri] of Object.entries(DIALECTS)) {
         try {
           // A fresh schema object per engine: the compile cache is keyed by
           // content and engine, and the identity caches by object.
-          const schema = withDialect(JSON.parse(JSON.stringify(group.schema)), uri)
+          const schema = JSON.parse(JSON.stringify(group.schema))
           const src = toStandaloneModule(new Validator(schema, {}), { format: 'cjs' })
           if (!src) { ok = false; break }
           mods[e] = load(src)

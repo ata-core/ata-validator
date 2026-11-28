@@ -5,15 +5,11 @@
 // on forms, and on values JSON cannot hold. A schema it refuses returns null
 // and is counted, never guessed.
 import assert from 'node:assert'
-import fs from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { specialize, functionBody } from '../lib/ir/emit.mjs'
 import { closureModule } from '../lib/ir/closures.mjs'
 import * as K from '../lib/kernels/index.mjs'
+import suite from './suite-loader.js'
 
-const here = path.dirname(fileURLToPath(import.meta.url))
-const SUITE = path.join(here, 'suite/tests')
 const load = (src) => { const m = /^import \{([^}]*)\} from "[^"\n]*"\n/.exec(src); return new Function('K', `const {${m[1]}}=K\n` + src.slice(m[0].length).replace(/^export const\{isValid,validate\}=/m, 'const{isValid,validate}=') + 'return{isValid,validate}')(K) }
 const loadModule = (src) => new Function('K', functionBody(src))(K)
 const FIELDS = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'message', 'docUrl']
@@ -36,16 +32,15 @@ function compare (schema, docs, label, opts = {}) {
   return true
 }
 
-for (const dialect of fs.readdirSync(SUITE)) {
-  for (const sub of ['', 'optional/format']) {
-    const dir = path.join(SUITE, dialect, sub)
-    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue
-    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-      for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-        groups++
-        if (JSON.stringify(g.schema).includes('localhost:1234')) continue
-        if (compare(g.schema, g.tests.map((t) => t.data), `${dialect}/${sub}${f}: ${g.description}`)) taken++
-      }
+// Every case of every dialect, the format-assertion ones included (the old
+// layout kept those in optional/format). A case with external documents is
+// left out: the closure backend is given no registry.
+for (const dialect of Object.keys(suite.DIALECTS)) {
+  for (const { file, cases: groupsOf } of suite.files(dialect, { which: 'all' })) {
+    for (const g of groupsOf) {
+      groups++
+      if (g.externalSchemas || JSON.stringify(g.schema).includes('localhost:1234')) continue
+      if (compare(g.schema, g.tests.map((t) => t.data), `${dialect}/${file}: ${g.description}`)) taken++
     }
   }
 }

@@ -31,8 +31,11 @@ const DIALECTS = ['draft2020-12', 'draft2019-09', 'draft7', 'draft6', 'draft4', 
 
 // Why each entry of the gate's KNOWN_ORDER is allowed. A new entry with no
 // reason here stops the report.
+// The suite names the 2020-12 case with a suffix and its v1 twin without.
+const UNEVAL_DYNAMIC_ORDER = 'A `$ref` to an embedded resource that holds a `$dynamicRef`: the errors name paths in two resources and neither engine ranks them, so generated code and the interpreted walk list the same errors in a different order. The verdict and the set of errors agree. Open, not decided.';
 const ORDER_REASONS = {
-  'unevaluatedItems with $dynamicRef': 'A `$ref` to an embedded resource that holds a `$dynamicRef`: the errors name paths in two resources and neither engine ranks them, so generated code and the interpreted walk list the same errors in a different order. The verdict and the set of errors agree. Open, not decided.',
+  'unevaluatedItems with $dynamicRef (2020-12)': UNEVAL_DYNAMIC_ORDER,
+  'v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef': UNEVAL_DYNAMIC_ORDER,
 };
 // The same for KNOWN, by kind of document. Empty in gate.js today.
 const KNOWN_REASONS = {};
@@ -94,8 +97,9 @@ function measureSuite() {
     const r = node([path.join(ROOT, 'tests', 'run_suite.js'), dialect]);
     const a = /^\s*(\d+) passed of (\d+) /m.exec(r.stdout);
     const b = /^\s*(\d+) known failures, (\d+) regressions/m.exec(r.stdout);
-    if (!a || !b) throw new Error(`tests/run_suite.js ${dialect}: no figures in its output\n${r.stdout.slice(-1500)}${r.stderr.slice(-1500)}`);
-    return { dialect, passed: +a[1], total: +a[2], knownFailures: +b[1], regressions: +b[2], exit: r.status };
+    const f = /^\s*format assertion: (\d+) passed of (\d+)/m.exec(r.stdout);
+    if (!a || !b || !f) throw new Error(`tests/run_suite.js ${dialect}: no figures in its output\n${r.stdout.slice(-1500)}${r.stderr.slice(-1500)}`);
+    return { dialect, passed: +a[1], total: +a[2], formatPassed: +f[1], formatTotal: +f[2], knownFailures: +b[1], regressions: +b[2], exit: r.status };
   });
 }
 
@@ -232,7 +236,7 @@ function render(r) {
   p('## Corpora', '');
   p('| corpus | commit | date | subject | read by the gate |', '|---|---|---|---|---|');
   const cs = r.corpora.suite;
-  p(`| JSON Schema Test Suite (${code('tests/suite')}) | ${code(cs.commit)} | ${cs.date} | ${cell(cs.subject)} | ${DIALECTS.join(', ')}: the required tests, \`optional/format\` and \`optional/non-bmp-regex.json\` |`);
+  p(`| JSON Schema Test Suite (${code('tests/suite')}) | ${code(cs.commit)} | ${cs.date} | ${cell(cs.subject)} | ${DIALECTS.join(', ')}: every case at the top level of \`validation/tests\` that applies to the dialect, format-assertion cases included, the format-assertion cases of \`optional\` and \`optional/non-bmp-regex.json\` |`);
   if (r.corpora.schemastore) { const s = r.corpora.schemastore; p(`| SchemaStore | ${code(s.commit)} | ${s.date} | ${cell(s.subject)} | ${s.schemaFiles} schema files in \`src/schemas/json\`; those with sample documents the Validator builds are checked |`); }
   else p('| SchemaStore | not given | | | not run |');
   p('');
@@ -270,13 +274,13 @@ function render(r) {
   p('');
 
   p('## Official test suite', '');
-  p(`\`node tests/run_suite.js <dialect>\`, suite at ${code(short(cs.commit))}. Every case of the dialect directory runs; a schema that does not compile counts as failed. \`format\` is an annotation, as the suite expects, and the suite's remote documents are registered from \`tests/suite/remotes\`. The optional tests are not in these figures.`, '');
-  p('| dialect | passed | cases | listed known failures | regressions | exit status |', '|---|---|---|---|---|---|');
-  for (const d of r.dialects) p(`| ${d.dialect} | ${d.passed} | ${d.total} | ${d.knownFailures} | ${d.regressions} | ${d.exit} |`);
+  p(`\`node tests/run_suite.js <dialect>\`, suite at ${code(short(cs.commit))}. Every case at the top level of \`validation/tests\` that applies to the dialect runs, the cases tagged format-assertion aside; a schema that does not compile counts as failed. \`format\` is an annotation, as the suite expects, and each case's external documents (\`externalSchemas\`) are registered for that case alone. The cases tagged format-assertion run after them with \`assertFormat: true\` and have columns of their own; the listed known failures count both runs. The optional tests are not in these figures.`, '');
+  p('| dialect | passed | cases | format assertion passed | format assertion cases | listed known failures | regressions | exit status |', '|---|---|---|---|---|---|---|---|');
+  for (const d of r.dialects) p(`| ${d.dialect} | ${d.passed} | ${d.total} | ${d.formatPassed} | ${d.formatTotal} | ${d.knownFailures} | ${d.regressions} | ${d.exit} |`);
   p('');
 
   p('## With code generation blocked', '');
-  p('`node tests/test_no_eval.js` replaces `eval` and `Function` before the package loads, so that building a function from source throws, turns the native engine off, and runs every case of each dialect directory through `validate()`.', '');
+  p('`node tests/test_no_eval.js` replaces `eval` and `Function` before the package loads, so that building a function from source throws, turns the native engine off, and runs the same cases as `tests/run_suite.js` through `validate()`.', '');
   p('| dialect | passed | cases | failed | errored |', '|---|---|---|---|---|');
   for (const d of r.noEval.dialects) p(`| ${d.dialect} | ${d.passed} | ${d.total} | ${d.failed} | ${d.errored} |`);
   p('');
@@ -301,7 +305,7 @@ function render(r) {
   p('- The package entries for browsers and Workers (`index.browser.mjs`, `index.edge.js`), `ata-validator/lite`, `ata-validator/compat` and `ata-validator/stream` are not gate paths. How `ata-validator/compat` differs from the default validator is not part of this report.');
   p('- The `ata` command line binary is not run. The modules the gate checks are built through library calls (`toStandaloneModule`, `toCompactModule`, `toSchemaModule`, `compiledModuleFor`), not through the binary.');
   p('- The buffer APIs have no gate path. The native engine with code generation blocked is not run anywhere here: the run with code generation blocked turns the native engine off.');
-  p('- The gate leaves out the suite groups whose schema names `http://localhost:1234`, the suite\'s remote documents; `tests/run_suite.js` and `tests/test_no_eval.js` include them.');
+  p('- The gate leaves out the suite cases that bring external documents (`externalSchemas`) or name `http://localhost:1234`; `tests/run_suite.js` and `tests/test_no_eval.js` include them.');
   p('- The documents a SchemaStore schema meets are its samples, copies changed in one place and the extra documents above. A schema with no sample document is not checked.');
   p('- The 2.0 entries are not in this tree and not in this report.');
   p('');

@@ -5,38 +5,23 @@
 // This diffs the two over the official suite, three dialects, both
 // directions, plus the verdict-only mode.
 
-const fs = require('fs')
-const path = require('path')
 const assert = require('assert')
 const { createInterpreter } = require('../lib/interpreter')
+const suite = require('./suite-loader')
 
 const DIALECTS = { 'draft2020-12': false, draft7: false, v1: true }
-
-// The suite's remote documents, addressable by their retrieval URI, so
-// cross-document references compile and diff too.
-const remotes = new Map()
-;(function collect(dir, prefix) {
-  if (!fs.existsSync(dir)) return
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) collect(full, prefix + entry.name + '/')
-    else if (entry.name.endsWith('.json')) {
-      try { remotes.set('http://localhost:1234/' + prefix + entry.name, JSON.parse(fs.readFileSync(full, 'utf8'))) } catch {}
-    }
-  }
-})(path.join(__dirname, 'suite/remotes'), '')
 
 let compiled = 0
 let declined = 0
 let cases = 0
 
+// Each case brings its own external documents, addressable by their retrieval
+// URI, so cross-document references compile and diff too. The registry is
+// per case: the same URI can mean different documents in different cases.
 for (const [dialect, v1] of Object.entries(DIALECTS)) {
-  const dir = path.join(__dirname, 'suite/tests', dialect)
-  if (!fs.existsSync(dir)) continue
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))) {
-      const schemaMap = new Map(remotes)
-      if (group.registry) for (const [id, sub] of Object.entries(group.registry)) schemaMap.set(id, sub)
+  for (const { file, cases: groups } of suite.HAVE_SUITE ? suite.files(dialect) : []) {
+    for (const group of groups) {
+      const schemaMap = suite.registryMap(group)
       let fastI, evalI
       try {
         fastI = createInterpreter(group.schema, { v1, schemaMap })

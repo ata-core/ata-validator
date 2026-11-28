@@ -9,8 +9,7 @@
 // retry.
 
 const assert = require('assert')
-const fs = require('fs')
-const path = require('path')
+const suite = require('./suite-loader')
 const { compileSafe, parse } = require('../lib/safe-regex')
 const { nativeIsLinear } = require('../lib/regex-linear')
 
@@ -45,12 +44,9 @@ function collect (node) {
   if (node.patternProperties && typeof node.patternProperties === 'object') for (const k of Object.keys(node.patternProperties)) patterns.add(k)
   for (const v of Object.values(node)) collect(v)
 }
-for (const dir of ['draft2020-12', 'draft7']) {
-  const base = path.join(__dirname, 'suite', 'tests', dir)
-  if (!fs.existsSync(base)) continue
-  for (const f of fs.readdirSync(base).filter((x) => x.endsWith('.json'))) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(base, f), 'utf8'))) collect(group.schema)
-  }
+for (const dialect of ['draft2020-12', 'draft7']) {
+  if (!suite.HAVE_SUITE) break
+  for (const group of suite.cases(dialect)) collect(group.schema)
 }
 
 let seed = 0x5eed

@@ -27,17 +27,16 @@ const result = esbuild.buildSync({
 assert.strictEqual(result.errors.length, 0, 'the browser entry bundles without errors')
 
 const script = `
-  const fs = require('fs')
   const { Validator: Full } = require(${JSON.stringify(ROOT)})
+  const suite = require(${JSON.stringify(path.join(ROOT, 'tests', 'suite-loader.js'))})
   import(${JSON.stringify('file://' + path.join(dir, 'bundle.mjs'))}).then(({ Validator: Min }) => {
-    const root = ${JSON.stringify(path.join(ROOT, 'tests', 'suite', 'tests'))}
     // Values every group is also asked about: the suite's own documents did
     // not reach the anyOf/oneOf collapse of every schema.
     const PROBES = [true, null, 0, 1.5, '', 'x', [], [1], [{}], [[1], { x: 1 }], {}, { a: 1 }, { foo: [] }]
     const shape = (r) => JSON.stringify(r.valid ? true : r.errors.map((e) => [e.code, e.keyword, e.instancePath, e.schemaPath, e.message]))
     let docs = 0, differ = [], thrown = []
-    for (const d of ['draft2020-12', 'draft2019-09', 'draft7']) for (const f of fs.readdirSync(root + '/' + d).filter((x) => x.endsWith('.json'))) for (const g of JSON.parse(fs.readFileSync(root + '/' + d + '/' + f))) {
-      if (f === 'format.json' && /idn/.test(g.description)) continue
+    for (const d of ['draft2020-12', 'draft2019-09', 'draft7']) for (const { file: f, cases } of suite.files(d)) for (const g of cases) {
+      if (f.startsWith('format-idn-')) continue
       let a, b
       try { a = new Full(g.schema); b = new Min(g.schema); a.isValidObject(null) } catch { continue }
       for (const t of g.tests.concat(PROBES.map((data) => ({ data })))) {

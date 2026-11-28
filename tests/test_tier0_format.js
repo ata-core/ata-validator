@@ -3,22 +3,21 @@
 // string property with the table the interpreted engine reads
 // (formats.formatChecks) or the caller's own function. Held here to the same
 // verdicts as the interpreted engine and the generated code, on every case of
-// the official suite's format tests in every dialect, with each value as a
-// property of an object (tier 0 takes objects of primitives).
+// the official suite's format-assertion cases in every dialect, with each
+// value as a property of an object (tier 0 takes objects of primitives).
 const assert = require('assert')
-const fs = require('fs')
-const path = require('path')
 const { Validator } = require('..')
+const suite = require('./suite-loader')
 const { classify } = require('../lib/shape-classifier')
 const { buildTier0Plan, tier0Validate } = require('../lib/tier0')
 
 let compared = 0
 const diffs = []
 for (const dialect of ['draft2020-12', 'draft2019-09', 'draft7', 'draft6', 'draft4']) {
-  const dir = path.join(__dirname, 'suite/tests', dialect, 'optional/format')
-  if (!fs.existsSync(dir)) continue
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))) {
+  if (!suite.HAVE_SUITE) break
+  for (const dir of ['', 'optional']) {
+    for (const group of suite.cases(dialect, { dir, which: 'assertion' })) {
+      const file = group.file
       const format = group.schema && group.schema.format
       if (typeof format !== 'string') continue
       for (const required of [false, true]) {

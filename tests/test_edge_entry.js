@@ -34,13 +34,12 @@ const root = path.resolve(__dirname, '..');
 // validate, isValidObject and validateJSON.
 {
   const script = (entry) => `
-    const fs = require('fs'), path = require('path');
     const { Validator } = require(${JSON.stringify(root)} + '/' + ${JSON.stringify(entry)});
+    const suite = require(${JSON.stringify(path.join(root, 'tests/suite-loader.js'))});
     const out = [];
-    for (const [dia, uri] of [['draft2020-12', 'https://json-schema.org/draft/2020-12/schema'], ['draft7', 'http://json-schema.org/draft-07/schema#']]) {
-      const dir = path.join(${JSON.stringify(path.join(root, 'tests/suite/tests'))}, dia);
-      for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-        const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
+    for (const dia of ['draft2020-12', 'draft7']) {
+      for (const g of suite.cases(dia)) {
+        const schema = g.schema;
         let v; try { v = new Validator(schema); } catch (e) { out.push('ctor ' + e.message); continue; }
         for (const t of g.tests) {
           const r = v.validate(JSON.parse(JSON.stringify(t.data)));

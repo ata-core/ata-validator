@@ -11,20 +11,16 @@
 // on the closure tree it hands over to after its first thousand calls.
 
 const assert = require('node:assert')
-const fs = require('node:fs')
-const path = require('node:path')
 const { Validator } = require('..')
+const suite = require('./suite-loader')
 
 const dirs = ['draft2020-12', 'draft2019-09', 'draft7', 'draft6', 'draft4']
 const show = (r) => JSON.stringify(r, (k, v) => (v === undefined ? '\u0000u' : v))
 let groups = 0, answers = 0, turnedOff = 0
 for (const d of dirs) {
-  const dir = path.join(__dirname, 'suite', 'tests', d)
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => path.join(dir, f))
-  const opt = path.join(dir, 'optional')
-  if (fs.existsSync(opt)) for (const f of fs.readdirSync(opt)) if (f.endsWith('.json')) files.push(path.join(opt, f))
-  for (const file of files) {
-    for (const g of JSON.parse(fs.readFileSync(file, 'utf8'))) {
+  const files = suite.files(d).concat(suite.files(d, { dir: 'optional' }))
+  for (const { file, cases } of files) {
+    for (const g of cases) {
       const text = JSON.stringify(g.schema)
       if (!/"(anyOf|oneOf)"/.test(text)) continue
       const bad = g.tests.filter((t) => !t.valid).map((t) => t.data)
@@ -40,7 +36,7 @@ for (const d of dirs) {
         for (let i = 0; i < 6; i++) for (const b of bad) v.validate(structuredClone(b)).errors.length
         turnedOff++
         g.tests.forEach((t, i) => {
-          assert.strictEqual(show(v.validate(structuredClone(t.data))), fresh[i], `${path.basename(file)} / ${g.description} / ${t.description}, after ${calls} calls`)
+          assert.strictEqual(show(v.validate(structuredClone(t.data))), fresh[i], `${file} / ${g.description} / ${t.description}, after ${calls} calls`)
           assert.strictEqual(v.isValidObject(structuredClone(t.data)), JSON.parse(fresh[i]).valid)
           answers++
         })

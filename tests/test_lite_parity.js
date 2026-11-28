@@ -14,6 +14,7 @@ const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
+const suite = require('./suite-loader')
 
 const OPTION_SETS = [{}, { allErrors: false }, { coerceTypes: true }, { useDefaults: true }, { removeAdditional: true }, { abortEarly: true }]
 const OPTION_SCHEMAS = [
@@ -22,36 +23,16 @@ const OPTION_SCHEMAS = [
 ]
 const OPTION_DATA = [{ s: 'ok' }, { s: 'o' }, { s: 'ok', n: '5', b: 'true', extra: 1 }, { list: ['1', 2], nested: {} }, { list: 'x' }, {}, null, 7]
 
-// The suite states the dialect by directory, so each schema gets its $schema
-// the way tests/run_suite.js gives it, and the remote documents go in as a
-// registry keyed by the URI the suite serves them from.
-const DIALECTS = {
-  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
-  draft7: 'http://json-schema.org/draft-07/schema#',
-  v1: 'https://json-schema.org/v1',
-}
-const registry = {}
-;(function collect (dir, prefix) {
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, e.name)
-    if (e.isDirectory()) collect(full, prefix + e.name + '/')
-    else if (e.name.endsWith('.json')) registry['http://localhost:1234/' + prefix + e.name] = JSON.parse(fs.readFileSync(full, 'utf8'))
-  }
-})(path.join(__dirname, 'suite/remotes'), '')
-
-function withDialect (schema, dialect) {
-  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return schema
-  return '$schema' in schema ? schema : { ...schema, $schema: DIALECTS[dialect] }
-}
+// The loader gives each schema its dialect's $schema the way
+// tests/run_suite.js gives it, and each case its own external documents as a
+// registry keyed by their retrieval URI.
+const DIALECTS = ['draft2020-12', 'draft7', 'v1']
 
 function cases () {
   const out = []
-  for (const dialect of Object.keys(DIALECTS)) {
-    const dir = path.join(__dirname, 'suite/tests', dialect)
-    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-      for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-        out.push({ schema: withDialect(g.schema, dialect), opts: { schemas: registry }, data: g.tests.map((t) => t.data) })
-      }
+  for (const dialect of DIALECTS) {
+    for (const g of suite.cases(dialect)) {
+      out.push({ schema: g.schema, opts: { schemas: suite.registry(g) }, data: g.tests.map((t) => t.data) })
     }
   }
   for (const schema of OPTION_SCHEMAS) for (const opts of OPTION_SETS) out.push({ schema, opts, data: OPTION_DATA })
@@ -111,7 +92,7 @@ function runChild (noNative) {
 }
 const children = [['with the addon', runChild(false)], ['without the addon', runChild(true)]]
 
-function label (opts) { return JSON.stringify(opts, (k, v) => (k === 'schemas' ? '[suite remotes]' : v)) }
+function label (opts) { return JSON.stringify(opts, (k, v) => (k === 'schemas' ? '[external schemas]' : v)) }
 
 const full = require('..')
 const all = cases()

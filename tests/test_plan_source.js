@@ -3,14 +3,13 @@
 // lib/plan-source.js emits a verdict function from interpreter plans. Its one
 // promise is that wherever it compiles, it answers exactly what the
 // interpreted engine answers. This holds it to that over the official suite
-// in both dialects, the format suite, and a corpus aimed at the keywords it
+// in both dialects, its format-assertion cases, and a corpus aimed at the keywords it
 // covers with values of every type, and reports how much it compiled, so a
 // change that makes it decline everything cannot pass by comparing nothing.
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
 const { Validator } = require('..');
+const suite = require('./suite-loader');
 const { createInterpreter } = require('../lib/interpreter');
 const { compileVerdict } = require('../lib/plan-source');
 
@@ -25,18 +24,13 @@ try {
   process.exit(0);
 }
 
-const DIALECTS = { 'draft2020-12': null, draft7: 'http://json-schema.org/draft-07/schema#' };
 const groups = [];
-for (const [dialect, uri] of Object.entries(DIALECTS)) {
-  const base = path.join(__dirname, 'suite/tests', dialect);
-  for (const sub of ['', 'optional/format']) {
-    const dir = path.join(base, sub);
-    if (!fs.existsSync(dir)) continue;
-    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-      for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-        const schema = uri && g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
-        groups.push([`${dialect}/${sub}${f}: ${g.description}`, schema, g.tests.map((t) => t.data)]);
-      }
+for (const dialect of ['draft2020-12', 'draft7']) {
+  // The required cases, then the format-assertion cases the old layout kept
+  // under optional/format.
+  for (const which of ['required', 'assertion']) {
+    for (const { file: f, cases } of suite.files(dialect, { which })) {
+      for (const g of cases) groups.push([`${dialect}/${which === 'assertion' ? '[format-assertion] ' : ''}${f}: ${g.description}`, g.schema, g.tests.map((t) => t.data)]);
     }
   }
 }

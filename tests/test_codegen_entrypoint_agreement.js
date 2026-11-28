@@ -21,8 +21,6 @@
 // they answer differently on the same schema. Any two that both agree to compile
 // a schema must agree about every instance of it.
 
-const fs = require('fs')
-const path = require('path')
 const {
   compileToJS,
   compileToJSCodegen,
@@ -30,34 +28,10 @@ const {
   compileToJSCodegenWithErrors,
 } = require('../lib/js-compiler.js')
 
-const DIALECTS = {
-  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
-  draft7: 'http://json-schema.org/draft-07/schema#',
-  v1: 'https://json-schema.org/v1',
-}
+const suite = require('./suite-loader')
+const DIALECTS = ['draft2020-12', 'draft7', 'v1']
 
 const VALID_RESULT = { valid: true, errors: [] }
-
-// The suite serves its remote schemas from http://localhost:1234/<relative path>.
-function loadRemotes() {
-  const registry = new Map()
-  ;(function collect(dir, prefix) {
-    if (!fs.existsSync(dir)) return
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name)
-      if (entry.isDirectory()) collect(full, prefix + entry.name + '/')
-      else if (entry.name.endsWith('.json')) {
-        try {
-          registry.set(
-            'http://localhost:1234/' + prefix + entry.name,
-            JSON.parse(fs.readFileSync(full, 'utf8')),
-          )
-        } catch {}
-      }
-    }
-  })(path.join(__dirname, 'suite/remotes'), '')
-  return registry
-}
 
 // Each entry point returns a different shape. Normalise to a boolean verdict,
 // or null when the call declined or could not answer on its own.
@@ -116,27 +90,21 @@ const ENTRY_POINTS = [
   },
 ]
 
-const remotes = loadRemotes()
 const disagreements = []
 let compiled = 0
 let declined = 0
 let checked = 0
 
-for (const [dialect, uri] of Object.entries(DIALECTS)) {
-  const dir = path.join(__dirname, 'suite/tests', dialect)
-  if (!fs.existsSync(dir)) continue
-
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-    const groups = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))
-
-    for (const group of groups) {
+for (const dialect of suite.HAVE_SUITE ? DIALECTS : []) {
+  for (const { file, cases } of suite.files(dialect)) {
+    for (const group of cases) {
       if (typeof group.schema !== 'object' || group.schema === null) continue
 
-      // The suite states the dialect by directory rather than in every schema.
-      const schema = '$schema' in group.schema ? group.schema : { ...group.schema, $schema: uri }
-
-      const map = new Map(remotes)
-      for (const id in group.registry || {}) map.set(id, group.registry[id])
+      // The loader has put the dialect in, and each case has its own external
+      // documents: the same retrieval URI can mean different documents in
+      // different cases.
+      const schema = group.schema
+      const map = suite.registryMap(group)
 
       // Build every entry point that agrees to take this schema.
       const built = []

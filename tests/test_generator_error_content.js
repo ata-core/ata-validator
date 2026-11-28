@@ -13,8 +13,7 @@
 // property named it's, in instancePath as well as schemaPath.
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
+const suite = require('./suite-loader');
 const jc = require('../lib/js-compiler');
 const { Validator } = require('..');
 
@@ -36,15 +35,11 @@ for (const k of KEYS) {
 
 const groups = [];
 for (const dialect of ['draft2020-12', 'draft7']) {
-  const dir = path.join(__dirname, 'suite/tests', dialect);
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-    for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-      // The suite states the dialect by directory; say it in the schema, as the
-      // suite runner does, or a draft-07 schema is read as 2020-12.
-      const schema = dialect === 'draft7' && g.schema && typeof g.schema === 'object' && !('$schema' in g.schema)
-        ? { ...g.schema, $schema: 'http://json-schema.org/draft-07/schema#' }
-        : g.schema;
-      groups.push([`${dialect}/${f}: ${g.description}`, schema, g.tests.map((t) => t.data)]);
+  // The loader gives each schema the dialect's $schema, as the suite runner
+  // does, or a draft-07 schema would be read as 2020-12.
+  for (const { file: f, cases } of suite.files(dialect)) {
+    for (const g of cases) {
+      groups.push([`${dialect}/${f}: ${g.description}`, g.schema, g.tests.map((t) => t.data)]);
     }
   }
 }

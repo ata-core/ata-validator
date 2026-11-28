@@ -12,6 +12,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const suite = require('./suite-loader.js');
 const core = require('../lib/validator-core.js');
 const F = require('../lib/formats.js');
 
@@ -27,17 +28,19 @@ if (!native) {
 const FORMATS = ['email', 'date', 'uri', 'uuid', 'ipv4', 'ipv6'];
 
 const samples = new Set();
-const suite = path.join(__dirname, 'suite', 'tests');
-(function walk (d) {
-  if (!fs.existsSync(d)) return;
-  for (const f of fs.readdirSync(d)) {
-    const p = path.join(d, f);
-    if (fs.statSync(p).isDirectory()) walk(p);
-    else if (f.endsWith('.json')) {
-      for (const g of JSON.parse(fs.readFileSync(p, 'utf8'))) for (const t of g.tests || []) if (typeof t.data === 'string') samples.add(t.data);
+// Every string the suite tests with, in any dialect, required, optional and
+// proposals, format-assertion cases included.
+if (suite.HAVE_SUITE) {
+  const proposals = path.join(suite.ROOT, 'proposals');
+  const dirs = ['', 'optional'].concat(fs.existsSync(proposals)
+    ? fs.readdirSync(proposals, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => 'proposals/' + e.name)
+    : []);
+  for (const dialect of Object.keys(suite.DIALECTS)) {
+    for (const dir of dirs) {
+      for (const c of suite.cases(dialect, { dir, which: 'all' })) for (const t of c.tests || []) if (typeof t.data === 'string') samples.add(t.data);
     }
   }
-})(suite);
+}
 for (const s of [...samples]) { samples.add(s + 'x'); samples.add('\u00e9' + s); samples.add(s.slice(1)); samples.add(s.toUpperCase()); }
 
 const alpha = 'abcAB09.:-@[]/%?#_~!$&\'()*+,;=" \\vV2585\u00e9xzfF0123456789:::';

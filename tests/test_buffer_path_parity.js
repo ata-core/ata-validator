@@ -12,15 +12,10 @@
 // different binding. Nothing in the suite compared the two paths, so nothing
 // caught it. This file compares them over the whole official corpus.
 
-const fs = require('fs')
-const path = require('path')
 const { Validator } = require('..')
+const suite = require('./suite-loader')
 
-const DIALECTS = {
-  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
-  draft7: 'http://json-schema.org/draft-07/schema#',
-  v1: 'https://json-schema.org/v1',
-}
+const DIALECTS = ['draft2020-12', 'draft7', 'v1']
 
 console.log('\nbuffer path parity: isValid(buffer) against validate(value)\n')
 
@@ -33,43 +28,22 @@ try {
   process.exit(0)
 }
 
-const REMOTES = path.join(__dirname, 'suite/remotes')
-const registry = {}
-;(function collect(dir, prefix) {
-  if (!fs.existsSync(dir)) return
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) collect(full, prefix + entry.name + '/')
-    else if (entry.name.endsWith('.json')) {
-      try {
-        registry['http://localhost:1234/' + prefix + entry.name] = JSON.parse(
-          fs.readFileSync(full, 'utf8'),
-        )
-      } catch {}
-    }
-  }
-})(REMOTES, '')
-
 const PAD = ' '.repeat(9000)
 let compared = 0
 const disagreements = []
 
-for (const [dialect, dialectUri] of Object.entries(DIALECTS)) {
-  const dir = path.join(__dirname, 'suite/tests', dialect)
-  if (!fs.existsSync(dir)) continue
+for (const dialect of DIALECTS) {
+  if (!suite.HAVE_SUITE) break
 
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))) {
-      const schema =
-        typeof group.schema === 'object' && group.schema !== null && !Array.isArray(group.schema)
-          ? '$schema' in group.schema
-            ? group.schema
-            : { ...group.schema, $schema: dialectUri }
-          : group.schema
+  // Each case brings its own external documents; the same URI can mean a
+  // different document in another case.
+  for (const { file, cases } of suite.files(dialect)) {
+    for (const group of cases) {
+      const schema = group.schema
 
       let validator
       try {
-        validator = new Validator(schema, { schemas: registry })
+        validator = new Validator(schema, { schemas: suite.registry(group) })
       } catch {
         continue
       }
@@ -120,7 +94,7 @@ for (const [dialect, dialectUri] of Object.entries(DIALECTS)) {
 // disagreement is a new entry in that gate, not a new number here.
 const KNOWN_GAP = 0
 
-console.log(`  compared ${compared} cases across ${Object.keys(DIALECTS).length} dialects`)
+console.log(`  compared ${compared} cases across ${DIALECTS.length} dialects`)
 console.log(`  ${disagreements.length} disagreements, known gap is ${KNOWN_GAP}\n`)
 
 if (disagreements.length > KNOWN_GAP) {

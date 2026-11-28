@@ -16,11 +16,10 @@
 //     threw: a valid document was reported invalid (ATA9000).
 
 const assert = require('node:assert')
-const fs = require('node:fs')
-const path = require('node:path')
 const Module = require('node:module')
 const { Validator } = require('..')
 const aot = require('../aot.js')
+const suite = require('./suite-loader')
 
 const FIELDS = ['code', 'keyword', 'instancePath', 'schemaPath', 'params', 'message', 'docUrl']
 const load = (src) => { const m = new Module('module'); m._compile(src, 'module.cjs'); return m.exports }
@@ -53,16 +52,16 @@ function compare (schema, data, label) {
   }
 }
 
-const SUITE = path.join(__dirname, 'suite/tests')
-for (const dialect of fs.readdirSync(SUITE)) {
-  for (const sub of ['', 'optional/format']) {
-    const dir = path.join(SUITE, dialect, sub)
-    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue
-    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-      for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-        if (JSON.stringify(g.schema).includes('localhost:1234')) continue
-        compare(g.schema, g.tests.map((t) => t.data), `${dialect}/${sub}${f}: ${g.description}`)
-      }
+// Every case of every dialect, and the format-assertion cases, which the
+// suite keeps at the top level and in optional/. A case with external
+// documents is left out: a module is built here without a registry.
+for (const dialect of Object.keys(suite.DIALECTS)) {
+  if (!suite.HAVE_SUITE) break
+  const sets = [suite.files(dialect, { which: 'all' }), suite.files(dialect, { dir: 'optional', which: 'assertion' })]
+  for (const { file: f, cases } of sets.flat()) {
+    for (const g of cases) {
+      if (g.externalSchemas || JSON.stringify(g.schema).includes('localhost:1234')) continue
+      compare(g.schema, g.tests.map((t) => t.data), `${dialect}/${f}: ${g.description}`)
     }
   }
 }
