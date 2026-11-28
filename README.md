@@ -1128,7 +1128,7 @@ Both are implemented in the interpreted engine, so a v1 schema that uses `$dynam
 
 ### Known limitations
 
-Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1319 of 1319 cases. Draft 2019-09 gives 1292 of 1292, draft 7 972 of 972, draft-06 878 of 878, draft-04 672 of 672. The v1 dialect gives 1290 of 1290. `npm run test:suite` reproduces all six. The suite's format-assertion cases, run with `assertFormat: true`, pass in full on the five released dialects (763, 751, 683, 340 and 239 cases). Under v1, 734 of 745 pass: v1 lets `date-time` take RFC 9557 suffixes such as `[Europe/London]` and stops `time` from taking a leap second, and ata still asserts both formats the 2020-12 way. These figures are for the suite at `e2a68a1`.
+Running the whole Draft 2020-12 suite with nothing excluded, `format` and `default` under specification semantics (`assertFormat: false`, `useDefaults: false`), gives 1319 of 1319 cases. Draft 2019-09 gives 1292 of 1292, draft 7 972 of 972, draft-06 878 of 878, draft-04 672 of 672. The v1 dialect gives 1290 of 1290. `npm run test:suite` reproduces all six. The suite's format-assertion cases, run with `assertFormat: true`, pass in full on the five released dialects (763, 751, 683, 340 and 239 cases). Under v1, 737 of 745 pass. The other 8 ask `date-time` to take RFC 9557 suffixes such as `[Europe/London]`, which the v1 specification added and then removed again (json-schema-spec#1800); ata follows the specification. These figures are for the suite at `e2a68a1`.
 
 Areas that remain deliberate scope decisions for 1.x:
 

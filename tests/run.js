@@ -57,6 +57,7 @@ const FILES = [
   "tests/test_output_format.js",
   "tests/test_output_annotations.js",
   "tests/test_v1_dynamic_ref.js",
+  "tests/test_v1_time_leap.js",
   "tests/test_standard_json_schema.js",
   "tests/test_retry_message.js",
   "tests/test_describe_schema.js",
