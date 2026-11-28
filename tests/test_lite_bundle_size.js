@@ -324,7 +324,11 @@ const esbuild = require('esbuild')
 // refuses the method, and the choice between the native walker and validate()
 // for the buffer APIs lives in lib/buffer-gate.js, whose browser twin only
 // throws; 537 bytes less.
-const BUDGET = 63500
+// 63540 (63527 measured): under v1 a `$dynamicRef` written as a bare anchor
+// name is read as that fragment (lib/interpreter-core.js dynamicRefUri), as
+// the suite at e2a68a1 writes it, and the buffer APIs route that spelling
+// through validate(); 48 bytes.
+const BUDGET = 63540
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

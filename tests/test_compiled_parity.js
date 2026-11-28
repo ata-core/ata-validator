@@ -19,11 +19,9 @@ const { fromCompiled } = require('../lib/compiled')
 const { fromCompiledVerdict } = require('../lib/compiled-verdict')
 const { fromCompiledObject } = require('../lib/compiled-object')
 
-const DIALECTS = {
-  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
-  draft7: 'http://json-schema.org/draft-07/schema#',
-  v1: 'https://json-schema.org/v1',
-}
+const suite = require('./suite-loader')
+
+const DIALECTS = ['draft2020-12', 'draft7', 'v1']
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-compiled-'))
 let n = 0
 function load (src) {
@@ -35,13 +33,10 @@ function load (src) {
 const show = (r) => JSON.stringify(r)
 let schemas = 0, declined = 0, unbuilt = 0, compared = 0
 const diffs = []
-for (const [dialect, uri] of Object.entries(DIALECTS)) {
-  const sdir = path.join(__dirname, 'suite/tests', dialect)
-  for (const file of fs.readdirSync(sdir).filter((f) => f.endsWith('.json'))) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(sdir, file), 'utf8'))) {
-      const schema = typeof group.schema === 'object' && group.schema !== null && !('$schema' in group.schema)
-        ? { ...group.schema, $schema: uri }
-        : group.schema
+for (const dialect of DIALECTS) {
+  for (const { file, cases } of suite.files(dialect)) {
+    for (const group of cases) {
+      const schema = group.schema
       if (!compiledEligible(schema)) { declined++; continue }
       const src = compiledModuleFor(schema, { format: 'cjs' })
       if (!src) { unbuilt++; continue }

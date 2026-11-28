@@ -3,8 +3,8 @@
 
 // Corpus-driven TS generator correctness check.
 //
-// Walks the JSON Schema Test Suite (Draft 2020-12) shipped under tests/suite,
-// extracts every unique schema, runs the ata generator to emit validator.mjs
+// Walks the JSON Schema Test Suite (Draft 2020-12 by default) shipped under
+// tests/suite, read through tests/suite-loader.js, takes every case's schema, runs the ata generator to emit validator.mjs
 // and validator.d.mts, then invokes tsc on a synthesised use.ts that imports
 // the type predicate and narrows an unknown value through it.
 //
@@ -26,7 +26,7 @@ const { toTypeScript } = require('../lib/ts-gen');
 const aot = require('../lib/aot');
 
 const DRAFT = process.env.CORPUS_DRAFT || 'draft2020-12';
-const SUITE_DIR = path.join(__dirname, 'suite', 'tests', DRAFT);
+const suite = require('./suite-loader');
 const { TSC_JS: TSC_BIN } = require('./_tsc');
 const FAIL_BUDGET_PCT = Number(process.env.CORPUS_TS_FAIL_BUDGET || '0');
 const ONLY = process.env.CORPUS_ONLY ? new Set(process.env.CORPUS_ONLY.split(',')) : null;
@@ -48,18 +48,15 @@ export const validate = () => ({ valid: false, errors: [] })
 export default { isValid, validate }
 `;
 
+// The suite's files with the cases that apply to DRAFT, format-annotation
+// cases included and format-assertion ones left out, as the validator suite
+// runs them.
 function listSuiteFiles() {
-  const files = [];
-  for (const name of fs.readdirSync(SUITE_DIR)) {
-    if (!name.endsWith('.json')) continue;
-    if (ONLY && !ONLY.has(name)) continue;
-    files.push(path.join(SUITE_DIR, name));
-  }
-  return files.sort();
+  if (!suite.HAVE_SUITE) return [];
+  return suite.files(DRAFT, { only: ONLY ? (name) => ONLY.has(name) : null });
 }
 
-function extractSchemas(filePath) {
-  const cases = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+function extractSchemas(cases) {
   const schemas = [];
   for (let i = 0; i < cases.length; i++) {
     const c = cases[i];
@@ -125,7 +122,7 @@ function runOne(workDir, schema) {
 function main() {
   const files = listSuiteFiles();
   if (files.length === 0) {
-    process.stdout.write(`no suite files under ${SUITE_DIR}\n`);
+    process.stdout.write(`no suite cases for ${DRAFT} under ${suite.ROOT}\n`);
     process.exit(1);
   }
 
@@ -141,9 +138,9 @@ function main() {
   const failureSamples = [];
   const skipReasons = new Map();
 
-  for (const file of files) {
+  for (const { file, cases } of files) {
     const base = path.basename(file, '.json');
-    const schemas = extractSchemas(file);
+    const schemas = extractSchemas(cases);
     if (schemas.length === 0) continue;
 
     let pass = 0, fail = 0, skip = 0;

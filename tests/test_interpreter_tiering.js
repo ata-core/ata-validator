@@ -9,8 +9,7 @@
 // stack), and the shared error runtime's answer to such data.
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
+const suite = require('./suite-loader');
 const { createInterpreter } = require('../lib/interpreter');
 const { Validator } = require('..');
 
@@ -22,9 +21,8 @@ const plain = (r) => JSON.stringify({ valid: r.valid, errors: r.errors });
   let cases = 0;
   const bad = [];
   for (const [dialect, v1] of Object.entries({ 'draft2020-12': false, draft7: false, v1: true })) {
-    const dir = path.join(__dirname, 'suite/tests', dialect);
-    for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-      for (const group of JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))) {
+    for (const { file, cases: groups } of suite.files(dialect)) {
+      for (const group of groups) {
         let walk, tree;
         try {
           walk = createInterpreter(group.schema, { v1, tier: Infinity });

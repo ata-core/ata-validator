@@ -18,6 +18,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const suiteLoader = require('./suite-loader');
 const Module = require('module');
 const { Validator } = require('..');
 const { toStandaloneModule } = require('../build.js');
@@ -90,12 +91,10 @@ const shape = (errors) => JSON.stringify(errors.map((e) => [e.keyword, e.instanc
 
 // The suites: verdict, data after defaults, errors in order.
 let groups = 0, cases = 0;
-const suite = path.join(__dirname, 'suite', 'tests');
 for (const dialect of ['draft2020-12', 'draft7']) {
-  const dir = path.join(suite, dialect);
-  if (!fs.existsSync(dir)) continue;
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-    for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
+  if (!suiteLoader.HAVE_SUITE) continue;
+  for (const { file: f, cases: list } of suiteLoader.files(dialect)) {
+    for (const g of list) {
       let c; try { c = compile(g.schema, { order: true }); } catch { c = null; }
       if (!c) continue;
       groups++;
@@ -122,10 +121,9 @@ assert.ok(groups > 500, `only ${groups} suite groups compiled`);
 const { bundleStandalone } = require('../build.js');
 let bundled = 0;
 for (const dialect of ['draft2020-12', 'draft7']) {
-  const dir = path.join(suite, dialect);
-  if (!fs.existsSync(dir)) continue;
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-    for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
+  if (!suiteLoader.HAVE_SUITE) continue;
+  for (const { file: f, cases: list } of suiteLoader.files(dialect)) {
+    for (const g of list) {
       if (g.schema === null || typeof g.schema !== 'object') continue;
       let fn;
       try { fn = load(bundleStandalone([g.schema], { order: true, verbose: true }), `.order-bundle-${n++}.cjs`)[0]; } catch { fn = null; }

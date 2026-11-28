@@ -12,6 +12,7 @@ const path = require('path')
 const { Validator } = require('..')
 const { compiledModuleFor, compiledSchemaFor, compiledEligible } = require('../build')
 const { fromCompiledPlain } = require('../lib/compiled-plain')
+const suite = require('./suite-loader')
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ata-plain-'))
 let n = 0
@@ -20,11 +21,10 @@ const show = (r) => JSON.stringify(r.valid ? { valid: true } : { valid: false, e
 
 let compared = 0, schemas = 0
 const diffs = []
-for (const [dialect, uri] of [['draft2020-12', 'https://json-schema.org/draft/2020-12/schema'], ['draft2019-09', 'https://json-schema.org/draft/2019-09/schema'], ['draft7', 'http://json-schema.org/draft-07/schema#'], ['draft6', 'http://json-schema.org/draft-06/schema#'], ['draft4', 'http://json-schema.org/draft-04/schema#']]) {
-  const sdir = path.join(__dirname, 'suite/tests', dialect)
-  for (const file of fs.readdirSync(sdir).filter((f) => f.endsWith('.json')).sort()) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(sdir, file), 'utf8'))) {
-      const schema = typeof group.schema === 'object' && group.schema !== null && !('$schema' in group.schema) ? { ...group.schema, $schema: uri } : group.schema
+for (const dialect of ['draft2020-12', 'draft2019-09', 'draft7', 'draft6', 'draft4']) {
+  for (const { file, cases } of suite.files(dialect)) {
+    for (const group of cases) {
+      const schema = group.schema
       if (!compiledEligible(schema)) continue
       const src = compiledModuleFor(schema, { format: 'cjs', plainErrors: true })
       if (!src) continue

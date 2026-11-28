@@ -15,59 +15,40 @@
 // is what would catch an early return that skipped it.
 
 const assert = require('node:assert');
-const fs = require('node:fs');
 const path = require('node:path');
 const { Validator } = require('..');
 
-const REMOTES_DIR = path.join(__dirname, 'suite/remotes');
-const registry = {};
-(function collect (dir, prefix) {
-  if (!fs.existsSync(dir)) return;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) collect(full, prefix + entry.name + '/');
-    else if (entry.name.endsWith('.json')) {
-      try { registry['http://localhost:1234/' + prefix + entry.name] = JSON.parse(fs.readFileSync(full, 'utf8')); } catch {}
-    }
-  }
-})(REMOTES_DIR, '');
+const suite = require('./suite-loader');
 
-const DIALECTS = {
-  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
-  draft7: 'http://json-schema.org/draft-07/schema#',
-};
-
+// The required cases run with format as an annotation; the format-assertion
+// cases (the old optional/format files) with the default options.
 const files = [];
-for (const [dialect, uri] of Object.entries(DIALECTS)) {
-  const dir = path.join(__dirname, 'suite/tests', dialect);
-  for (const f of fs.readdirSync(dir)) if (f.endsWith('.json')) files.push({ file: path.join(dir, f), uri, formats: false });
-  const fmt = path.join(dir, 'optional/format');
-  if (fs.existsSync(fmt)) for (const f of fs.readdirSync(fmt)) if (f.endsWith('.json')) files.push({ file: path.join(fmt, f), uri, formats: true });
+for (const dialect of ['draft2020-12', 'draft7']) {
+  for (const f of suite.files(dialect)) files.push({ ...f, formats: false });
+  for (const f of suite.files(dialect, { which: 'assertion' })) files.push({ ...f, formats: true });
 }
 assert.ok(files.length > 50, `found only ${files.length} suite files; is the submodule checked out?`);
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
-const withDialect = (schema, uri) =>
-  (typeof schema === 'object' && schema !== null && !Array.isArray(schema) && !('$schema' in schema))
-    ? { ...schema, $schema: uri } : schema;
 
 let cases = 0, fused = 0, bad = 0;
-for (const { file, uri, formats } of files) {
-  for (const group of JSON.parse(fs.readFileSync(file, 'utf8'))) {
-    const opts = () => formats ? { schemas: registry } : { schemas: registry, assertFormat: false, useDefaults: false };
+for (const { file, cases: groups, formats } of files) {
+  for (const group of groups) {
+    // Each case's external documents, fresh for every Validator.
+    const opts = () => formats ? { schemas: suite.registry(group) } : { schemas: suite.registry(group), assertFormat: false, useDefaults: false };
     let plain, calls = 0, never, always, counted, vNever, vAlways;
     const EXTRA = { keyword: 'extra', instancePath: '', schemaPath: '#/extra', params: {}, message: 'extra check failed' };
     try {
-      plain = new Validator(withDialect(clone(group.schema), uri), opts());
-      counted = new Validator(withDialect(clone(group.schema), uri), opts());
+      plain = new Validator(clone(group.schema), opts());
+      counted = new Validator(clone(group.schema), opts());
       counted._extendVerdict(() => () => { calls++; return true; });
-      never = new Validator(withDialect(clone(group.schema), uri), opts());
+      never = new Validator(clone(group.schema), opts());
       never._extendVerdict(() => () => false);
-      always = new Validator(withDialect(clone(group.schema), uri), opts());
+      always = new Validator(clone(group.schema), opts());
       always._extendVerdict(() => () => true);
-      vNever = new Validator(withDialect(clone(group.schema), uri), opts());
+      vNever = new Validator(clone(group.schema), opts());
       vNever._extendValidate(() => ({ check: () => false, errors: () => [EXTRA] }));
-      vAlways = new Validator(withDialect(clone(group.schema), uri), opts());
+      vAlways = new Validator(clone(group.schema), opts());
       vAlways._extendValidate(() => ({ check: () => true, errors: () => null }));
     } catch { continue; }
     for (const t of group.tests) {

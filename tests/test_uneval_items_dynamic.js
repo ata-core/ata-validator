@@ -14,7 +14,7 @@ const { compileToJSCombined } = require('../lib/js-compiler')
 const { createInterpreter } = require('../lib/interpreter')
 
 const D = '2020-12'
-const groups = require('./suite/tests/draft2020-12/unevaluatedItems.json').map((g) => [g.schema, g.tests.map((t) => t.data)])
+const groups = require('./suite-loader').cases('draft2020-12', { only: (f) => f === 'unevaluatedItems.json' }).map((g) => [g.schema, g.tests.map((t) => t.data)])
 const S = 'https://json-schema.org/draft/2020-12/schema'
 groups.push(
   [{ $schema: S, prefixItems: [{ type: 'string' }], allOf: [{ prefixItems: [true, { type: 'integer' }], unevaluatedItems: true, minItems: 5 }], unevaluatedItems: false }, [['a', 1, 2], ['a', 1, 2, 3, 4], ['a']]],

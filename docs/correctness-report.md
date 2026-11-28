@@ -4,10 +4,10 @@ This file is written by `node scripts/gate-report.js`. Do not edit it by hand: e
 
 ## Summary
 
-- Tree: ata-validator 1.66.0 at commit `cbadeeb`. Node v25.2.1 on darwin-arm64.
-- Gate: 17 paths, each held to the Validator on the same documents. Official suite: 1767 schemas. SchemaStore: 492 schemas. Documents that differ or threw: 0.
-- Official JSON Schema Test Suite at `245a45a`: draft2020-12 1300 of 1300, draft2019-09 1259 of 1259, draft7 927 of 927, draft6 839 of 839, draft4 616 of 616, v1 1147 of 1147.
-- With `eval` and `new Function` blocked: draft2020-12 1300 of 1300, draft2019-09 1259 of 1259, draft7 927 of 927, draft6 839 of 839, draft4 616 of 616, v1 1147 of 1147.
+- Tree: ata-validator 1.66.0 at commit `fa7c7bc`. Node v25.2.1 on darwin-arm64.
+- Gate: 17 paths, each held to the Validator on the same documents. Official suite: 1945 schemas. SchemaStore: 492 schemas. Documents that differ or threw: 0.
+- Official JSON Schema Test Suite at `e2a68a1`: draft2020-12 1319 of 1319, draft2019-09 1292 of 1292, draft7 972 of 972, draft6 878 of 878, draft4 672 of 672, v1 1290 of 1290.
+- With `eval` and `new Function` blocked: draft2020-12 1319 of 1319, draft2019-09 1292 of 1292, draft7 972 of 972, draft6 878 of 878, draft4 672 of 672, v1 1290 of 1290.
 - Native engine: loaded from local build, version 1.66.0.
 - Sweep classes: 19. Closed in this tree, with their tests passing: 19. Open in this tree: 0.
 
@@ -27,34 +27,34 @@ The documents are the official suite's test data; for SchemaStore, each schema's
 
 | corpus | commit | date | subject | read by the gate |
 |---|---|---|---|---|
-| JSON Schema Test Suite (`tests/suite`) | `245a45abc90190c0bff04d97e6d2b541b4bb9f12` | 2026-11-03 | test: add missing RFC 3987 coverage to iri and iri-reference (#1249) | draft2020-12, draft2019-09, draft7, draft6, draft4, v1: the required tests, `optional/format` and `optional/non-bmp-regex.json` |
+| JSON Schema Test Suite (`tests/suite`) | `e2a68a15cd490750fd6b95e604e4054d7d978d1f` | 2026-11-16 | test(email): limit RFC 5321-only rejections to 2020-12 and later (#1271) | draft2020-12, draft2019-09, draft7, draft6, draft4, v1: every case at the top level of `validation/tests` that applies to the dialect, format-assertion cases included, the format-assertion cases of `optional` and `optional/non-bmp-regex.json` |
 | SchemaStore | `ce64da2a95a2bd40740c2d608206f8a36024d30b` | 2026-10-08 | fix(claude-code-settings): accept skills-dir marketplace source (#6469) | 990 schema files in `src/schemas/json`; those with sample documents the Validator builds are checked |
 
 The suite checkout is at the commit this tree pins.
 
 ## Paths, official suite
 
-1767 schemas the Validator builds. Gate exit status 0.
+1945 schemas the Validator builds. Gate exit status 0.
 
 | path | error fields compared | order compared | schemas taken | declined | documents | differ | threw | allowed as ATA9000 | other order, none promised | known |
 |---|---|---|---|---|---|---|---|---|---|---|
-| interpreted engine | rich | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 1 |
-| generated code, warm | rich | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 0 |
-| closure tree | rich | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 1 |
-| JSON text | rich | yes | 1767 | 0 | 23421 | 0 | 0 | 0 | 0 | 0 |
-| plain errors | plain | yes | 1767 | 0 | 24545 | 0 | 0 | 0 | 0 | 1 |
-| module | module | yes | 1635 | 132 | 23018 | 0 | 0 | 72 | 0 | 0 |
-| module, one pass | module | no | 1635 | 132 | 23018 | 0 | 0 | 72 | 0 | 0 |
-| module, plain errors | plain | yes | 1625 | 142 | 22918 | 0 | 0 | 0 | 0 | 0 |
-| compact module | module | yes | 1625 | 142 | 22918 | 0 | 0 | 0 | 0 | 1 |
-| schema module | module | yes | 1743 | 24 | 24235 | 0 | 0 | 0 | 0 | 1 |
-| ir module | rich | yes | 1763 | 4 | 24505 | 0 | 0 | 0 | 0 | 1 |
-| ir module, plain errors | plain | yes | 1763 | 4 | 24505 | 0 | 0 | 0 | 0 | 1 |
-| ir closures | rich | yes | 1765 | 2 | 24525 | 0 | 0 | 0 | 0 | 1 |
-| ir table | rich | yes | 1501 | 266 | 21363 | 0 | 0 | 0 | 0 | 0 |
-| ir table, plain errors | plain | yes | 1501 | 266 | 21363 | 0 | 0 | 0 | 0 | 0 |
-| ir plan as JSON | rich | yes | 1460 | 307 | 20830 | 0 | 0 | 0 | 0 | 0 |
-| ir closure module | plain | yes | 601 | 1166 | 10762 | 0 | 0 | 0 | 0 | 0 |
+| interpreted engine | rich | yes | 1945 | 0 | 26664 | 0 | 0 | 0 | 0 | 1 |
+| generated code, warm | rich | yes | 1945 | 0 | 26664 | 0 | 0 | 0 | 0 | 0 |
+| closure tree | rich | yes | 1945 | 0 | 26664 | 0 | 0 | 0 | 0 | 1 |
+| JSON text | rich | yes | 1945 | 0 | 25404 | 0 | 0 | 0 | 0 | 0 |
+| plain errors | plain | yes | 1945 | 0 | 26664 | 0 | 0 | 0 | 0 | 1 |
+| module | module | yes | 1814 | 131 | 25147 | 0 | 0 | 0 | 0 | 0 |
+| module, one pass | module | no | 1814 | 131 | 25147 | 0 | 0 | 0 | 0 | 0 |
+| module, plain errors | plain | yes | 1814 | 131 | 25147 | 0 | 0 | 0 | 0 | 0 |
+| compact module | module | yes | 1814 | 131 | 25147 | 0 | 0 | 0 | 0 | 1 |
+| schema module | module | yes | 1926 | 19 | 26400 | 0 | 0 | 0 | 0 | 1 |
+| ir module | rich | yes | 1942 | 3 | 26634 | 0 | 0 | 0 | 0 | 2 |
+| ir module, plain errors | plain | yes | 1942 | 3 | 26634 | 0 | 0 | 0 | 0 | 2 |
+| ir closures | rich | yes | 1944 | 1 | 26654 | 0 | 0 | 0 | 0 | 2 |
+| ir table | rich | yes | 1689 | 256 | 23582 | 0 | 0 | 0 | 0 | 0 |
+| ir table, plain errors | plain | yes | 1689 | 256 | 23582 | 0 | 0 | 0 | 0 | 0 |
+| ir plan as JSON | rich | yes | 1648 | 297 | 23049 | 0 | 0 | 0 | 0 | 0 |
+| ir closure module | plain | yes | 757 | 1188 | 12495 | 0 | 0 | 0 | 0 | 0 |
 
 ## Paths, SchemaStore
 
@@ -86,41 +86,45 @@ None. No path gave an answer that differs from the Validator's, and no path thre
 
 ## Known exceptions
 
-- Error order, for a suite group whose description ends in "unevaluatedItems with $dynamicRef". A `$ref` to an embedded resource that holds a `$dynamicRef`: the errors name paths in two resources and neither engine ranks them, so generated code and the interpreted walk list the same errors in a different order. The verdict and the set of errors agree. Open, not decided.
-  - interpreted engine, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
-  - closure tree, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
-  - plain errors, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
-  - compact module, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
-  - schema module, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
-  - ir module, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
-  - ir module, plain errors, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
-  - ir closures, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
+- Error order, for a suite group whose description ends in "unevaluatedItems with $dynamicRef (2020-12)". A `$ref` to an embedded resource that holds a `$dynamicRef`: the errors name paths in two resources and neither engine ranks them, so generated code and the interpreted walk list the same errors in a different order. The verdict and the set of errors agree. Open, not decided.
+  - interpreted engine, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)`, document kind "array".
+  - closure tree, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)`, document kind "array".
+  - plain errors, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)`, document kind "array".
+  - compact module, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)`, document kind "array".
+  - schema module, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)`, document kind "array".
+  - ir module, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)`, document kind "array".
+  - ir module, plain errors, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)`, document kind "array".
+  - ir closures, official suite: `draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)`, document kind "array".
+- Error order, for a suite group whose description ends in "v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef". A `$ref` to an embedded resource that holds a `$dynamicRef`: the errors name paths in two resources and neither engine ranks them, so generated code and the interpreted walk list the same errors in a different order. The verdict and the set of errors agree. Open, not decided.
+  - ir module, official suite: `v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
+  - ir module, plain errors, official suite: `v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
+  - ir closures, official suite: `v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef`, document kind "array".
 
 ## Official test suite
 
-`node tests/run_suite.js <dialect>`, suite at `245a45a`. Every case of the dialect directory runs; a schema that does not compile counts as failed. `format` is an annotation, as the suite expects, and the suite's remote documents are registered from `tests/suite/remotes`. The optional tests are not in these figures.
+`node tests/run_suite.js <dialect>`, suite at `e2a68a1`. Every case at the top level of `validation/tests` that applies to the dialect runs, the cases tagged format-assertion aside; a schema that does not compile counts as failed. `format` is an annotation, as the suite expects, and each case's external documents (`externalSchemas`) are registered for that case alone. The cases tagged format-assertion run after them with `assertFormat: true` and have columns of their own; the listed known failures count both runs. The optional tests are not in these figures.
 
-| dialect | passed | cases | listed known failures | regressions | exit status |
-|---|---|---|---|---|---|
-| draft2020-12 | 1300 | 1300 | 0 | 0 | 0 |
-| draft2019-09 | 1259 | 1259 | 0 | 0 | 0 |
-| draft7 | 927 | 927 | 0 | 0 | 0 |
-| draft6 | 839 | 839 | 0 | 0 | 0 |
-| draft4 | 616 | 616 | 0 | 0 | 0 |
-| v1 | 1147 | 1147 | 0 | 0 | 0 |
+| dialect | passed | cases | format assertion passed | format assertion cases | listed known failures | regressions | exit status |
+|---|---|---|---|---|---|---|---|
+| draft2020-12 | 1319 | 1319 | 763 | 763 | 0 | 0 | 0 |
+| draft2019-09 | 1292 | 1292 | 751 | 751 | 0 | 0 | 0 |
+| draft7 | 972 | 972 | 683 | 683 | 0 | 0 | 0 |
+| draft6 | 878 | 878 | 340 | 340 | 0 | 0 | 0 |
+| draft4 | 672 | 672 | 239 | 239 | 0 | 0 | 0 |
+| v1 | 1290 | 1290 | 734 | 745 | 11 | 0 | 0 |
 
 ## With code generation blocked
 
-`node tests/test_no_eval.js` replaces `eval` and `Function` before the package loads, so that building a function from source throws, turns the native engine off, and runs every case of each dialect directory through `validate()`.
+`node tests/test_no_eval.js` replaces `eval` and `Function` before the package loads, so that building a function from source throws, turns the native engine off, and runs the same cases as `tests/run_suite.js` through `validate()`, the format-assertion cases aside.
 
 | dialect | passed | cases | failed | errored |
 |---|---|---|---|---|
-| draft2020-12 | 1300 | 1300 | 0 | 0 |
-| draft2019-09 | 1259 | 1259 | 0 | 0 |
-| draft7 | 927 | 927 | 0 | 0 |
-| draft6 | 839 | 839 | 0 | 0 |
-| draft4 | 616 | 616 | 0 | 0 |
-| v1 | 1147 | 1147 | 0 | 0 |
+| draft2020-12 | 1319 | 1319 | 0 | 0 |
+| draft2019-09 | 1292 | 1292 | 0 | 0 |
+| draft7 | 972 | 972 | 0 | 0 |
+| draft6 | 878 | 878 | 0 | 0 |
+| draft4 | 672 | 672 | 0 | 0 |
+| v1 | 1290 | 1290 | 0 | 0 |
 
 Code generation attempts blocked: 1. Standard Schema check with code generation blocked: passed. Exit status 0.
 
@@ -161,17 +165,18 @@ The classes found by the sweep of 1.x for answers that differ between paths, one
 - The package entries for browsers and Workers (`index.browser.mjs`, `index.edge.js`), `ata-validator/lite`, `ata-validator/compat` and `ata-validator/stream` are not gate paths. How `ata-validator/compat` differs from the default validator is not part of this report.
 - The `ata` command line binary is not run. The modules the gate checks are built through library calls (`toStandaloneModule`, `toCompactModule`, `toSchemaModule`, `compiledModuleFor`), not through the binary.
 - The buffer APIs have no gate path. The native engine with code generation blocked is not run anywhere here: the run with code generation blocked turns the native engine off.
-- The gate leaves out the suite groups whose schema names `http://localhost:1234`, the suite's remote documents; `tests/run_suite.js` and `tests/test_no_eval.js` include them.
+- The gate leaves out the suite cases that bring external documents (`externalSchemas`) or name `http://localhost:1234`; `tests/run_suite.js` and `tests/test_no_eval.js` include them.
 - The documents a SchemaStore schema meets are its samples, copies changed in one place and the extra documents above. A schema with no sample document is not checked.
 - The 2.0 entries are not in this tree and not in this report.
 
 ## Known open items
 
-- The error order exception "unevaluatedItems with $dynamicRef" in `scripts/gate.js`.
+- The error order exception "unevaluatedItems with $dynamicRef (2020-12)" in `scripts/gate.js`.
+- The error order exception "v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef" in `scripts/gate.js`.
 
 ## Reproduce
 
-From a clean clone at the commit that adds this file, whose code is that of `cbadeeb`, with Node and git:
+From a clean clone at the commit that adds this file, whose code is that of `fa7c7bc`, with Node and git:
 
 ```sh
 git clone https://github.com/ata-core/ata-validator.git && cd ata-validator
@@ -190,16 +195,16 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
 {
  "format": "ata-correctness-report/1",
  "tree": {
-  "commit": "cbadeeb93e076f14467ac7526185b6451513430d",
+  "commit": "fa7c7bc68f737a006224cab7d5a3f461f5242b90",
   "version": "1.66.0",
   "uncommitted": []
  },
  "corpora": {
   "suite": {
-   "commit": "245a45abc90190c0bff04d97e6d2b541b4bb9f12",
-   "date": "2026-11-03",
-   "subject": "test: add missing RFC 3987 coverage to iri and iri-reference (#1249)",
-   "pinned": "245a45abc90190c0bff04d97e6d2b541b4bb9f12",
+   "commit": "e2a68a15cd490750fd6b95e604e4054d7d978d1f",
+   "date": "2026-11-16",
+   "subject": "test(email): limit RFC 5321-only rejections to 2020-12 and later (#1271)",
+   "pinned": "e2a68a15cd490750fd6b95e604e4054d7d978d1f",
    "atPin": true
   },
   "schemastore": {
@@ -238,7 +243,7 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
     "paths": null,
     "every": 1
    },
-   "schemas": 1767,
+   "schemas": 1945,
    "paths": [
     {
      "name": "interpreted engine",
@@ -247,9 +252,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1767,
+     "taken": 1945,
      "declined": 0,
-     "docs": 24545,
+     "docs": 26664,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -263,9 +268,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1767,
+     "taken": 1945,
      "declined": 0,
-     "docs": 24545,
+     "docs": 26664,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -279,9 +284,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1767,
+     "taken": 1945,
      "declined": 0,
-     "docs": 24545,
+     "docs": 26664,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -295,9 +300,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": true,
      "fills": false,
-     "taken": 1767,
+     "taken": 1945,
      "declined": 0,
-     "docs": 23421,
+     "docs": 25404,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -311,9 +316,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1767,
+     "taken": 1945,
      "declined": 0,
-     "docs": 24545,
+     "docs": 26664,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -327,12 +332,12 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": true,
      "json": false,
      "fills": false,
-     "taken": 1635,
-     "declined": 132,
-     "docs": 23018,
+     "taken": 1814,
+     "declined": 131,
+     "docs": 25147,
      "diffs": 0,
      "threw": 0,
-     "abort": 72,
+     "abort": 0,
      "known": 0,
      "unordered": 0
     },
@@ -343,12 +348,12 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": true,
      "json": false,
      "fills": false,
-     "taken": 1635,
-     "declined": 132,
-     "docs": 23018,
+     "taken": 1814,
+     "declined": 131,
+     "docs": 25147,
      "diffs": 0,
      "threw": 0,
-     "abort": 72,
+     "abort": 0,
      "known": 0,
      "unordered": 0
     },
@@ -359,9 +364,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1625,
-     "declined": 142,
-     "docs": 22918,
+     "taken": 1814,
+     "declined": 131,
+     "docs": 25147,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -375,9 +380,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": true,
      "json": false,
      "fills": false,
-     "taken": 1625,
-     "declined": 142,
-     "docs": 22918,
+     "taken": 1814,
+     "declined": 131,
+     "docs": 25147,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -391,9 +396,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": true,
      "json": false,
      "fills": false,
-     "taken": 1743,
-     "declined": 24,
-     "docs": 24235,
+     "taken": 1926,
+     "declined": 19,
+     "docs": 26400,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -407,13 +412,13 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1763,
-     "declined": 4,
-     "docs": 24505,
+     "taken": 1942,
+     "declined": 3,
+     "docs": 26634,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
-     "known": 1,
+     "known": 2,
      "unordered": 0
     },
     {
@@ -423,13 +428,13 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1763,
-     "declined": 4,
-     "docs": 24505,
+     "taken": 1942,
+     "declined": 3,
+     "docs": 26634,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
-     "known": 1,
+     "known": 2,
      "unordered": 0
     },
     {
@@ -439,13 +444,13 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1765,
-     "declined": 2,
-     "docs": 24525,
+     "taken": 1944,
+     "declined": 1,
+     "docs": 26654,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
-     "known": 1,
+     "known": 2,
      "unordered": 0
     },
     {
@@ -455,9 +460,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1501,
-     "declined": 266,
-     "docs": 21363,
+     "taken": 1689,
+     "declined": 256,
+     "docs": 23582,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -471,9 +476,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1501,
-     "declined": 266,
-     "docs": 21363,
+     "taken": 1689,
+     "declined": 256,
+     "docs": 23582,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -487,9 +492,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1460,
-     "declined": 307,
-     "docs": 20830,
+     "taken": 1648,
+     "declined": 297,
+     "docs": 23049,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -503,9 +508,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": false,
-     "taken": 601,
-     "declined": 1166,
-     "docs": 10762,
+     "taken": 757,
+     "declined": 1188,
+     "docs": 12495,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -517,54 +522,73 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
    "report": [],
    "known": [],
    "knownOrder": [
-    "unevaluatedItems with $dynamicRef"
+    "unevaluatedItems with $dynamicRef (2020-12)",
+    "v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef"
    ],
    "knownSeen": [
     {
      "path": "interpreted engine",
-     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)",
      "tag": "array",
      "what": "errors"
     },
     {
      "path": "closure tree",
-     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)",
      "tag": "array",
      "what": "errors"
     },
     {
      "path": "plain errors",
-     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)",
      "tag": "array",
      "what": "errors"
     },
     {
      "path": "compact module",
-     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)",
      "tag": "array",
      "what": "errors"
     },
     {
      "path": "schema module",
-     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)",
      "tag": "array",
      "what": "errors"
     },
     {
      "path": "ir module",
-     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)",
      "tag": "array",
      "what": "errors"
     },
     {
      "path": "ir module, plain errors",
-     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)",
      "tag": "array",
      "what": "errors"
     },
     {
      "path": "ir closures",
-     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "label": "draft2020-12/unevaluatedItems.json: unevaluatedItems with $dynamicRef (2020-12)",
+     "tag": "array",
+     "what": "errors"
+    },
+    {
+     "path": "ir module",
+     "label": "v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "tag": "array",
+     "what": "errors"
+    },
+    {
+     "path": "ir module, plain errors",
+     "label": "v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
+     "tag": "array",
+     "what": "errors"
+    },
+    {
+     "path": "ir closures",
+     "label": "v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef",
      "tag": "array",
      "what": "errors"
     }
@@ -877,7 +901,8 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
    "report": [],
    "known": [],
    "knownOrder": [
-    "unevaluatedItems with $dynamicRef"
+    "unevaluatedItems with $dynamicRef (2020-12)",
+    "v1/unevaluatedItems.json: unevaluatedItems with $dynamicRef"
    ],
    "knownSeen": [],
    "exit": 0
@@ -886,49 +911,61 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
  "dialects": [
   {
    "dialect": "draft2020-12",
-   "passed": 1300,
-   "total": 1300,
+   "passed": 1319,
+   "total": 1319,
+   "formatPassed": 763,
+   "formatTotal": 763,
    "knownFailures": 0,
    "regressions": 0,
    "exit": 0
   },
   {
    "dialect": "draft2019-09",
-   "passed": 1259,
-   "total": 1259,
+   "passed": 1292,
+   "total": 1292,
+   "formatPassed": 751,
+   "formatTotal": 751,
    "knownFailures": 0,
    "regressions": 0,
    "exit": 0
   },
   {
    "dialect": "draft7",
-   "passed": 927,
-   "total": 927,
+   "passed": 972,
+   "total": 972,
+   "formatPassed": 683,
+   "formatTotal": 683,
    "knownFailures": 0,
    "regressions": 0,
    "exit": 0
   },
   {
    "dialect": "draft6",
-   "passed": 839,
-   "total": 839,
+   "passed": 878,
+   "total": 878,
+   "formatPassed": 340,
+   "formatTotal": 340,
    "knownFailures": 0,
    "regressions": 0,
    "exit": 0
   },
   {
    "dialect": "draft4",
-   "passed": 616,
-   "total": 616,
+   "passed": 672,
+   "total": 672,
+   "formatPassed": 239,
+   "formatTotal": 239,
    "knownFailures": 0,
    "regressions": 0,
    "exit": 0
   },
   {
    "dialect": "v1",
-   "passed": 1147,
-   "total": 1147,
-   "knownFailures": 0,
+   "passed": 1290,
+   "total": 1290,
+   "formatPassed": 734,
+   "formatTotal": 745,
+   "knownFailures": 11,
    "regressions": 0,
    "exit": 0
   }
@@ -937,43 +974,43 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
   "dialects": [
    {
     "dialect": "draft2020-12",
-    "passed": 1300,
-    "total": 1300,
+    "passed": 1319,
+    "total": 1319,
     "failed": 0,
     "errored": 0
    },
    {
     "dialect": "draft2019-09",
-    "passed": 1259,
-    "total": 1259,
+    "passed": 1292,
+    "total": 1292,
     "failed": 0,
     "errored": 0
    },
    {
     "dialect": "draft7",
-    "passed": 927,
-    "total": 927,
+    "passed": 972,
+    "total": 972,
     "failed": 0,
     "errored": 0
    },
    {
     "dialect": "draft6",
-    "passed": 839,
-    "total": 839,
+    "passed": 878,
+    "total": 878,
     "failed": 0,
     "errored": 0
    },
    {
     "dialect": "draft4",
-    "passed": 616,
-    "total": 616,
+    "passed": 672,
+    "total": 672,
     "failed": 0,
     "errored": 0
    },
    {
     "dialect": "v1",
-    "passed": 1147,
-    "total": 1147,
+    "passed": 1290,
+    "total": 1290,
     "failed": 0,
     "errored": 0
    }

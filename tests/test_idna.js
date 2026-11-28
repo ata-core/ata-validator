@@ -14,17 +14,15 @@
 // the Bidi rule to a label rather than to the whole name, as the suite
 // (`0a.א`) and RFC 5893 do.
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
 const { Validator } = require('..');
 const { __ataIdna } = require('../lib/idna.js');
 
 const I = __ataIdna();
-const suite = path.join(__dirname, 'suite/tests/draft2020-12/optional/format');
+const suite = require('./suite-loader');
 
 const cases = [];
 for (const format of ['hostname', 'idn-hostname']) {
-  for (const g of JSON.parse(fs.readFileSync(path.join(suite, format + '.json'), 'utf8'))) {
+  for (const g of suite.formatCases('draft2020-12', format)) {
     for (const t of g.tests) if (typeof t.data === 'string') cases.push([format, t.data, t.valid, t.description]);
   }
 }

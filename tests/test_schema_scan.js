@@ -16,6 +16,7 @@
 const assert = require('assert')
 const fs = require('fs')
 const path = require('path')
+const suite = require('./suite-loader')
 const { normalizeDraft7, normalizeNullable } = require('../lib/draft7')
 const { Validator } = require('../index.js')
 const { needsNormalization, scan } = require('../lib/schema-scan')
@@ -33,27 +34,33 @@ function reallyChanges(schema, isDraft7) {
   return JSON.stringify(copy) !== before
 }
 
+// Every case's schema in every dialect, required, optional and proposals, and
+// every external document a case brings, which is a schema in its own right.
+// Each is taken as the suite wrote it: the `$schema` the loader inserts for
+// the dialect under test is taken out again. The scan is consulted only for
+// schemas read as 2020-12 or draft-07 (lib/validator-core.js skips it for
+// draft-06, draft-04 and 2019-09), so a draft-04 `$schema` would hold it to
+// work it is never asked about.
 function everySuiteSchema() {
-  const root = path.join(__dirname, 'suite')
   const out = []
-  const collect = (dir) => {
-    if (!fs.existsSync(dir)) return
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, e.name)
-      if (e.isDirectory()) collect(full)
-      else if (e.name.endsWith('.json')) {
-        let parsed
-        try { parsed = JSON.parse(fs.readFileSync(full, 'utf8')) } catch { continue }
-        if (Array.isArray(parsed)) {
-          for (const c of parsed) if (c && c.schema !== undefined) out.push(c.schema)
-        } else if (parsed && typeof parsed === 'object') {
-          out.push(parsed)      // the remotes are schemas in their own right
-        }
+  if (!suite.HAVE_SUITE) return out
+  const proposals = path.join(suite.ROOT, 'proposals')
+  const dirs = ['', 'optional'].concat(fs.existsSync(proposals)
+    ? fs.readdirSync(proposals, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => 'proposals/' + e.name)
+    : [])
+  for (const [dialect, { uri }] of Object.entries(suite.DIALECTS)) {
+    const raw = (s) => {
+      if (!s || typeof s !== 'object' || Array.isArray(s) || s.$schema !== uri) return s
+      const { $schema, ...rest } = s
+      return rest
+    }
+    for (const dir of dirs) {
+      for (const c of suite.cases(dialect, { dir, which: 'all' })) {
+        if (c.schema !== undefined) out.push(raw(c.schema))
+        if (c.externalSchemas) for (const doc of Object.values(c.externalSchemas)) out.push(raw(doc))
       }
     }
   }
-  collect(path.join(root, 'tests'))
-  collect(path.join(root, 'remotes'))
   return out
 }
 

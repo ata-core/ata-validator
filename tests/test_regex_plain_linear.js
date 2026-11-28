@@ -28,7 +28,9 @@ const walk = (o) => {
     walk(o[k]);
   }
 };
-const suite = path.join(__dirname, 'suite', 'tests');
+// Every file of the suite, every dialect, read whole: the patterns sit in
+// schemas, in external documents and in test data.
+const suite = require('./suite-loader').ROOT;
 const files = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? files(path.join(d, e.name)) : e.name.endsWith('.json') ? [path.join(d, e.name)] : []);
 if (fs.existsSync(suite)) for (const f of files(suite)) walk(JSON.parse(fs.readFileSync(f, 'utf8')));
 

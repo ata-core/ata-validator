@@ -11,41 +11,47 @@
 // (annotation, not assertion; no instance mutation), which is how the suite
 // expects them to behave and how the Bowtie harness configures ata.
 //
-// Usage: node tests/run_suite.js [draft2020-12|draft7|v1]
+// Usage: node tests/run_suite.js [draft2020-12|draft2019-09|draft7|draft6|draft4|v1]
 // These answers compare the generated code with the interpreter: keep a small
 // schema's first calls on the generated code (lib/codegen-engine.js SmallTwin).
 process.env.ATA_NO_SMALL_TWIN = '1'
 
-const fs = require("fs");
-const path = require("path");
 const { Validator } = require("../index");
-
-const DIALECTS = {
-  "draft2020-12": "https://json-schema.org/draft/2020-12/schema",
-  draft7: "http://json-schema.org/draft-07/schema#",
-  draft6: "http://json-schema.org/draft-06/schema#",
-  draft4: "http://json-schema.org/draft-04/schema#",
-  "draft2019-09": "https://json-schema.org/draft/2019-09/schema",
-  v1: "https://json-schema.org/v1",
-};
+const suite = require("./suite-loader");
 
 const dialect = process.argv[2] || "draft2020-12";
-if (!DIALECTS[dialect]) {
-  console.error(`unknown dialect "${dialect}" (expected one of: ${Object.keys(DIALECTS).join(", ")})`);
+if (!suite.DIALECTS[dialect]) {
+  console.error(`unknown dialect "${dialect}" (expected one of: ${Object.keys(suite.DIALECTS).join(", ")})`);
   process.exit(2);
 }
-
-const SUITE_DIR = path.join(__dirname, "suite/tests", dialect);
-const REMOTES_DIR = path.join(__dirname, "suite/remotes");
+if (!suite.HAVE_SUITE) {
+  console.error("tests/suite is not checked out (git submodule update --init tests/suite)");
+  process.exit(2);
+}
 
 // Cases the suite exercises that ata does not get right yet. Listed explicitly
 // so a new failure is a hard error while a known one does not turn the run red,
 // and so fixing one shows up as a line to delete rather than a silent pass.
 const KNOWN_FAILURES = {
   "draft2020-12": new Set([]),
-  draft7: new Set([
+  draft7: new Set([]),
+  // v1 changes two formats, and ata asserts both the 2020-12 way under every
+  // dialect: date-time also takes RFC 9557 suffixes ("...Z[Europe/London]"),
+  // and time no longer takes a leap second. Only the format-assertion cases
+  // are affected; with format as an annotation v1 passes in full.
+  v1: new Set([
+    "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with an elective time-zone suffix",
+    "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a numeric offset and a time-zone suffix",
+    "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a critical time-zone suffix",
+    "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a suffix-tag",
+    "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a numeric offset time-zone suffix",
+    "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a critical suffix-tag",
+    "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a time-zone suffix followed by suffix-tags",
+    "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a 14 character time-zone-part",
+    "[format-assertion] format-time.json :: leap seconds are not valid times :: a leap second is not a valid time",
+    "[format-assertion] format-time.json :: leap seconds are not valid times :: a leap second with a positive time-offset is not a valid time",
+    "[format-assertion] format-time.json :: leap seconds are not valid times :: a leap second with a negative time-offset is not a valid time",
   ]),
-  v1: new Set([]),
   draft6: new Set([]),
   draft4: new Set([]),
   "draft2019-09": new Set([]),
@@ -55,32 +61,6 @@ const KNOWN_FAILURES = {
 // total. There are none at present; a new one is a regression, not an entry.
 const ENGINE_SPECIFIC = new Set([]);
 
-// The suite serves its remote schemas from http://localhost:1234/<relative path>.
-// Keying the registry by that URI is what lets a reference to the retrieval URI
-// resolve even when the document declares a different $id.
-const registry = {};
-(function collect(dir, prefix) {
-  if (!fs.existsSync(dir)) return;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) collect(full, prefix + entry.name + "/");
-    else if (entry.name.endsWith(".json")) {
-      try {
-        registry["http://localhost:1234/" + prefix + entry.name] = JSON.parse(
-          fs.readFileSync(full, "utf8"),
-        );
-      } catch {}
-    }
-  }
-})(REMOTES_DIR, "");
-
-// The suite states the dialect by directory rather than in every schema.
-function withDialect(schema) {
-  if (typeof schema !== "object" || schema === null || Array.isArray(schema)) return schema;
-  return "$schema" in schema ? schema : { ...schema, $schema: DIALECTS[dialect] };
-}
-
-const options = { schemas: registry, assertFormat: false, useDefaults: false };
 const known = KNOWN_FAILURES[dialect];
 
 let pass = 0;
@@ -88,58 +68,77 @@ let knownFail = 0;
 const regressions = [];
 const fixed = [];
 
-console.log(`\nJSON Schema Test Suite — ${dialect}\n`);
+// One selection of the suite under one set of options. Each case gets a
+// validator of its own with its own external documents.
+function run(which, options, label) {
+  let selPass = 0;
+  let selTotal = 0;
+  for (const { file, cases } of suite.files(dialect, { which })) {
+    let filePass = 0;
+    let fileBad = 0;
 
-for (const file of fs.readdirSync(SUITE_DIR).filter((f) => f.endsWith(".json"))) {
-  const groups = JSON.parse(fs.readFileSync(path.join(SUITE_DIR, file), "utf8"));
-  let filePass = 0;
-  let fileBad = 0;
+    for (const c of cases) {
+      let validator = null;
+      let compileError = null;
+      try {
+        validator = new Validator(c.schema, { ...options, schemas: suite.registry(c) });
+      } catch (e) {
+        compileError = e;
+      }
 
-  for (const group of groups) {
-    let validator = null;
-    let compileError = null;
-    try {
-      validator = new Validator(withDialect(group.schema), options);
-    } catch (e) {
-      compileError = e;
-    }
+      for (const test of c.tests) {
+        const key = `${label}${file} :: ${c.description} :: ${test.description}`;
+        let ok = false;
+        let detail = "";
 
-    for (const test of group.tests) {
-      const key = `${file} :: ${group.description} :: ${test.description}`;
-      let ok = false;
-      let detail = "";
+        if (compileError) {
+          detail = `schema failed to compile: ${compileError.message}`;
+        } else {
+          try {
+            const got = validator.validate(test.data).valid;
+            ok = got === test.valid;
+            if (!ok) detail = `expected ${test.valid}, got ${got}`;
+          } catch (e) {
+            detail = `threw: ${e.message}`;
+          }
+        }
 
-      if (compileError) {
-        detail = `schema failed to compile: ${compileError.message}`;
-      } else {
-        try {
-          const got = validator.validate(test.data).valid;
-          ok = got === test.valid;
-          if (!ok) detail = `expected ${test.valid}, got ${got}`;
-        } catch (e) {
-          detail = `threw: ${e.message}`;
+        if (ok) {
+          filePass++;
+          pass++;
+          if (known.has(key)) fixed.push(key);
+        } else {
+          fileBad++;
+          if (known.has(key) || ENGINE_SPECIFIC.has(key)) knownFail++;
+          else regressions.push({ key, detail });
         }
       }
-
-      if (ok) {
-        filePass++;
-        pass++;
-        if (known.has(key)) fixed.push(key);
-      } else {
-        fileBad++;
-        if (known.has(key) || ENGINE_SPECIFIC.has(key)) knownFail++;
-        else regressions.push({ key, detail });
-      }
     }
-  }
 
-  const status = fileBad === 0 ? "PASS" : "FAIL";
-  console.log(`  ${status}  ${file.padEnd(30)} ${filePass}/${filePass + fileBad}`);
+    selPass += filePass;
+    selTotal += filePass + fileBad;
+    const status = fileBad === 0 ? "PASS" : "FAIL";
+    console.log(`  ${status}  ${(label + file).padEnd(36)} ${filePass}/${filePass + fileBad}`);
+  }
+  return [selPass, selTotal];
 }
+
+console.log(`\nJSON Schema Test Suite, ${dialect}\n`);
+
+// The headline figure: every case that does not ask for format assertion,
+// with format as an annotation and no instance mutation, as the suite expects
+// and as the Bowtie harness configures ata.
+const [reqPass, reqTotal] = run("required", { assertFormat: false, useDefaults: false }, "");
+
+// The cases tagged format-assertion, with format asserted. Reported on their
+// own line: up to 2020-12 the suite treats format assertion as optional.
+console.log("");
+const [fmtPass, fmtTotal] = run("assertion", { assertFormat: true, useDefaults: false }, "[format-assertion] ");
 
 const total = pass + knownFail + regressions.length;
 console.log("\n========================================");
-console.log(`  ${pass} passed of ${total} (${((pass / total) * 100).toFixed(1)}%)`);
+console.log(`  ${reqPass} passed of ${reqTotal} (${((reqPass / reqTotal) * 100).toFixed(1)}%)`);
+console.log(`  format assertion: ${fmtPass} passed of ${fmtTotal}`);
 console.log(`  ${knownFail} known failures, ${regressions.length} regressions`);
 console.log("========================================\n");
 

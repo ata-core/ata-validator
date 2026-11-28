@@ -3,10 +3,11 @@
 // answer as the Validator does, with the same errors, and a module written
 // without the option has to stay as it was.
 import assert from 'node:assert'
-import fs from 'node:fs'
 import { createRequire } from 'node:module'
 import { specialize } from '../lib/ir/index.mjs'
-const { Validator } = createRequire(import.meta.url)('..')
+const require = createRequire(import.meta.url)
+const { Validator } = require('..')
+const suite = require('./suite-loader.js')
 const kernels = new URL('../lib/kernels/index.mjs', import.meta.url).href
 const load = (src) => import('data:text/javascript,' + encodeURIComponent(src.replace(/(['"])ata-validator\/kernels\1/g, `'${kernels}'`)))
 
@@ -15,9 +16,7 @@ const extra = ['', 'a', 'a@b', 'a@b.co', '"quoted"@example.com', 'a@[IPv6:::1]',
 let schemas = 0; let docs = 0; let refused = 0
 for (const dialect of ['draft2020-12', 'draft2019-09', 'draft7']) {
   for (const format of SMALL) {
-    const file = new URL(`./suite/tests/${dialect}/optional/format/${format}.json`, import.meta.url)
-    if (!fs.existsSync(file)) continue
-    for (const group of JSON.parse(fs.readFileSync(file, 'utf8'))) {
+    for (const group of suite.formatCases(dialect, format)) {
       for (const richErrors of [true, false]) {
         const opts = { richErrors, assertFormat: true }
         const want = new Validator(group.schema, opts)

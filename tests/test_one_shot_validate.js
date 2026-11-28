@@ -11,8 +11,7 @@
 // that has built it, since that is where the two used to part.
 
 const assert = require('assert')
-const fs = require('fs')
-const path = require('path')
+const suite = require('./suite-loader')
 const ata = require('..')
 const { Validator, validate } = ata
 
@@ -22,10 +21,9 @@ const shape = (r) => JSON.stringify({
   errors: (r.errors || []).map((e) => [e.code, e.keyword, e.instancePath, e.schemaPath]),
 })
 
-const dir = path.join(__dirname, 'suite/tests/draft2020-12')
 let compared = 0, bad = 0
-for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-  for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
+for (const { file: f, cases } of suite.files('draft2020-12')) {
+  for (const g of cases) {
     let v
     try { v = new Validator(g.schema) } catch { continue }
     for (const t of g.tests) {

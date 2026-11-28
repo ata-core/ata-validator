@@ -10,16 +10,14 @@
 // engine: 'interpreter', with and without a defaults pass.
 
 const assert = require('assert')
-const fs = require('fs')
-const path = require('path')
 const { Validator } = require('..')
+const suite = require('./suite-loader')
 
-const root = path.join(__dirname, 'suite', 'tests')
 let rejected = 0
 const bad = []
 for (const d of ['draft2020-12', 'draft2019-09', 'draft7']) {
-  for (const f of fs.readdirSync(path.join(root, d)).filter((x) => x.endsWith('.json'))) {
-    for (const g of JSON.parse(fs.readFileSync(path.join(root, d, f), 'utf8'))) {
+  for (const { file: f, cases } of suite.files(d)) {
+    for (const g of cases) {
       for (const extra of [{}, { engine: 'interpreter' }, { useDefaults: false }]) {
         let ref, v
         try { ref = new Validator(g.schema, extra); v = new Validator(g.schema, { ...extra, abortEarly: true }) } catch { continue }

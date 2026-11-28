@@ -161,7 +161,8 @@ for (const [value, expected] of DATE_TIME_PICKED) {
 
   // The suite's own corpus, which is where the disagreement between the two
   // engines showed up: one accepted an IPv4 tail and the other did not.
-  const suite = require('./suite/tests/draft2020-12/optional/format/ipv6.json');
+  const suite = require('./suite-loader').formatCases('draft2020-12', 'ipv6');
+  assert.ok(suite.length > 0, 'the suite has ipv6 format-assertion cases');
   for (const group of suite) {
     for (const t of group.tests) {
       if (typeof t.data !== 'string') continue;

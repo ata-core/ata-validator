@@ -12,17 +12,15 @@
 // by never reaching the second path.
 
 const assert = require('node:assert')
-const fs = require('node:fs')
-const path = require('node:path')
+const suite = require('./suite-loader')
 const { Validator } = require('..')
 
 const view = (r) => JSON.stringify({ valid: r.valid, errors: r.valid ? [] : r.errors, raw: r.valid ? null : r._ataRaw(), json: r })
 
 let switched = 0, compared = 0, ownObjects = 0
 for (const dialect of ['draft2020-12', 'draft7']) {
-  const dir = path.join(__dirname, 'suite', 'tests', dialect)
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-    for (const g of JSON.parse(fs.readFileSync(path.join(dir, f)))) {
+  for (const { file: f, cases } of suite.files(dialect)) {
+    for (const g of cases) {
       for (const richErrors of [true, false]) {
         let v
         try { v = new Validator(g.schema, { richErrors }) } catch { continue }

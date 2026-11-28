@@ -24,9 +24,9 @@ const { spawnSync } = require('child_process');
 
 const { Validator } = require('..');
 const { toTypeScript } = require('../lib/ts-gen');
+const suite = require('./suite-loader');
 
 const DRAFT = process.env.CORPUS_DRAFT || 'draft2020-12';
-const SUITE_DIR = path.join(__dirname, 'suite', 'tests', DRAFT);
 const { TSC_JS: TSC_BIN } = require('./_tsc');
 const FAIL_BUDGET_PCT = Number(process.env.DIFF_FAIL_BUDGET || '0');
 const ONLY = process.env.CORPUS_ONLY ? new Set(process.env.CORPUS_ONLY.split(',')) : null;
@@ -36,14 +36,10 @@ export const validate = () => ({ valid: false, errors: [] })
 export default { isValid, validate }
 `;
 
+// The suite's required cases for DRAFT, one entry per file.
 function listSuiteFiles() {
-  const files = [];
-  for (const name of fs.readdirSync(SUITE_DIR)) {
-    if (!name.endsWith('.json')) continue;
-    if (ONLY && !ONLY.has(name)) continue;
-    files.push(path.join(SUITE_DIR, name));
-  }
-  return files.sort();
+  if (!suite.HAVE_SUITE) return [];
+  return suite.files(DRAFT, { only: ONLY ? (name) => ONLY.has(name) : null });
 }
 
 function hasExplicitType(schema) {
@@ -58,8 +54,7 @@ function hasExplicitType(schema) {
   return false;
 }
 
-function extractCases(filePath) {
-  const cases = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+function extractCases(cases) {
   const out = [];
   for (let i = 0; i < cases.length; i++) {
     const c = cases[i];
@@ -135,7 +130,7 @@ function runOne(workDir, entry) {
 function main() {
   const files = listSuiteFiles();
   if (files.length === 0) {
-    process.stdout.write(`no suite files under ${SUITE_DIR}\n`);
+    process.stdout.write(`no suite files for ${DRAFT} under ${suite.ROOT}\n`);
     process.exit(1);
   }
 
@@ -150,9 +145,9 @@ function main() {
   let skipped = 0;
   const failureSamples = [];
 
-  for (const file of files) {
+  for (const { file, cases: fileCases } of files) {
     const base = path.basename(file, '.json');
-    const cases = extractCases(file);
+    const cases = extractCases(fileCases);
     if (cases.length === 0) continue;
 
     let pass = 0, fail = 0, skip = 0;

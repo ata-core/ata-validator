@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const { Validator } = require('../index');
 const { compileScanner } = require('../lib/scan-compiler');
+const suite = require('./suite-loader');
 
 let compiled = 0, declined = 0, cases = 0, bails = 0;
 const failures = [];
@@ -62,29 +63,21 @@ function prepare(schema) {
 
 // ---------------------------------------------------------------------------
 // 1. the official suite
+// Every case that applies to each dialect: the required files, optional/ and
+// the proposals, format-assertion cases included.
 const DIALECTS = ['draft2020-12', 'draft7', 'v1'];
+const DIRS = ['', 'optional', 'proposals/propertyDependencies'];
 for (const dialect of DIALECTS) {
-  const dir = path.join(__dirname, 'suite/tests', dialect);
-  if (!fs.existsSync(dir)) continue;
-  const files = [];
-  (function walk(d) {
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-      const full = path.join(d, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith('.json')) files.push(full);
-    }
-  })(dir);
-  for (const file of files) {
-    let groups;
-    try { groups = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { continue; }
-    for (const group of groups) {
+  if (!suite.HAVE_SUITE) break;
+  for (const dir of DIRS) {
+    for (const group of suite.cases(dialect, { dir, which: 'all' })) {
       const v = prepare(group.schema);
       if (!v) continue;
       for (const t of group.tests) {
         let text;
         try { text = JSON.stringify(t.data); } catch { continue; }
         if (text === undefined) continue;
-        check(`${dialect}/${path.basename(file)}/${group.description}/${t.description}`, text, v);
+        check(`${dialect}/${group.file}/${group.description}/${t.description}`, text, v);
       }
     }
   }

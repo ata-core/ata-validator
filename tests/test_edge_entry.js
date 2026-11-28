@@ -34,13 +34,12 @@ const root = path.resolve(__dirname, '..');
 // validate, isValidObject and validateJSON.
 {
   const script = (entry) => `
-    const fs = require('fs'), path = require('path');
     const { Validator } = require(${JSON.stringify(root)} + '/' + ${JSON.stringify(entry)});
+    const suite = require(${JSON.stringify(path.join(root, 'tests/suite-loader.js'))});
     const out = [];
-    for (const [dia, uri] of [['draft2020-12', 'https://json-schema.org/draft/2020-12/schema'], ['draft7', 'http://json-schema.org/draft-07/schema#']]) {
-      const dir = path.join(${JSON.stringify(path.join(root, 'tests/suite/tests'))}, dia);
-      for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-        const schema = g.schema && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
+    for (const dia of ['draft2020-12', 'draft7']) {
+      for (const g of suite.cases(dia)) {
+        const schema = g.schema;
         let v; try { v = new Validator(schema); } catch (e) { out.push('ctor ' + e.message); continue; }
         for (const t of g.tests) {
           const r = v.validate(JSON.parse(JSON.stringify(t.data)));
@@ -182,7 +181,11 @@ const root = path.resolve(__dirname, '..');
     // bytes.
     // 68580 bytes (68566 measured): the sweep's fixes, the unresolved
     // $ref fix and the patternFallback option together in one tree.
-    assert.ok(size < 68580, `the Workers bundle is ${size} bytes gzipped, over 68580`);
+    // 68650 bytes (68638 measured): under v1 a `$dynamicRef` written as a bare
+    // anchor name is read as that fragment (lib/interpreter-core.js
+    // dynamicRefUri), and the buffer APIs route that spelling through
+    // validate(); 72 bytes.
+    assert.ok(size < 68650, `the Workers bundle is ${size} bytes gzipped, over 68650`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

@@ -11,13 +11,11 @@ const path = require('path')
 
 const child = `
 const assert = require('assert')
-const fs = require('fs')
-const path = require('path')
 const { Validator, createPaddedBuffer } = require(${JSON.stringify(path.join(__dirname, '..'))})
-const base = ${JSON.stringify(path.join(__dirname, 'suite', 'tests', 'draft2020-12'))}
+const suite = require(${JSON.stringify(path.join(__dirname, 'suite-loader'))})
 let cases = 0, schemas = 0
-for (const f of fs.readdirSync(base).filter((x) => x.endsWith('.json'))) {
-  for (const group of JSON.parse(fs.readFileSync(path.join(base, f), 'utf8'))) {
+for (const { file: f, cases: groups } of suite.files('draft2020-12')) {
+  for (const group of groups) {
     let v
     try { v = new Validator(group.schema); v.validate(null) } catch { continue }
     schemas++

@@ -8,9 +8,8 @@
 // sharing a module cannot collide on a name.
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
 const { Validator } = require('..');
+const suite = require('./suite-loader');
 const aot = require('../lib/aot.js');
 
 let blocked = false;
@@ -18,21 +17,17 @@ try { new Function('return 1')(); } catch { blocked = true; }
 if (blocked) { console.log('skip: code generation is blocked, standalone modules cannot be loaded here'); process.exit(0); }
 
 const load = (src) => { const m = { exports: {} }; new Function('module', 'exports', 'require', src)(m, m.exports, require); return m.exports; };
-const root = path.join(__dirname, 'suite/tests');
-const URIS = { 'draft2020-12': null, 'draft2019-09': 'https://json-schema.org/draft/2019-09/schema', draft7: 'http://json-schema.org/draft-07/schema#', draft6: 'http://json-schema.org/draft-06/schema#', draft4: 'http://json-schema.org/draft-04/schema#' };
 const counts = {};
 const bad = [];
 const check = (k, got, want, where) => {
   counts[k] = (counts[k] || 0) + 1;
   if (got !== want) bad.push(`${k} ${where}: got ${got}, want ${want}`);
 };
-for (const [dialect, uri] of Object.entries(URIS)) {
-  const dir = path.join(root, dialect);
-  if (!fs.existsSync(dir)) continue;
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
+for (const dialect of ['draft2020-12', 'draft2019-09', 'draft7', 'draft6', 'draft4']) {
+  for (const { file: f, cases } of suite.files(dialect)) {
     const groups = [];
-    for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) {
-      const schema = uri && g.schema !== null && typeof g.schema === 'object' && !('$schema' in g.schema) ? { ...g.schema, $schema: uri } : g.schema;
+    for (const g of cases) {
+      const schema = g.schema;
       let v;
       try { v = new Validator(schema); } catch { continue; }
       groups.push({ g, schema, v });
@@ -69,9 +64,9 @@ for (const [dialect, uri] of Object.entries(URIS)) {
 // The format checks, asserted: each needs its own helper in the module
 // (`_uri`, `_em`, the IPv6 walk), the same class of miss as `_cpLen`.
 {
-  const dir = path.join(root, 'draft2020-12/optional/format');
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-    const groups = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).map((g) => ({ g, v: new Validator(g.schema, { assertFormat: true }) }));
+  const formatFiles = ['', 'optional'].flatMap((dir) => suite.files('draft2020-12', { dir, which: 'assertion' }));
+  for (const { file: f, cases } of formatFiles) {
+    const groups = cases.map((g) => ({ g, v: new Validator(g.schema, { assertFormat: true }) }));
     const builds = {
       'format toStandaloneModule': () => groups.map(({ v }) => { const src = aot.toStandaloneModule(v, { format: 'cjs' }); if (!src) return null; const m = load(src); return (d) => m.validate(d); }),
       'format bundleStandalone': () => load(Validator.bundleStandalone(groups.map(({ g }) => g.schema), { format: 'cjs', assertFormat: true })),
@@ -84,7 +79,7 @@ for (const [dialect, uri] of Object.entries(URIS)) {
         for (const t of g.tests) {
           let got;
           try { got = fns[i](t.data).valid; } catch (e) { got = 'threw ' + e.message; }
-          check(k, got, v.validate(t.data).valid, `format/${f} | ${g.description} | ${t.description}`);
+          check(k, got, v.validate(t.data).valid, `${f} | ${g.description} | ${t.description}`);
         }
       });
     }

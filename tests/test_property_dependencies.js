@@ -18,11 +18,10 @@
 // decline a schema that uses it, because emitting nothing for a keyword they do
 // not know would make the constraint vacuous.
 
-const fs = require('fs')
-const path = require('path')
 const assert = require('assert')
 const { Validator } = require('..')
 const { compileToJSCodegen, compileToJS } = require('../lib/js-compiler')
+const suite = require('./suite-loader')
 
 let passed = 0
 let failed = 0
@@ -110,24 +109,24 @@ assert.strictEqual(
 passed += 2
 console.log('  PASS  both JS compiler paths decline the keyword')
 
-// Official test files for the proposal.
-const SUITE = path.join(__dirname, 'suite/tests/v1/proposals/propertyDependencies')
+// Official test files for the proposal, run under v1.
+const PROPOSAL = 'proposals/propertyDependencies'
 
 // $dynamicRef resolution through a $ref into a sibling resource is a gap the
 // interpreted engine has independently of this keyword: the if/then form of the
 // same schema fails identically. Listed so a change in either direction shows.
 const KNOWN = new Set([
-  'dynamicRef.json :: multiple dynamic paths to the $dynamicRef keyword :: number list with number values',
-  'dynamicRef.json :: multiple dynamic paths to the $dynamicRef keyword :: string list with string values',
+  'proposals/propertyDependencies/dynamicRef.json :: multiple dynamic paths to the $dynamicRef keyword :: number list with number values',
+  'proposals/propertyDependencies/dynamicRef.json :: multiple dynamic paths to the $dynamicRef keyword :: string list with string values',
 ])
 
-if (fs.existsSync(SUITE)) {
+if (suite.HAVE_SUITE) {
   let suitePass = 0
   let known = 0
   const regressions = []
 
-  for (const file of fs.readdirSync(SUITE).filter((f) => f.endsWith('.json'))) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(SUITE, file), 'utf8'))) {
+  for (const { file, cases } of suite.files('v1', { dir: PROPOSAL, which: 'all' })) {
+    for (const group of cases) {
       let validator
       try {
         validator = new Validator(group.schema)

@@ -15,6 +15,7 @@ const zlib = require('zlib')
 const { Validator } = require('..')
 const { compiledModuleFor, compiledEligible } = require('../build')
 const { bareStandard } = require('../lib/compiled-standard')
+const suite = require('./suite-loader')
 
 ;(async () => {
 const esm = await import(pathToFileURL(path.join(__dirname, '..', 'compiled-standard.mjs')).href)
@@ -25,11 +26,11 @@ const show = (r) => JSON.stringify('issues' in r ? r.issues.map((i) => [i.messag
 
 let compared = 0, schemas = 0
 const diffs = []
-for (const [dialect, uri] of [['draft2020-12', 'https://json-schema.org/draft/2020-12/schema'], ['draft7', 'http://json-schema.org/draft-07/schema#']]) {
-  const sdir = path.join(__dirname, 'suite/tests', dialect)
-  for (const file of fs.readdirSync(sdir).filter((f) => f.endsWith('.json')).sort()) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(sdir, file), 'utf8'))) {
-      const schema = typeof group.schema === 'object' && group.schema !== null && !('$schema' in group.schema) ? { ...group.schema, $schema: uri } : group.schema
+for (const dialect of ['draft2020-12', 'draft7']) {
+  for (const { file, cases } of suite.files(dialect)) {
+    for (const group of cases) {
+      // The loader gives the schema its dialect's $schema.
+      const schema = group.schema
       if (!compiledEligible(schema)) continue
       const src = compiledModuleFor(schema, { format: 'cjs', plainErrors: true })
       if (!src) continue

@@ -1,6 +1,6 @@
 'use strict'
 
-// The official suite ships tests for the specification's own output format
+// The official suite shipped tests for the specification's own output format
 // under `tests/suite/output-tests/`, separate from the validation tests. They
 // check what a validator reports, not what it decides: the JSON Pointers in
 // `keywordLocation` and `instanceLocation`, and which annotations survive.
@@ -14,6 +14,10 @@
 // check is a validation of ata's output by ata, against a schema written by
 // the specification. The output schema for the release is registered first,
 // since the cases $ref it by URI.
+//
+// The unified suite layout dropped output-tests (upstream 8ef5253, #1221).
+// They are kept under tests/fixtures/output-tests as they were at 245a45a,
+// with the suite's license, so the checks below keep running.
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -21,17 +25,12 @@ const assert = require('node:assert')
 const { Validator } = require('..')
 const { toOutput } = require('../lib/output-format')
 
-const SUITE = path.join(__dirname, 'suite', 'output-tests')
+const SUITE = path.join(__dirname, 'fixtures', 'output-tests')
 
 // `basic` is defined for these two. The v1 `list` format is deliberately not
 // run: it is still changing, and v1's own output schema does not define `list`
 // yet, so there is nothing stable to hold an implementation to.
 const DIALECTS = ['draft2019-09', 'draft2020-12']
-
-if (!fs.existsSync(SUITE)) {
-  console.log('output format: suite not checked out, skipped')
-  process.exit(0)
-}
 
 let passed = 0
 const failures = []

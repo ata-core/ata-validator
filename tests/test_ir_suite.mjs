@@ -1,49 +1,38 @@
 // The IR compiler (lib/ir) against the official test suite, every dialect,
-// and its format tests with formats asserted, on both backends: generated
+// and its format-assertion cases with formats asserted, on both backends: generated
 // modules (also as functions of the kernels object) and closures. A group the IR refuses ("ir: ...") is counted, never
 // guessed; every group it accepts must give the suite's verdicts and the
 // current engine's full output (every error, every field, in order).
-import fs from 'node:fs'
-import path from 'node:path'
 import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
 const require = createRequire(import.meta.url)
 const { Validator } = require('../index.js')
+const suite = require('./suite-loader.js')
 const { METASCHEMAS } = require('../lib/metaschemas.js')
 const { compileClosures } = await import('../lib/ir/index.mjs')
 const { compile: compileModule, compileFunction } = await import('./ir-load-module.mjs')
 
-const here = path.dirname(fileURLToPath(import.meta.url))
-const SUITE = path.join(here, 'suite/tests')
-const DIALECTS = { v1: 'https://json-schema.org/v1', 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', 'draft2019-09': 'https://json-schema.org/draft/2019-09/schema', draft7: 'http://json-schema.org/draft-07/schema#', draft6: 'http://json-schema.org/draft-06/schema#', draft4: 'http://json-schema.org/draft-04/schema#' }
+const DIALECTS = Object.keys(suite.DIALECTS)
 // What the IR must cover, so coverage cannot shrink unnoticed.
-// Every group, on both backends; the module writer refuses four v1 groups
-// (a $dynamicRef that resolves only on the scope needs the closures).
-const MIN_GROUPS = { v1: 348, 'draft2020-12': 384, 'draft2019-09': 373, draft7: 258, draft6: 233, draft4: 160 }
-const MIN_MODULES = { v1: 344 }
-
-const registry = {}
-;(function collect (d, prefix) {
-  if (!fs.existsSync(d)) return
-  for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-    const full = path.join(d, e.name)
-    if (e.isDirectory()) collect(full, prefix + e.name + '/')
-    else if (e.name.endsWith('.json')) { try { registry['http://localhost:1234/' + prefix + e.name] = JSON.parse(fs.readFileSync(full, 'utf8')) } catch {} }
-  }
-})(path.join(here, 'suite/remotes'), '')
+// Every group, on both backends, except in v1: both refuse "unevaluatedProperties
+// with $dynamicRef" (a $ref that resolves to nothing), and the module writer
+// also refuses two groups whose $dynamicRef resolves only on the scope, which
+// needs the closures.
+const MIN_GROUPS = { v1: 396, 'draft2020-12': 409, 'draft2019-09': 396, draft7: 285, draft6: 253, draft4: 187 }
+const MIN_MODULES = { v1: 394 }
 
 const shape = (r) => JSON.stringify([r.valid, (r.errors || []).map((e) => Object.keys(e).map((k) => [k, e[k] === undefined ? '<undef>' : e[k]]))])
 let failed = 0
 const fail = (m) => { failed++; if (failed <= 10) console.log('  FAIL ' + m) }
 
-async function runDir (dir, dialect, assertFormat, backend) {
-  const opts = { assertFormat, useDefaults: false, schemas: registry }
-  const withDialect = (s) => s && typeof s === 'object' && !Array.isArray(s) && !('$schema' in s) ? { ...s, $schema: DIALECTS[dialect] } : s
+// One selection of the suite's files. Every case gets its own external
+// documents: the same URI names different documents in different cases.
+async function runFiles (files, dialect, assertFormat, backend) {
   let groups = 0; let supported = 0; let cases = 0
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
-    for (const g of JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))) {
+  for (const { file, cases: list } of files) {
+    for (const g of list) {
       groups++
-      const schema = withDialect(g.schema)
+      const opts = { assertFormat, useDefaults: false, schemas: suite.registry(g) }
+      const schema = g.schema
       let eng
       try {
         eng = backend === 'closures' ? compileClosures(schema, { ...opts, metaschemas: METASCHEMAS }) : backend === 'function' ? compileFunction(schema, { ...opts, metaschemas: METASCHEMAS }) : await compileModule(schema, { ...opts, metaschemas: METASCHEMAS })
@@ -67,12 +56,13 @@ async function runDir (dir, dialect, assertFormat, backend) {
 
 // 'function' is the modules' text run through functionBody: the same groups.
 for (const backend of ['closures', 'modules', 'function']) {
-  for (const dialect of Object.keys(DIALECTS)) {
-    const main = await runDir(path.join(SUITE, dialect), dialect, false, backend)
+  for (const dialect of DIALECTS) {
+    const main = await runFiles(suite.files(dialect), dialect, false, backend)
     const min = backend !== 'closures' && MIN_MODULES[dialect] !== undefined ? MIN_MODULES[dialect] : MIN_GROUPS[dialect]
     if (main.supported < min) fail(`${backend} ${dialect}: ${main.supported} groups supported, expected at least ${min}`)
-    const fmtDir = path.join(SUITE, dialect, 'optional/format')
-    const fmt = fs.existsSync(fmtDir) ? await runDir(fmtDir, dialect, true, backend) : { supported: 0, cases: 0, groups: 0 }
+    // The format-assertion cases, at the top level and in optional/.
+    const fmtFiles = ['', 'optional'].flatMap((dir) => suite.files(dialect, { dir, which: 'assertion' }))
+    const fmt = await runFiles(fmtFiles, dialect, true, backend)
     console.log(`  ${backend.padEnd(8)} ${dialect.padEnd(13)} ${main.supported}/${main.groups} groups, ${main.cases} cases; formats ${fmt.supported}/${fmt.groups} groups, ${fmt.cases} cases`)
   }
 }

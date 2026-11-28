@@ -336,8 +336,11 @@ check("what 'reject' lets through runs on the linear engine or a RegExp shown li
       walk(v)
     }
   }
-  const files = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? files(path.join(d, e.name)) : e.name.endsWith('.json') ? [path.join(d, e.name)] : [])
-  for (const f of files(path.join(__dirname, 'suite', 'tests'))) walk(JSON.parse(fs.readFileSync(f, 'utf8')))
+  // Every case of every dialect, its schema, external documents and data.
+  const suite = require('./suite-loader')
+  for (const d of Object.keys(suite.DIALECTS)) {
+    for (const dir of ['', 'optional', 'proposals/propertyDependencies']) for (const c of suite.cases(d, { dir, which: 'all' })) walk(c)
+  }
   let survivors = 0, out = 0
   for (const p of pats) {
     try { new RegExp(p, 'u') } catch { try { new RegExp(p) } catch { continue } }

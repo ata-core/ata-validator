@@ -56,19 +56,14 @@ const { Validator } = require('..')
 
 // --- the class, behaviourally, over the official suite ----------------------
 {
-  const root = path.join(__dirname, 'suite', 'tests')
-  if (!fs.existsSync(root)) {
+  const suite = require('./suite-loader')
+  if (!suite.HAVE_SUITE) {
     console.log('skip: suite submodule not checked out')
   } else {
     let schemas = 0, cases = 0
     const crashes = []
     for (const dialect of ['draft2020-12', 'draft7']) {
-      const dir = path.join(root, dialect)
-      if (!fs.existsSync(dir)) continue
-      for (const file of fs.readdirSync(dir)) {
-        if (!file.endsWith('.json')) continue
-        let groups
-        try { groups = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')) } catch { continue }
+      for (const { file, cases: groups } of suite.files(dialect)) {
         for (const group of groups) {
           let v
           try { v = new Validator(group.schema) } catch { continue }

@@ -12,20 +12,10 @@
 // must run on generated code.
 
 const assert = require('node:assert')
-const fs = require('node:fs')
-const path = require('node:path')
 const { Validator } = require('..')
 const jc = require('../lib/js-compiler')
 
-const suite = path.join(__dirname, 'suite')
-const remotes = {}
-;(function collect (dir, prefix) {
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, e.name)
-    if (e.isDirectory()) collect(full, prefix + e.name + '/')
-    else if (e.name.endsWith('.json')) remotes['http://localhost:1234/' + prefix + e.name] = JSON.parse(fs.readFileSync(full, 'utf8'))
-  }
-})(path.join(suite, 'remotes'), '')
+const suite = require('./suite-loader')
 
 let seed = 3
 const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff }
@@ -44,16 +34,29 @@ function mutate (doc) {
 }
 
 const shape = (errs) => (errs || []).map((e) => JSON.stringify([e.keyword, e.instancePath, e.schemaPath, e.params])).sort().join('\n')
-const files = ['dynamicRef.json', 'defs.json', 'ref.json', 'refRemote.json', 'anchor.json', 'unevaluatedProperties.json', 'unevaluatedItems.json']
+// The reference groups of the 2020-12 suite, each with its own external
+// documents, and validation against the 2020-12 meta-schema itself, which the
+// suite stopped carrying (defs.json, removed upstream in 22e6730).
+const FILES = new Set(['dynamicRef.json', 'ref.json', 'anchor.json', 'unevaluatedProperties.json', 'unevaluatedItems.json'])
+const META = 'meta-schema'
+const groupsToRun = suite.cases('draft2020-12', { only: (f) => FILES.has(f) })
+groupsToRun.push({
+  file: META,
+  description: 'validate a definition against the 2020-12 meta-schema',
+  schema: { $schema: 'https://json-schema.org/draft/2020-12/schema', $ref: 'https://json-schema.org/draft/2020-12/schema' },
+  externalSchemas: null,
+  tests: [{ description: 'valid', data: { $defs: { foo: { type: 'integer' } } }, valid: true }, { description: 'invalid', data: { $defs: { foo: { type: 1 } } }, valid: false }],
+})
 let groups = 0, onCodegen = 0, compared = 0, dynamicGroups = 0, dynamicOnCodegen = 0
-for (const file of files) {
-  for (const g of JSON.parse(fs.readFileSync(path.join(suite, 'tests', 'draft2020-12', file), 'utf8'))) {
+{
+  for (const g of groupsToRun) {
+    const file = g.file
     groups++
-    const dynamic = JSON.stringify(g.schema).includes('$dynamicRef') || file === 'defs.json'
+    const dynamic = JSON.stringify(g.schema).includes('$dynamicRef') || file === META
     if (dynamic) dynamicGroups++
-    const gen = new Validator(g.schema, { schemas: remotes, assertFormat: false, richErrors: false })
+    const gen = new Validator(g.schema, { schemas: suite.registry(g), assertFormat: false, richErrors: false })
     gen._coldCalls = 64
-    const interp = new Validator(g.schema, { schemas: remotes, assertFormat: false, richErrors: false, engine: 'interpreter' })
+    const interp = new Validator(g.schema, { schemas: suite.registry(g), assertFormat: false, richErrors: false, engine: 'interpreter' })
     const docs = g.tests.map((t) => t.data)
     for (const d of g.tests.map((t) => t.data)) for (let i = 0; i < 3; i++) docs.push(mutate(d))
     for (let r = 0; r < 40; r++) for (const d of docs) void gen.validate(d).errors
@@ -70,17 +73,20 @@ for (const file of files) {
       compared++
     }
     if (gen.engine() === 'codegen') { onCodegen++; if (dynamic) dynamicOnCodegen++ }
-    if (file === 'defs.json') assert.strictEqual(gen.engine(), 'codegen', 'validation against the 2020-12 meta-schema runs on generated code')
+    if (file === META) assert.strictEqual(gen.engine(), 'codegen', 'validation against the 2020-12 meta-schema runs on generated code')
   }
 }
-assert.ok(onCodegen >= 142, `expected at least 142 of the ${groups} groups on generated code, got ${onCodegen}`)
+// 119 of 127 at e2a68a1. The suite before it had 150 groups here, 142 on
+// generated code: the same 8 stay off it, the rest were merged upstream.
+assert.ok(onCodegen >= 119, `expected at least 119 of the ${groups} groups on generated code, got ${onCodegen}`)
 assert.ok(dynamicOnCodegen >= dynamicGroups - 1, `expected every dynamic group but the boolean-target one on generated code, got ${dynamicOnCodegen} of ${dynamicGroups}`)
 
 // The unrolled schema: no dynamic keyword, no nested identifier, and nothing
 // but the copies something refers to under $defs.
 {
-  const schemas = new Map(Object.entries(remotes))
-  const tree = JSON.parse(fs.readFileSync(path.join(suite, 'tests', 'draft2020-12', 'dynamicRef.json'), 'utf8')).find((g) => g.description.startsWith('strict-tree')).schema
+  const c = suite.cases('draft2020-12', { only: (f) => f === 'dynamicRef.json' }).find((g) => g.description.startsWith('strict-tree'))
+  const schemas = suite.registryMap(c)
+  const tree = c.schema
   const out = jc._expandDynamicScopes(tree, schemas)
   const text = JSON.stringify(out)
   assert.ok(out && !text.includes('"$dynamicRef"') && !text.includes('"$dynamicAnchor"') && !text.includes('"$anchor"'), text)

@@ -16,9 +16,8 @@ process.env.ATA_NO_SMALL_TWIN = '1'
 // for a handful of schemas to pass: the interpreted engine has to be correct
 // across the same corpus the compiled path is measured on.
 
-const fs = require('fs')
-const path = require('path')
 const assert = require('assert')
+const suite = require('./suite-loader')
 
 // No native addon exists on the runtimes this simulates.
 process.env.ATA_NO_NATIVE = '1'
@@ -55,67 +54,37 @@ Object.defineProperty(globalThis, 'Function', {
 // Loaded only after the block is in place.
 const { Validator } = require('../index')
 
-const DIALECTS = {
-  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
-  draft7: 'http://json-schema.org/draft-07/schema#',
-  draft6: 'http://json-schema.org/draft-06/schema#',
-  draft4: 'http://json-schema.org/draft-04/schema#',
-  'draft2019-09': 'https://json-schema.org/draft/2019-09/schema',
-  v1: 'https://json-schema.org/v1',
-}
-
-const REMOTES_DIR = path.join(__dirname, 'suite/remotes')
-const registry = {}
-;(function collect(dir, prefix) {
-  if (!fs.existsSync(dir)) return
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) collect(full, prefix + entry.name + '/')
-    else if (entry.name.endsWith('.json')) {
-      try {
-        registry['http://localhost:1234/' + prefix + entry.name] = JSON.parse(
-          fs.readFileSync(full, 'utf8'),
-        )
-      } catch {}
-    }
-  }
-})(REMOTES_DIR, '')
+const DIALECTS = ['draft2020-12', 'draft7', 'draft6', 'draft4', 'draft2019-09', 'v1']
 
 // The compiled path is measured by tests/run_suite.js. This test asserts the
 // interpreted path is not meaningfully worse, so a drop in either engine fails
 // rather than being absorbed silently.
 const FLOOR = {
-  'draft2020-12': { total: 1300, minPass: 1300 },
-  draft7: { total: 927, minPass: 927 },
-  draft6: { total: 839, minPass: 839 },
-  draft4: { total: 616, minPass: 616 },
-  'draft2019-09': { total: 1259, minPass: 1259 },
-  v1: { total: 1147, minPass: 1147 },
+  'draft2020-12': { total: 1319, minPass: 1319 },
+  draft7: { total: 972, minPass: 972 },
+  draft6: { total: 878, minPass: 878 },
+  draft4: { total: 672, minPass: 672 },
+  'draft2019-09': { total: 1292, minPass: 1292 },
+  v1: { total: 1290, minPass: 1290 },
 }
 
 console.log('\nata with eval and new Function blocked\n')
 
 let exitCode = 0
 
-for (const [dialect, dialectUri] of Object.entries(DIALECTS)) {
-  const dir = path.join(__dirname, 'suite/tests', dialect)
-  const options = { schemas: registry, assertFormat: false, useDefaults: false }
+for (const dialect of DIALECTS) {
   let pass = 0
   let fail = 0
   let errored = 0
 
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-    for (const group of JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))) {
-      const schema =
-        typeof group.schema === 'object' && group.schema !== null && !Array.isArray(group.schema)
-          ? '$schema' in group.schema
-            ? group.schema
-            : { ...group.schema, $schema: dialectUri }
-          : group.schema
-
+  // The required cases, as tests/run_suite.js counts them for the headline
+  // figure: format as an annotation, each case with its own external documents.
+  for (const { file, cases } of suite.files(dialect)) {
+    for (const group of cases) {
+      const options = { schemas: suite.registry(group), assertFormat: false, useDefaults: false }
       let validator
       try {
-        validator = new Validator(schema, options)
+        validator = new Validator(group.schema, options)
       } catch {
         errored += group.tests.length
         continue

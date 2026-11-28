@@ -21,29 +21,21 @@ const require = createRequire(import.meta.url)
 const { schemaToBunType, Declined } = require('../../../lib/bun-target.js')
 const { Validator } = require('../../..')
 
+const suite = require('../../../tests/suite-loader.js')
+
 const dialect = process.argv[2] || 'draft2020-12'
-const DIALECTS = {
-  'draft2020-12': 'https://json-schema.org/draft/2020-12/schema',
-  draft7: 'http://json-schema.org/draft-07/schema#',
-  draft6: 'http://json-schema.org/draft-06/schema#',
-  draft4: 'http://json-schema.org/draft-04/schema#',
-  'draft2019-09': 'https://json-schema.org/draft/2019-09/schema',
-}
-// The suite's schemas carry no $schema; the runner gives them the dialect's.
-const withDialect = (s) => (typeof s === 'object' && s !== null && !Array.isArray(s) && s.$schema === undefined) ? { $schema: DIALECTS[dialect], ...s } : s
+if (!suite.DIALECTS[dialect]) { console.error(`unknown dialect "${dialect}" (expected one of: ${Object.keys(suite.DIALECTS).join(', ')})`); process.exit(2) }
 const bun = process.argv[3] || process.env.BUN || 'bun'
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..')
-const suiteDir = path.join(root, 'tests/suite/tests', dialect)
 
 const cases = [] // { id, typeSource, aliases, tests: [{ data, valid, desc }], group, file }
 const declined = new Map()
 let groups = 0
-for (const file of fs.readdirSync(suiteDir).filter((f) => f.endsWith('.json')).sort()) {
-  const list = JSON.parse(fs.readFileSync(path.join(suiteDir, file), 'utf8'))
+// The loader gives every schema the dialect's $schema, as the suite runner does.
+for (const { file, cases: list } of suite.files(dialect)) {
   for (const g of list) {
     groups++
     let mapped
-    const schema = withDialect(g.schema)
+    const schema = g.schema
     // The suite reads format as an annotation, as suiteOptions below say.
     // The tagged split, for the pull request build of 2026-10-24 that had validate<T>.
     try { mapped = schemaToBunType(schema, { name: `T${cases.length}`, aliasPrefix: `D${cases.length}_`, assertFormat: false, tags: true }) } catch (e) {
@@ -52,7 +44,7 @@ for (const file of fs.readdirSync(suiteDir).filter((f) => f.endsWith('.json')).s
       declined.set(key, (declined.get(key) || 0) + 1)
       continue
     }
-    cases.push({ id: cases.length, mapped, tests: g.tests, group: g.description, file, schema, residual: mapped.residual })
+    cases.push({ id: cases.length, mapped, tests: g.tests, group: g.description, file, schema, residual: mapped.residual, schemas: suite.registry(g) })
   }
 }
 
@@ -98,8 +90,8 @@ for (const [id, i, typeOk] of answers) {
   const t = c.tests[i]
   tests++
   if (!modules.has(id)) {
-    try { modules.set(id, new Validator(c.schema, suiteOptions)) } catch { modules.set(id, null) }
-    try { residuals.set(id, c.residual === null ? null : new Validator(c.residual, suiteOptions)) } catch (e) { residuals.set(id, undefined); console.log('RESIDUAL DOES NOT COMPILE', c.file, '/', c.group, e.message) }
+    try { modules.set(id, new Validator(c.schema, { ...suiteOptions, schemas: c.schemas })) } catch { modules.set(id, null) }
+    try { residuals.set(id, c.residual === null ? null : new Validator(c.residual, { ...suiteOptions, schemas: c.schemas })) } catch (e) { residuals.set(id, undefined); console.log('RESIDUAL DOES NOT COMPILE', c.file, '/', c.group, e.message) }
   }
   const m = modules.get(id)
   const mv = m ? m.isValidObject(t.data) : null

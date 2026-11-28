@@ -14,9 +14,8 @@
 // the suite file.
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
 const { Validator } = require('..');
+const suite = require('./suite-loader');
 const { compileSafe } = require('../lib/safe-regex');
 
 let checks = 0;
@@ -28,14 +27,11 @@ const expectAll = (schema, data, valid, label) => {
   checks += 3;
 };
 
-const DIALECTS = { 'draft2020-12': 'https://json-schema.org/draft/2020-12/schema', 'draft2019-09': 'https://json-schema.org/draft/2019-09/schema', draft7: 'http://json-schema.org/draft-07/schema#', draft6: 'http://json-schema.org/draft-06/schema#', draft4: 'http://json-schema.org/draft-04/schema#', v1: 'https://json-schema.org/v1' };
 let suiteCases = 0;
-for (const [dialect, uri] of Object.entries(DIALECTS)) {
-  const f = path.join(__dirname, 'suite', 'tests', dialect, 'optional', 'non-bmp-regex.json');
-  if (!fs.existsSync(f)) continue;
-  for (const g of JSON.parse(fs.readFileSync(f, 'utf8'))) {
-    const schema = { $schema: uri, ...g.schema };
-    for (const t of g.tests) { expectAll(schema, t.data, t.valid, `${dialect} ${g.description}: ${t.description}`); suiteCases++; }
+for (const dialect of Object.keys(suite.DIALECTS)) {
+  if (!suite.HAVE_SUITE) break;
+  for (const g of suite.cases(dialect, { dir: 'optional', only: (f) => f === 'non-bmp-regex.json' })) {
+    for (const t of g.tests) { expectAll(g.schema, t.data, t.valid, `${dialect} ${g.description}: ${t.description}`); suiteCases++; }
   }
 }
 assert.ok(suiteCases >= 60, `only ${suiteCases} suite cases read; is tests/suite checked out?`);

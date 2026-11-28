@@ -2,6 +2,16 @@
 
 All notable changes to ata-validator are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to semantic versioning.
 
+## Unreleased
+
+### Fixed
+
+- Under the v1 dialect, a `$dynamicRef` written as the bare name of a `$dynamicAnchor` (`"$dynamicRef": "items"`) is read as that fragment, the way 2020-12 writes it (`"#items"`). It was read as a relative URI to a document that is not there, so every engine rejected documents the schema accepts: 14 cases of the official suite at `e2a68a1`, which switched its v1 cases to this spelling. The v1 core specification requires the value to be a plain name, so under v1 any value without `#` is now an anchor name: a `"$dynamicRef": "tree.json"` names the anchor `tree.json`, not a document. 2020-12 and earlier dialects are unchanged. The buffer APIs send that spelling through `validate()`, and `toSchemaModule` declines it. ata-validator/lite grows by 48 bytes gzipped (63479 to 63527) and the Workers bundle by 72 (68566 to 68638).
+
+### Changed
+
+- The official JSON Schema Test Suite moved to `e2a68a1`, which keeps every dialect in one tree (`validation/tests`) with per-case `compatibility`, `tags` and `externalSchemas`. All test runners read it through `tests/suite-loader.js`, and each case gets its own registry. Figures: Draft 2020-12 1319 of 1319, 2019-09 1292 of 1292, draft-07 972 of 972, draft-06 878 of 878, draft-04 672 of 672, v1 1290 of 1290, the same with code generation blocked. The format-assertion cases, run with `assertFormat: true`, pass in full on the five released dialects; under v1 734 of 745 pass, because ata does not apply v1's changes to `date-time` (RFC 9557 suffixes) or `time` (a leap second is no longer valid, which ata still accepts). The suite dropped its output tests; they are kept under `tests/fixtures/output-tests` as they were at `245a45a`.
+
 ## 1.66.0 - 2026-11-25
 
 ### Added

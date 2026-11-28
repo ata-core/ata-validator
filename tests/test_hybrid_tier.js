@@ -11,15 +11,13 @@
 // runner's options, so the reference here is the interpreter on the same ones.
 
 const assert = require('assert')
-const fs = require('fs')
-const path = require('path')
 const { Validator } = require('..')
+const suite = require('./suite-loader')
 
 const TIER = 64
-const dir = path.join(__dirname, 'suite/tests/draft2020-12')
 const groups = []
-for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-  for (const g of JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))) groups.push([`${f}: ${g.description}`, g])
+for (const { file, cases } of suite.files('draft2020-12')) {
+  for (const g of cases) groups.push([`${file}: ${g.description}`, g])
 }
 
 const shape = (r) => JSON.stringify({ valid: r.valid, errors: r.valid ? [] : r.errors.map((e) => [e.keyword, e.instancePath, e.schemaPath]) })
