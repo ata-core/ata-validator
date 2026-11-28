@@ -31,7 +31,8 @@ function entryPoints (v, doc) {
     ['validateJSON', v.validateJSON(text).valid],
     ['isValidJSON', v.isValidJSON(text)],
   ]
-  try { out.push(['isValid(buffer)', v.isValid(Buffer.from(text))]) } catch {}
+  // Without the addon the buffer APIs answer through validate().
+  out.push(['isValid(buffer)', v.isValid(Buffer.from(text))])
   return out
 }
 
@@ -88,6 +89,10 @@ for (const t of LEAP) {
   // A document given through `schemas`, reached from a v1 root.
   expect('v1 schemas document', { $schema: V1, properties: { at: { $ref: 'https://example.com/t' } } }, { at: t }, false,
     { schemas: { 'https://example.com/t': { $schema: V1, format: 'time' } } })
+  // Removal fused into the verdict, and a const/enum the JSON-text scanner
+  // hands to a compiled delegate: both are built without the root's dialect.
+  expect('v1 removeAdditional', { $schema: V1, type: 'object', properties: { at: { type: 'string', format: 'time' } }, additionalProperties: false }, { at: t }, false, { removeAdditional: true })
+  expect('v1 enum delegate', { $schema: V1, enum: [{ at: t }, { b: 1 }], properties: { at: { format: 'time' } } }, { at: t }, false)
   // 2020-12 keeps the leap second.
   for (const [where, schema, doc] of shapes(D2020, t)) expect(`2020-12 ${where}`, schema, doc, true)
   // Format as an annotation: nothing is asserted under either dialect.
