@@ -13,6 +13,7 @@
 #endif
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -435,16 +436,69 @@ static bool is_integer_value(dom::element el) {
   }
 }
 
-// multipleOf as validate() decides it (multipleOfOk in lib/interpreter.js):
-// the quotient is an integer, or within 1e-9 of one. The engine used an
-// absolute remainder test, which disagreed on large values: 1e308 against
-// multipleOf 0.5 has a remainder of 0, but the quotient overflows to infinity
-// and validate() rejects it.
+// multipleOf as validate() decides it (lib/multiple-of.js): the value is a
+// multiple when dividing by the keyword's value gives a whole number, decided
+// exactly on the two numbers' shortest round-trip decimals and not on a
+// floating point quotient. Two safe integers use the integer remainder. A
+// value that is not finite, or a divisor of 0, is not a multiple. The old test
+// (a quotient within 1e-9 of a whole number) accepted 1e20 for 3 and
+// 0.30000000000000004 for 0.1 and rejected 1e308 for 0.5, whose quotient
+// overflows to infinity.
+//
+// A double is written with std::to_chars in scientific form, which gives at
+// most 17 significant digits as `d.ddde+XX` (or `de+XX`), so the digits fit a
+// uint64_t, and so does `rem * 10` below, because rem < the divisor's digits.
+// Without the format argument a large integer can be written in fixed notation
+// with up to 20 digits, and the accumulator would wrap.
+static bool parse_decimal_double(double v, uint64_t& digits, int& exp10) {
+  char buf[40];
+  auto res = std::to_chars(buf, buf + sizeof(buf), std::abs(v), std::chars_format::scientific);
+  if (res.ec != std::errc{}) return false;
+  const char* p = buf;
+  const char* end = res.ptr;
+  uint64_t d = 0;
+  int frac = 0;
+  bool seen_dot = false;
+  for (; p < end && *p != 'e'; p++) {
+    if (*p == '.') { seen_dot = true; continue; }
+    d = d * 10 + static_cast<uint64_t>(*p - '0');
+    if (seen_dot) frac++;
+  }
+  int e = 0;
+  if (p < end && *p == 'e') {
+    p++;
+    bool neg = false;
+    if (p < end && (*p == '+' || *p == '-')) { neg = (*p == '-'); p++; }
+    for (; p < end; p++) e = e * 10 + (*p - '0');
+    if (neg) e = -e;
+  }
+  digits = d;
+  exp10 = e - frac;
+  return true;
+}
+
 static bool multiple_of_ok(double d, double m) {
-  if (m == 0) return false;
-  double q = d / m;
-  if (std::isfinite(q) && std::floor(q) == q) return true;
-  return std::abs(q - std::round(q)) < 1e-9;
+  if (!std::isfinite(d) || !std::isfinite(m) || m == 0.0) return false;
+  constexpr double kMaxSafe = 9007199254740991.0;
+  if (std::abs(d) <= kMaxSafe && std::abs(m) <= kMaxSafe && std::floor(d) == d && std::floor(m) == m) {
+    return static_cast<int64_t>(d) % static_cast<int64_t>(m) == 0;
+  }
+  uint64_t da = 0, db = 0;
+  int ea = 0, eb = 0;
+  if (!parse_decimal_double(d, da, ea) || !parse_decimal_double(m, db, eb) || db == 0) return false;
+  if (da == 0) return true;
+  if (ea >= eb) {
+    // da * 10^(ea - eb) must be divisible by db.
+    uint64_t rem = da % db;
+    for (int i = ea - eb; i > 0 && rem != 0; i--) rem = (rem * 10) % db;
+    return rem == 0;
+  }
+  // da must be divisible by db * 10^(eb - ea): by 10 that many times, then by db.
+  for (int i = eb - ea; i > 0; i--) {
+    if (da % 10 != 0) return false;
+    da /= 10;
+  }
+  return da % db == 0;
 }
 
 // One spelling per numeric value, so enum, const and uniqueItems compare the

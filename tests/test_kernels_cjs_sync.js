@@ -1,6 +1,6 @@
 'use strict';
-// lib/kernels/unique.mjs and lib/kernels/collapse.mjs are lib/unique-items.js
-// and lib/branch-collapse.js as ES modules; they must not drift from them.
+// lib/kernels/unique.mjs, lib/kernels/multiple-of.mjs and lib/kernels/collapse.mjs
+// are lib/unique-items.js, lib/multiple-of.js and lib/branch-collapse.js as ES modules; they must not drift from them.
 // Regenerate with node scripts/gen-kernels-cjs.js.
 const assert = require('assert');
 const fs = require('fs');

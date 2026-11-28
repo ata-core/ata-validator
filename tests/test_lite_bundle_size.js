@@ -324,7 +324,12 @@ const esbuild = require('esbuild')
 // refuses the method, and the choice between the native walker and validate()
 // for the buffer APIs lives in lib/buffer-gate.js, whose browser twin only
 // throws; 537 bytes less.
-const BUDGET = 63500
+// 63650 (63636 measured): exact decimal multipleOf (lib/multiple-of.js, and
+// the helper the code generator writes into a program); 157 bytes.
+// 64180 (64165 measured): uniqueItems under hash collisions sorts a bucket's
+// indices by a total order over values (the comparator, the run scan and the
+// larger bucket loop of lib/unique-items.js); 529 bytes.
+const BUDGET = 64180
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],

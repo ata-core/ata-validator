@@ -394,6 +394,13 @@ for (const [name, ver] of Object.entries(pkg.optionalDependencies)) {
 // tests and Bowtie ask (pattern and additional properties, contains,
 // dependentSchemas, $ref and $dynamicRef, unevaluated*, unknown keywords),
 // in lib/output-format.js, which only a toOutput call loads. Measured 694.0 KB.
-assert.ok(manifest.size < 695 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
+// 692 KB with exact decimal multipleOf (lib/multiple-of.js and its kernels
+// copy lib/kernels/multiple-of.mjs). Measured 691.3 KB.
+// 696 KB with the uniqueItems collision settling in lib/unique-items.js, its
+// generated copies (lib/unique-items-source.js, lib/kernels/unique.mjs) and
+// the changelog entry. Measured 694.7 KB.
+// Those two figures were measured without the toOutput change above. 700 KB
+// with all three together in one tree. Measured 698.7 KB.
+assert.ok(manifest.size < 700 * 1024, `tarball ${manifest.size} bytes exceeds ceiling (adjust only with a reviewed reason)`);
 
 console.log(`ok: core tarball is pure JS (${files.length} files, ${manifest.size} bytes packed)`);
