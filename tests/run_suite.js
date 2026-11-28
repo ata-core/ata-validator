@@ -35,10 +35,11 @@ if (!suite.HAVE_SUITE) {
 const KNOWN_FAILURES = {
   "draft2020-12": new Set([]),
   draft7: new Set([]),
-  // v1 changes two formats, and ata asserts both the 2020-12 way under every
-  // dialect: date-time also takes RFC 9557 suffixes ("...Z[Europe/London]"),
-  // and time no longer takes a leap second. Only the format-assertion cases
-  // are affected; with format as an annotation v1 passes in full.
+  // The suite at e2a68a1 still asks v1 `date-time` to take RFC 9557 suffixes
+  // ("...Z[Europe/London]"). The specification added them and then took them
+  // out again (json-schema-org/json-schema-spec#1800, 2026-11-19), and the
+  // pull request that removes these cases from the suite is open
+  // (JSON-Schema-Test-Suite#1288). ata follows the specification.
   v1: new Set([
     "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with an elective time-zone suffix",
     "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a numeric offset and a time-zone suffix",
@@ -48,9 +49,6 @@ const KNOWN_FAILURES = {
     "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a critical suffix-tag",
     "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a time-zone suffix followed by suffix-tags",
     "[format-assertion] format-date-time.json :: validation of date-time strings with RFC 9557 suffixes :: a valid date-time-ext with a 14 character time-zone-part",
-    "[format-assertion] format-time.json :: leap seconds are not valid times :: a leap second is not a valid time",
-    "[format-assertion] format-time.json :: leap seconds are not valid times :: a leap second with a positive time-offset is not a valid time",
-    "[format-assertion] format-time.json :: leap seconds are not valid times :: a leap second with a negative time-offset is not a valid time",
   ]),
   draft6: new Set([]),
   draft4: new Set([]),

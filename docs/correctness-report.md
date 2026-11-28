@@ -4,7 +4,7 @@ This file is written by `node scripts/gate-report.js`. Do not edit it by hand: e
 
 ## Summary
 
-- Tree: ata-validator 1.66.0 at commit `fa7c7bc`. Node v25.2.1 on darwin-arm64.
+- Tree: ata-validator 1.66.0 at commit `144cf7d`. Node v25.2.1 on darwin-arm64.
 - Gate: 17 paths, each held to the Validator on the same documents. Official suite: 1945 schemas. SchemaStore: 492 schemas. Documents that differ or threw: 0.
 - Official JSON Schema Test Suite at `e2a68a1`: draft2020-12 1319 of 1319, draft2019-09 1292 of 1292, draft7 972 of 972, draft6 878 of 878, draft4 672 of 672, v1 1290 of 1290.
 - With `eval` and `new Function` blocked: draft2020-12 1319 of 1319, draft2019-09 1292 of 1292, draft7 972 of 972, draft6 878 of 878, draft4 672 of 672, v1 1290 of 1290.
@@ -43,18 +43,18 @@ The suite checkout is at the commit this tree pins.
 | closure tree | rich | yes | 1945 | 0 | 26664 | 0 | 0 | 0 | 0 | 1 |
 | JSON text | rich | yes | 1945 | 0 | 25404 | 0 | 0 | 0 | 0 | 0 |
 | plain errors | plain | yes | 1945 | 0 | 26664 | 0 | 0 | 0 | 0 | 1 |
-| module | module | yes | 1814 | 131 | 25147 | 0 | 0 | 0 | 0 | 0 |
-| module, one pass | module | no | 1814 | 131 | 25147 | 0 | 0 | 0 | 0 | 0 |
-| module, plain errors | plain | yes | 1814 | 131 | 25147 | 0 | 0 | 0 | 0 | 0 |
-| compact module | module | yes | 1814 | 131 | 25147 | 0 | 0 | 0 | 0 | 1 |
+| module | module | yes | 1810 | 135 | 25069 | 0 | 0 | 0 | 0 | 0 |
+| module, one pass | module | no | 1810 | 135 | 25069 | 0 | 0 | 0 | 0 | 0 |
+| module, plain errors | plain | yes | 1810 | 135 | 25069 | 0 | 0 | 0 | 0 | 0 |
+| compact module | module | yes | 1810 | 135 | 25069 | 0 | 0 | 0 | 0 | 1 |
 | schema module | module | yes | 1926 | 19 | 26400 | 0 | 0 | 0 | 0 | 1 |
-| ir module | rich | yes | 1942 | 3 | 26634 | 0 | 0 | 0 | 0 | 2 |
-| ir module, plain errors | plain | yes | 1942 | 3 | 26634 | 0 | 0 | 0 | 0 | 2 |
-| ir closures | rich | yes | 1944 | 1 | 26654 | 0 | 0 | 0 | 0 | 2 |
-| ir table | rich | yes | 1689 | 256 | 23582 | 0 | 0 | 0 | 0 | 0 |
-| ir table, plain errors | plain | yes | 1689 | 256 | 23582 | 0 | 0 | 0 | 0 | 0 |
-| ir plan as JSON | rich | yes | 1648 | 297 | 23049 | 0 | 0 | 0 | 0 | 0 |
-| ir closure module | plain | yes | 757 | 1188 | 12495 | 0 | 0 | 0 | 0 | 0 |
+| ir module | rich | yes | 1938 | 7 | 26556 | 0 | 0 | 0 | 0 | 2 |
+| ir module, plain errors | plain | yes | 1938 | 7 | 26556 | 0 | 0 | 0 | 0 | 2 |
+| ir closures | rich | yes | 1940 | 5 | 26576 | 0 | 0 | 0 | 0 | 2 |
+| ir table | rich | yes | 1685 | 260 | 23504 | 0 | 0 | 0 | 0 | 0 |
+| ir table, plain errors | plain | yes | 1685 | 260 | 23504 | 0 | 0 | 0 | 0 | 0 |
+| ir plan as JSON | rich | yes | 1644 | 301 | 22971 | 0 | 0 | 0 | 0 | 0 |
+| ir closure module | plain | yes | 753 | 1192 | 12417 | 0 | 0 | 0 | 0 | 0 |
 
 ## Paths, SchemaStore
 
@@ -111,7 +111,7 @@ None. No path gave an answer that differs from the Validator's, and no path thre
 | draft7 | 972 | 972 | 683 | 683 | 0 | 0 | 0 |
 | draft6 | 878 | 878 | 340 | 340 | 0 | 0 | 0 |
 | draft4 | 672 | 672 | 239 | 239 | 0 | 0 | 0 |
-| v1 | 1290 | 1290 | 734 | 745 | 11 | 0 | 0 |
+| v1 | 1290 | 1290 | 737 | 745 | 8 | 0 | 0 |
 
 ## With code generation blocked
 
@@ -176,7 +176,7 @@ The classes found by the sweep of 1.x for answers that differ between paths, one
 
 ## Reproduce
 
-From a clean clone at the commit that adds this file, whose code is that of `fa7c7bc`, with Node and git:
+From a clean clone at the commit that adds this file, whose code is that of `144cf7d`, with Node and git:
 
 ```sh
 git clone https://github.com/ata-core/ata-validator.git && cd ata-validator
@@ -195,7 +195,7 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
 {
  "format": "ata-correctness-report/1",
  "tree": {
-  "commit": "fa7c7bc68f737a006224cab7d5a3f461f5242b90",
+  "commit": "144cf7d9ec47e8e5a9cb9f4a9de04f48a6efbe2b",
   "version": "1.66.0",
   "uncommitted": []
  },
@@ -332,9 +332,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": true,
      "json": false,
      "fills": false,
-     "taken": 1814,
-     "declined": 131,
-     "docs": 25147,
+     "taken": 1810,
+     "declined": 135,
+     "docs": 25069,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -348,9 +348,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": true,
      "json": false,
      "fills": false,
-     "taken": 1814,
-     "declined": 131,
-     "docs": 25147,
+     "taken": 1810,
+     "declined": 135,
+     "docs": 25069,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -364,9 +364,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1814,
-     "declined": 131,
-     "docs": 25147,
+     "taken": 1810,
+     "declined": 135,
+     "docs": 25069,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -380,9 +380,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": true,
      "json": false,
      "fills": false,
-     "taken": 1814,
-     "declined": 131,
-     "docs": 25147,
+     "taken": 1810,
+     "declined": 135,
+     "docs": 25069,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -412,9 +412,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1942,
-     "declined": 3,
-     "docs": 26634,
+     "taken": 1938,
+     "declined": 7,
+     "docs": 26556,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -428,9 +428,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1942,
-     "declined": 3,
-     "docs": 26634,
+     "taken": 1938,
+     "declined": 7,
+     "docs": 26556,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -444,9 +444,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1944,
-     "declined": 1,
-     "docs": 26654,
+     "taken": 1940,
+     "declined": 5,
+     "docs": 26576,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -460,9 +460,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1689,
-     "declined": 256,
-     "docs": 23582,
+     "taken": 1685,
+     "declined": 260,
+     "docs": 23504,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -476,9 +476,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1689,
-     "declined": 256,
-     "docs": 23582,
+     "taken": 1685,
+     "declined": 260,
+     "docs": 23504,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -492,9 +492,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": true,
-     "taken": 1648,
-     "declined": 297,
-     "docs": 23049,
+     "taken": 1644,
+     "declined": 301,
+     "docs": 22971,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -508,9 +508,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
      "abortAllowed": false,
      "json": false,
      "fills": false,
-     "taken": 757,
-     "declined": 1188,
-     "docs": 12495,
+     "taken": 753,
+     "declined": 1192,
+     "docs": 12417,
      "diffs": 0,
      "threw": 0,
      "abort": 0,
@@ -963,9 +963,9 @@ The last command prints nothing and exits 0 when every figure reproduces. On ano
    "dialect": "v1",
    "passed": 1290,
    "total": 1290,
-   "formatPassed": 734,
+   "formatPassed": 737,
    "formatTotal": 745,
-   "knownFailures": 11,
+   "knownFailures": 8,
    "regressions": 0,
    "exit": 0
   }
