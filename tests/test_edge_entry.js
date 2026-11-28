@@ -185,7 +185,10 @@ const root = path.resolve(__dirname, '..');
     // anchor name is read as that fragment (lib/interpreter-core.js
     // dynamicRefUri), and the buffer APIs route that spelling through
     // validate(); 72 bytes.
-    assert.ok(size < 68650, `the Workers bundle is ${size} bytes gzipped, over 68650`);
+    // 69190 bytes (69177 measured): uniqueItems under hash collisions sorts a
+    // bucket's indices by a total order over values (lib/unique-items.js); 536
+    // bytes.
+    assert.ok(size < 69190, `the Workers bundle is ${size} bytes gzipped, over 69190`);
     const browser = build(['browser'], 'browser');
     assert.ok(shipped(browser).some((k) => /codegen-engine/.test(k)), 'a browser bundle keeps the code generator');
     // A bundle for Node (the `module` condition, which esbuild, Rollup and

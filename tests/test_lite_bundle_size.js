@@ -328,7 +328,10 @@ const esbuild = require('esbuild')
 // name is read as that fragment (lib/interpreter-core.js dynamicRefUri), as
 // the suite at e2a68a1 writes it, and the buffer APIs route that spelling
 // through validate(); 48 bytes.
-const BUDGET = 63540
+// 64080 (64065 measured): uniqueItems under hash collisions sorts a bucket's
+// indices by a total order over values (the comparator, the run scan and the
+// larger bucket loop of lib/unique-items.js); 535 bytes.
+const BUDGET = 64080
 
 const result = esbuild.buildSync({
   entryPoints: [path.join(__dirname, '..', 'lite.mjs')],
